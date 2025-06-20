@@ -35,17 +35,17 @@ const ImageUpscalingPanel = ({ uploadedImages, referenceImage }: ImageUpscalingP
   return (
     <div className="space-y-6">
       {/* Main Card */}
-      <Card className="border-0 bg-gradient-to-br from-green-100/80 to-emerald-200/80 shadow-lg">
+      <Card className="border-0 warm-gradient shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2 text-xl">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center shadow-sm">
               <Zap className="w-4 h-4 text-white" />
             </div>
-            <span className="bg-gradient-to-r from-green-700 to-emerald-700 bg-clip-text text-transparent">
+            <span className="text-amber-800">
               AI高清化
             </span>
           </CardTitle>
-          <CardDescription className="text-green-700/80">
+          <CardDescription className="text-amber-700">
             使用先进AI算法，智能提升图片分辨率和细节
           </CardDescription>
         </CardHeader>
@@ -53,7 +53,7 @@ const ImageUpscalingPanel = ({ uploadedImages, referenceImage }: ImageUpscalingP
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Upscale Ratio */}
             <div className="space-y-3">
-              <Label className="text-sm font-medium text-green-700">
+              <Label className="text-sm font-medium text-amber-800">
                 放大倍数: {upscaleRatio[0]}x
               </Label>
               <div className="px-2">
@@ -65,7 +65,7 @@ const ImageUpscalingPanel = ({ uploadedImages, referenceImage }: ImageUpscalingP
                   step={0.5}
                   className="w-full"
                 />
-                <div className="flex justify-between text-xs text-green-600/70 mt-1">
+                <div className="flex justify-between text-xs text-amber-600 mt-2">
                   <span>1.5x</span>
                   <span>标准</span>
                   <span>4.0x</span>
@@ -75,9 +75,9 @@ const ImageUpscalingPanel = ({ uploadedImages, referenceImage }: ImageUpscalingP
 
             {/* Model Selection */}
             <div className="space-y-3">
-              <Label className="text-sm font-medium text-green-700">AI模型</Label>
+              <Label className="text-sm font-medium text-amber-800">AI模型</Label>
               <Select value={model} onValueChange={setModel}>
-                <SelectTrigger className="bg-white/80">
+                <SelectTrigger className="glass-effect border-amber-200 focus:border-amber-400">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -91,10 +91,10 @@ const ImageUpscalingPanel = ({ uploadedImages, referenceImage }: ImageUpscalingP
           </div>
 
           {/* Enhance Details Toggle */}
-          <div className="flex items-center justify-between p-4 bg-white/30 rounded-lg">
+          <div className="flex items-center justify-between p-4 glass-effect rounded-lg border border-amber-200/30">
             <div className="space-y-1">
-              <Label className="text-sm font-medium text-green-700">细节增强</Label>
-              <p className="text-xs text-green-600/70">进一步优化图片细节和纹理</p>
+              <Label className="text-sm font-medium text-amber-800">细节增强</Label>
+              <p className="text-xs text-amber-600">进一步优化图片细节和纹理</p>
             </div>
             <Switch
               checked={enhanceDetails}
@@ -105,7 +105,7 @@ const ImageUpscalingPanel = ({ uploadedImages, referenceImage }: ImageUpscalingP
           <Button 
             onClick={handleProcess}
             disabled={uploadedImages.length === 0}
-            className="w-full h-12 text-lg font-medium bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 border-0 shadow-lg mt-6"
+            className="w-full h-12 text-lg font-semibold bg-amber-500 hover:bg-amber-600 text-white border-0 shadow-lg hover-lift mt-6"
             size="lg"
           >
             开始高清化处理 {uploadedImages.length > 0 && `(${uploadedImages.length}张)`}
@@ -114,15 +114,15 @@ const ImageUpscalingPanel = ({ uploadedImages, referenceImage }: ImageUpscalingP
       </Card>
 
       {/* Tips */}
-      <Card className="border-0 bg-gradient-to-br from-green-50/80 to-emerald-50/80 shadow-sm">
+      <Card className="border-0 warm-gradient-soft shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2 text-lg">
-            <Settings className="w-5 h-5 text-green-600" />
-            <span className="text-green-700">处理建议</span>
+            <Settings className="w-5 h-5 text-amber-600" />
+            <span className="text-amber-800">处理建议</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ul className="space-y-2 text-sm text-green-600">
+          <ul className="space-y-2 text-sm text-amber-700">
             <li>• 2x放大适合日常使用，4x放大适合专业需求</li>
             <li>• 选择正确的AI模型可显著提升效果</li>
             <li>• 细节增强功能会增加处理时间但效果更佳</li>
