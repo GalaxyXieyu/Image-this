@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { Wand2, ArrowRight, Info, Settings } from 'lucide-react';
+import { Wand2, Info, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -33,83 +33,44 @@ const OneClickWorkflowPanel = ({ uploadedImages, referenceImage }: OneClickWorkf
 
   return (
     <div className="space-y-6">
-      {/* Workflow Overview */}
-      <Card className="border-0 warm-gradient shadow-lg">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2 text-xl">
-            <div className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center shadow-sm">
-              <Wand2 className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-amber-800">
-              一键AI处理工作流
-            </span>
-          </CardTitle>
-          <CardDescription className="text-amber-700">
-            智能化处理流程：换背景 → 扩图 → 高清化，专业级一站式解决方案
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {/* Workflow Steps */}
-          <div className="flex items-center justify-between p-6 glass-effect rounded-xl">
-            <div className="text-center">
-              <div className="w-12 h-12 rounded-full bg-amber-500 text-white flex items-center justify-center text-sm font-bold mb-3 shadow-md">1</div>
-              <span className="text-sm font-semibold text-amber-800">AI换背景</span>
-              <p className="text-xs text-amber-600 mt-1">智能抠图替换</p>
-            </div>
-            <ArrowRight className="w-6 h-6 text-amber-400" />
-            <div className="text-center">
-              <div className="w-12 h-12 rounded-full bg-amber-500 text-white flex items-center justify-center text-sm font-bold mb-3 shadow-md">2</div>
-              <span className="text-sm font-semibold text-amber-800">智能扩图</span>
-              <p className="text-xs text-amber-600 mt-1">边界智能扩展</p>
-            </div>
-            <ArrowRight className="w-6 h-6 text-amber-400" />
-            <div className="text-center">
-              <div className="w-12 h-12 rounded-full bg-amber-500 text-white flex items-center justify-center text-sm font-bold mb-3 shadow-md">3</div>
-              <span className="text-sm font-semibold text-amber-800">AI高清化</span>
-              <p className="text-xs text-amber-600 mt-1">分辨率提升</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Settings */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Background Settings */}
-        <Card className="border-0 warm-gradient-soft shadow-sm">
+        <Card className="border-gray-200 bg-white shadow-sm">
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg text-amber-800 flex items-center space-x-2">
+            <CardTitle className="text-lg text-gray-800 flex items-center space-x-2">
               <span>背景设置</span>
-              <Info className="w-4 h-4 text-amber-600" />
+              <Info className="w-4 h-4 text-gray-600" />
             </CardTitle>
-            <p className="text-xs text-amber-600">详细描述有助于获得更精准的背景效果</p>
+            <p className="text-xs text-gray-600">详细描述有助于获得更精准的背景效果</p>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <Label className="text-sm font-medium text-amber-800">背景描述</Label>
+              <Label className="text-sm font-medium text-gray-800">背景描述</Label>
               <Textarea
                 value={settings.backgroundPrompt}
                 onChange={(e) => 
                   setSettings(prev => ({ ...prev, backgroundPrompt: e.target.value }))
                 }
                 placeholder="例如：纯白色背景、办公室环境、蓝天白云..."
-                className="min-h-[80px] glass-effect text-sm border-amber-200 focus:border-amber-400"
+                className="min-h-[80px] border-gray-200 focus:border-blue-400"
               />
             </div>
           </CardContent>
         </Card>
 
         {/* Expand Settings */}
-        <Card className="border-0 warm-gradient-soft shadow-sm">
+        <Card className="border-gray-200 bg-white shadow-sm">
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg text-amber-800 flex items-center space-x-2">
+            <CardTitle className="text-lg text-gray-800 flex items-center space-x-2">
               <span>扩图设置</span>
-              <Settings className="w-4 h-4 text-amber-600" />
+              <Settings className="w-4 h-4 text-gray-600" />
             </CardTitle>
-            <p className="text-xs text-amber-600">推荐1.5-2.0倍扩展比例获得最佳视觉效果</p>
+            <p className="text-xs text-gray-600">推荐1.5-2.0倍扩展比例获得最佳视觉效果</p>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <Label className="text-sm font-medium text-amber-800">
+              <Label className="text-sm font-medium text-gray-800">
                 扩图比例: {settings.expandRatio[0]}x
               </Label>
               <div className="px-2">
@@ -123,7 +84,7 @@ const OneClickWorkflowPanel = ({ uploadedImages, referenceImage }: OneClickWorkf
                   step={0.1}
                   className="w-full"
                 />
-                <div className="flex justify-between text-xs text-amber-600 mt-2">
+                <div className="flex justify-between text-xs text-gray-600 mt-2">
                   <span>1.2x</span>
                   <span>推荐范围</span>
                   <span>3.0x</span>
@@ -134,17 +95,17 @@ const OneClickWorkflowPanel = ({ uploadedImages, referenceImage }: OneClickWorkf
         </Card>
 
         {/* Upscale Settings */}
-        <Card className="border-0 warm-gradient-soft shadow-sm">
+        <Card className="border-gray-200 bg-white shadow-sm">
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg text-amber-800 flex items-center space-x-2">
+            <CardTitle className="text-lg text-gray-800 flex items-center space-x-2">
               <span>高清化设置</span>
-              <Settings className="w-4 h-4 text-amber-600" />
+              <Settings className="w-4 h-4 text-gray-600" />
             </CardTitle>
-            <p className="text-xs text-amber-600">更高倍数需要更长处理时间，请合理选择</p>
+            <p className="text-xs text-gray-600">更高倍数需要更长处理时间，请合理选择</p>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <Label className="text-sm font-medium text-amber-800">
+              <Label className="text-sm font-medium text-gray-800">
                 高清放大: {settings.upscaleRatio[0]}x
               </Label>
               <div className="px-2">
@@ -158,7 +119,7 @@ const OneClickWorkflowPanel = ({ uploadedImages, referenceImage }: OneClickWorkf
                   step={0.5}
                   className="w-full"
                 />
-                <div className="flex justify-between text-xs text-amber-600 mt-2">
+                <div className="flex justify-between text-xs text-gray-600 mt-2">
                   <span>1.5x</span>
                   <span>标准质量</span>
                   <span>4.0x</span>
@@ -170,16 +131,16 @@ const OneClickWorkflowPanel = ({ uploadedImages, referenceImage }: OneClickWorkf
       </div>
 
       {/* Processing Button */}
-      <Card className="border-0 warm-gradient-soft shadow-sm">
+      <Card className="border-gray-200 bg-white shadow-sm">
         <CardContent className="pt-6">
           <div className="text-center mb-6">
-            <p className="text-sm text-amber-700 font-medium mb-2">
+            <p className="text-sm text-gray-700 font-medium mb-2">
               {uploadedImages.length > 0 
                 ? `已准备处理 ${uploadedImages.length} 张图片`
                 : '请先上传图片开始处理'
               }
             </p>
-            <p className="text-xs text-amber-600">
+            <p className="text-xs text-gray-600">
               预计处理时间：{Math.max(uploadedImages.length * 2, 2)}-{uploadedImages.length * 5 || 5} 分钟
             </p>
           </div>
@@ -187,7 +148,7 @@ const OneClickWorkflowPanel = ({ uploadedImages, referenceImage }: OneClickWorkf
           <Button 
             onClick={handleOneClickProcess}
             disabled={uploadedImages.length === 0}
-            className="w-full h-14 text-lg font-semibold bg-amber-500 hover:bg-amber-600 text-white border-0 shadow-lg transition-all duration-200 hover-lift"
+            className="w-full h-14 text-lg font-semibold bg-blue-600 hover:bg-blue-700 text-white border-0 shadow-lg transition-all duration-200 hover:shadow-xl"
             size="lg"
           >
             <Wand2 className="w-5 h-5 mr-2" />
