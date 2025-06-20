@@ -217,18 +217,6 @@ const Workspace = () => {
             {/* Processing Button - Bottom */}
             <Card className="border-gray-200 bg-white shadow-sm mt-6">
               <CardContent className="pt-6">
-                <div className="text-center mb-6">
-                  <p className="text-sm text-gray-700 font-medium mb-2">
-                    {uploadedImages.length > 0 
-                      ? `已准备处理 ${uploadedImages.length} 张图片`
-                      : '请先上传图片开始处理'
-                    }
-                  </p>
-                  <p className="text-xs text-gray-600">
-                    预计处理时间：{Math.max(uploadedImages.length * 2, 2)}-{uploadedImages.length * 5 || 5} 分钟
-                  </p>
-                </div>
-                
                 <Button 
                   onClick={() => handleProcess()}
                   disabled={uploadedImages.length === 0}
