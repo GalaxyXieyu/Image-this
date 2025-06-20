@@ -53,19 +53,19 @@ const BatchImageUploader = ({ onImagesSelected, uploadedImages }: BatchImageUplo
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center space-x-2">
-          <h3 className="font-medium bg-gradient-to-r from-orange-700 to-red-700 bg-clip-text text-transparent">
+      <div className="flex items-center justify-between mb-3 min-h-[32px]">
+        <div className="flex items-center space-x-2 flex-1 min-w-0">
+          <h3 className="font-medium text-amber-800 truncate">
             待处理图片
           </h3>
           {uploadedImages.length > 0 && (
-            <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0">
+            <Badge className="bg-amber-500 text-white border-0 shrink-0">
               {uploadedImages.length}
             </Badge>
           )}
         </div>
         {uploadedImages.length > 0 && (
-          <Button variant="ghost" size="sm" onClick={clearAll} className="hover:bg-red-100 text-red-600">
+          <Button variant="ghost" size="sm" onClick={clearAll} className="hover:bg-red-100 text-red-600 shrink-0 ml-2">
             清空
           </Button>
         )}
@@ -74,7 +74,7 @@ const BatchImageUploader = ({ onImagesSelected, uploadedImages }: BatchImageUplo
       {uploadedImages.length > 0 ? (
         <div className="flex-1 flex flex-col">
           {/* 主预览区域 */}
-          <div className="flex-1 rounded-xl bg-gradient-to-br from-orange-100/50 to-red-100/50 border border-orange-200/50 overflow-hidden relative mb-3 shadow-inner">
+          <div className="flex-1 rounded-xl cream-gradient border border-amber-200/50 overflow-hidden relative mb-3 shadow-inner">
             <img 
               src={URL.createObjectURL(uploadedImages[currentPreview])} 
               alt={`预览 ${currentPreview + 1}`}
@@ -124,8 +124,8 @@ const BatchImageUploader = ({ onImagesSelected, uploadedImages }: BatchImageUplo
                   className={`
                     flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden cursor-pointer border-2 transition-all shadow-sm
                     ${currentPreview === index 
-                      ? 'border-orange-400 shadow-lg scale-105' 
-                      : 'border-orange-200/50 hover:border-orange-300 hover:shadow-md'
+                      ? 'border-amber-400 shadow-lg scale-105' 
+                      : 'border-amber-200/50 hover:border-amber-300 hover:shadow-md'
                     }
                   `}
                   onClick={() => setCurrentPreview(index)}
@@ -146,31 +146,31 @@ const BatchImageUploader = ({ onImagesSelected, uploadedImages }: BatchImageUplo
           className={`
             flex-1 border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-300 flex flex-col items-center justify-center
             ${isDragActive || dragActive 
-              ? 'border-orange-400 bg-gradient-to-br from-orange-100/80 to-red-100/80 scale-[1.02] shadow-lg' 
-              : 'border-orange-300/50 hover:border-orange-400/70 hover:bg-gradient-to-br hover:from-orange-50/80 hover:to-red-50/80'
+              ? 'border-amber-400 cream-gradient scale-[1.02] shadow-lg' 
+              : 'border-amber-300/50 hover:border-amber-400/70 hover:cream-gradient'
             }
           `}
         >
           <input {...getInputProps()} />
           <div className="space-y-3">
-            <div className="mx-auto w-12 h-12 rounded-full bg-gradient-to-br from-orange-200 to-red-200 flex items-center justify-center shadow-sm">
-              <Upload className={`w-6 h-6 ${isDragActive ? 'text-orange-600' : 'text-orange-500'}`} />
+            <div className="mx-auto w-12 h-12 rounded-full cream-gradient flex items-center justify-center shadow-sm">
+              <Upload className={`w-6 h-6 ${isDragActive ? 'text-amber-600' : 'text-amber-500'}`} />
             </div>
             <div>
-              <p className="font-medium text-orange-800">
+              <p className="font-medium text-amber-800">
                 {isDragActive ? '松开上传图片' : '批量上传图片'}
               </p>
-              <p className="text-sm text-orange-600/80 mt-1">
+              <p className="text-sm text-amber-600/80 mt-1">
                 支持拖拽文件夹或多选图片
               </p>
             </div>
             <div className="flex items-center space-x-2">
-              <Button variant="outline" size="sm" className="border-orange-300 text-orange-600 hover:bg-orange-50">
+              <Button variant="outline" size="sm" className="border-amber-300 text-amber-600 hover:bg-amber-50">
                 <FolderOpen className="w-4 h-4 mr-2" />
                 选择文件夹
               </Button>
-              <span className="text-orange-400">或</span>
-              <Button variant="outline" size="sm" className="border-orange-300 text-orange-600 hover:bg-orange-50">
+              <span className="text-amber-400">或</span>
+              <Button variant="outline" size="sm" className="border-amber-300 text-amber-600 hover:bg-amber-50">
                 选择图片
               </Button>
             </div>
