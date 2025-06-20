@@ -1,6 +1,5 @@
-
 import { useState } from 'react';
-import { Settings as SettingsIcon, Palette, Zap, Database } from 'lucide-react';
+import { Settings as SettingsIcon, Palette, Zap, Database, Key } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
@@ -8,21 +7,36 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const Settings = () => {
   const [settings, setSettings] = useState({
+    // GPT-4o 设置
+    gptApiUrl: 'https://api.openai.com/v1/chat/completions',
+    gptApiKey: '',
+    gptModel: 'gpt-4o',
+    defaultSeed: 123456,
+    enableReview: true,
+    maxReviewAttempts: 3,
+    
+    // 通义千问设置
+    qwenApiKey: '',
+    tempFileServerUrl: '',
+    useBase64Upload: true,
+    
+    // 扩图默认参数
+    defaultXScale: 2.0,
+    defaultYScale: 2.0,
+    bestQuality: false,
+    limitImageSize: true,
+    
+    // 高清放大默认参数
+    defaultUpscaleFactor: 2,
+    upscalePrompt: '图像超分。',
+    
     // 背景替换设置
     defaultBackgroundPrompt: '纯白色背景，简约风格，专业产品摄影',
     backgroundStyle: 'professional',
-    
-    // API设置
-    apiEndpoint: 'https://api.example.com/v1',
-    apiKey: '',
-    
-    // 模型配置
-    backgroundModel: 'stable-diffusion-xl',
-    upscaleModel: 'real-esrgan-x4',
-    expandModel: 'outpainting-v2',
     
     // 自动保存设置
     autoSave: true,
@@ -32,30 +46,313 @@ const Settings = () => {
 
   const handleSave = () => {
     console.log('保存设置:', settings);
-    // 这里会调用API保存设置
+    localStorage.setItem('aiImageSettings', JSON.stringify(settings));
   };
 
   return (
     <div className="h-full p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground mb-2">设置中心</h1>
-        <p className="text-muted-foreground">配置AI模型参数和系统设置</p>
+        <p className="text-muted-foreground">配置AI模型参数和API设置</p>
       </div>
 
-      <Tabs defaultValue="prompts" className="h-full">
-        <TabsList className="grid w-fit grid-cols-3 bg-muted/50 mb-6">
+      <Tabs defaultValue="api" className="h-full">
+        <TabsList className="grid w-fit grid-cols-4 bg-muted/50 mb-6">
+          <TabsTrigger value="api" className="data-[state=active]:bg-background">
+            <Key className="w-4 h-4 mr-2" />
+            API配置
+          </TabsTrigger>
           <TabsTrigger value="prompts" className="data-[state=active]:bg-background">
+            <Palette className="w-4 h-4 mr-2" />
             提示词配置
           </TabsTrigger>
           <TabsTrigger value="models" className="data-[state=active]:bg-background">
-            模型设置
+            <Zap className="w-4 h-4 mr-2" />
+            模型参数
           </TabsTrigger>
           <TabsTrigger value="system" className="data-[state=active]:bg-background">
+            <Database className="w-4 h-4 mr-2" />
             系统设置
           </TabsTrigger>
         </TabsList>
 
         <div className="space-y-6">
+          <TabsContent value="api" className="mt-0">
+            <div className="space-y-6">
+              {/* GPT-4o API 配置 */}
+              <Card className="hover-lift border-0 shadow-lg bg-card/80 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Zap className="w-5 h-5 text-primary" />
+                    <span>GPT-4o 图像生成API</span>
+                  </CardTitle>
+                  <CardDescription>
+                    配置GPT-4o图像生成API的连接参数
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="gpt-api-url">API地址</Label>
+                      <Input
+                        id="gpt-api-url"
+                        placeholder="https://api.openai.com/v1/chat/completions"
+                        value={settings.gptApiUrl}
+                        onChange={(e) => 
+                          setSettings(prev => ({ ...prev, gptApiUrl: e.target.value }))
+                        }
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="gpt-api-key">API密钥</Label>
+                      <Input
+                        id="gpt-api-key"
+                        type="password"
+                        placeholder="输入您的GPT API密钥"
+                        value={settings.gptApiKey}
+                        onChange={(e) => 
+                          setSettings(prev => ({ ...prev, gptApiKey: e.target.value }))
+                        }
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="gpt-model">GPT模型</Label>
+                        <Select 
+                          value={settings.gptModel} 
+                          onValueChange={(value) => 
+                            setSettings(prev => ({ ...prev, gptModel: value }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="gpt-4o">GPT-4o</SelectItem>
+                            <SelectItem value="gpt-4-vision-preview">GPT-4 Vision</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="default-seed">默认种子</Label>
+                        <Input
+                          id="default-seed"
+                          type="number"
+                          value={settings.defaultSeed}
+                          onChange={(e) => 
+                            setSettings(prev => ({ ...prev, defaultSeed: parseInt(e.target.value) }))
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                      <div className="space-y-1">
+                        <Label>启用图像审核</Label>
+                        <p className="text-sm text-muted-foreground">
+                          自动检查生成图像质量并重试
+                        </p>
+                      </div>
+                      <Switch
+                        checked={settings.enableReview}
+                        onCheckedChange={(checked) => 
+                          setSettings(prev => ({ ...prev, enableReview: checked }))
+                        }
+                      />
+                    </div>
+
+                    {settings.enableReview && (
+                      <div className="space-y-2">
+                        <Label htmlFor="max-review-attempts">最大审核重试次数</Label>
+                        <Input
+                          id="max-review-attempts"
+                          type="number"
+                          min="1"
+                          max="10"
+                          value={settings.maxReviewAttempts}
+                          onChange={(e) => 
+                            setSettings(prev => ({ ...prev, maxReviewAttempts: parseInt(e.target.value) }))
+                          }
+                        />
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 通义千问 API 配置 */}
+              <Card className="hover-lift border-0 shadow-lg bg-card/80 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Zap className="w-5 h-5 text-primary" />
+                    <span>通义千问API (扩图/高清化)</span>
+                  </CardTitle>
+                  <CardDescription>
+                    配置阿里云通义千问DashScope API
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="qwen-api-key">通义千问API密钥</Label>
+                    <Input
+                      id="qwen-api-key"
+                      type="password"
+                      placeholder="输入您的DashScope API密钥"
+                      value={settings.qwenApiKey}
+                      onChange={(e) => 
+                        setSettings(prev => ({ ...prev, qwenApiKey: e.target.value }))
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="temp-server-url">临时文件服务器地址 (可选)</Label>
+                    <Input
+                      id="temp-server-url"
+                      placeholder="https://your-temp-server.com/upload"
+                      value={settings.tempFileServerUrl}
+                      onChange={(e) => 
+                        setSettings(prev => ({ ...prev, tempFileServerUrl: e.target.value }))
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      留空将使用Base64内联方式传输图片
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                    <div className="space-y-1">
+                      <Label>使用Base64上传</Label>
+                      <p className="text-sm text-muted-foreground">
+                        直接在请求中发送Base64编码的图片
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.useBase64Upload}
+                      onCheckedChange={(checked) => 
+                        setSettings(prev => ({ ...prev, useBase64Upload: checked }))
+                      }
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="models" className="mt-0">
+            <div className="space-y-6">
+              {/* 扩图参数 */}
+              <Card className="hover-lift border-0 shadow-lg bg-card/80 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle>扩图默认参数</CardTitle>
+                  <CardDescription>配置图像扩图的默认参数</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="x-scale">X轴扩展倍数: {settings.defaultXScale}x</Label>
+                      <input
+                        id="x-scale"
+                        type="range"
+                        min="1.2"
+                        max="3.0"
+                        step="0.1"
+                        value={settings.defaultXScale}
+                        onChange={(e) => 
+                          setSettings(prev => ({ ...prev, defaultXScale: parseFloat(e.target.value) }))
+                        }
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="y-scale">Y轴扩展倍数: {settings.defaultYScale}x</Label>
+                      <input
+                        id="y-scale"
+                        type="range"
+                        min="1.2"
+                        max="3.0"
+                        step="0.1"
+                        value={settings.defaultYScale}
+                        onChange={(e) => 
+                          setSettings(prev => ({ ...prev, defaultYScale: parseFloat(e.target.value) }))
+                        }
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                      <div className="space-y-1">
+                        <Label>最佳质量</Label>
+                        <p className="text-sm text-muted-foreground">启用最高质量模式</p>
+                      </div>
+                      <Switch
+                        checked={settings.bestQuality}
+                        onCheckedChange={(checked) => 
+                          setSettings(prev => ({ ...prev, bestQuality: checked }))
+                        }
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                      <div className="space-y-1">
+                        <Label>限制图像大小</Label>
+                        <p className="text-sm text-muted-foreground">避免生成过大图像</p>
+                      </div>
+                      <Switch
+                        checked={settings.limitImageSize}
+                        onCheckedChange={(checked) => 
+                          setSettings(prev => ({ ...prev, limitImageSize: checked }))
+                        }
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 高清化参数 */}
+              <Card className="hover-lift border-0 shadow-lg bg-card/80 backdrop-blur-sm">
+                <CardHeader>
+                  <CardTitle>高清化默认参数</CardTitle>
+                  <CardDescription>配置图像高清化的默认参数</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="upscale-factor">放大倍数: {settings.defaultUpscaleFactor}x</Label>
+                    <input
+                      id="upscale-factor"
+                      type="range"
+                      min="1"
+                      max="4"
+                      step="1"
+                      value={settings.defaultUpscaleFactor}
+                      onChange={(e) => 
+                        setSettings(prev => ({ ...prev, defaultUpscaleFactor: parseInt(e.target.value) }))
+                      }
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="upscale-prompt">高清化提示词</Label>
+                    <Input
+                      id="upscale-prompt"
+                      value={settings.upscalePrompt}
+                      onChange={(e) => 
+                        setSettings(prev => ({ ...prev, upscalePrompt: e.target.value }))
+                      }
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
           <TabsContent value="prompts" className="mt-0">
             <div className="space-y-6">
               <Card className="hover-lift border-0 shadow-lg bg-card/80 backdrop-blur-sm">
@@ -113,82 +410,6 @@ const Settings = () => {
                         ))}
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="models" className="mt-0">
-            <div className="space-y-6">
-              <Card className="hover-lift border-0 shadow-lg bg-card/80 backdrop-blur-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Zap className="w-5 h-5 text-primary" />
-                    <span>AI模型配置</span>
-                  </CardTitle>
-                  <CardDescription>
-                    配置不同功能使用的AI模型
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="bg-model">背景替换模型</Label>
-                      <Input
-                        id="bg-model"
-                        value={settings.backgroundModel}
-                        onChange={(e) => 
-                          setSettings(prev => ({ ...prev, backgroundModel: e.target.value }))
-                        }
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="upscale-model">高清放大模型</Label>
-                      <Input
-                        id="upscale-model"
-                        value={settings.upscaleModel}
-                        onChange={(e) => 
-                          setSettings(prev => ({ ...prev, upscaleModel: e.target.value }))
-                        }
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="expand-model">图片扩展模型</Label>
-                      <Input
-                        id="expand-model"
-                        value={settings.expandModel}
-                        onChange={(e) => 
-                          setSettings(prev => ({ ...prev, expandModel: e.target.value }))
-                        }
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="api-endpoint">API地址</Label>
-                      <Input
-                        id="api-endpoint"
-                        value={settings.apiEndpoint}
-                        onChange={(e) => 
-                          setSettings(prev => ({ ...prev, apiEndpoint: e.target.value }))
-                        }
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="api-key">API密钥</Label>
-                    <Input
-                      id="api-key"
-                      type="password"
-                      placeholder="输入您的API密钥"
-                      value={settings.apiKey}
-                      onChange={(e) => 
-                        setSettings(prev => ({ ...prev, apiKey: e.target.value }))
-                      }
-                    />
                   </div>
                 </CardContent>
               </Card>
