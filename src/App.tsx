@@ -20,7 +20,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <SidebarProvider>
-          <div className="min-h-screen flex w-full gradient-cream">
+          <div className="min-h-screen flex w-full bg-gray-50">
             <AppSidebar />
             <main className="flex-1">
               <Routes>

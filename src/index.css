@@ -3,47 +3,47 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 统一奶油暖黄色调设计系统 */
+/* 优化的白色为主的设计系统 */
 
 @layer base {
   :root {
-    --background: 48 100% 98%;
+    --background: 0 0% 100%;
     --foreground: 25 20% 10%;
 
-    --card: 45 100% 96%;
+    --card: 0 0% 100%;
     --card-foreground: 25 20% 10%;
 
-    --popover: 45 100% 96%;
+    --popover: 0 0% 100%;
     --popover-foreground: 25 20% 10%;
 
     --primary: 38 92% 50%;
-    --primary-foreground: 48 100% 98%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 42 100% 94%;
+    --secondary: 0 0% 96%;
     --secondary-foreground: 25 20% 10%;
 
-    --muted: 44 100% 95%;
+    --muted: 0 0% 96%;
     --muted-foreground: 25 15% 45%;
 
-    --accent: 40 100% 92%;
+    --accent: 42 100% 96%;
     --accent-foreground: 25 20% 10%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 42 100% 90%;
-    --input: 42 100% 90%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
     --ring: 38 92% 50%;
 
     --radius: 0.75rem;
 
-    --sidebar-background: 45 100% 96%;
+    --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 25 20% 10%;
     --sidebar-primary: 38 92% 50%;
-    --sidebar-primary-foreground: 48 100% 98%;
-    --sidebar-accent: 42 100% 94%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 96%;
     --sidebar-accent-foreground: 25 20% 10%;
-    --sidebar-border: 42 100% 90%;
+    --sidebar-border: 0 0% 90%;
     --sidebar-ring: 38 92% 50%;
   }
 
@@ -98,15 +98,15 @@
   }
 }
 
-/* 奶油色调系统效果 */
+/* 更清爽的白色为主的效果 */
 .gradient-cream {
-  background: linear-gradient(135deg, hsl(48 100% 98%) 0%, hsl(44 100% 95%) 100%);
+  background: linear-gradient(135deg, hsl(0 0% 100%) 0%, hsl(0 0% 98%) 100%);
 }
 
 .glass-effect {
   backdrop-filter: blur(12px);
-  background: rgba(254, 243, 226, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .hover-lift {
@@ -115,14 +115,18 @@
 
 .hover-lift:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 32px rgba(245, 158, 11, 0.15);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
 }
 
-/* 统一暖黄渐变 */
+/* 精简的暖色调点缀 */
 .warm-gradient {
-  background: linear-gradient(135deg, hsl(42 100% 94%) 0%, hsl(38 92% 85%) 100%);
+  background: linear-gradient(135deg, hsl(0 0% 98%) 0%, hsl(42 100% 96%) 100%);
 }
 
 .warm-gradient-soft {
-  background: linear-gradient(135deg, hsl(48 100% 98%) 0%, hsl(42 100% 94%) 100%);
+  background: linear-gradient(135deg, hsl(0 0% 100%) 0%, hsl(0 0% 98%) 100%);
+}
+
+.cream-gradient {
+  background: linear-gradient(135deg, hsl(0 0% 98%) 0%, hsl(42 50% 96%) 100%);
 }
