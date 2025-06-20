@@ -1,4 +1,3 @@
-
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, X, FolderOpen, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -72,7 +71,7 @@ const BatchImageUploader = ({ onImagesSelected, uploadedImages }: BatchImageUplo
       </div>
 
       {uploadedImages.length > 0 ? (
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-h-0">
           {/* 主预览区域 */}
           <div className="flex-1 rounded-xl cream-gradient border border-amber-200/50 overflow-hidden relative mb-3 shadow-inner">
             <img 
@@ -115,28 +114,30 @@ const BatchImageUploader = ({ onImagesSelected, uploadedImages }: BatchImageUplo
             </Button>
           </div>
 
-          {/* 底部缩略图滑动选择 */}
+          {/* 底部缩略图滑动选择 - 修复溢出问题 */}
           {uploadedImages.length > 1 && (
-            <div className="flex space-x-2 overflow-x-auto pb-2">
-              {uploadedImages.map((image, index) => (
-                <div
-                  key={index}
-                  className={`
-                    flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden cursor-pointer border-2 transition-all shadow-sm
-                    ${currentPreview === index 
-                      ? 'border-amber-400 shadow-lg scale-105' 
-                      : 'border-amber-200/50 hover:border-amber-300 hover:shadow-md'
-                    }
-                  `}
-                  onClick={() => setCurrentPreview(index)}
-                >
-                  <img 
-                    src={URL.createObjectURL(image)} 
-                    alt={`缩略图 ${index + 1}`}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              ))}
+            <div className="flex-shrink-0 h-16 overflow-hidden">
+              <div className="flex space-x-2 overflow-x-auto h-full scrollbar-hide">
+                {uploadedImages.map((image, index) => (
+                  <div
+                    key={index}
+                    className={`
+                      flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden cursor-pointer border-2 transition-all shadow-sm
+                      ${currentPreview === index 
+                        ? 'border-amber-400 shadow-lg scale-105' 
+                        : 'border-amber-200/50 hover:border-amber-300 hover:shadow-md'
+                      }
+                    `}
+                    onClick={() => setCurrentPreview(index)}
+                  >
+                    <img 
+                      src={URL.createObjectURL(image)} 
+                      alt={`缩略图 ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
