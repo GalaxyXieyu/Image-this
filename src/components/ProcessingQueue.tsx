@@ -32,53 +32,68 @@ const ProcessingQueue = () => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'processing':
-        return <Clock className="w-4 h-4 text-primary animate-spin" />;
+        return <Clock className="w-4 h-4 text-amber-500 animate-spin" />;
       case 'completed':
         return <CheckCircle className="w-4 h-4 text-green-500" />;
       case 'error':
-        return <AlertCircle className="w-4 h-4 text-destructive" />;
+        return <AlertCircle className="w-4 h-4 text-red-500" />;
       default:
-        return <Clock className="w-4 h-4 text-muted-foreground" />;
+        return <Clock className="w-4 h-4 text-gray-400" />;
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'processing':
-        return <Badge variant="default" className="bg-primary/10 text-primary">处理中</Badge>;
+        return <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0">处理中</Badge>;
       case 'completed':
-        return <Badge variant="default" className="bg-green-100 text-green-700">已完成</Badge>;
+        return <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0">已完成</Badge>;
       case 'error':
-        return <Badge variant="destructive">错误</Badge>;
+        return <Badge className="bg-gradient-to-r from-red-500 to-pink-500 text-white border-0">错误</Badge>;
       default:
-        return <Badge variant="secondary">排队中</Badge>;
+        return <Badge className="bg-gradient-to-r from-gray-400 to-gray-500 text-white border-0">排队中</Badge>;
     }
   };
 
   if (processingItems.length === 0) {
-    return null;
+    return (
+      <div className="text-center py-8">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center">
+          <Clock className="w-8 h-8 text-amber-500" />
+        </div>
+        <p className="text-amber-600 font-medium">暂无处理任务</p>
+        <p className="text-amber-500 text-sm mt-1">上传图片后将显示处理进度</p>
+      </div>
+    );
   }
 
   return (
-    <div className="mt-6 pt-6 border-t border-border/50">
-      <h3 className="font-medium text-foreground mb-4">处理队列</h3>
+    <div>
+      <h3 className="font-medium mb-4 bg-gradient-to-r from-amber-700 to-orange-700 bg-clip-text text-transparent">
+        处理队列
+      </h3>
       <div className="space-y-3">
         {processingItems.map((item) => (
-          <div key={item.id} className="p-3 rounded-lg bg-muted/20 border border-border/30">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center space-x-2">
+          <div key={item.id} className="p-4 rounded-xl bg-gradient-to-r from-white/80 to-amber-50/80 border border-white/50 shadow-sm backdrop-blur-sm">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center space-x-3">
                 {getStatusIcon(item.status)}
-                <span className="text-sm font-medium truncate">{item.filename}</span>
+                <span className="text-sm font-medium text-gray-800 truncate">{item.filename}</span>
               </div>
               {getStatusBadge(item.status)}
             </div>
             
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>{item.stage}</span>
-                <span>{item.progress}%</span>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-amber-700 font-medium">{item.stage}</span>
+                <span className="text-amber-600 font-semibold">{item.progress}%</span>
               </div>
-              <Progress value={item.progress} className="h-1.5" />
+              <div className="w-full bg-amber-100 rounded-full h-2 overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-amber-400 to-orange-400 transition-all duration-300 ease-out rounded-full"
+                  style={{ width: `${item.progress}%` }}
+                />
+              </div>
             </div>
           </div>
         ))}

@@ -37,16 +37,18 @@ const ReferenceImageUploader = ({ onImageSelected, selectedImage }: ReferenceIma
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="font-medium text-foreground">参考图片</h3>
+        <h3 className="font-medium bg-gradient-to-r from-amber-700 to-orange-700 bg-clip-text text-transparent">
+          参考图片
+        </h3>
         {selectedImage && (
-          <Button variant="ghost" size="sm" onClick={removeImage}>
+          <Button variant="ghost" size="sm" onClick={removeImage} className="hover:bg-red-100">
             <X className="w-4 h-4" />
           </Button>
         )}
       </div>
 
       {selectedImage ? (
-        <div className="flex-1 rounded-xl bg-muted/20 border border-border/30 overflow-hidden">
+        <div className="flex-1 rounded-xl bg-gradient-to-br from-amber-100/50 to-orange-100/50 border border-amber-200/50 overflow-hidden shadow-inner">
           <img 
             src={URL.createObjectURL(selectedImage)} 
             alt="参考图片"
@@ -57,23 +59,23 @@ const ReferenceImageUploader = ({ onImageSelected, selectedImage }: ReferenceIma
         <div
           {...getRootProps()}
           className={`
-            flex-1 border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-200 flex flex-col items-center justify-center
+            flex-1 border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all duration-300 flex flex-col items-center justify-center
             ${isDragActive || dragActive 
-              ? 'border-primary bg-primary/5 scale-[1.02]' 
-              : 'border-border/50 hover:border-primary/50 hover:bg-muted/20'
+              ? 'border-amber-400 bg-gradient-to-br from-amber-100/80 to-orange-100/80 scale-[1.02] shadow-lg' 
+              : 'border-amber-300/50 hover:border-amber-400/70 hover:bg-gradient-to-br hover:from-amber-50/80 hover:to-orange-50/80'
             }
           `}
         >
           <input {...getInputProps()} />
           <div className="space-y-3">
-            <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-              <ImageIcon className={`w-6 h-6 ${isDragActive ? 'text-primary' : 'text-muted-foreground'}`} />
+            <div className="mx-auto w-12 h-12 rounded-full bg-gradient-to-br from-amber-200 to-orange-200 flex items-center justify-center shadow-sm">
+              <ImageIcon className={`w-6 h-6 ${isDragActive ? 'text-amber-600' : 'text-amber-500'}`} />
             </div>
             <div>
-              <p className="font-medium text-foreground">
+              <p className="font-medium text-amber-800">
                 {isDragActive ? '松开上传参考图片' : '上传参考图片'}
               </p>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-amber-600/80 mt-1">
                 点击或拖拽图片到此处
               </p>
             </div>
@@ -84,4 +86,4 @@ const ReferenceImageUploader = ({ onImageSelected, selectedImage }: ReferenceIma
   );
 };
 
-export default ReferenceImageUploader;
+export default ReferenceImageUproller;
