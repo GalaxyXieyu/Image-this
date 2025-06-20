@@ -1,7 +1,7 @@
 
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, X, FolderOpen, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Upload, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
@@ -55,11 +55,11 @@ const BatchImageUploader = ({ onImagesSelected, uploadedImages }: BatchImageUplo
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between mb-3 min-h-[32px]">
         <div className="flex items-center space-x-2 flex-1 min-w-0">
-          <h3 className="font-medium text-amber-800 truncate">
-            待处理图片
+          <h3 className="font-medium text-gray-700 truncate">
+            上传图片
           </h3>
           {uploadedImages.length > 0 && (
-            <Badge className="bg-amber-500 text-white border-0 shrink-0">
+            <Badge className="bg-blue-500 text-white border-0 shrink-0">
               {uploadedImages.length}
             </Badge>
           )}
@@ -73,14 +73,14 @@ const BatchImageUploader = ({ onImagesSelected, uploadedImages }: BatchImageUplo
 
       <div className="flex-1 relative">
         {/* 统一的白色背景卡片 */}
-        <div className="absolute inset-0 bg-white rounded-2xl shadow-sm border border-amber-200/30"></div>
+        <div className="absolute inset-0 bg-white rounded-2xl shadow-sm border border-gray-200"></div>
         
         {uploadedImages.length > 0 ? (
           /* 有图片时的内容区域 */
           <div className="relative z-10 h-full p-4">
             <div className="h-full flex flex-col">
               {/* 主预览区域 */}
-              <div className="flex-1 rounded-xl cream-gradient border border-amber-200/50 overflow-hidden relative mb-3 shadow-inner">
+              <div className="flex-1 rounded-xl bg-gray-50 border border-gray-200 overflow-hidden relative mb-3">
                 <img 
                   src={URL.createObjectURL(uploadedImages[currentPreview])} 
                   alt={`预览 ${currentPreview + 1}`}
@@ -131,8 +131,8 @@ const BatchImageUploader = ({ onImagesSelected, uploadedImages }: BatchImageUplo
                         className={`
                           flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden cursor-pointer border-2 transition-all shadow-sm
                           ${currentPreview === index 
-                            ? 'border-amber-400 shadow-lg scale-105' 
-                            : 'border-amber-200/50 hover:border-amber-300 hover:shadow-md'
+                            ? 'border-blue-400 shadow-lg scale-105' 
+                            : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
                           }
                         `}
                         onClick={() => setCurrentPreview(index)}
@@ -156,33 +156,23 @@ const BatchImageUploader = ({ onImagesSelected, uploadedImages }: BatchImageUplo
             className={`
               absolute inset-0 border-2 border-dashed rounded-2xl text-center cursor-pointer transition-all duration-300 flex flex-col items-center justify-center
               ${isDragActive || dragActive 
-                ? 'border-amber-400 cream-gradient scale-[1.02] shadow-lg z-20' 
-                : 'border-amber-300/50 hover:border-amber-400/70 hover:cream-gradient z-10'
+                ? 'border-blue-400 bg-blue-50 scale-[1.02] shadow-lg z-20' 
+                : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50 z-10'
               }
             `}
           >
             <input {...getInputProps()} />
             <div className="space-y-3">
-              <div className="mx-auto w-12 h-12 rounded-full cream-gradient flex items-center justify-center shadow-sm">
-                <Upload className={`w-6 h-6 ${isDragActive ? 'text-amber-600' : 'text-amber-500'}`} />
+              <div className="mx-auto w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
+                <Upload className={`w-6 h-6 ${isDragActive ? 'text-blue-600' : 'text-gray-500'}`} />
               </div>
               <div>
-                <p className="font-medium text-amber-800">
+                <p className="font-medium text-gray-800">
                   {isDragActive ? '松开上传图片' : '批量上传图片'}
                 </p>
-                <p className="text-sm text-amber-600/80 mt-1">
+                <p className="text-sm text-gray-600 mt-1">
                   支持拖拽文件夹或多选图片
                 </p>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Button variant="outline" size="sm" className="border-amber-300 text-amber-600 hover:bg-amber-50">
-                  <FolderOpen className="w-4 h-4 mr-2" />
-                  选择文件夹
-                </Button>
-                <span className="text-amber-400">或</span>
-                <Button variant="outline" size="sm" className="border-amber-300 text-amber-600 hover:bg-amber-50">
-                  选择图片
-                </Button>
               </div>
             </div>
           </div>

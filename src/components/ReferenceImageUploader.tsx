@@ -37,7 +37,7 @@ const ReferenceImageUploader = ({ onImageSelected, selectedImage }: ReferenceIma
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="font-medium text-amber-800">
+        <h3 className="font-medium text-gray-700">
           参考图片
         </h3>
         {selectedImage && (
@@ -49,12 +49,12 @@ const ReferenceImageUploader = ({ onImageSelected, selectedImage }: ReferenceIma
 
       <div className="flex-1 relative">
         {/* 统一的白色背景卡片 */}
-        <div className="absolute inset-0 bg-white rounded-2xl shadow-sm border border-amber-200/30"></div>
+        <div className="absolute inset-0 bg-white rounded-2xl shadow-sm border border-gray-200"></div>
         
         {/* 统一的内容区域 */}
         <div className="relative z-10 h-full p-4">
           {selectedImage ? (
-            <div className="h-full rounded-xl cream-gradient border border-amber-200/50 overflow-hidden shadow-inner">
+            <div className="h-full rounded-xl bg-gray-50 border border-gray-200 overflow-hidden">
               <img 
                 src={URL.createObjectURL(selectedImage)} 
                 alt="参考图片"
@@ -67,21 +67,21 @@ const ReferenceImageUploader = ({ onImageSelected, selectedImage }: ReferenceIma
               className={`
                 h-full border-2 border-dashed rounded-xl text-center cursor-pointer transition-all duration-300 flex flex-col items-center justify-center
                 ${isDragActive || dragActive 
-                  ? 'border-amber-400 cream-gradient scale-[1.02] shadow-lg' 
-                  : 'border-amber-300/50 hover:border-amber-400/70 hover:cream-gradient'
+                  ? 'border-blue-400 bg-blue-50 scale-[1.02] shadow-lg' 
+                  : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
                 }
               `}
             >
               <input {...getInputProps()} />
               <div className="space-y-3">
-                <div className="mx-auto w-12 h-12 rounded-full cream-gradient flex items-center justify-center shadow-sm">
-                  <ImageIcon className={`w-6 h-6 ${isDragActive ? 'text-amber-600' : 'text-amber-500'}`} />
+                <div className="mx-auto w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
+                  <ImageIcon className={`w-6 h-6 ${isDragActive ? 'text-blue-600' : 'text-gray-500'}`} />
                 </div>
                 <div>
-                  <p className="font-medium text-amber-800">
+                  <p className="font-medium text-gray-800">
                     {isDragActive ? '松开上传参考图片' : '上传参考图片'}
                   </p>
-                  <p className="text-sm text-amber-600/80 mt-1">
+                  <p className="text-sm text-gray-600 mt-1">
                     点击或拖拽图片到此处
                   </p>
                 </div>
