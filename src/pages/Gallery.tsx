@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -262,49 +261,47 @@ const Gallery = () => {
           </TabsList>
 
           <TabsContent value="results" className="h-[calc(100%-4rem)]">
-            <ContextMenuTrigger asChild>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filteredImages.map((image) => (
-                  <ContextMenu key={image.id}>
-                    <ContextMenuTrigger asChild>
-                      <div>
-                        <ImageCard
-                          image={image}
-                          selected={galleryState.selectedImages.includes(image.id)}
-                          onSelect={toggleImageSelection}
-                          onPreview={handleImagePreview}
-                          onDownload={handleImageDownload}
-                          onDelete={handleImageDelete}
-                          onContextMenu={handleImageContextMenu}
-                        />
-                      </div>
-                    </ContextMenuTrigger>
-                    <ContextMenuContent>
-                      <ContextMenuItem onClick={() => handleImagePreview(image)}>
-                        预览
-                      </ContextMenuItem>
-                      <ContextMenuItem onClick={() => handleImageDownload(image)}>
-                        下载
-                      </ContextMenuItem>
-                      <ContextMenuSeparator />
-                      <ContextMenuItem onClick={() => console.log('重命名')}>
-                        重命名
-                      </ContextMenuItem>
-                      <ContextMenuItem onClick={() => console.log('复制')}>
-                        复制
-                      </ContextMenuItem>
-                      <ContextMenuSeparator />
-                      <ContextMenuItem 
-                        onClick={() => handleImageDelete(image)}
-                        className="text-red-600"
-                      >
-                        删除
-                      </ContextMenuItem>
-                    </ContextMenuContent>
-                  </ContextMenu>
-                ))}
-              </div>
-            </ContextMenuTrigger>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredImages.map((image) => (
+                <ContextMenu key={image.id}>
+                  <ContextMenuTrigger asChild>
+                    <div>
+                      <ImageCard
+                        image={image}
+                        selected={galleryState.selectedImages.includes(image.id)}
+                        onSelect={toggleImageSelection}
+                        onPreview={handleImagePreview}
+                        onDownload={handleImageDownload}
+                        onDelete={handleImageDelete}
+                        onContextMenu={handleImageContextMenu}
+                      />
+                    </div>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent>
+                    <ContextMenuItem onClick={() => handleImagePreview(image)}>
+                      预览
+                    </ContextMenuItem>
+                    <ContextMenuItem onClick={() => handleImageDownload(image)}>
+                      下载
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem onClick={() => console.log('重命名')}>
+                      重命名
+                    </ContextMenuItem>
+                    <ContextMenuItem onClick={() => console.log('复制')}>
+                      复制
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem 
+                      onClick={() => handleImageDelete(image)}
+                      className="text-red-600"
+                    >
+                      删除
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
+              ))}
+            </div>
           </TabsContent>
 
           <TabsContent value="folders" className="h-[calc(100%-4rem)]">
