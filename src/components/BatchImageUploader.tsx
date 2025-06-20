@@ -150,29 +150,31 @@ const BatchImageUploader = ({ onImagesSelected, uploadedImages }: BatchImageUplo
             </div>
           </div>
         ) : (
-          /* 空状态时的虚线框直接贴合白色背景 */
-          <div
-            {...getRootProps()}
-            className={`
-              absolute inset-0 border-2 border-dashed rounded-2xl text-center cursor-pointer transition-all duration-300 flex flex-col items-center justify-center
-              ${isDragActive || dragActive 
-                ? 'border-blue-400 bg-blue-50 scale-[1.02] shadow-lg z-20' 
-                : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50 z-10'
-              }
-            `}
-          >
-            <input {...getInputProps()} />
-            <div className="space-y-3">
-              <div className="mx-auto w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-                <Upload className={`w-6 h-6 ${isDragActive ? 'text-blue-600' : 'text-gray-500'}`} />
-              </div>
-              <div>
-                <p className="font-medium text-gray-800">
-                  {isDragActive ? '松开上传图片' : '批量上传图片'}
-                </p>
-                <p className="text-sm text-gray-600 mt-1">
-                  支持拖拽文件夹或多选图片
-                </p>
+          /* 空状态时的内容区域，与参考图片完全统一 */
+          <div className="relative z-10 h-full p-4">
+            <div
+              {...getRootProps()}
+              className={`
+                h-full border-2 border-dashed rounded-xl text-center cursor-pointer transition-all duration-300 flex flex-col items-center justify-center
+                ${isDragActive || dragActive 
+                  ? 'border-blue-400 bg-blue-50 scale-[1.02] shadow-lg' 
+                  : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
+                }
+              `}
+            >
+              <input {...getInputProps()} />
+              <div className="space-y-3">
+                <div className="mx-auto w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
+                  <Upload className={`w-6 h-6 ${isDragActive ? 'text-blue-600' : 'text-gray-500'}`} />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-800">
+                    {isDragActive ? '松开上传图片' : '上传图片'}
+                  </p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    拖拽或点击选择图片
+                  </p>
+                </div>
               </div>
             </div>
           </div>

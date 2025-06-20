@@ -1,7 +1,7 @@
 
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, X, Image as ImageIcon } from 'lucide-react';
+import { Upload, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface ReferenceImageUploaderProps {
@@ -75,14 +75,14 @@ const ReferenceImageUploader = ({ onImageSelected, selectedImage }: ReferenceIma
               <input {...getInputProps()} />
               <div className="space-y-3">
                 <div className="mx-auto w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-                  <ImageIcon className={`w-6 h-6 ${isDragActive ? 'text-blue-600' : 'text-gray-500'}`} />
+                  <Upload className={`w-6 h-6 ${isDragActive ? 'text-blue-600' : 'text-gray-500'}`} />
                 </div>
                 <div>
                   <p className="font-medium text-gray-800">
-                    {isDragActive ? '松开上传参考图片' : '上传参考图片'}
+                    {isDragActive ? '松开上传图片' : '上传图片'}
                   </p>
                   <p className="text-sm text-gray-600 mt-1">
-                    点击或拖拽图片到此处
+                    拖拽或点击选择图片
                   </p>
                 </div>
               </div>
