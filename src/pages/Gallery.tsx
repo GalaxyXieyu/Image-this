@@ -2,66 +2,178 @@
 import { useState } from 'react';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Download, Trash2, Eye, FolderPlus, Search } from 'lucide-react';
+import { FolderPlus, Search, Grid3X3, List, Download, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { useGallery } from '@/hooks/useGallery';
+import { ImageFile, Folder, GalleryContextMenuData } from '@/types/gallery';
+import ImageCard from '@/components/ImageCard';
+import FolderCard from '@/components/FolderCard';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
 
 const Gallery = () => {
-  const [searchTerm, setSearchTerm] = useState('');
+  const {
+    galleryState,
+    updateSearchTerm,
+    toggleImageSelection,
+    toggleFolderSelection,
+    clearSelection,
+    selectAll,
+    setViewMode,
+  } = useGallery();
 
-  // 示例处理结果数据
-  const processedImages = [
+  const [contextMenu, setContextMenu] = useState<GalleryContextMenuData | null>(null);
+
+  // Mock data - 保持现有的示例数据但转换为新的类型
+  const processedImages: ImageFile[] = [
     {
-      id: 1,
-      originalName: 'portrait.jpg',
-      processedUrl: 'https://images.unsplash.com/photo-1649972904349-6e44c42644a7?w=300&h=400&fit=crop',
+      id: '1',
+      filename: 'portrait.jpg',
       originalUrl: 'https://images.unsplash.com/photo-1649972904349-6e44c42644a7?w=150&h=200&fit=crop',
+      processedUrl: 'https://images.unsplash.com/photo-1649972904349-6e44c42644a7?w=300&h=400&fit=crop',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1649972904349-6e44c42644a7?w=150&h=200&fit=crop',
       processType: '背景替换',
       status: 'completed',
       createdAt: '2024-12-20 14:30',
-      size: '2.3MB'
+      updatedAt: '2024-12-20 14:30',
+      size: '2.3MB',
+      folderId: null,
     },
     {
-      id: 2,
-      originalName: 'landscape.jpg',
-      processedUrl: 'https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=300&h=400&fit=crop',
+      id: '2',
+      filename: 'landscape.jpg',
       originalUrl: 'https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=150&h=200&fit=crop',
+      processedUrl: 'https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=300&h=400&fit=crop',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=150&h=200&fit=crop',
       processType: '扩图+高清',
       status: 'completed',
       createdAt: '2024-12-20 13:15',
-      size: '4.1MB'
+      updatedAt: '2024-12-20 13:15',
+      size: '4.1MB',
+      folderId: null,
     },
     {
-      id: 3,
-      originalName: 'tech.jpg',
-      processedUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=300&h=400&fit=crop',
+      id: '3',
+      filename: 'tech.jpg',
       originalUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=150&h=200&fit=crop',
+      processedUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=300&h=400&fit=crop',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=150&h=200&fit=crop',
       processType: '一键增强',
       status: 'processing',
       createdAt: '2024-12-20 15:45',
-      size: '1.8MB'
+      updatedAt: '2024-12-20 15:45',
+      size: '1.8MB',
+      folderId: null,
     },
     {
-      id: 4,
-      originalName: 'code.jpg',
-      processedUrl: 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=300&h=400&fit=crop',
+      id: '4',
+      filename: 'code.jpg',
       originalUrl: 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=150&h=200&fit=crop',
+      processedUrl: 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=300&h=400&fit=crop',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=150&h=200&fit=crop',
       processType: '背景模糊',
       status: 'completed',
       createdAt: '2024-12-20 12:00',
-      size: '3.5MB'
+      updatedAt: '2024-12-20 12:00',
+      size: '3.5MB',
+      folderId: null,
     }
   ];
 
-  // 示例文件夹数据
-  const folders = [
-    { id: 1, name: '人像处理', count: 15, color: 'from-amber-500 to-orange-500' },
-    { id: 2, name: '产品图片', count: 8, color: 'from-orange-500 to-red-500' },
-    { id: 3, name: '风景照片', count: 23, color: 'from-red-500 to-pink-500' },
-    { id: 4, name: '技术截图', count: 12, color: 'from-pink-500 to-purple-500' }
+  const folders: Folder[] = [
+    { 
+      id: '1', 
+      name: '人像处理', 
+      imageCount: 15, 
+      color: 'from-amber-500 to-orange-500',
+      createdAt: '2024-12-20 10:00',
+      updatedAt: '2024-12-20 10:00',
+      parentId: null,
+    },
+    { 
+      id: '2', 
+      name: '产品图片', 
+      imageCount: 8, 
+      color: 'from-orange-500 to-red-500',
+      createdAt: '2024-12-20 10:00',
+      updatedAt: '2024-12-20 10:00',
+      parentId: null,
+    },
+    { 
+      id: '3', 
+      name: '风景照片', 
+      imageCount: 23, 
+      color: 'from-red-500 to-pink-500',
+      createdAt: '2024-12-20 10:00',
+      updatedAt: '2024-12-20 10:00',
+      parentId: null,
+    },
+    { 
+      id: '4', 
+      name: '技术截图', 
+      imageCount: 12, 
+      color: 'from-pink-500 to-purple-500',
+      createdAt: '2024-12-20 10:00',
+      updatedAt: '2024-12-20 10:00',
+      parentId: null,
+    }
   ];
+
+  // Filter functions
+  const filteredImages = processedImages.filter(image =>
+    image.filename.toLowerCase().includes(galleryState.searchTerm.toLowerCase())
+  );
+
+  const filteredFolders = folders.filter(folder =>
+    folder.name.toLowerCase().includes(galleryState.searchTerm.toLowerCase())
+  );
+
+  // Event handlers
+  const handleImagePreview = (image: ImageFile) => {
+    console.log('Preview image:', image);
+  };
+
+  const handleImageDownload = (image: ImageFile) => {
+    console.log('Download image:', image);
+  };
+
+  const handleImageDelete = (image: ImageFile) => {
+    console.log('Delete image:', image);
+  };
+
+  const handleFolderOpen = (folder: Folder) => {
+    console.log('Open folder:', folder);
+  };
+
+  const handleImageContextMenu = (e: React.MouseEvent, image: ImageFile) => {
+    setContextMenu({
+      type: 'image',
+      target: image,
+      position: { x: e.clientX, y: e.clientY }
+    });
+  };
+
+  const handleFolderContextMenu = (e: React.MouseEvent, folder: Folder) => {
+    setContextMenu({
+      type: 'folder',
+      target: folder,
+      position: { x: e.clientX, y: e.clientY }
+    });
+  };
+
+  const handleBatchDownload = () => {
+    console.log('Batch download:', galleryState.selectedImages);
+  };
+
+  const handleBatchDelete = () => {
+    console.log('Batch delete:', galleryState.selectedImages);
+  };
 
   return (
     <div className="h-full flex flex-col bg-gradient-to-br from-amber-50 via-orange-50 to-red-50">
@@ -75,16 +187,56 @@ const Gallery = () => {
                 <h1 className="text-xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
                   图片管理
                 </h1>
-                <p className="text-sm text-muted-foreground">管理您的处理结果和文件夹</p>
+                <p className="text-sm text-muted-foreground">
+                  {galleryState.selectedImages.length > 0 || galleryState.selectedFolders.length > 0
+                    ? `已选择 ${galleryState.selectedImages.length + galleryState.selectedFolders.length} 项`
+                    : '管理您的处理结果和文件夹'
+                  }
+                </p>
               </div>
             </div>
             <div className="flex items-center space-x-3">
+              {/* Selection Actions */}
+              {(galleryState.selectedImages.length > 0 || galleryState.selectedFolders.length > 0) && (
+                <>
+                  <Button variant="outline" size="sm" onClick={handleBatchDownload}>
+                    <Download className="w-4 h-4 mr-2" />
+                    批量下载
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleBatchDelete} className="text-red-600">
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    批量删除
+                  </Button>
+                </>
+              )}
+              
+              {/* View Mode Toggle */}
+              <div className="flex items-center border rounded-lg p-1 bg-white/90">
+                <Button
+                  variant={galleryState.viewMode === 'grid' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('grid')}
+                  className="h-7 px-2"
+                >
+                  <Grid3X3 className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant={galleryState.viewMode === 'list' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('list')}
+                  className="h-7 px-2"
+                >
+                  <List className="w-4 h-4" />
+                </Button>
+              </div>
+
+              {/* Search */}
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
                   placeholder="搜索图片..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  value={galleryState.searchTerm}
+                  onChange={(e) => updateSearchTerm(e.target.value)}
                   className="pl-10 w-64 bg-white/90"
                 />
               </div>
@@ -110,74 +262,86 @@ const Gallery = () => {
           </TabsList>
 
           <TabsContent value="results" className="h-[calc(100%-4rem)]">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {processedImages.map((image) => (
-                <Card key={image.id} className="overflow-hidden bg-white/90 backdrop-blur-sm border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
-                  <div className="relative aspect-[3/4] overflow-hidden">
-                    <img 
-                      src={image.processedUrl} 
-                      alt={image.originalName}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute top-2 right-2">
-                      <Badge className={`${
-                        image.status === 'completed' ? 'bg-green-500' : 
-                        image.status === 'processing' ? 'bg-amber-500' : 'bg-red-500'
-                      } text-white border-0`}>
-                        {image.status === 'completed' ? '已完成' : 
-                         image.status === 'processing' ? '处理中' : '失败'}
-                      </Badge>
-                    </div>
-                  </div>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium truncate">{image.originalName}</CardTitle>
-                    <CardDescription className="text-xs space-y-1">
-                      <div className="flex justify-between">
-                        <span>{image.processType}</span>
-                        <span>{image.size}</span>
+            <ContextMenuTrigger asChild>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {filteredImages.map((image) => (
+                  <ContextMenu key={image.id}>
+                    <ContextMenuTrigger asChild>
+                      <div>
+                        <ImageCard
+                          image={image}
+                          selected={galleryState.selectedImages.includes(image.id)}
+                          onSelect={toggleImageSelection}
+                          onPreview={handleImagePreview}
+                          onDownload={handleImageDownload}
+                          onDelete={handleImageDelete}
+                          onContextMenu={handleImageContextMenu}
+                        />
                       </div>
-                      <div className="text-muted-foreground">{image.createdAt}</div>
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="flex space-x-2">
-                      <Button variant="outline" size="sm" className="flex-1">
-                        <Eye className="w-3 h-3 mr-1" />
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                      <ContextMenuItem onClick={() => handleImagePreview(image)}>
                         预览
-                      </Button>
-                      <Button variant="outline" size="sm" className="flex-1">
-                        <Download className="w-3 h-3 mr-1" />
+                      </ContextMenuItem>
+                      <ContextMenuItem onClick={() => handleImageDownload(image)}>
                         下载
-                      </Button>
-                      <Button variant="outline" size="sm" className="text-red-600 hover:bg-red-50">
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                      </ContextMenuItem>
+                      <ContextMenuSeparator />
+                      <ContextMenuItem onClick={() => console.log('重命名')}>
+                        重命名
+                      </ContextMenuItem>
+                      <ContextMenuItem onClick={() => console.log('复制')}>
+                        复制
+                      </ContextMenuItem>
+                      <ContextMenuSeparator />
+                      <ContextMenuItem 
+                        onClick={() => handleImageDelete(image)}
+                        className="text-red-600"
+                      >
+                        删除
+                      </ContextMenuItem>
+                    </ContextMenuContent>
+                  </ContextMenu>
+                ))}
+              </div>
+            </ContextMenuTrigger>
           </TabsContent>
 
           <TabsContent value="folders" className="h-[calc(100%-4rem)]">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {folders.map((folder) => (
-                <Card key={folder.id} className="bg-white/90 backdrop-blur-sm border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer">
-                  <CardContent className="p-6">
-                    <div className="text-center space-y-4">
-                      <div className={`w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br ${folder.color} flex items-center justify-center shadow-lg`}>
-                        <span className="text-white text-2xl">📁</span>
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-foreground">{folder.name}</h3>
-                        <p className="text-sm text-muted-foreground mt-1">{folder.count} 张图片</p>
-                      </div>
-                      <Button variant="outline" size="sm" className="w-full">
-                        打开文件夹
-                      </Button>
+              {filteredFolders.map((folder) => (
+                <ContextMenu key={folder.id}>
+                  <ContextMenuTrigger asChild>
+                    <div>
+                      <FolderCard
+                        folder={folder}
+                        selected={galleryState.selectedFolders.includes(folder.id)}
+                        onSelect={toggleFolderSelection}
+                        onOpen={handleFolderOpen}
+                        onContextMenu={handleFolderContextMenu}
+                      />
                     </div>
-                  </CardContent>
-                </Card>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent>
+                    <ContextMenuItem onClick={() => handleFolderOpen(folder)}>
+                      打开文件夹
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem onClick={() => console.log('重命名文件夹')}>
+                      重命名
+                    </ContextMenuItem>
+                    <ContextMenuItem onClick={() => console.log('复制文件夹')}>
+                      复制
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem 
+                      onClick={() => console.log('删除文件夹')}
+                      className="text-red-600"
+                    >
+                      删除
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
               ))}
             </div>
           </TabsContent>
