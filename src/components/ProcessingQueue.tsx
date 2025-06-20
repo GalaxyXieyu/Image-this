@@ -1,59 +1,101 @@
 
-import { Clock, CheckCircle, AlertCircle } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
+import { Clock } from 'lucide-react';
+import { ProcessingItem, BatchProcessingGroup as BatchGroup, SingleProcessingTask as SingleTask } from '@/types/processing';
+import BatchProcessingGroup from './BatchProcessingGroup';
+import SingleProcessingTask from './SingleProcessingTask';
 
 const ProcessingQueue = () => {
-  // Mock processing queue data
-  const processingItems = [
+  // Mock processing queue data with both batch and single tasks
+  const processingItems: ProcessingItem[] = [
     {
-      id: '1',
-      filename: 'product_001.jpg',
+      id: 'batch-1',
+      name: '产品图片批量处理',
+      type: 'workflow',
+      totalImages: 5,
+      completedImages: 2,
       status: 'processing',
-      progress: 65,
-      stage: '背景替换中...'
+      overallProgress: 40,
+      createdAt: new Date(),
+      tasks: [
+        {
+          id: 'task-1',
+          filename: 'product_001.jpg',
+          status: 'completed',
+          progress: 100,
+          stage: '处理完成'
+        },
+        {
+          id: 'task-2',
+          filename: 'product_002.jpg',
+          status: 'completed',
+          progress: 100,
+          stage: '处理完成'
+        },
+        {
+          id: 'task-3',
+          filename: 'product_003.jpg',
+          status: 'processing',
+          progress: 65,
+          stage: '背景替换中...'
+        },
+        {
+          id: 'task-4',
+          filename: 'product_004.jpg',
+          status: 'queued',
+          progress: 0,
+          stage: '等待处理'
+        },
+        {
+          id: 'task-5',
+          filename: 'product_005.jpg',
+          status: 'queued',
+          progress: 0,
+          stage: '等待处理'
+        }
+      ]
     },
     {
-      id: '2',
-      filename: 'portrait_002.png',
+      id: 'single-1',
+      type: 'single',
+      filename: 'portrait_single.png',
+      status: 'processing',
+      progress: 30,
+      stage: '智能扩图中...'
+    },
+    {
+      id: 'batch-2',
+      name: '头像高清化处理',
+      type: 'upscale',
+      totalImages: 3,
+      completedImages: 3,
       status: 'completed',
-      progress: 100,
-      stage: '处理完成'
-    },
-    {
-      id: '3',
-      filename: 'landscape_003.jpg',
-      status: 'queued',
-      progress: 0,
-      stage: '等待处理'
+      overallProgress: 100,
+      createdAt: new Date(),
+      tasks: [
+        {
+          id: 'task-6',
+          filename: 'avatar_001.jpg',
+          status: 'completed',
+          progress: 100,
+          stage: '处理完成'
+        },
+        {
+          id: 'task-7',
+          filename: 'avatar_002.jpg',
+          status: 'completed',
+          progress: 100,
+          stage: '处理完成'
+        },
+        {
+          id: 'task-8',
+          filename: 'avatar_003.jpg',
+          status: 'completed',
+          progress: 100,
+          stage: '处理完成'
+        }
+      ]
     }
   ];
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'processing':
-        return <Clock className="w-4 h-4 text-amber-500 animate-spin" />;
-      case 'completed':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case 'error':
-        return <AlertCircle className="w-4 h-4 text-red-500" />;
-      default:
-        return <Clock className="w-4 h-4 text-gray-400" />;
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'processing':
-        return <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0">处理中</Badge>;
-      case 'completed':
-        return <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0">已完成</Badge>;
-      case 'error':
-        return <Badge className="bg-gradient-to-r from-red-500 to-pink-500 text-white border-0">错误</Badge>;
-      default:
-        return <Badge className="bg-gradient-to-r from-gray-400 to-gray-500 text-white border-0">排队中</Badge>;
-    }
-  };
 
   if (processingItems.length === 0) {
     return (
@@ -67,35 +109,22 @@ const ProcessingQueue = () => {
     );
   }
 
+  const isBatchGroup = (item: ProcessingItem): item is BatchGroup => {
+    return 'tasks' in item && 'totalImages' in item;
+  };
+
   return (
     <div>
       <h3 className="font-medium mb-4 bg-gradient-to-r from-amber-700 to-orange-700 bg-clip-text text-transparent">
         处理队列
       </h3>
-      <div className="space-y-3">
+      <div className="space-y-3 max-h-96 overflow-y-auto">
         {processingItems.map((item) => (
-          <div key={item.id} className="p-4 rounded-xl bg-gradient-to-r from-white/80 to-amber-50/80 border border-white/50 shadow-sm backdrop-blur-sm">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center space-x-3">
-                {getStatusIcon(item.status)}
-                <span className="text-sm font-medium text-gray-800 truncate">{item.filename}</span>
-              </div>
-              {getStatusBadge(item.status)}
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-amber-700 font-medium">{item.stage}</span>
-                <span className="text-amber-600 font-semibold">{item.progress}%</span>
-              </div>
-              <div className="w-full bg-amber-100 rounded-full h-2 overflow-hidden">
-                <div 
-                  className="h-full bg-gradient-to-r from-amber-400 to-orange-400 transition-all duration-300 ease-out rounded-full"
-                  style={{ width: `${item.progress}%` }}
-                />
-              </div>
-            </div>
-          </div>
+          isBatchGroup(item) ? (
+            <BatchProcessingGroup key={item.id} batch={item} />
+          ) : (
+            <SingleProcessingTask key={item.id} task={item as SingleTask} />
+          )
         ))}
       </div>
     </div>
