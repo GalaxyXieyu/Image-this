@@ -86,4 +86,4 @@ const ReferenceImageUploader = ({ onImageSelected, selectedImage }: ReferenceIma
   );
 };
 
-export default ReferenceImageUproller;
+export default ReferenceImageUploader;
