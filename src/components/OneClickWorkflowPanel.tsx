@@ -1,11 +1,10 @@
 
 import { useState } from 'react';
-import { Wand2, Info, Settings } from 'lucide-react';
+import { Wand2, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { Textarea } from '@/components/ui/textarea';
 
 interface OneClickWorkflowPanelProps {
   uploadedImages: File[];
@@ -14,7 +13,6 @@ interface OneClickWorkflowPanelProps {
 
 const OneClickWorkflowPanel = ({ uploadedImages, referenceImage }: OneClickWorkflowPanelProps) => {
   const [settings, setSettings] = useState({
-    backgroundPrompt: '纯白色背景',
     expandRatio: [1.5],
     upscaleRatio: [2]
   });
@@ -34,31 +32,7 @@ const OneClickWorkflowPanel = ({ uploadedImages, referenceImage }: OneClickWorkf
   return (
     <div className="space-y-6">
       {/* Settings */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Background Settings */}
-        <Card className="border-gray-200 bg-white shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg text-gray-800 flex items-center space-x-2">
-              <span>背景设置</span>
-              <Info className="w-4 h-4 text-gray-600" />
-            </CardTitle>
-            <p className="text-xs text-gray-600">详细描述有助于获得更精准的背景效果</p>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <Label className="text-sm font-medium text-gray-800">背景描述</Label>
-              <Textarea
-                value={settings.backgroundPrompt}
-                onChange={(e) => 
-                  setSettings(prev => ({ ...prev, backgroundPrompt: e.target.value }))
-                }
-                placeholder="例如：纯白色背景、办公室环境、蓝天白云..."
-                className="min-h-[80px] border-gray-200 focus:border-blue-400"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Expand Settings */}
         <Card className="border-gray-200 bg-white shadow-sm">
           <CardHeader className="pb-3">
@@ -148,7 +122,7 @@ const OneClickWorkflowPanel = ({ uploadedImages, referenceImage }: OneClickWorkf
           <Button 
             onClick={handleOneClickProcess}
             disabled={uploadedImages.length === 0}
-            className="w-full h-14 text-lg font-semibold bg-blue-600 hover:bg-blue-700 text-white border-0 shadow-lg transition-all duration-200 hover:shadow-xl"
+            className="w-full h-14 text-lg font-semibold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white border-0 shadow-lg transition-all duration-200 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
             size="lg"
           >
             <Wand2 className="w-5 h-5 mr-2" />
