@@ -1,0 +1,177 @@
+
+import { useCallback, useState } from 'react';
+import { useDropzone } from 'react-dropzone';
+import { Upload, X, FolderOpen, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+
+interface BatchImageUploaderProps {
+  onImagesSelected: (images: File[]) => void;
+  uploadedImages: File[];
+}
+
+const BatchImageUploader = ({ onImagesSelected, uploadedImages }: BatchImageUploaderProps) => {
+  const [dragActive, setDragActive] = useState(false);
+  const [currentPreview, setCurrentPreview] = useState(0);
+
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    const imageFiles = acceptedFiles.filter(file => file.type.startsWith('image/'));
+    onImagesSelected([...uploadedImages, ...imageFiles]);
+    setDragActive(false);
+  }, [uploadedImages, onImagesSelected]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      'image/*': ['.png', '.jpg', '.jpeg', '.webp']
+    },
+    multiple: true,
+    onDragEnter: () => setDragActive(true),
+    onDragLeave: () => setDragActive(false)
+  });
+
+  const removeImage = (index: number) => {
+    const newImages = uploadedImages.filter((_, i) => i !== index);
+    onImagesSelected(newImages);
+    if (currentPreview >= newImages.length && newImages.length > 0) {
+      setCurrentPreview(newImages.length - 1);
+    }
+  };
+
+  const clearAll = () => {
+    onImagesSelected([]);
+    setCurrentPreview(0);
+  };
+
+  const nextImage = () => {
+    setCurrentPreview((prev) => (prev + 1) % uploadedImages.length);
+  };
+
+  const prevImage = () => {
+    setCurrentPreview((prev) => (prev - 1 + uploadedImages.length) % uploadedImages.length);
+  };
+
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center space-x-2">
+          <h3 className="font-medium text-foreground">待处理图片</h3>
+          {uploadedImages.length > 0 && (
+            <Badge variant="secondary">{uploadedImages.length}</Badge>
+          )}
+        </div>
+        {uploadedImages.length > 0 && (
+          <Button variant="ghost" size="sm" onClick={clearAll}>
+            清空
+          </Button>
+        )}
+      </div>
+
+      {uploadedImages.length > 0 ? (
+        <div className="flex-1 flex flex-col">
+          {/* 主预览区域 */}
+          <div className="flex-1 rounded-xl bg-muted/20 border border-border/30 overflow-hidden relative mb-3">
+            <img 
+              src={URL.createObjectURL(uploadedImages[currentPreview])} 
+              alt={`预览 ${currentPreview + 1}`}
+              className="w-full h-full object-cover"
+            />
+            
+            {uploadedImages.length > 1 && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background/90"
+                  onClick={prevImage}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background/90"
+                  onClick={nextImage}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+                <div className="absolute bottom-2 right-2 bg-background/80 px-2 py-1 rounded text-sm">
+                  {currentPreview + 1} / {uploadedImages.length}
+                </div>
+              </>
+            )}
+
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 right-2 bg-background/80 hover:bg-background/90 hover:text-destructive"
+              onClick={() => removeImage(currentPreview)}
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+
+          {/* 底部缩略图滑动选择 */}
+          {uploadedImages.length > 1 && (
+            <div className="flex space-x-2 overflow-x-auto pb-2">
+              {uploadedImages.map((image, index) => (
+                <div
+                  key={index}
+                  className={`
+                    flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden cursor-pointer border-2 transition-all
+                    ${currentPreview === index ? 'border-primary' : 'border-border/30 hover:border-primary/50'}
+                  `}
+                  onClick={() => setCurrentPreview(index)}
+                >
+                  <img 
+                    src={URL.createObjectURL(image)} 
+                    alt={`缩略图 ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div
+          {...getRootProps()}
+          className={`
+            flex-1 border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-200 flex flex-col items-center justify-center
+            ${isDragActive || dragActive 
+              ? 'border-primary bg-primary/5 scale-[1.02]' 
+              : 'border-border/50 hover:border-primary/50 hover:bg-muted/20'
+            }
+          `}
+        >
+          <input {...getInputProps()} />
+          <div className="space-y-3">
+            <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+              <Upload className={`w-6 h-6 ${isDragActive ? 'text-primary' : 'text-muted-foreground'}`} />
+            </div>
+            <div>
+              <p className="font-medium text-foreground">
+                {isDragActive ? '松开上传图片' : '批量上传图片'}
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                支持拖拽文件夹或多选图片
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button variant="outline" size="sm">
+                <FolderOpen className="w-4 h-4 mr-2" />
+                选择文件夹
+              </Button>
+              <span className="text-muted-foreground">或</span>
+              <Button variant="outline" size="sm">
+                选择图片
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default BatchImageUploader;
