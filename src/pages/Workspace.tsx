@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Clock, ChevronDown } from 'lucide-react';
+import { Clock, ChevronDown, Sparkles } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import ReferenceImageUploader from '@/components/ReferenceImageUploader';
 import BatchImageUploader from '@/components/BatchImageUploader';
@@ -23,20 +23,25 @@ const Workspace = () => {
       <header className="border-b border-border/50 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-4">
               <SidebarTrigger />
-              <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
-                  AI图像处理工作台
-                </h1>
-                <p className="text-sm text-muted-foreground">专业图像AI增强处理</p>
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg">
+                  <Sparkles className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
+                    AI图像处理工作台
+                  </h1>
+                  <p className="text-sm text-muted-foreground">专业图像AI增强处理平台</p>
+                </div>
               </div>
             </div>
             
             {/* Processing Queue Button */}
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="flex items-center space-x-2 bg-gradient-to-r from-amber-100 to-orange-100 hover:from-amber-150 hover:to-orange-150 border-amber-200">
+                <Button variant="outline" className="flex items-center space-x-2 bg-gradient-to-r from-amber-100 to-orange-100 hover:from-amber-150 hover:to-orange-150 border-amber-200 shadow-sm">
                   <Clock className="w-4 h-4" />
                   <span>处理队列</span>
                   <ChevronDown className="w-4 h-4" />
@@ -55,17 +60,30 @@ const Workspace = () => {
       {/* Main Content */}
       <main className="flex-1 p-6">
         <Tabs defaultValue="workflow" className="h-full">
-          <TabsList className="grid w-full grid-cols-4 mb-6 bg-white/60 backdrop-blur-sm">
-            <TabsTrigger value="workflow" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-500 data-[state=active]:text-white">
+          <TabsList className="grid w-full grid-cols-4 mb-6 bg-white/60 backdrop-blur-sm p-1 h-12">
+            <TabsTrigger 
+              value="workflow" 
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-500 data-[state=active]:text-white data-[state=active]:shadow-md transition-all duration-200 h-10"
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
               一键处理
             </TabsTrigger>
-            <TabsTrigger value="background" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white">
+            <TabsTrigger 
+              value="background" 
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-cyan-500 data-[state=active]:text-white data-[state=active]:shadow-md transition-all duration-200 h-10"
+            >
               图片换背景
             </TabsTrigger>
-            <TabsTrigger value="expand" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-red-500 data-[state=active]:text-white">
+            <TabsTrigger 
+              value="expand" 
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-red-500 data-[state=active]:text-white data-[state=active]:shadow-md transition-all duration-200 h-10"
+            >
               扩图
             </TabsTrigger>
-            <TabsTrigger value="upscale" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-red-500 data-[state=active]:to-pink-500 data-[state=active]:text-white">
+            <TabsTrigger 
+              value="upscale" 
+              className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-emerald-500 data-[state=active]:text-white data-[state=active]:shadow-md transition-all duration-200 h-10"
+            >
               高清化
             </TabsTrigger>
           </TabsList>
