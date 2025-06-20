@@ -75,9 +75,9 @@ const BatchImageUploader = ({ onImagesSelected, uploadedImages }: BatchImageUplo
         {/* 统一的白色背景卡片 */}
         <div className="absolute inset-0 bg-white rounded-2xl shadow-sm border border-amber-200/30"></div>
         
-        {/* 统一的内容区域 */}
-        <div className="relative z-10 h-full p-4">
-          {uploadedImages.length > 0 ? (
+        {uploadedImages.length > 0 ? (
+          /* 有图片时的内容区域 */
+          <div className="relative z-10 h-full p-4">
             <div className="h-full flex flex-col">
               {/* 主预览区域 */}
               <div className="flex-1 rounded-xl cream-gradient border border-amber-200/50 overflow-hidden relative mb-3 shadow-inner">
@@ -148,44 +148,45 @@ const BatchImageUploader = ({ onImagesSelected, uploadedImages }: BatchImageUplo
                 </div>
               )}
             </div>
-          ) : (
-            <div
-              {...getRootProps()}
-              className={`
-                h-full border-2 border-dashed rounded-xl text-center cursor-pointer transition-all duration-300 flex flex-col items-center justify-center
-                ${isDragActive || dragActive 
-                  ? 'border-amber-400 cream-gradient scale-[1.02] shadow-lg' 
-                  : 'border-amber-300/50 hover:border-amber-400/70 hover:cream-gradient'
-                }
-              `}
-            >
-              <input {...getInputProps()} />
-              <div className="space-y-3">
-                <div className="mx-auto w-12 h-12 rounded-full cream-gradient flex items-center justify-center shadow-sm">
-                  <Upload className={`w-6 h-6 ${isDragActive ? 'text-amber-600' : 'text-amber-500'}`} />
-                </div>
-                <div>
-                  <p className="font-medium text-amber-800">
-                    {isDragActive ? '松开上传图片' : '批量上传图片'}
-                  </p>
-                  <p className="text-sm text-amber-600/80 mt-1">
-                    支持拖拽文件夹或多选图片
-                  </p>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Button variant="outline" size="sm" className="border-amber-300 text-amber-600 hover:bg-amber-50">
-                    <FolderOpen className="w-4 h-4 mr-2" />
-                    选择文件夹
-                  </Button>
-                  <span className="text-amber-400">或</span>
-                  <Button variant="outline" size="sm" className="border-amber-300 text-amber-600 hover:bg-amber-50">
-                    选择图片
-                  </Button>
-                </div>
+          </div>
+        ) : (
+          /* 空状态时的虚线框直接贴合白色背景 */
+          <div
+            {...getRootProps()}
+            className={`
+              absolute inset-0 border-2 border-dashed rounded-2xl text-center cursor-pointer transition-all duration-300 flex flex-col items-center justify-center
+              ${isDragActive || dragActive 
+                ? 'border-amber-400 cream-gradient scale-[1.02] shadow-lg z-20' 
+                : 'border-amber-300/50 hover:border-amber-400/70 hover:cream-gradient z-10'
+              }
+            `}
+          >
+            <input {...getInputProps()} />
+            <div className="space-y-3">
+              <div className="mx-auto w-12 h-12 rounded-full cream-gradient flex items-center justify-center shadow-sm">
+                <Upload className={`w-6 h-6 ${isDragActive ? 'text-amber-600' : 'text-amber-500'}`} />
+              </div>
+              <div>
+                <p className="font-medium text-amber-800">
+                  {isDragActive ? '松开上传图片' : '批量上传图片'}
+                </p>
+                <p className="text-sm text-amber-600/80 mt-1">
+                  支持拖拽文件夹或多选图片
+                </p>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button variant="outline" size="sm" className="border-amber-300 text-amber-600 hover:bg-amber-50">
+                  <FolderOpen className="w-4 h-4 mr-2" />
+                  选择文件夹
+                </Button>
+                <span className="text-amber-400">或</span>
+                <Button variant="outline" size="sm" className="border-amber-300 text-amber-600 hover:bg-amber-50">
+                  选择图片
+                </Button>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
