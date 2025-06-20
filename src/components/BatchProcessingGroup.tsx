@@ -2,6 +2,7 @@
 import { Clock, CheckCircle, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useState } from 'react';
 import { BatchProcessingGroup as BatchGroup } from '@/types/processing';
@@ -90,23 +91,27 @@ const BatchProcessingGroup = ({ batch }: BatchProcessingGroupProps) => {
         <CollapsibleContent className="space-y-2">
           <div className="border-t border-amber-100 pt-3">
             <h4 className="text-xs font-medium text-amber-700 mb-2">详细任务</h4>
-            {batch.tasks.map((task) => (
-              <div key={task.id} className="flex items-center justify-between py-2 px-3 bg-white/50 rounded-lg">
-                <div className="flex items-center space-x-2">
-                  {getStatusIcon(task.status)}
-                  <span className="text-xs text-gray-700 truncate max-w-32">{task.filename}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs text-gray-600">{task.progress}%</span>
-                  <div className="w-16 bg-gray-200 rounded-full h-1">
-                    <div 
-                      className="h-full bg-amber-400 rounded-full transition-all duration-300"
-                      style={{ width: `${task.progress}%` }}
-                    />
+            <ScrollArea className={batch.tasks.length > 10 ? "h-64" : undefined}>
+              <div className="space-y-2">
+                {batch.tasks.map((task) => (
+                  <div key={task.id} className="flex items-center justify-between py-2 px-3 bg-white/50 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      {getStatusIcon(task.status)}
+                      <span className="text-xs text-gray-700 truncate max-w-32">{task.filename}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs text-gray-600">{task.progress}%</span>
+                      <div className="w-16 bg-gray-200 rounded-full h-1">
+                        <div 
+                          className="h-full bg-amber-400 rounded-full transition-all duration-300"
+                          style={{ width: `${task.progress}%` }}
+                        />
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ))}
               </div>
-            ))}
+            </ScrollArea>
           </div>
         </CollapsibleContent>
       </Collapsible>
