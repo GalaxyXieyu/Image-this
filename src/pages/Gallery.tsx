@@ -1,20 +1,9 @@
+
 import { useState } from 'react';
-import { SidebarTrigger } from '@/components/ui/sidebar';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { FolderPlus, Search, Grid3X3, List, Download, Trash2 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
 import { useGallery } from '@/hooks/useGallery';
 import { ImageFile, Folder, GalleryContextMenuData } from '@/types/gallery';
-import ImageCard from '@/components/ImageCard';
-import FolderCard from '@/components/FolderCard';
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from '@/components/ui/context-menu';
+import GalleryHeader from '@/components/GalleryHeader';
+import GalleryTabs from '@/components/GalleryTabs';
 
 const Gallery = () => {
   const {
@@ -29,7 +18,7 @@ const Gallery = () => {
 
   const [contextMenu, setContextMenu] = useState<GalleryContextMenuData | null>(null);
 
-  // Mock data - 保持现有的示例数据但转换为新的类型
+  // Mock data
   const processedImages: ImageFile[] = [
     {
       id: '1',
@@ -174,175 +163,36 @@ const Gallery = () => {
     console.log('Batch delete:', galleryState.selectedImages);
   };
 
+  const handleCreateFolder = () => {
+    console.log('Create new folder');
+  };
+
   return (
     <div className="h-full flex flex-col bg-gradient-to-br from-amber-50 via-orange-50 to-red-50">
-      {/* Header */}
-      <header className="border-b border-border/50 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <SidebarTrigger />
-              <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
-                  图片管理
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  {galleryState.selectedImages.length > 0 || galleryState.selectedFolders.length > 0
-                    ? `已选择 ${galleryState.selectedImages.length + galleryState.selectedFolders.length} 项`
-                    : '管理您的处理结果和文件夹'
-                  }
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3">
-              {/* Selection Actions */}
-              {(galleryState.selectedImages.length > 0 || galleryState.selectedFolders.length > 0) && (
-                <>
-                  <Button variant="outline" size="sm" onClick={handleBatchDownload}>
-                    <Download className="w-4 h-4 mr-2" />
-                    批量下载
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={handleBatchDelete} className="text-red-600">
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    批量删除
-                  </Button>
-                </>
-              )}
-              
-              {/* View Mode Toggle */}
-              <div className="flex items-center border rounded-lg p-1 bg-white/90">
-                <Button
-                  variant={galleryState.viewMode === 'grid' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('grid')}
-                  className="h-7 px-2"
-                >
-                  <Grid3X3 className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant={galleryState.viewMode === 'list' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('list')}
-                  className="h-7 px-2"
-                >
-                  <List className="w-4 h-4" />
-                </Button>
-              </div>
+      <GalleryHeader
+        galleryState={galleryState}
+        onSearchChange={updateSearchTerm}
+        onViewModeChange={setViewMode}
+        onBatchDownload={handleBatchDownload}
+        onBatchDelete={handleBatchDelete}
+        onCreateFolder={handleCreateFolder}
+      />
 
-              {/* Search */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                <Input
-                  placeholder="搜索图片..."
-                  value={galleryState.searchTerm}
-                  onChange={(e) => updateSearchTerm(e.target.value)}
-                  className="pl-10 w-64 bg-white/90"
-                />
-              </div>
-              <Button className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600">
-                <FolderPlus className="w-4 h-4 mr-2" />
-                新建文件夹
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
       <main className="flex-1 p-6">
-        <Tabs defaultValue="results" className="h-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6 bg-white/60 backdrop-blur-sm">
-            <TabsTrigger value="results" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-500 data-[state=active]:to-orange-500 data-[state=active]:text-white">
-              处理结果
-            </TabsTrigger>
-            <TabsTrigger value="folders" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-red-500 data-[state=active]:text-white">
-              文件夹管理
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="results" className="h-[calc(100%-4rem)]">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredImages.map((image) => (
-                <ContextMenu key={image.id}>
-                  <ContextMenuTrigger asChild>
-                    <div>
-                      <ImageCard
-                        image={image}
-                        selected={galleryState.selectedImages.includes(image.id)}
-                        onSelect={toggleImageSelection}
-                        onPreview={handleImagePreview}
-                        onDownload={handleImageDownload}
-                        onDelete={handleImageDelete}
-                        onContextMenu={handleImageContextMenu}
-                      />
-                    </div>
-                  </ContextMenuTrigger>
-                  <ContextMenuContent>
-                    <ContextMenuItem onClick={() => handleImagePreview(image)}>
-                      预览
-                    </ContextMenuItem>
-                    <ContextMenuItem onClick={() => handleImageDownload(image)}>
-                      下载
-                    </ContextMenuItem>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem onClick={() => console.log('重命名')}>
-                      重命名
-                    </ContextMenuItem>
-                    <ContextMenuItem onClick={() => console.log('复制')}>
-                      复制
-                    </ContextMenuItem>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem 
-                      onClick={() => handleImageDelete(image)}
-                      className="text-red-600"
-                    >
-                      删除
-                    </ContextMenuItem>
-                  </ContextMenuContent>
-                </ContextMenu>
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="folders" className="h-[calc(100%-4rem)]">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredFolders.map((folder) => (
-                <ContextMenu key={folder.id}>
-                  <ContextMenuTrigger asChild>
-                    <div>
-                      <FolderCard
-                        folder={folder}
-                        selected={galleryState.selectedFolders.includes(folder.id)}
-                        onSelect={toggleFolderSelection}
-                        onOpen={handleFolderOpen}
-                        onContextMenu={handleFolderContextMenu}
-                      />
-                    </div>
-                  </ContextMenuTrigger>
-                  <ContextMenuContent>
-                    <ContextMenuItem onClick={() => handleFolderOpen(folder)}>
-                      打开文件夹
-                    </ContextMenuItem>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem onClick={() => console.log('重命名文件夹')}>
-                      重命名
-                    </ContextMenuItem>
-                    <ContextMenuItem onClick={() => console.log('复制文件夹')}>
-                      复制
-                    </ContextMenuItem>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem 
-                      onClick={() => console.log('删除文件夹')}
-                      className="text-red-600"
-                    >
-                      删除
-                    </ContextMenuItem>
-                  </ContextMenuContent>
-                </ContextMenu>
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
+        <GalleryTabs
+          filteredImages={filteredImages}
+          filteredFolders={filteredFolders}
+          selectedImages={galleryState.selectedImages}
+          selectedFolders={galleryState.selectedFolders}
+          onImageSelect={toggleImageSelection}
+          onFolderSelect={toggleFolderSelection}
+          onImagePreview={handleImagePreview}
+          onImageDownload={handleImageDownload}
+          onImageDelete={handleImageDelete}
+          onFolderOpen={handleFolderOpen}
+          onImageContextMenu={handleImageContextMenu}
+          onFolderContextMenu={handleFolderContextMenu}
+        />
       </main>
     </div>
   );
