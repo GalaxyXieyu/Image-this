@@ -58,18 +58,18 @@ export function AppSidebar() {
                       to={item.url}
                       end
                       className={({ isActive }) =>
-                        `flex items-center space-x-3 px-3 py-3 rounded-xl transition-all duration-200 ${
+                        `flex items-center space-x-3 px-3 py-3 mx-1 rounded-xl transition-all duration-200 ${
                           isActive
                             ? 'bg-gradient-to-r from-amber-50 to-orange-50 text-amber-700 font-medium shadow-sm border border-amber-100'
                             : 'hover:bg-gray-50 text-gray-600 hover:text-gray-900'
                         }`
                       }
                     >
-                      <div className={`w-5 h-5 ${isActive ? 'text-amber-600' : 'text-gray-500'}`}>
+                      <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
                         <item.icon className="w-5 h-5" />
                       </div>
                       {sidebarState === 'expanded' && (
-                        <span className="font-medium">{item.title}</span>
+                        <span className="font-medium flex-1">{item.title}</span>
                       )}
                     </NavLink>
                   </SidebarMenuButton>
