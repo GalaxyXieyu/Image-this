@@ -1,0 +1,164 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// NextAuth.js required models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  hashedPassword String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  accounts      Account[]
+  sessions      Session[]
+  projects      Project[]
+  processedImages ProcessedImage[]
+  taskQueue     TaskQueue[]
+
+  @@map("users")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verificationtokens")
+}
+
+// Application specific models
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  processedImages ProcessedImage[]
+  taskQueue       TaskQueue[]
+
+  @@map("projects")
+}
+
+model ProcessedImage {
+  id               String           @id @default(cuid())
+  filename         String
+  originalUrl      String
+  processedUrl     String?
+  thumbnailUrl     String?
+  processType      ProcessType
+  status           ProcessStatus    @default(PENDING)
+  errorMessage     String?
+  metadata         Json?            // 存储处理参数和其他元数据
+  fileSize         Int?
+  width            Int?
+  height           Int?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  
+  // Relations
+  userId           String
+  projectId        String?
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project          Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  taskQueue        TaskQueue[]
+
+  @@map("processed_images")
+}
+
+enum ProcessType {
+  BACKGROUND_REMOVAL    // 背景替换
+  IMAGE_EXPANSION      // 扩图
+  IMAGE_UPSCALING      // 高清化
+  ONE_CLICK_WORKFLOW   // 一键处理
+  GPT_GENERATION       // GPT生成
+}
+
+enum ProcessStatus {
+  PENDING     // 等待处理
+  PROCESSING  // 处理中
+  COMPLETED   // 已完成
+  FAILED      // 失败
+  CANCELLED   // 已取消
+}
+
+// 异步任务队列模型
+model TaskQueue {
+  id               String        @id @default(cuid())
+  type             ProcessType   // 任务类型
+  status           ProcessStatus @default(PENDING)
+  priority         Int           @default(1) // 优先级，数字越大优先级越高
+  progress         Float         @default(0) // 进度百分比 0-100
+  currentStep      String?       // 当前处理步骤描述
+  totalSteps       Int           @default(1) // 总步骤数
+  completedSteps   Int           @default(0) // 已完成步骤数
+  
+  // 任务数据
+  inputData        Json          // 输入数据（图片URL、参数等）
+  outputData       Json?         // 输出结果
+  errorMessage     String?       // 错误信息
+  
+  // 时间戳
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  startedAt        DateTime?     // 开始处理时间
+  completedAt      DateTime?     // 完成时间
+  
+  // 关联
+  userId           String
+  projectId        String?
+  processedImageId String?       // 关联到处理结果
+  
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project          Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  processedImage   ProcessedImage? @relation(fields: [processedImageId], references: [id], onDelete: SetNull)
+
+  @@map("task_queue")
+}
