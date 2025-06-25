@@ -57,12 +57,12 @@ export async function POST(request: NextRequest) {
         originalUrl: 'temp', // 临时值，稍后更新
         processType: 'GENERATE',
         status: 'PROCESSING',
-        metadata: {
+        metadata: JSON.stringify({
           prompt,
           model,
           seed: seed || Math.floor(Math.random() * 1000000),
           referenceImageSize: referenceImage.length
-        },
+        }),
         userId: session.user.id,
         projectId: projectId || null
       }
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       const errorText = await response.text();
       // console.error('GPT API Error:', errorText);
       return NextResponse.json(
-        { error: `GPT API 调用失败: ${response.statusText}` },
+        { error: `GPT API 调用失败: ${response.statusText} - ${errorText}` },
         { status: response.status }
       );
     }
@@ -123,11 +123,11 @@ export async function POST(request: NextRequest) {
         data: {
           originalUrl: originalMinioUrl,
           status: 'COMPLETED',
-          metadata: {
-            ...processedImage.metadata,
+          metadata: JSON.stringify({
+            ...(processedImage.metadata ? JSON.parse(processedImage.metadata as string) : {}),
             gptResponse: result,
             processingCompletedAt: new Date().toISOString()
-          }
+          })
         }
       });
 

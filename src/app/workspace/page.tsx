@@ -2,10 +2,10 @@
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
@@ -20,8 +20,6 @@ import {
   Settings as SettingsIcon,
   Play,
   RefreshCw,
-  Clock,
-  Sparkles,
   X,
   ChevronLeft,
   ChevronRight,
@@ -46,7 +44,18 @@ interface ProcessedResult {
   processedImageUrl: string;
   processType: string;
   timestamp: string;
-  parameters?: any;
+  parameters?: Record<string, unknown>;
+}
+
+interface Task {
+  id: string;
+  type: string;
+  status: string;
+  progress: number;
+  currentStep: string;
+  createdAt: string;
+  originalImageId?: string;
+  originalName?: string;
 }
 
 export default function WorkspacePage() {
@@ -57,14 +66,16 @@ export default function WorkspacePage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [referenceImage, setReferenceImage] = useState<UploadedImage | null>(null);
-  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [showImageModal, setShowImageModal] = useState(false);
   const [selectedPreviewIndex, setSelectedPreviewIndex] = useState<number>(0); // 用于大图预览的选中索引
   const [processedResults, setProcessedResults] = useState<ProcessedResult[]>([]);
   const [showResultModal, setShowResultModal] = useState(false);
   const [selectedResultIndex, setSelectedResultIndex] = useState<number | null>(null);
-  const [processedCount, setProcessedCount] = useState(0); // 已处理的图片数量
-  const [totalCount, setTotalCount] = useState(0); // 总图片数量
+  
+  // 新增：任务管理状态
+  const [activeTasks, setActiveTasks] = useState<Task[]>([]);
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const referenceInputRef = useRef<HTMLInputElement>(null);
@@ -74,6 +85,130 @@ export default function WorkspacePage() {
       router.push("/auth/login");
     }
   }, [status, router]);
+
+  // 轮询任务状态
+  const pollTaskStatus = useCallback(async () => {
+    if (activeTasks.length === 0) return;
+
+    try {
+      const taskIds = activeTasks.map(task => task.id).join(',');
+      const response = await fetch(`/api/tasks?ids=${taskIds}`);
+      
+      if (!response.ok) return;
+      
+      const data = await response.json();
+      const updatedTasks = data.tasks;
+
+      setActiveTasks(updatedTasks);
+
+      // 检查是否有任务完成
+      const completedTasks = updatedTasks.filter((task: Task) => 
+        task.status === 'COMPLETED' && 
+        !processedResults.find(result => result.id === task.id)
+      );
+
+      // 处理完成的任务
+      for (const task of completedTasks) {
+        if (task.outputData) {
+          try {
+            const outputData = JSON.parse(task.outputData);
+            const processedResult: ProcessedResult = {
+              id: task.id,
+              originalImageId: task.originalImageId || '',
+              originalName: task.originalName || 'Unknown',
+              processedImageUrl: outputData.imageData || outputData.processedImageUrl,
+              processType: getProcessTypeName(task.type),
+              timestamp: new Date().toLocaleString(),
+              parameters: outputData.settings || {}
+            };
+            
+            setProcessedResults(prev => [...prev, processedResult]);
+            
+            toast({
+              title: "任务完成",
+              description: `${task.originalName} ${getProcessTypeName(task.type)}处理完成`,
+            });
+          } catch (error) {
+            console.error('解析任务输出数据失败:', error);
+          }
+        }
+      }
+
+      // 检查失败的任务
+      const failedTasks = updatedTasks.filter((task: Task) => 
+        task.status === 'FAILED'
+      );
+
+      for (const task of failedTasks) {
+        toast({
+          title: "任务失败",
+          description: `${task.originalName} ${getProcessTypeName(task.type)}处理失败`,
+          variant: "destructive",
+        });
+      }
+
+      // 如果所有任务都完成了，停止轮询
+      const remainingActiveTasks = updatedTasks.filter((task: Task) => 
+        task.status === 'PENDING' || task.status === 'PROCESSING'
+      );
+
+      if (remainingActiveTasks.length === 0) {
+        setIsProcessing(false);
+        if (pollingInterval) {
+          clearInterval(pollingInterval);
+          setPollingInterval(null);
+        }
+      }
+
+    } catch (error) {
+      console.error('轮询任务状态失败:', error);
+    }
+  }, [activeTasks, processedResults, pollingInterval, toast]);
+
+  // 启动轮询
+  useEffect(() => {
+    if (isProcessing && activeTasks.length > 0 && !pollingInterval) {
+      const interval = setInterval(pollTaskStatus, 2000); // 每2秒轮询一次
+      setPollingInterval(interval);
+    }
+
+    return () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+    };
+  }, [isProcessing, activeTasks.length, pollingInterval, pollTaskStatus]);
+
+  // 组件卸载时清理所有资源 - 修复：移除uploadedImages和referenceImage依赖
+  useEffect(() => {
+    return () => {
+      // 清理定时器
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+      // 清理URL对象以防止内存泄露
+      // 注意：这里使用闭包捕获当前的图片状态，避免在依赖数组中包含它们
+      uploadedImages.forEach(img => {
+        if (img.preview) {
+          URL.revokeObjectURL(img.preview);
+        }
+      });
+      if (referenceImage && referenceImage.preview) {
+        URL.revokeObjectURL(referenceImage.preview);
+      }
+    };
+  }, [pollingInterval]); // ✅ 只依赖pollingInterval，避免过度清理
+
+  // 获取处理类型显示名称
+  const getProcessTypeName = (type: string): string => {
+    switch (type) {
+      case 'ONE_CLICK_WORKFLOW': return '一键增强';
+      case 'BACKGROUND_REMOVAL': return '背景替换';
+      case 'IMAGE_EXPANSION': return '图像扩展';
+      case 'IMAGE_UPSCALING': return '图像高清化';
+      default: return type;
+    }
+  };
 
   if (status === "loading") {
     return (
@@ -191,7 +326,7 @@ export default function WorkspacePage() {
       title: "一键增强",
       icon: Wand2,
       description: "背景替换 + 扩图 + 高清化",
-      color: "amber"
+      color: "orange"
     },
     {
       id: "background" as ActiveTab,
@@ -205,14 +340,14 @@ export default function WorkspacePage() {
       title: "图像扩展",
       icon: Expand,
       description: "智能扩图",
-      color: "green"
+      color: "blue"
     },
     {
       id: "upscaling" as ActiveTab,
       title: "图像高清化",
       icon: Zap,
-      description: "AI提升分辨率 (演示模式)",
-      color: "purple"
+      description: "AI超分辨率",
+      color: "orange"
     }
   ];
 
@@ -220,49 +355,41 @@ export default function WorkspacePage() {
     const files = event.target.files;
     if (!files) return;
 
-    const validFiles: File[] = [];
+    const validFiles: UploadedImage[] = [];
     const invalidFiles: string[] = [];
 
-    Array.from(files).forEach((file) => {
+    Array.from(files).forEach((file, index) => {
       if (isValidImageFile(file)) {
-        validFiles.push(file);
+        const id = `${Date.now()}-${index}`;
+        const preview = URL.createObjectURL(file);
+        validFiles.push({
+          id,
+          file,
+          preview,
+          name: file.name
+        });
       } else {
         invalidFiles.push(file.name);
       }
     });
 
-    // 显示无效文件警告
+    if (validFiles.length > 0) {
+      setUploadedImages(prev => [...prev, ...validFiles]);
+      toast({
+        title: "图片上传成功",
+        description: `成功上传 ${validFiles.length} 张图片`,
+      });
+    }
+
     if (invalidFiles.length > 0) {
       toast({
-        title: "文件格式错误",
-        description: `以下文件格式不支持或文件过大：${invalidFiles.join(', ')}。支持的格式：JPG, PNG, WebP, GIF, BMP, TIFF`,
+        title: "部分文件上传失败",
+        description: `${invalidFiles.length} 个文件格式不支持或文件过大`,
         variant: "destructive",
       });
     }
 
-    // 处理有效文件
-    validFiles.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const newImage: UploadedImage = {
-          id: Math.random().toString(36).substr(2, 9),
-          file,
-          preview: e.target?.result as string,
-          name: file.name
-        };
-        setUploadedImages(prev => {
-          const newImages = [...prev, newImage];
-          // 如果这是第一张图片，设置为预览图片
-          if (prev.length === 0) {
-            setSelectedPreviewIndex(0);
-          }
-          return newImages;
-        });
-      };
-      reader.readAsDataURL(file);
-    });
-
-    // 清空input值，允许重复选择同一文件
+    // 清空input的值，以便重复选择同一文件
     event.target.value = '';
   };
 
@@ -270,44 +397,41 @@ export default function WorkspacePage() {
     const files = event.target.files;
     if (!files) return;
 
-    const validFiles: File[] = [];
+    const validFiles: UploadedImage[] = [];
     const invalidFiles: string[] = [];
 
-    // 过滤出有效的图片文件并按名称排序
-    Array.from(files).forEach((file) => {
+    Array.from(files).forEach((file, index) => {
       if (isValidImageFile(file)) {
-        validFiles.push(file);
-      } else if (file.type.startsWith('image/') || file.name.match(/\.(jpg|jpeg|png|gif|bmp|webp|tiff|tif)$/i)) {
-        // 只对看起来像图片的文件报告错误
+        const id = `${Date.now()}-${index}`;
+        const preview = URL.createObjectURL(file);
+        validFiles.push({
+          id,
+          file,
+          preview,
+          name: file.name
+        });
+      } else {
         invalidFiles.push(file.name);
       }
     });
 
-    // 显示无效文件警告
+    if (validFiles.length > 0) {
+      setUploadedImages(prev => [...prev, ...validFiles]);
+      toast({
+        title: "文件夹上传成功",
+        description: `从文件夹中成功上传 ${validFiles.length} 张图片`,
+      });
+    }
+
     if (invalidFiles.length > 0) {
       toast({
-        title: "文件格式错误",
-        description: `以下文件格式不支持或文件过大：${invalidFiles.join(', ')}。支持的格式：JPG, PNG, WebP, GIF, BMP, TIFF`,
+        title: "部分文件上传失败",
+        description: `${invalidFiles.length} 个文件格式不支持或文件过大`,
         variant: "destructive",
       });
     }
 
-    // 按名称排序并处理有效文件
-    validFiles.sort((a, b) => a.name.localeCompare(b.name)).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const newImage: UploadedImage = {
-          id: Math.random().toString(36).substr(2, 9),
-          file,
-          preview: e.target?.result as string,
-          name: file.name
-        };
-        setUploadedImages(prev => [...prev, newImage]);
-      };
-      reader.readAsDataURL(file);
-    });
-
-    // 清空input值，允许重复选择
+    // 清空input的值
     event.target.value = '';
   };
 
@@ -318,62 +442,117 @@ export default function WorkspacePage() {
     if (!isValidImageFile(file)) {
       toast({
         title: "文件格式错误",
-        description: `文件格式不支持或文件过大：${file.name}。支持的格式：JPG, PNG, WebP, GIF, BMP, TIFF`,
+        description: "请选择有效的图片文件（JPG、PNG、WebP等）",
         variant: "destructive",
       });
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const newImage: UploadedImage = {
-        id: Math.random().toString(36).substr(2, 9),
-        file,
-        preview: e.target?.result as string,
-        name: file.name
-      };
-      setReferenceImage(newImage);
-    };
-    reader.readAsDataURL(file);
+    const id = `ref-${Date.now()}`;
+    const preview = URL.createObjectURL(file);
+    setReferenceImage({
+      id,
+      file,
+      preview,
+      name: file.name
+    });
+
+    toast({
+      title: "参考图片上传成功",
+      description: file.name,
+    });
+
+    // 清空input的值
+    event.target.value = '';
   };
 
   const removeImage = (id: string) => {
-    setUploadedImages(prev => {
-      const newImages = prev.filter(img => img.id !== id);
-      // 如果删除的是当前预览的图片，调整预览索引
-      const removedIndex = prev.findIndex(img => img.id === id);
-      if (removedIndex === selectedPreviewIndex) {
-        if (newImages.length > 0) {
-          setSelectedPreviewIndex(Math.min(selectedPreviewIndex, newImages.length - 1));
-        }
-      } else if (removedIndex < selectedPreviewIndex) {
-        setSelectedPreviewIndex(selectedPreviewIndex - 1);
-      }
-      return newImages;
-    });
+    const imageToRemove = uploadedImages.find(img => img.id === id);
+    if (imageToRemove) {
+      URL.revokeObjectURL(imageToRemove.preview);
+      setUploadedImages(prev => prev.filter(img => img.id !== id));
+    }
   };
 
   const removeReferenceImage = () => {
-    setReferenceImage(null);
+    if (referenceImage) {
+      URL.revokeObjectURL(referenceImage.preview);
+      setReferenceImage(null);
+    }
   };
 
   const clearAllImages = () => {
+    uploadedImages.forEach(img => URL.revokeObjectURL(img.preview));
     setUploadedImages([]);
-    setSelectedPreviewIndex(0);
-  };
-
-  const openImageModal = (index: number) => {
-    setSelectedImageIndex(index);
-    setShowImageModal(true);
   };
 
   const navigateImage = (direction: 'prev' | 'next') => {
-    if (selectedImageIndex === null) return;
+    if (direction === 'prev') {
+      setSelectedPreviewIndex(prev => prev > 0 ? prev - 1 : uploadedImages.length - 1);
+    } else {
+      setSelectedPreviewIndex(prev => prev < uploadedImages.length - 1 ? prev + 1 : 0);
+    }
+  };
 
-    if (direction === 'prev' && selectedImageIndex > 0) {
-      setSelectedImageIndex(selectedImageIndex - 1);
-    } else if (direction === 'next' && selectedImageIndex < uploadedImages.length - 1) {
-      setSelectedImageIndex(selectedImageIndex + 1);
+  // 批量创建任务的通用函数
+  const createBatchTasks = async (taskType: string, taskData: Record<string, unknown>[]) => {
+    try {
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(taskData.map(data => ({
+          type: taskType,
+          inputData: JSON.stringify(data),
+          priority: 1,
+          totalSteps: taskType === 'ONE_CLICK_WORKFLOW' ? 3 : 1
+        }))),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`创建任务失败: ${errorData.details || response.statusText}`);
+      }
+
+      const result = await response.json();
+      const createdTasks = result.tasks.map((task: Task, index: number) => ({
+        ...task,
+        originalImageId: uploadedImages[index]?.id || '',
+        originalName: uploadedImages[index]?.name || 'Unknown'
+      }));
+
+      setActiveTasks(createdTasks);
+      setIsProcessing(true);
+
+      // 启动后台任务处理
+      await triggerWorker();
+
+      toast({
+        title: "任务创建成功",
+        description: `已创建 ${createdTasks.length} 个${getProcessTypeName(taskType)}任务`,
+      });
+
+      return createdTasks;
+
+    } catch (error) {
+      console.error('创建批量任务失败:', error);
+      throw error;
+    }
+  };
+
+  // 触发后台任务处理器
+  const triggerWorker = async () => {
+    try {
+      await fetch('/api/tasks/worker', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ batch: true }),
+      });
+    } catch (error) {
+      console.error('触发任务处理器失败:', error);
     }
   };
 
@@ -387,10 +566,6 @@ export default function WorkspacePage() {
       return;
     }
 
-    setIsProcessing(true);
-    setProcessedCount(0);
-    setTotalCount(uploadedImages.length);
-
     try {
       // 根据当前标签页选择不同的处理方式
       if (activeTab === 'expansion') {
@@ -403,16 +578,13 @@ export default function WorkspacePage() {
         await handleBackgroundReplace();
       }
     } catch (error) {
-      // console.error('处理失败:', error);
+      console.error('处理失败:', error);
       toast({
         title: "处理失败",
         description: error instanceof Error ? error.message : '未知错误',
         variant: "destructive",
       });
-    } finally {
       setIsProcessing(false);
-      setProcessedCount(0);
-      setTotalCount(0);
     }
   };
 
@@ -420,122 +592,36 @@ export default function WorkspacePage() {
     const xScale = parseFloat((document.getElementById('xScale') as HTMLInputElement)?.value || '2.0');
     const yScale = parseFloat((document.getElementById('yScale') as HTMLInputElement)?.value || '2.0');
 
+    const taskData = [];
     for (let i = 0; i < uploadedImages.length; i++) {
       const image = uploadedImages[i];
-      try {
-        // 调整图片尺寸以符合API要求
-        // console.log(`正在调整图片 ${image.name} 的尺寸...`);
-        const resizedImageUrl = await resizeImageForAPI(image.preview);
-        // console.log(`图片 ${image.name} 尺寸调整完成`);
-
-        const response = await fetch('/api/qwen/outpaint', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            imageUrl: resizedImageUrl,
-            xScale,
-            yScale,
-          }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(`扩图失败: ${errorData.details || response.statusText}`);
-        }
-
-        const result = await response.json();
-        // console.log('扩图成功:', result);
-
-        // 保存处理结果
-        const processedResult: ProcessedResult = {
-          id: result.data.id, // 使用数据库记录ID
-          originalImageId: image.id,
-          originalName: image.name,
-          processedImageUrl: result.data.imageData, // 用于即时显示
-          processType: '图像扩展',
-          timestamp: new Date().toLocaleString(),
-          parameters: { xScale, yScale }
-        };
-
-        setProcessedResults(prev => [...prev, processedResult]);
-        setProcessedCount(i + 1); // 更新已处理数量
-        toast({
-          title: "扩图成功",
-          description: `图片 ${image.name} 扩图处理完成`,
-        });
-      } catch (error) {
-        // console.error(`图片 ${image.name} 扩图失败:`, error);
-        setProcessedCount(i + 1); // 即使失败也要更新计数
-        toast({
-          title: "扩图失败",
-          description: `图片 ${image.name} 扩图失败: ${error instanceof Error ? error.message : '未知错误'}`,
-          variant: "destructive",
-        });
-        throw error;
-      }
+      const resizedImageUrl = await resizeImageForAPI(image.preview);
+      
+      taskData.push({
+        imageUrl: resizedImageUrl,
+        xScale,
+        yScale,
+      });
     }
+
+    await createBatchTasks('IMAGE_EXPANSION', taskData);
   };
 
   const handleUpscaling = async () => {
     const upscaleFactor = parseInt((document.getElementById('upscaleFactor') as HTMLInputElement)?.value || '2');
 
+    const taskData = [];
     for (let i = 0; i < uploadedImages.length; i++) {
       const image = uploadedImages[i];
-      try {
-        // 调整图片尺寸以符合API要求
-        // console.log(`正在调整图片 ${image.name} 的尺寸...`);
-        const resizedImageUrl = await resizeImageForAPI(image.preview);
-        // console.log(`图片 ${image.name} 尺寸调整完成`);
-
-        const response = await fetch('/api/qwen/upscale', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            imageUrl: resizedImageUrl,
-            upscaleFactor,
-          }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(`高清化失败: ${errorData.details || response.statusText}`);
-        }
-
-        const result = await response.json();
-        // console.log('高清化成功:', result);
-
-        // 保存处理结果
-        const processedResult: ProcessedResult = {
-          id: result.data.id, // 使用数据库记录ID
-          originalImageId: image.id,
-          originalName: image.name,
-          processedImageUrl: result.data.imageData, // 用于即时显示
-          processType: '图像高清化',
-          timestamp: new Date().toLocaleString(),
-          parameters: { upscaleFactor }
-        };
-
-        setProcessedResults(prev => [...prev, processedResult]);
-        setProcessedCount(i + 1); // 更新已处理数量
-        toast({
-          title: "高清化成功",
-          description: `图片 ${image.name} 高清化处理完成`,
-        });
-      } catch (error) {
-        // console.error(`图片 ${image.name} 高清化失败:`, error);
-        setProcessedCount(i + 1); // 即使失败也要更新计数
-        toast({
-          title: "高清化失败",
-          description: `图片 ${image.name} 高清化失败: ${error instanceof Error ? error.message : '未知错误'}`,
-          variant: "destructive",
-        });
-        throw error;
-      }
+      const resizedImageUrl = await resizeImageForAPI(image.preview);
+      
+      taskData.push({
+        imageUrl: resizedImageUrl,
+        upscaleFactor,
+      });
     }
+
+    await createBatchTasks('IMAGE_UPSCALING', taskData);
   };
 
   const handleOneClick = async () => {
@@ -543,75 +629,29 @@ export default function WorkspacePage() {
     const yScale = parseFloat((document.getElementById('yScale') as HTMLInputElement)?.value || '2.0');
     const upscaleFactor = parseInt((document.getElementById('upscaleFactor') as HTMLInputElement)?.value || '2');
 
+    const taskData = [];
     for (let i = 0; i < uploadedImages.length; i++) {
       const image = uploadedImages[i];
-      try {
-        // 调整图片尺寸以符合API要求
-        // console.log(`正在调整图片 ${image.name} 的尺寸...`);
-        const resizedImageUrl = await resizeImageForAPI(image.preview);
-        // console.log(`图片 ${image.name} 尺寸调整完成`);
-
-        // 如果有参考图片，也需要调整尺寸
-        let resizedReferenceUrl = undefined;
-        if (referenceImage) {
-          // console.log(`正在调整参考图片 ${referenceImage.name} 的尺寸...`);
-          resizedReferenceUrl = await resizeImageForAPI(referenceImage.preview);
-          // console.log(`参考图片 ${referenceImage.name} 尺寸调整完成`);
-        }
-
-        const response = await fetch('/api/workflow/one-click', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            imageUrl: resizedImageUrl,
-            referenceImageUrl: resizedReferenceUrl,
-            xScale,
-            yScale,
-            upscaleFactor,
-            enableBackgroundReplace: !!referenceImage,
-            enableOutpaint: true,
-            enableUpscale: true, // 使用模拟高清化API
-          }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(`一键增强失败: ${errorData.details || response.statusText}`);
-        }
-
-        const result = await response.json();
-        // console.log('一键增强成功:', result);
-
-        // 保存处理结果
-        const processedResult: ProcessedResult = {
-          id: result.data.id, // 使用数据库记录ID
-          originalImageId: image.id,
-          originalName: image.name,
-          processedImageUrl: result.data.imageData, // 用于即时显示
-          processType: '一键增强',
-          timestamp: new Date().toLocaleString(),
-          parameters: { xScale, yScale, upscaleFactor }
-        };
-
-        setProcessedResults(prev => [...prev, processedResult]);
-        setProcessedCount(i + 1); // 更新已处理数量
-        toast({
-          title: "一键增强成功",
-          description: `图片 ${image.name} 一键增强处理完成`,
-        });
-      } catch (error) {
-        // console.error(`图片 ${image.name} 一键增强失败:`, error);
-        setProcessedCount(i + 1); // 即使失败也要更新计数
-        toast({
-          title: "一键增强失败",
-          description: `图片 ${image.name} 一键增强失败: ${error instanceof Error ? error.message : '未知错误'}`,
-          variant: "destructive",
-        });
-        throw error;
+      const resizedImageUrl = await resizeImageForAPI(image.preview);
+      
+      let resizedReferenceUrl = undefined;
+      if (referenceImage) {
+        resizedReferenceUrl = await resizeImageForAPI(referenceImage.preview);
       }
+
+      taskData.push({
+        imageUrl: resizedImageUrl,
+        referenceImageUrl: resizedReferenceUrl,
+        xScale,
+        yScale,
+        upscaleFactor,
+        enableBackgroundReplace: !!referenceImage,
+        enableOutpaint: true,
+        enableUpscale: true,
+      });
     }
+
+    await createBatchTasks('ONE_CLICK_WORKFLOW', taskData);
   };
 
   const handleBackgroundReplace = async () => {
@@ -619,70 +659,22 @@ export default function WorkspacePage() {
       throw new Error('背景替换需要参考图片');
     }
 
-    // 获取自定义提示词
     const customPrompt = (document.getElementById('customPrompt') as HTMLTextAreaElement)?.value || '';
 
+    const taskData = [];
     for (let i = 0; i < uploadedImages.length; i++) {
       const image = uploadedImages[i];
-      try {
-        // 调整图片尺寸以符合API要求
-        // console.log(`正在调整图片 ${image.name} 的尺寸...`);
-        const resizedOriginalUrl = await resizeImageForAPI(image.preview);
-        const resizedReferenceUrl = await resizeImageForAPI(referenceImage.preview);
-        // console.log(`图片 ${image.name} 尺寸调整完成`);
+      const resizedOriginalUrl = await resizeImageForAPI(image.preview);
+      const resizedReferenceUrl = await resizeImageForAPI(referenceImage.preview);
 
-        const response = await fetch('/api/gpt/background-replace', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            originalImageUrl: resizedOriginalUrl,
-            referenceImageUrl: resizedReferenceUrl,
-            customPrompt: customPrompt
-          }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(`背景替换失败: ${errorData.details || response.statusText}`);
-        }
-
-        const result = await response.json();
-        // console.log('背景替换成功:', result);
-
-        // 保存处理结果
-        const processedResult: ProcessedResult = {
-          id: result.data.id, // 使用数据库记录ID
-          originalImageId: image.id,
-          originalName: image.name,
-          processedImageUrl: result.data.imageData, // 用于即时显示
-          processType: '背景替换',
-          timestamp: new Date().toLocaleString(),
-          parameters: {
-            hasReferenceImage: true,
-            prompt: result.data.prompt,
-            customPrompt: customPrompt
-          }
-        };
-
-        setProcessedResults(prev => [...prev, processedResult]);
-        setProcessedCount(i + 1); // 更新已处理数量
-        toast({
-          title: "背景替换成功",
-          description: `图片 ${image.name} 背景替换处理完成`,
-        });
-      } catch (error) {
-        // console.error(`图片 ${image.name} 背景替换失败:`, error);
-        setProcessedCount(i + 1); // 即使失败也要更新计数
-        toast({
-          title: "背景替换失败",
-          description: `图片 ${image.name} 背景替换失败: ${error instanceof Error ? error.message : '未知错误'}`,
-          variant: "destructive",
-        });
-        throw error;
-      }
+      taskData.push({
+        imageUrl: resizedOriginalUrl,
+        referenceImageUrl: resizedReferenceUrl,
+        customPrompt: customPrompt
+      });
     }
+
+    await createBatchTasks('BACKGROUND_REMOVAL', taskData);
   };
 
   const renderTabContent = () => {
@@ -691,13 +683,13 @@ export default function WorkspacePage() {
         {/* 上传区域 - 左右布局 */}
         <div className={`grid gap-6 ${(activeTab === "background" || activeTab === "one-click") ? 'grid-cols-1 lg:grid-cols-3' : 'grid-cols-1'}`}>
           {/* 主要图片上传区域 */}
-          <Card className={`border-2 border-dashed border-gray-300 hover:border-amber-400 transition-all duration-300 bg-gradient-to-br from-white to-gray-50 ${(activeTab === "background" || activeTab === "one-click") ? 'lg:col-span-2' : ''}`}>
+          <Card className={`border-2 border-dashed border-gray-300 hover:border-orange-400 transition-all duration-300 bg-white ${(activeTab === "background" || activeTab === "one-click") ? 'lg:col-span-2' : ''}`}>
           <CardContent className="p-6">
             {uploadedImages.length === 0 ? (
               // 空状态 - 显示上传提示
               <div className="text-center">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-100 to-amber-200 flex items-center justify-center mx-auto mb-3">
-                  <FileImage className="w-6 h-6 text-amber-600" />
+                <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center mx-auto mb-3">
+                  <FileImage className="w-6 h-6 text-orange-600" />
                 </div>
                 <h3 className="text-base font-semibold text-gray-900 mb-1">上传图片</h3>
                 <p className="text-gray-500 text-sm mb-3">
@@ -706,7 +698,7 @@ export default function WorkspacePage() {
                 <div className="flex gap-2 justify-center">
                   <Button
                     size="sm"
-                    className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+                    className="bg-orange-500 hover:bg-orange-600 text-white"
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <Upload className="w-4 h-4 mr-2" />
@@ -715,7 +707,7 @@ export default function WorkspacePage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="border-amber-300 text-amber-600 hover:bg-amber-50"
+                    className="border-orange-300 text-orange-600 hover:bg-orange-50"
                     onClick={() => folderInputRef.current?.click()}
                   >
                     <FileImage className="w-4 h-4 mr-2" />
@@ -724,7 +716,7 @@ export default function WorkspacePage() {
                 </div>
               </div>
             ) : (
-              // 有图片时 - 显示预览网格
+              // 有图片时 - 显示大图预览和缩略图选择
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-sm font-medium text-gray-700">已选择 {uploadedImages.length} 张图片</span>
@@ -740,549 +732,492 @@ export default function WorkspacePage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="border-amber-300 text-amber-600 hover:bg-amber-50"
-                      onClick={() => folderInputRef.current?.click()}
-                    >
-                      <FileImage className="w-4 h-4 mr-2" />
-                      添加文件夹
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-red-300 text-red-600 hover:bg-red-50"
                       onClick={clearAllImages}
                     >
-                      <X className="w-4 h-4 mr-2" />
-                      清空全部
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      清空
                     </Button>
                   </div>
                 </div>
-
-                {/* 主图预览区域 */}
-                <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
-                  <div className="aspect-video bg-gray-50 rounded-lg overflow-hidden mb-3 relative">
+                
+                {/* 大图预览区域 */}
+                <div className="mb-4">
+                  <div 
+                    className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-200 cursor-pointer hover:border-orange-300 transition-colors"
+                    onClick={() => setShowImageModal(true)}
+                  >
                     <img
                       src={uploadedImages[selectedPreviewIndex]?.preview}
                       alt={uploadedImages[selectedPreviewIndex]?.name}
                       className="w-full h-full object-contain"
                     />
-                    {/* 图片信息 */}
-                    <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
-                      {uploadedImages[selectedPreviewIndex]?.name}
+                    
+                    {/* 放大按钮 */}
+                    <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 transition-all duration-200 flex items-center justify-center">
+                      <div className="w-10 h-10 bg-white bg-opacity-90 rounded-full flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-200">
+                        <ZoomIn className="w-5 h-5 text-gray-700" />
+                      </div>
                     </div>
-                    {/* 图片计数 */}
-                    <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
-                      {selectedPreviewIndex + 1} / {uploadedImages.length}
-                    </div>
-                    {/* 放大查看按钮 */}
-                    <button
-                      onClick={() => openImageModal(selectedPreviewIndex)}
-                      className="absolute top-2 left-2 w-8 h-8 bg-black bg-opacity-50 hover:bg-opacity-70 text-white rounded-full flex items-center justify-center transition-all"
-                    >
-                      <ZoomIn className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {/* 缩略图导航 */}
-                  <div className="flex gap-2 overflow-x-auto pb-2">
-                    {uploadedImages.map((image, index) => (
-                      <div key={image.id} className="relative group flex-shrink-0">
-                        <div
-                          className={`w-16 h-16 bg-white rounded-lg overflow-hidden cursor-pointer transition-all shadow-sm border-2 ${
-                            index === selectedPreviewIndex
-                              ? 'border-amber-400 ring-2 ring-amber-200'
-                              : 'border-gray-200 hover:border-amber-300'
-                          }`}
-                          onClick={() => setSelectedPreviewIndex(index)}
+                    
+                    {uploadedImages.length > 1 && (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigateImage('prev');
+                          }}
+                          className="absolute left-2 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-white bg-opacity-90 text-gray-700 rounded-full flex items-center justify-center hover:bg-opacity-100 shadow-md"
                         >
-                          <img
-                            src={image.preview}
-                            alt={image.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigateImage('next');
+                          }}
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-white bg-opacity-90 text-gray-700 rounded-full flex items-center justify-center hover:bg-opacity-100 shadow-md"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </>
+                    )}
+                    <div className="absolute bottom-2 left-2 right-2 bg-white bg-opacity-90 rounded px-3 py-1">
+                      <p className="text-sm font-medium text-gray-900 truncate">{uploadedImages[selectedPreviewIndex]?.name}</p>
+                      {uploadedImages.length > 1 && (
+                        <p className="text-xs text-gray-600">{selectedPreviewIndex + 1} / {uploadedImages.length}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* 缩略图选择区域 */}
+                {uploadedImages.length > 1 && (
+                  <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2">
+                    {uploadedImages.map((image, index) => (
+                      <div
+                        key={image.id}
+                        className={`group relative aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 ${
+                          index === selectedPreviewIndex 
+                            ? 'ring-2 ring-orange-400 ring-offset-2' 
+                            : 'hover:ring-2 hover:ring-gray-300'
+                        }`}
+                        onClick={() => setSelectedPreviewIndex(index)}
+                      >
+                        <img
+                          src={image.preview}
+                          alt={image.name}
+                          className="w-full h-full object-cover"
+                        />
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             removeImage(image.id);
+                            // 如果删除的是当前选中的图片，调整选中索引
+                            if (index === selectedPreviewIndex && uploadedImages.length > 1) {
+                              setSelectedPreviewIndex(prev => prev > 0 ? prev - 1 : 0);
+                            }
                           }}
-                          className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                          className="absolute top-0.5 right-0.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-600 text-xs"
                         >
                           <X className="w-3 h-3" />
                         </button>
                       </div>
                     ))}
                   </div>
-                </div>
+                )}
               </div>
             )}
-
-            {/* 隐藏的文件输入 */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,image/*"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-
-            {/* 隐藏的文件夹输入 */}
-            <input
-              ref={folderInputRef}
-              type="file"
-              {...({ webkitdirectory: "" } as any)}
-              multiple
-              accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,image/*"
-              onChange={handleFolderUpload}
-              className="hidden"
-            />
           </CardContent>
         </Card>
 
-        {/* 参考图片上传区域（背景替换和一键增强需要） */}
-        {(activeTab === "background" || activeTab === "one-click") && (
-          <Card className="border-2 border-dashed border-gray-300 hover:border-blue-400 transition-all duration-300 bg-gradient-to-br from-white to-gray-50">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg font-semibold text-gray-900 flex items-center">
-                <ImageIcon className="w-5 h-5 mr-2 text-blue-600" />
-                参考图片
-              </CardTitle>
-              <CardDescription className="text-sm text-gray-500">用于背景替换的参考图片（可选）</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-0">
-              {!referenceImage ? (
-                <div
-                  className="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-400 transition-colors"
-                  onClick={() => referenceInputRef.current?.click()}
-                >
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center mx-auto mb-3">
-                    <Upload className="w-6 h-6 text-blue-600" />
+          {/* 参考图片上传区域 - 仅在背景替换和一键增强模式显示 */}
+          {(activeTab === "background" || activeTab === "one-click") && (
+            <Card className="border-2 border-dashed border-blue-300 hover:border-blue-300 transition-all duration-300 bg-white">
+              <CardContent className="p-6">
+                {!referenceImage ? (
+                  <div className="text-center">
+                    <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-3">
+                      <ImageIcon className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <h3 className="text-base font-semibold text-gray-900 mb-1">参考图片</h3>
+                    <p className="text-gray-500 text-sm mb-3">
+                      {activeTab === "background" ? "选择背景参考图片" : "选择背景参考图片（可选）"}
+                    </p>
+                    <Button
+                      size="sm"
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                      onClick={() => referenceInputRef.current?.click()}
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      选择图片
+                    </Button>
                   </div>
-                  <p className="text-sm text-gray-600 mb-2">点击上传参考图片</p>
-                  <p className="text-xs text-gray-500">支持 JPG, PNG 格式</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
+                ) : (
                   <div className="relative">
-                    <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                    <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden mb-3">
                       <img
                         src={referenceImage.preview}
                         alt={referenceImage.name}
                         className="w-full h-full object-cover"
                       />
                     </div>
-                    <button
-                      onClick={removeReferenceImage}
-                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 shadow-lg"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                    <p className="text-sm text-gray-700 mb-2 truncate">{referenceImage.name}</p>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => referenceInputRef.current?.click()}
+                      >
+                        更换
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={removeReferenceImage}
+                      >
+                        <X className="w-4 h-4 mr-1" />
+                        删除
+                      </Button>
+                    </div>
                   </div>
-                  <div className="text-center">
-                    <p className="text-sm font-medium text-gray-900 truncate">{referenceImage.name}</p>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="mt-2 border-blue-200 text-blue-600 hover:bg-blue-50"
-                      onClick={() => referenceInputRef.current?.click()}
-                    >
-                      <Upload className="w-4 h-4 mr-2" />
-                      更换图片
-                    </Button>
-                  </div>
-                </div>
-              )}
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
-              {/* 隐藏的文件输入 */}
-              <input
-                ref={referenceInputRef}
-                type="file"
-                accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,image/*"
-                onChange={handleReferenceUpload}
-                className="hidden"
-              />
+        {/* 任务进度显示 */}
+        {isProcessing && activeTasks.length > 0 && (
+          <Card className="border-orange-200 bg-orange-50">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  正在处理 {activeTasks.length} 个任务
+                </h3>
+              </div>
+              
+              <div className="space-y-3">
+                {activeTasks.map((task) => (
+                  <div key={task.id} className="bg-white rounded-lg p-4 border border-orange-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-gray-900">
+                        {task.originalName || 'Unknown'} - {getProcessTypeName(task.type)}
+                      </span>
+                      <span className="text-sm text-gray-500">
+                        {task.status === 'COMPLETED' ? (
+                          <CheckCircle className="w-5 h-5 text-green-500" />
+                        ) : task.status === 'FAILED' ? (
+                          <X className="w-5 h-5 text-red-500" />
+                        ) : (
+                          `${Math.round(task.progress)}%`
+                        )}
+                      </span>
+                    </div>
+                    
+                    <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                      <div
+                        className={`h-2 rounded-full transition-all duration-300 ${
+                          task.status === 'COMPLETED' ? 'bg-green-500' :
+                          task.status === 'FAILED' ? 'bg-red-500' :
+                          'bg-orange-500'
+                        }`}
+                        style={{ width: `${Math.max(task.progress, 5)}%` }}
+                      ></div>
+                    </div>
+                    
+                    <p className="text-sm text-gray-600">{task.currentStep}</p>
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
         )}
-        </div>
-      </div>
-    );
 
-    const commonSettingsSection = (
-      <Card className="bg-gradient-to-br from-white to-gray-50 border-0 shadow-lg mb-8">
-        <CardHeader className="text-center pb-6">
-          <CardTitle className="flex items-center justify-center text-2xl font-bold text-gray-900">
-            <SettingsIcon className="w-6 h-6 mr-3 text-amber-600" />
-            处理设置
-          </CardTitle>
-          <CardDescription className="text-gray-600 mt-2">
-            调整参数以获得最佳处理效果
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* 参数设置区域 */}
+        <Card className="bg-white">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-gray-900">
+              <SettingsIcon className="w-5 h-5" />
+              参数设置
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             {(activeTab === "expansion" || activeTab === "one-click") && (
-              <>
-                <div className="space-y-3">
-                  <Label htmlFor="xScale" className="text-sm font-semibold text-gray-700">X轴缩放倍数</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="xScale">X轴扩展倍数</Label>
                   <Input
                     id="xScale"
                     type="number"
-                    defaultValue="2.0"
+                    min="1.1"
+                    max="4.0"
                     step="0.1"
-                    min="1"
-                    max="4"
-                    className="text-center text-lg font-medium border-gray-200 focus:border-amber-400 focus:ring-amber-400"
+                    defaultValue="2.0"
+                    className="mt-1"
                   />
-                  <p className="text-xs text-gray-500">建议范围：1.0 - 4.0</p>
                 </div>
-                <div className="space-y-3">
-                  <Label htmlFor="yScale" className="text-sm font-semibold text-gray-700">Y轴缩放倍数</Label>
+                <div>
+                  <Label htmlFor="yScale">Y轴扩展倍数</Label>
                   <Input
                     id="yScale"
                     type="number"
-                    defaultValue="2.0"
+                    min="1.1"
+                    max="4.0"
                     step="0.1"
-                    min="1"
-                    max="4"
-                    className="text-center text-lg font-medium border-gray-200 focus:border-amber-400 focus:ring-amber-400"
+                    defaultValue="2.0"
+                    className="mt-1"
                   />
-                  <p className="text-xs text-gray-500">建议范围：1.0 - 4.0</p>
                 </div>
+              </div>
+            )}
+
+            {(activeTab === "upscaling" || activeTab === "one-click") && (
+              <div>
+                <Label htmlFor="upscaleFactor">高清化倍数</Label>
+                <select
+                  id="upscaleFactor"
+                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
+                  defaultValue="2"
+                >
+                  <option value="2">2x</option>
+                  <option value="4">4x</option>
+                </select>
+              </div>
+            )}
+
+            {activeTab === "background" && (
+              <div>
+                <Label htmlFor="customPrompt">自定义提示词（可选）</Label>
+                <textarea
+                  id="customPrompt"
+                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                  rows={3}
+                  placeholder="描述期望的背景效果..."
+                />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 处理按钮 */}
+        <div className="flex justify-center">
+          <Button
+            size="lg"
+            onClick={handleProcess}
+            disabled={uploadedImages.length === 0 || isProcessing || (activeTab === "background" && !referenceImage)}
+            className="px-8 py-3 text-lg bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+          >
+            {isProcessing ? (
+              <>
+                <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
+                处理中...
+              </>
+            ) : (
+              <>
+                <Play className="w-5 h-5 mr-2" />
+                开始{tabs.find(tab => tab.id === activeTab)?.title}
               </>
             )}
-            {(activeTab === "upscaling" || activeTab === "one-click") && (
-              <div className="space-y-3">
-                <Label htmlFor="upscaleFactor" className="text-sm font-semibold text-gray-700">高清化倍数</Label>
-                <Input
-                  id="upscaleFactor"
-                  type="number"
-                  defaultValue="2"
-                  min="1"
-                  max="4"
-                  className="text-center text-lg font-medium border-gray-200 focus:border-amber-400 focus:ring-amber-400"
-                />
-                <p className="text-xs text-gray-500">建议范围：1 - 4 倍</p>
-              </div>
-            )}
-            {activeTab === "background" && (
-              <div className="col-span-1 md:col-span-2 lg:col-span-3 space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="customPrompt" className="text-sm font-semibold text-gray-700">
-                    自定义提示词 (可选)
-                  </Label>
-                  <textarea
-                    id="customPrompt"
-                    rows={4}
-                    placeholder="留空使用默认提示词，或输入自定义提示词来精确控制背景替换效果..."
-                    className="w-full px-3 py-2 border border-gray-200 rounded-md focus:border-blue-400 focus:ring-blue-400 text-sm resize-none"
-                  />
-                  <p className="text-xs text-gray-500">
-                    默认提示词会保持产品形状、材质、比例和摆放角度完全一致，仅替换背景
-                  </p>
-                </div>
+          </Button>
+        </div>
 
-                <div className="bg-gray-50 p-3 rounded-lg">
-                  <details className="cursor-pointer">
-                    <summary className="text-sm font-medium text-gray-700 mb-2">
-                      查看默认提示词模板
-                    </summary>
-                    <div className="text-xs text-gray-600 bg-white p-3 rounded border mt-2">
-                      <p className="font-medium mb-2">默认提示词：</p>
-                      <p className="whitespace-pre-line">
-                        请将第二张图片中的所有产品替换为第一张图片的产品，要求：
-                        <br />
-                        1. 保持原图产品的形状、材质、特征比例、摆放角度及数量完全一致
-                        <br />
-                        2. 仅保留产品包装外壳，不得出现任何成品材质（如口红壳中不得显示口红）
-                        <br />
-                        3. 禁用背景虚化效果，确保画面清晰呈现所有产品
-                        <br />
-                        4. 产品的比例一定要保持，相对瘦长就瘦长，相对粗就相对粗
-                      </p>
+        {/* 处理结果展示 */}
+        {processedResults.length > 0 && (
+          <Card className="bg-white">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-gray-900">
+                <CheckCircle className="w-5 h-5 text-green-500" />
+                处理结果 ({processedResults.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {processedResults.map((result, index) => (
+                  <div
+                    key={result.id}
+                    className="group relative aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all duration-200"
+                    onClick={() => {
+                      setSelectedResultIndex(index);
+                      setShowResultModal(true);
+                    }}
+                  >
+                    <img
+                      src={result.processedImageUrl}
+                      alt={`${result.originalName} - ${result.processType}`}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
+                      <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                     </div>
-                  </details>
-                </div>
+                    <div className="absolute bottom-0 left-0 right-0 bg-white bg-opacity-90 p-2">
+                      <p className="text-gray-900 text-xs truncate font-medium">{result.originalName}</p>
+                      <p className="text-gray-600 text-xs">{result.processType}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    );
+            </CardContent>
+          </Card>
+        )}
 
-    return (
-      <div className="space-y-6">
-        {commonUploadSection}
-        {commonSettingsSection}
+        {/* 隐藏的文件输入 */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileUpload}
+        />
+        <input
+          ref={folderInputRef}
+          type="file"
+          multiple
+          {...({ webkitdirectory: "" } as React.InputHTMLAttributes<HTMLInputElement>)}
+          className="hidden"
+          onChange={handleFolderUpload}
+        />
+        <input
+          ref={referenceInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleReferenceUpload}
+        />
       </div>
     );
+
+    return commonUploadSection;
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-gray-50">
       <Navbar />
-
-      <div className="container mx-auto px-4 py-8">
-        {/* 标题区域 */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-4">
-            AI图像处理工作区
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        {/* 页面标题 */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+            AI 图像工作台
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            选择处理类型，上传图片，开始你的AI图像处理之旅
+          <p className="text-gray-600">
+            使用先进的 AI 技术进行图像处理和增强
           </p>
         </div>
 
-        {/* 功能选择标签 */}
-        <div className="flex flex-wrap justify-center gap-4 mb-12">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center px-6 py-4 rounded-2xl font-medium transition-all duration-300 transform hover:scale-105 ${
-                  isActive
-                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xl'
-                    : 'bg-white/70 backdrop-blur-sm text-gray-700 hover:bg-white/90 shadow-lg hover:shadow-xl'
-                }`}
-              >
-                <Icon className={`w-5 h-5 mr-3 ${isActive ? 'text-white' : 'text-gray-600'}`} />
-                <div className="text-left">
-                  <div className="font-semibold">{tab.title}</div>
-                  <div className={`text-sm ${isActive ? 'text-amber-100' : 'text-gray-500'}`}>
-                    {tab.description}
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* 主内容区域 */}
-        <div className="max-w-6xl mx-auto">
-          <Card className="border-0 bg-white/70 backdrop-blur-sm shadow-2xl">
-            <CardHeader className="text-center pb-6">
-              <div className="flex items-center justify-center mb-6">
-                {React.createElement(tabs.find(t => t.id === activeTab)?.icon || Wand2, {
-                  className: `w-10 h-10 mr-3 text-amber-600`
-                })}
-                <div>
-                  <CardTitle className="text-2xl font-bold text-gray-900">
-                    {tabs.find(t => t.id === activeTab)?.title}
-                  </CardTitle>
-                  <CardDescription className="text-gray-600 mt-1">
-                    {tabs.find(t => t.id === activeTab)?.description}
-                  </CardDescription>
-                </div>
-              </div>
-
-              {/* 处理按钮移到顶部 */}
-              <div className="mb-8">
-                <Button
-                  onClick={handleProcess}
-                  disabled={isProcessing}
-                  size="lg"
-                  className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 shadow-lg hover:shadow-xl transition-all duration-200 px-8 py-3 text-lg font-semibold"
+        {/* 标签页导航 */}
+        <div className="mb-8">
+          <div className="flex flex-wrap justify-center gap-2">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`group flex items-center gap-3 px-6 py-3 rounded-xl font-medium transition-all duration-300 ${
+                    isActive
+                      ? tab.color === 'orange'
+                        ? 'bg-orange-500 hover:bg-orange-600 text-white shadow-lg scale-105'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg scale-105'
+                      : 'bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-gray-200 shadow-sm'
+                  }`}
                 >
-                  {isProcessing ? (
-                    <>
-                      <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
-                      处理中...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-5 h-5 mr-2" />
-                      开始处理
-                    </>
-                  )}
-                </Button>
-
-                {isProcessing && (
-                  <div className="mt-4 max-w-xs mx-auto">
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-gradient-to-r from-amber-500 to-orange-500 h-2 rounded-full transition-all duration-300"
-                        style={{width: `${totalCount > 0 ? (processedCount / totalCount) * 100 : 0}%`}}
-                      ></div>
+                  <Icon className={`w-5 h-5 ${
+                    isActive 
+                      ? 'text-white' 
+                      : tab.color === 'orange' 
+                        ? 'text-orange-500' 
+                        : 'text-blue-600'
+                  }`} />
+                  <div className="text-left">
+                    <div className="font-semibold">{tab.title}</div>
+                    <div className={`text-xs ${isActive ? 'text-white text-opacity-90' : 'text-gray-500'}`}>
+                      {tab.description}
                     </div>
-                    <p className="text-sm text-gray-500 mt-2 text-center">
-                      已处理 {processedCount} / {totalCount} 张图片
-                    </p>
                   </div>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="px-8 pb-8">
-              {renderTabContent()}
-            </CardContent>
-          </Card>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* 处理结果区域 */}
-        {processedResults.length > 0 && (
-          <div className="max-w-6xl mx-auto mt-8">
-            <Card className="bg-gradient-to-br from-white to-gray-50 border-0 shadow-lg">
-              <CardHeader className="text-center pb-6">
-                <CardTitle className="flex items-center justify-center text-2xl font-bold text-gray-900">
-                  <CheckCircle className="w-6 h-6 mr-3 text-green-600" />
-                  处理结果
-                </CardTitle>
-                <CardDescription className="text-gray-600 mt-2">
-                  查看已完成的图像处理结果
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                  {processedResults.map((result, index) => (
-                    <div key={result.id} className="relative group">
-                      <div
-                        className="aspect-square bg-white rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-green-400 transition-all shadow-sm border border-gray-200"
-                        onClick={() => {
-                          setSelectedResultIndex(index);
-                          setShowResultModal(true);
-                        }}
-                      >
-                        <img
-                          src={result.processedImageUrl}
-                          alt={`${result.originalName} - ${result.processType}`}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-75 text-white text-xs p-2 rounded-b-lg">
-                        <div className="font-medium truncate">{result.originalName}</div>
-                        <div className="text-gray-300">{result.processType}</div>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setProcessedResults(prev => prev.filter(r => r.id !== result.id));
-                        }}
-                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4 flex justify-center">
-                  <Button
-                    variant="outline"
-                    onClick={() => setProcessedResults([])}
-                    className="text-red-600 border-red-300 hover:bg-red-50"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    清空所有结果
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+        {/* 标签页内容 */}
+        {renderTabContent()}
 
-        {/* 图片放大查看模态框 */}
-        {showImageModal && selectedImageIndex !== null && (
-          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-            <div className="relative max-w-4xl max-h-[90vh] w-full h-full flex items-center justify-center p-4">
-              {/* 关闭按钮 */}
+        {/* 图片预览模态框 */}
+        {showImageModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+            <div className="relative max-w-4xl max-h-full">
               <button
                 onClick={() => setShowImageModal(false)}
-                className="absolute top-4 right-4 w-10 h-10 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full flex items-center justify-center text-white transition-all z-10"
+                className="absolute top-4 right-4 w-10 h-10 bg-white bg-opacity-90 text-gray-700 rounded-full flex items-center justify-center hover:bg-opacity-100 z-10 transition-all"
               >
                 <X className="w-6 h-6" />
               </button>
-
-              {/* 左右导航按钮 */}
+              
               {uploadedImages.length > 1 && (
                 <>
                   <button
                     onClick={() => navigateImage('prev')}
-                    disabled={selectedImageIndex === 0}
-                    className="absolute left-4 top-1/2 transform -translate-y-1/2 w-12 h-12 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full flex items-center justify-center text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="absolute left-4 top-1/2 transform -translate-y-1/2 w-10 h-10 bg-white bg-opacity-90 text-gray-700 rounded-full flex items-center justify-center hover:bg-opacity-100 z-10 transition-all"
                   >
                     <ChevronLeft className="w-6 h-6" />
                   </button>
                   <button
                     onClick={() => navigateImage('next')}
-                    disabled={selectedImageIndex === uploadedImages.length - 1}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 w-12 h-12 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full flex items-center justify-center text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 w-10 h-10 bg-white bg-opacity-90 text-gray-700 rounded-full flex items-center justify-center hover:bg-opacity-100 z-10 transition-all"
                   >
                     <ChevronRight className="w-6 h-6" />
                   </button>
                 </>
               )}
-
-              {/* 图片显示 */}
-              <div className="relative max-w-full max-h-full">
-                <img
-                  src={uploadedImages[selectedImageIndex].preview}
-                  alt={uploadedImages[selectedImageIndex].name}
-                  className="max-w-full max-h-full object-contain"
-                />
-
-                {/* 图片信息 */}
-                <div className="absolute bottom-4 left-4 bg-black bg-opacity-50 text-white px-3 py-2 rounded-lg">
-                  <p className="text-sm font-medium">{uploadedImages[selectedImageIndex].name}</p>
-                  <p className="text-xs opacity-75">
-                    {selectedImageIndex + 1} / {uploadedImages.length}
+              
+              <img
+                src={uploadedImages[selectedPreviewIndex]?.preview}
+                alt={uploadedImages[selectedPreviewIndex]?.name}
+                className="max-w-full max-h-full object-contain rounded-lg"
+              />
+              
+              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white bg-opacity-95 text-gray-900 px-4 py-2 rounded-lg">
+                <p className="text-center font-medium">
+                  {uploadedImages[selectedPreviewIndex]?.name}
+                </p>
+                {uploadedImages.length > 1 && (
+                  <p className="text-center text-sm text-gray-600">
+                    {selectedPreviewIndex + 1} / {uploadedImages.length}
                   </p>
-                </div>
+                )}
               </div>
             </div>
           </div>
         )}
 
-        {/* 处理结果放大查看模态框 */}
-        {showResultModal && selectedResultIndex !== null && processedResults[selectedResultIndex] && (
-          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-            <div className="relative max-w-4xl max-h-[90vh] w-full h-full flex items-center justify-center p-4">
-              {/* 关闭按钮 */}
+        {/* 结果预览模态框 */}
+        {showResultModal && selectedResultIndex !== null && (
+          <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+            <div className="relative max-w-4xl max-h-full">
               <button
                 onClick={() => setShowResultModal(false)}
-                className="absolute top-4 right-4 w-10 h-10 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full flex items-center justify-center text-white transition-all z-10"
+                className="absolute top-4 right-4 w-10 h-10 bg-white bg-opacity-90 text-gray-700 rounded-full flex items-center justify-center hover:bg-opacity-100 z-10 transition-all"
               >
                 <X className="w-6 h-6" />
               </button>
-
-              {/* 左右导航按钮 */}
-              {processedResults.length > 1 && (
-                <>
-                  <button
-                    onClick={() => setSelectedResultIndex(Math.max(0, selectedResultIndex - 1))}
-                    disabled={selectedResultIndex === 0}
-                    className="absolute left-4 top-1/2 transform -translate-y-1/2 w-12 h-12 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full flex items-center justify-center text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronLeft className="w-6 h-6" />
-                  </button>
-                  <button
-                    onClick={() => setSelectedResultIndex(Math.min(processedResults.length - 1, selectedResultIndex + 1))}
-                    disabled={selectedResultIndex === processedResults.length - 1}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 w-12 h-12 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full flex items-center justify-center text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronRight className="w-6 h-6" />
-                  </button>
-                </>
-              )}
-
-              {/* 图片显示 */}
-              <div className="relative max-w-full max-h-full">
-                <img
-                  src={processedResults[selectedResultIndex].processedImageUrl}
-                  alt={`${processedResults[selectedResultIndex].originalName} - ${processedResults[selectedResultIndex].processType}`}
-                  className="max-w-full max-h-full object-contain"
-                />
-
-                {/* 图片信息 */}
-                <div className="absolute bottom-4 left-4 bg-black bg-opacity-50 text-white px-3 py-2 rounded-lg">
-                  <p className="text-sm font-medium">{processedResults[selectedResultIndex].originalName}</p>
-                  <p className="text-xs opacity-75">{processedResults[selectedResultIndex].processType}</p>
-                  <p className="text-xs opacity-75">{processedResults[selectedResultIndex].timestamp}</p>
-                  <p className="text-xs opacity-75">
-                    {selectedResultIndex + 1} / {processedResults.length}
-                  </p>
-                </div>
+              
+              <img
+                src={processedResults[selectedResultIndex]?.processedImageUrl}
+                alt={`${processedResults[selectedResultIndex]?.originalName} - ${processedResults[selectedResultIndex]?.processType}`}
+                className="max-w-full max-h-full object-contain rounded-lg"
+              />
+              
+              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white bg-opacity-95 text-gray-900 px-4 py-2 rounded-lg">
+                <p className="text-center font-medium">
+                  {processedResults[selectedResultIndex]?.originalName} - {processedResults[selectedResultIndex]?.processType}
+                </p>
+                <p className="text-center text-sm text-gray-600">
+                  处理时间: {processedResults[selectedResultIndex]?.timestamp}
+                </p>
               </div>
             </div>
           </div>

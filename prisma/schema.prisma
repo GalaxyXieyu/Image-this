@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -17,12 +17,12 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String?
   session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -93,10 +93,10 @@ model ProcessedImage {
   originalUrl      String
   processedUrl     String?
   thumbnailUrl     String?
-  processType      ProcessType
-  status           ProcessStatus    @default(PENDING)
+  processType      String
+  status           String           @default("PENDING")
   errorMessage     String?
-  metadata         Json?            // 存储处理参数和其他元数据
+  metadata         String?          // 存储处理参数和其他元数据（JSON字符串）
   fileSize         Int?
   width            Int?
   height           Int?
@@ -113,27 +113,25 @@ model ProcessedImage {
   @@map("processed_images")
 }
 
-enum ProcessType {
-  BACKGROUND_REMOVAL    // 背景替换
-  IMAGE_EXPANSION      // 扩图
-  IMAGE_UPSCALING      // 高清化
-  ONE_CLICK_WORKFLOW   // 一键处理
-  GPT_GENERATION       // GPT生成
-}
+// ProcessType 常量（SQLite不支持enum）:
+// "BACKGROUND_REMOVAL" - 背景替换
+// "IMAGE_EXPANSION" - 扩图  
+// "IMAGE_UPSCALING" - 高清化
+// "ONE_CLICK_WORKFLOW" - 一键处理
+// "GPT_GENERATION" - GPT生成
 
-enum ProcessStatus {
-  PENDING     // 等待处理
-  PROCESSING  // 处理中
-  COMPLETED   // 已完成
-  FAILED      // 失败
-  CANCELLED   // 已取消
-}
+// ProcessStatus 常量（SQLite不支持enum）:
+// "PENDING" - 等待处理
+// "PROCESSING" - 处理中
+// "COMPLETED" - 已完成
+// "FAILED" - 失败
+// "CANCELLED" - 已取消
 
 // 异步任务队列模型
 model TaskQueue {
   id               String        @id @default(cuid())
-  type             ProcessType   // 任务类型
-  status           ProcessStatus @default(PENDING)
+  type             String        // 任务类型
+  status           String        @default("PENDING")
   priority         Int           @default(1) // 优先级，数字越大优先级越高
   progress         Float         @default(0) // 进度百分比 0-100
   currentStep      String?       // 当前处理步骤描述
@@ -141,8 +139,8 @@ model TaskQueue {
   completedSteps   Int           @default(0) // 已完成步骤数
   
   // 任务数据
-  inputData        Json          // 输入数据（图片URL、参数等）
-  outputData       Json?         // 输出结果
+  inputData        String        // 输入数据（图片URL、参数等）JSON字符串
+  outputData       String?       // 输出结果 JSON字符串
   errorMessage     String?       // 错误信息
   
   // 时间戳

@@ -6,8 +6,9 @@ import { prisma } from '@/lib/prisma';
 // 获取单个任务详情
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -16,7 +17,7 @@ export async function GET(
 
     const task = await prisma.taskQueue.findFirst({
       where: {
-        id: params.id,
+        id: id,
         userId: session.user.id
       },
       include: {
@@ -59,8 +60,9 @@ export async function GET(
 // 更新任务状态
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -81,7 +83,7 @@ export async function PATCH(
     // 验证任务所有权
     const existingTask = await prisma.taskQueue.findFirst({
       where: {
-        id: params.id,
+        id: id,
         userId: session.user.id
       }
     });
@@ -133,7 +135,7 @@ export async function PATCH(
 
     // 更新任务
     const updatedTask = await prisma.taskQueue.update({
-      where: { id: params.id },
+      where: { id: id },
       data: updateData,
       include: {
         project: {
@@ -166,8 +168,9 @@ export async function PATCH(
 // 取消任务
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -177,7 +180,7 @@ export async function DELETE(
     // 验证任务所有权
     const task = await prisma.taskQueue.findFirst({
       where: {
-        id: params.id,
+        id: id,
         userId: session.user.id
       }
     });
@@ -186,28 +189,14 @@ export async function DELETE(
       return NextResponse.json({ error: '任务不存在' }, { status: 404 });
     }
 
-    // 只能取消未开始或进行中的任务
-    if (task.status === 'COMPLETED' || task.status === 'FAILED') {
-      return NextResponse.json(
-        { error: '无法取消已完成或失败的任务' },
-        { status: 400 }
-      );
-    }
-
-    // 更新任务状态为已取消
-    const updatedTask = await prisma.taskQueue.update({
-      where: { id: params.id },
-      data: {
-        status: 'CANCELLED',
-        completedAt: new Date(),
-        currentStep: '任务已取消'
-      }
+    // 删除任务
+    await prisma.taskQueue.delete({
+      where: { id: id }
     });
 
     return NextResponse.json({
       success: true,
-      message: '任务已取消',
-      task: updatedTask
+      message: '任务已删除'
     });
 
   } catch (error) {

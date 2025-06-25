@@ -10,7 +10,6 @@ import {
   Grid3X3,
   List,
   Search,
-  Filter,
   Upload,
   Trash2,
   Download,
@@ -18,14 +17,11 @@ import {
   MoreHorizontal,
   Check,
   X,
-  Move,
-  Archive,
-  Edit,
-  Settings
+  Edit
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import Navbar from '@/components/navigation/Navbar';
 
@@ -58,14 +54,7 @@ interface ProcessedImage {
   };
 }
 
-interface TaskQueueItem {
-  id: string;
-  type: string;
-  status: string;
-  progress: number;
-  currentStep?: string;
-  createdAt: string;
-}
+
 
 export default function GalleryPage() {
   const { data: session, status } = useSession();
@@ -76,7 +65,6 @@ export default function GalleryPage() {
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [images, setImages] = useState<ProcessedImage[]>([]);
-  const [tasks, setTasks] = useState<TaskQueueItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
@@ -84,6 +72,8 @@ export default function GalleryPage() {
   const [dragOverProject, setDragOverProject] = useState<string | null>(null);
   const [contextMenuProject, setContextMenuProject] = useState<string | null>(null);
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
   // 认证检查
   useEffect(() => {
@@ -97,7 +87,6 @@ export default function GalleryPage() {
     if (session?.user) {
       loadProjects();
       loadImages();
-      loadTasks();
     }
   }, [session]);
 
@@ -108,7 +97,7 @@ export default function GalleryPage() {
         const data = await response.json();
         setProjects(data.projects || []);
       }
-    } catch (error) {
+    } catch {
       // console.error('Failed to load projects:', error);
     }
   };
@@ -120,24 +109,14 @@ export default function GalleryPage() {
         const data = await response.json();
         setImages(data.images || []);
       }
-    } catch (error) {
+    } catch {
       // console.error('Failed to load images:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const loadTasks = async () => {
-    try {
-      const response = await fetch('/api/tasks?limit=10');
-      if (response.ok) {
-        const data = await response.json();
-        setTasks(data.tasks || []);
-      }
-    } catch (error) {
-      // console.error('Failed to load tasks:', error);
-    }
-  };
+
 
   const createProject = async () => {
     const name = prompt('请输入项目名称:');
@@ -164,7 +143,7 @@ export default function GalleryPage() {
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch {
       // console.error('Failed to create project:', error);
       toast({
         title: "创建失败",
@@ -199,7 +178,7 @@ export default function GalleryPage() {
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch {
       // console.error('Failed to rename project:', error);
       toast({
         title: "重命名失败",
@@ -240,7 +219,7 @@ export default function GalleryPage() {
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch {
       // console.error('Failed to delete project:', error);
       toast({
         title: "删除失败",
@@ -303,7 +282,7 @@ export default function GalleryPage() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-    } catch (error) {
+    } catch {
       // console.error('Download failed:', error);
     }
   };
@@ -328,7 +307,7 @@ export default function GalleryPage() {
         title: "下载完成",
         description: `成功下载 ${selectedImagesList.length} 张图片`,
       });
-    } catch (error) {
+    } catch {
       toast({
         title: "下载失败",
         description: "部分图片下载失败，请重试",
@@ -360,7 +339,7 @@ export default function GalleryPage() {
         title: "删除成功",
         description: `成功删除 ${selectedImages.size} 张图片`,
       });
-    } catch (error) {
+    } catch {
       // console.error('Batch delete failed:', error);
       toast({
         title: "删除失败",
@@ -395,7 +374,7 @@ export default function GalleryPage() {
         title: "移动成功",
         description: `成功将 ${selectedImages.size} 张图片移动到 ${targetProject}`,
       });
-    } catch (error) {
+    } catch {
       // console.error('Move to project failed:', error);
       toast({
         title: "移动失败",
@@ -455,7 +434,7 @@ export default function GalleryPage() {
         setSelectedImages(new Set(draggedImageIds));
         moveToProject(projectId);
       }
-    } catch (error) {
+    } catch {
       // console.error('Drop failed:', error);
     }
   };
@@ -483,6 +462,21 @@ export default function GalleryPage() {
       case 'IMAGE_EXPANSION': return '图像扩展';
       case 'IMAGE_UPSCALING': return '高清化';
       default: return type;
+    }
+  };
+
+  // 打开图片查看器
+  const openImageViewer = (imageIndex: number) => {
+    setSelectedImageIndex(imageIndex);
+    setShowImageModal(true);
+  };
+
+  // 图片导航
+  const navigateImage = (direction: 'prev' | 'next') => {
+    if (direction === 'prev') {
+      setSelectedImageIndex((prev) => (prev > 0 ? prev - 1 : filteredImages.length - 1));
+    } else {
+      setSelectedImageIndex((prev) => (prev < filteredImages.length - 1 ? prev + 1 : 0));
     }
   };
 
@@ -625,13 +619,15 @@ export default function GalleryPage() {
                     selectedProject === null ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
                   } ${dragOverProject === null ? 'bg-blue-100 border-2 border-blue-300 border-dashed' : ''}`}
                 >
-                  <div className="flex items-center">
-                    <Image className="w-4 h-4 mr-3" />
-                    所有图片
+                  <div className="flex items-center min-w-0 flex-1">
+                    <Image className="w-4 h-4 mr-3 flex-shrink-0" />
+                    <span className="truncate">所有图片</span>
                   </div>
-                  <span className="text-xs text-gray-500">
-                    {images.length}
-                  </span>
+                  <div className="flex items-center ml-2">
+                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full min-w-[24px] text-center">
+                      {images.length}
+                    </span>
+                  </div>
                 </div>
               </div>
               
@@ -650,12 +646,12 @@ export default function GalleryPage() {
                     onClick={() => setSelectedProject(project.id)}
                     onContextMenu={(e) => handleProjectContextMenu(e, project.id)}
                   >
-                    <div className="flex items-center">
-                      <Folder className="w-4 h-4 mr-3" />
-                      {project.name}
+                    <div className="flex items-center min-w-0 flex-1">
+                      <Folder className="w-4 h-4 mr-3 flex-shrink-0" />
+                      <span className="truncate">{project.name}</span>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs text-gray-500">
+                    <div className="flex items-center ml-2 space-x-1">
+                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full min-w-[24px] text-center">
                         {project._count.processedImages}
                       </span>
                       <div
@@ -674,44 +670,14 @@ export default function GalleryPage() {
             </div>
           </div>
 
-          {/* 任务队列 */}
-          <div className="p-4 border-t">
-            <h3 className="text-sm font-medium text-gray-900 mb-3">处理队列</h3>
-            <div className="space-y-2">
-              {tasks.length === 0 ? (
-                <p className="text-xs text-gray-500">暂无处理任务</p>
-              ) : (
-                tasks.slice(0, 5).map(task => (
-                  <div key={task.id} className="p-2 bg-gray-50 rounded text-xs">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-medium">{getTypeLabel(task.type)}</span>
-                      <span className={getStatusColor(task.status)}>
-                        {task.status}
-                      </span>
-                    </div>
-                    {task.status === 'PROCESSING' && (
-                      <div className="w-full bg-gray-200 rounded-full h-1">
-                        <div 
-                          className="bg-blue-600 h-1 rounded-full transition-all"
-                          style={{ width: `${task.progress}%` }}
-                        ></div>
-                      </div>
-                    )}
-                    {task.currentStep && (
-                      <p className="text-gray-600 mt-1">{task.currentStep}</p>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+
         </div>
 
         {/* 主内容区 */}
         <div className="flex-1 p-6">
           {viewMode === 'grid' ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-              {filteredImages.map(image => (
+              {filteredImages.map((image, index) => (
                 <Card
                   key={image.id}
                   className={`hover:shadow-lg transition-all cursor-pointer group ${
@@ -723,6 +689,8 @@ export default function GalleryPage() {
                   onClick={() => {
                     if (isSelectionMode || selectedImages.size > 0) {
                       toggleImageSelection(image.id);
+                    } else {
+                      openImageViewer(index);
                     }
                   }}
                 >
@@ -739,14 +707,12 @@ export default function GalleryPage() {
                         </span>
                       </div>
                       {(isSelectionMode || selectedImages.size > 0) && (
-                        <div className="absolute top-2 left-2">
-                          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                            selectedImages.has(image.id)
-                              ? 'bg-blue-500 border-blue-500 text-white'
-                              : 'bg-white border-gray-300'
-                          }`}>
-                            {selectedImages.has(image.id) && <Check className="w-4 h-4" />}
-                          </div>
+                        <div className={`absolute top-2 left-2 w-5 h-5 rounded border-2 transition-all duration-200 ${
+                          selectedImages.has(image.id)
+                            ? 'bg-blue-600 border-blue-600 text-white'
+                            : 'border-gray-300 bg-white'
+                        }`}>
+                          {selectedImages.has(image.id) && <Check className="w-4 h-4" />}
                         </div>
                       )}
                       {!isSelectionMode && selectedImages.size === 0 && (
@@ -947,6 +913,57 @@ export default function GalleryPage() {
             <Trash2 className="w-4 h-4 mr-2" />
             删除
           </button>
+        </div>
+      )}
+
+      {/* 图片查看模态框 */}
+      {showImageModal && filteredImages.length > 0 && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="relative max-w-6xl max-h-full">
+            <button
+              onClick={() => setShowImageModal(false)}
+              className="absolute top-4 right-4 w-10 h-10 bg-black bg-opacity-50 text-white rounded-full flex items-center justify-center hover:bg-opacity-75 z-10"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            
+            {filteredImages.length > 1 && (
+              <>
+                <button
+                  onClick={() => navigateImage('prev')}
+                  className="absolute left-4 top-1/2 transform -translate-y-1/2 w-10 h-10 bg-black bg-opacity-50 text-white rounded-full flex items-center justify-center hover:bg-opacity-75 z-10"
+                >
+                  ←
+                </button>
+                <button
+                  onClick={() => navigateImage('next')}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 w-10 h-10 bg-black bg-opacity-50 text-white rounded-full flex items-center justify-center hover:bg-opacity-75 z-10"
+                >
+                  →
+                </button>
+              </>
+            )}
+            
+            <img
+              src={filteredImages[selectedImageIndex]?.processedUrl || filteredImages[selectedImageIndex]?.originalUrl}
+              alt={filteredImages[selectedImageIndex]?.filename}
+              className="max-w-full max-h-full object-contain rounded-lg"
+            />
+            
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-75 text-white px-4 py-2 rounded-lg">
+              <p className="text-center font-medium">
+                {filteredImages[selectedImageIndex]?.filename}
+              </p>
+              <p className="text-center text-sm opacity-75">
+                {getTypeLabel(filteredImages[selectedImageIndex]?.processType)}
+              </p>
+              {filteredImages.length > 1 && (
+                <p className="text-center text-sm opacity-75">
+                  {selectedImageIndex + 1} / {filteredImages.length}
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

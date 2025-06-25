@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -12,7 +12,7 @@ import {
   LogOut,
   User,
   Home,
-  Clock
+  ListTodo
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -48,9 +48,9 @@ export default function Navbar() {
       active: pathname === '/gallery'
     },
     {
-      name: '处理记录',
+      name: '任务中心',
       href: '/history',
-      icon: Clock,
+      icon: ListTodo,
       active: pathname === '/history'
     },
     {
@@ -66,12 +66,12 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
+    <nav className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-orange-500 flex items-center justify-center">
               <Sparkles className="w-4 h-4 text-white" />
             </div>
             <Link href="/" className="text-xl font-bold text-gray-900">
@@ -89,7 +89,7 @@ export default function Navbar() {
                   href={item.href}
                   className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                     item.active
-                      ? 'bg-blue-50 text-blue-600'
+                      ? 'bg-orange-50 text-orange-600'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >
@@ -132,7 +132,7 @@ export default function Navbar() {
                 href={item.href}
                 className={`flex flex-col items-center px-2 py-1 text-xs ${
                   item.active
-                    ? 'text-blue-600'
+                    ? 'text-orange-600'
                     : 'text-gray-600'
                 }`}
               >

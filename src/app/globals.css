@@ -55,11 +55,11 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
-/* 自定义动画 */
+/* 自定义动画 - 简化版本 */
 @keyframes fade-in {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
@@ -67,24 +67,8 @@ body {
   }
 }
 
-@keyframes gradient {
-  0%, 100% {
-    background-size: 200% 200%;
-    background-position: left center;
-  }
-  50% {
-    background-size: 200% 200%;
-    background-position: right center;
-  }
-}
-
 .animate-fade-in {
-  animation: fade-in 0.6s ease-out;
-}
-
-.animate-gradient {
-  background-size: 200% 200%;
-  animation: gradient 3s ease infinite;
+  animation: fade-in 0.5s ease-out;
 }
 
 /* 平滑滚动 */
@@ -98,7 +82,7 @@ html {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: #f8fafc;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -108,4 +92,23 @@ html {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+/* 主题色变量 */
+:root {
+  --primary-orange: #f97316;
+  --primary-orange-light: #fed7aa;
+  --primary-orange-dark: #ea580c;
+  
+  /* 统一的蓝色系统 */
+  --primary-blue: #2563eb;        /* blue-600 - 主要蓝色 */
+  --primary-blue-hover: #1d4ed8;   /* blue-700 - 悬停状态 */
+  --primary-blue-light: #dbeafe;   /* blue-100 - 浅蓝背景 */
+  --primary-blue-lighter: #eff6ff; /* blue-50 - 超浅蓝背景 */
+  --primary-blue-border: #93c5fd;  /* blue-300 - 边框 */
+  --primary-blue-ring: #3b82f6;    /* blue-500 - 焦点环 */
+  
+  --neutral-gray: #6b7280;
+  --neutral-gray-light: #f9fafb;
+  --neutral-gray-dark: #374151;
 }

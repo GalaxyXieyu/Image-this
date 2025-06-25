@@ -67,16 +67,24 @@ async function pollTaskResult(taskId: string, apiKey: string): Promise<Blob> {
 
 export async function POST(request: NextRequest) {
   try {
-    // 验证用户身份
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: '未授权访问' },
-        { status: 401 }
-      );
-    }
-
     const body = await request.json();
+    let userId: string;
+
+    // 检查是否是服务端调用（包含userId参数）
+    if (body.userId && body.serverCall) {
+      // 服务端调用模式：直接使用传入的userId
+      userId = body.userId;
+    } else {
+      // 正常客户端调用：验证用户身份
+      const session = await getServerSession(authOptions);
+      if (!session?.user?.id) {
+        return NextResponse.json(
+          { error: '未授权访问' },
+          { status: 401 }
+        );
+      }
+      userId = session.user.id;
+    }
     const {
       imageUrl,
       xScale = 2.0,
@@ -110,14 +118,14 @@ export async function POST(request: NextRequest) {
         originalUrl: 'temp', // 临时值，稍后更新
         processType: 'IMAGE_EXPANSION',
         status: 'PROCESSING',
-        metadata: {
+        metadata: JSON.stringify({
           xScale,
           yScale,
           bestQuality,
           limitImageSize,
           originalImageSize: imageUrl.length
-        },
-        userId: session.user.id,
+        }),
+        userId: userId,
         projectId: projectId || null
       }
     });
@@ -156,7 +164,7 @@ export async function POST(request: NextRequest) {
       const errorText = await submitResponse.text();
       // console.error('Qwen Outpainting Submit Error:', errorText);
       return NextResponse.json(
-        { error: `扩图任务提交失败: ${submitResponse.statusText}` },
+        { error: `扩图任务提交失败: ${submitResponse.statusText} - ${errorText}` },
         { status: submitResponse.status }
       );
     }
@@ -215,11 +223,11 @@ export async function POST(request: NextRequest) {
           processedUrl: minioUrl,
           status: 'COMPLETED',
           fileSize: finalImageSize,
-          metadata: {
-            ...(processedImage.metadata as object || {}),
+          metadata: JSON.stringify({
+            ...(processedImage.metadata ? JSON.parse(processedImage.metadata as string) : {}),
             taskId,
             processingCompletedAt: new Date().toISOString()
-          }
+          })
         }
       });
 

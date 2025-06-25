@@ -121,16 +121,25 @@ async function submitUpscaleTask(
 
 export async function POST(request: NextRequest) {
   try {
-    // 验证用户身份
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: '未授权访问' },
-        { status: 401 }
-      );
+    const body = await request.json();
+    let userId: string;
+
+    // 检查是否是服务端调用（包含userId参数）
+    if (body.userId && body.serverCall) {
+      // 服务端调用模式：直接使用传入的userId
+      userId = body.userId;
+    } else {
+      // 正常客户端调用：验证用户身份
+      const session = await getServerSession(authOptions);
+      if (!session?.user?.id) {
+        return NextResponse.json(
+          { error: '未授权访问' },
+          { status: 401 }
+        );
+      }
+      userId = session.user.id;
     }
 
-    const body = await request.json();
     const {
       imageUrl,
       upscaleFactor = 2,
@@ -163,12 +172,12 @@ export async function POST(request: NextRequest) {
         originalUrl: 'temp', // 临时值，稍后更新
         processType: 'IMAGE_UPSCALING',
         status: 'PROCESSING',
-        metadata: {
+        metadata: JSON.stringify({
           upscaleFactor,
           prompt,
           originalImageSize: imageUrl.length
-        },
-        userId: session.user.id, // 使用正确的用户ID
+        }),
+        userId: userId, // 使用正确的用户ID
         projectId: projectId || null
       }
     });
@@ -254,12 +263,12 @@ export async function POST(request: NextRequest) {
           processedUrl: minioUrl,
           status: 'COMPLETED',
           fileSize: imageSize,
-          metadata: {
-            ...(processedImage.metadata as object || {}),
+          metadata: JSON.stringify({
+            ...(processedImage.metadata ? JSON.parse(processedImage.metadata as string) : {}),
             taskId: taskId,
             processingCompletedAt: new Date().toISOString(),
             useRealApi: useRealApi
-          }
+          })
         }
       });
 

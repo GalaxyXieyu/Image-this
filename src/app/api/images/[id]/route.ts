@@ -170,7 +170,7 @@ export async function DELETE(
           return parts.slice(2).join('/'); // 跳过空字符串和bucket名称
         }
         return null;
-      } catch {
+      } catch (error) {
         return null;
       }
     };

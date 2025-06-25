@@ -90,133 +90,104 @@ async function pollTaskResult(taskId: string, apiKey: string, type: 'outpaint' |
 // 背景替换函数
 async function replaceBackground(imageUrl: string, referenceImageUrl: string, gptApiKey: string, gptApiUrl: string): Promise<string> {
   // console.log('开始背景替换处理...');
-  const request = {
-    model: 'gpt-4o-image-vip',
-    messages: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'text',
-            text: `Replace the background of the first image with the background from the second reference image. Keep the main subject of the first image unchanged, only replace the background with the style/scene from the reference image.`
-          },
-          {
-            type: 'image_url',
-            image_url: {
-              url: imageUrl
-            }
-          },
-          {
-            type: 'image_url',
-            image_url: {
-              url: referenceImageUrl
-            }
-          }
-        ]
-      }
-    ],
-    seed: Math.floor(Math.random() * 1000000)
-  };
-
-  const response = await fetchWithTimeoutAndRetry(`${gptApiUrl}/v1/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${gptApiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(request)
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`背景替换失败: ${response.statusText} - ${errorText}`);
+  
+  function extractBase64FromDataUrl(dataUrl: string): string {
+    if (dataUrl.startsWith('data:')) {
+      return dataUrl.split(',')[1];
+    }
+    return dataUrl;
   }
 
-  const result = await response.json();
-  // console.log('GPT API 响应:', JSON.stringify(result, null, 2));
+  function base64ToBuffer(base64: string): Buffer {
+    return Buffer.from(base64, 'base64');
+  }
 
-  // 从GPT响应中提取生成的图像URL
-  if (result.choices && result.choices[0] && result.choices[0].message) {
-    const message = result.choices[0].message;
-    // console.log('GPT message content:', message.content);
+  try {
+    const FormData = require('form-data');
+    
+    // 创建FormData
+    const formData = new FormData();
+    
+    // 处理输入的图片URL（可能是base64或http URL）
+    let originalImageBuffer: Buffer;
+    let referenceImageBuffer: Buffer;
 
-    // 检查content字段中的markdown格式图片链接
-    if (message.content && typeof message.content === 'string') {
-      // 使用正则表达式提取markdown格式的图片链接 - 改进版本
-      const imageUrlRegex = /!\[.*?\]\((https?:\/\/[^\s\)]+\.(?:jpg|jpeg|png|gif|webp))\)/gi;
-      const matches = [...message.content.matchAll(imageUrlRegex)];
-
-      if (matches.length > 0) {
-        const extractedUrl = matches[0][1];
-        // console.log('从markdown格式中提取到图片URL:', extractedUrl);
-        return extractedUrl;
+    if (imageUrl.startsWith('data:')) {
+      // base64格式
+      const base64Data = extractBase64FromDataUrl(imageUrl);
+      originalImageBuffer = base64ToBuffer(base64Data);
+    } else {
+      // HTTP URL，需要下载
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        throw new Error('下载原始图片失败');
       }
+      const arrayBuffer = await response.arrayBuffer();
+      originalImageBuffer = Buffer.from(arrayBuffer);
+    }
 
-      // 更宽泛的markdown格式匹配（不限制文件扩展名）
-      const broadImageUrlRegex = /!\[.*?\]\((https?:\/\/[^\s\)]+)\)/gi;
-      const broadMatches = [...message.content.matchAll(broadImageUrlRegex)];
-
-      if (broadMatches.length > 0) {
-        const extractedUrl = broadMatches[0][1];
-        // console.log('从宽泛markdown格式中提取到图片URL:', extractedUrl);
-        return extractedUrl;
+    if (referenceImageUrl.startsWith('data:')) {
+      // base64格式
+      const base64Data = extractBase64FromDataUrl(referenceImageUrl);
+      referenceImageBuffer = base64ToBuffer(base64Data);
+    } else {
+      // HTTP URL，需要下载
+      const response = await fetch(referenceImageUrl);
+      if (!response.ok) {
+        throw new Error('下载参考图片失败');
       }
+      const arrayBuffer = await response.arrayBuffer();
+      referenceImageBuffer = Buffer.from(arrayBuffer);
+    }
+    
+    formData.append('image', originalImageBuffer, {
+      filename: 'original.jpg',
+      contentType: 'image/jpeg'
+    });
+    formData.append('image', referenceImageBuffer, {
+      filename: 'reference.jpg', 
+      contentType: 'image/jpeg'
+    });
+    formData.append('prompt', '把第二张图的产品替换成第一张图的产品，其他都不要改变');
+    formData.append('n', '1');
+    formData.append('size', '1024x1024');
 
-      // 检查是否直接包含URL（带常见图片扩展名）
-      const urlRegex = /(https?:\/\/[^\s]+\.(?:jpg|jpeg|png|gif|webp))/gi;
-      const urlMatches = message.content.match(urlRegex);
-      if (urlMatches && urlMatches.length > 0) {
-        // console.log('从文本中提取到图片URL:', urlMatches[0]);
-        return urlMatches[0];
-      }
+    const apiUrl = gptApiUrl.endsWith('/') ?
+      `${gptApiUrl}v1/images/edits` :
+      `${gptApiUrl}/v1/images/edits`;
 
-      // 更宽泛的URL匹配（filesystem.site域名）
-      const filesystemUrlRegex = /(https?:\/\/filesystem\.site\/[^\s]+)/gi;
-      const filesystemMatches = message.content.match(filesystemUrlRegex);
-      if (filesystemMatches && filesystemMatches.length > 0) {
-        // console.log('从filesystem.site域名中提取到图片URL:', filesystemMatches[0]);
-        return filesystemMatches[0];
-      }
+    const response = await fetchWithTimeoutAndRetry(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${gptApiKey}`,
+        'User-Agent': 'Node.js API Client',
+        ...formData.getHeaders()
+      },
+      body: formData
+    });
 
-      // 检查是否是base64格式
-      if (message.content.startsWith('data:image')) {
-        // console.log('检测到base64格式图片');
-        return message.content;
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`背景替换失败: ${response.statusText} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    // console.log('GPT API 响应:', JSON.stringify(result, null, 2));
+
+    // 从新的API响应格式中提取base64图片
+    if (result.data && Array.isArray(result.data) && result.data.length > 0) {
+      const firstItem = result.data[0];
+      if (firstItem && firstItem.b64_json) {
+        // 返回base64格式的图片数据
+        return `data:image/png;base64,${firstItem.b64_json}`;
       }
     }
 
-    // 检查是否有数组格式的content
-    if (Array.isArray(message.content)) {
-      for (const item of message.content) {
-        if (item.type === 'image_url' && item.image_url && item.image_url.url) {
-          // console.log('从数组content中提取到图片URL:', item.image_url.url);
-          return item.image_url.url;
-        }
-      }
-    }
+    throw new Error('背景替换失败：无法从GPT响应中获取生成的图片');
 
-    // 检查是否有自定义的图像字段
-    if (message.image_url) {
-      // console.log('从image_url字段提取到URL:', message.image_url);
-      return message.image_url;
-    }
+  } catch (error) {
+    throw error;
   }
-
-  // 检查响应的其他可能字段
-  if (result.data && result.data.url) {
-    // console.log('从data.url字段提取到URL:', result.data.url);
-    return result.data.url;
-  }
-
-  if (result.url) {
-    // console.log('从url字段提取到URL:', result.url);
-    return result.url;
-  }
-
-  // 如果无法获取新的图像，抛出错误而不是返回原图
-  // console.error('无法从GPT响应中提取图片URL');
-  // console.error('完整的GPT响应:', JSON.stringify(result, null, 2));
-  throw new Error('背景替换失败：无法从GPT响应中获取生成的图片');
 }
 
 // 扩图函数
@@ -349,13 +320,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 验证用户登录状态
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: '用户未登录' },
-        { status: 401 }
-      );
+    // 检查是否是服务端调用（包含userId参数）
+    let userId: string;
+    if (body.userId && body.serverCall) {
+      // 服务端调用模式：直接使用传入的userId
+      userId = body.userId;
+    } else {
+      // 正常客户端调用：验证用户身份
+      const session = await getServerSession(authOptions);
+      if (!session?.user?.id) {
+        return NextResponse.json(
+          { error: '用户未登录' },
+          { status: 401 }
+        );
+      }
+      userId = session.user.id;
     }
 
     // 创建处理记录
@@ -365,8 +344,8 @@ export async function POST(request: NextRequest) {
         originalUrl: imageUrl,
         processType: 'ONE_CLICK_WORKFLOW',
         status: 'PROCESSING',
-        userId: session.user.id,
-        metadata: {
+        userId: userId,
+        metadata: JSON.stringify({
           xScale,
           yScale,
           upscaleFactor,
@@ -374,7 +353,7 @@ export async function POST(request: NextRequest) {
           enableOutpaint,
           enableUpscale,
           referenceImageUrl
-        }
+        })
       }
     });
 
@@ -515,15 +494,15 @@ export async function POST(request: NextRequest) {
           processedUrl: minioUrl,
           status: 'COMPLETED',
           fileSize: imageSize,
-          metadata: {
-            ...(processedImage.metadata as any),
+          metadata: JSON.stringify({
+            ...(processedImage.metadata ? JSON.parse(processedImage.metadata as string) : {}),
             processingCompletedAt: new Date().toISOString(),
             processSteps: {
               backgroundReplace: enableBackgroundReplace && !!backgroundResult,
               outpaint: enableOutpaint && !!outpaintResult,
               upscale: enableUpscale && !!upscaleResult
             }
-          }
+          })
         }
       });
 
