@@ -98,88 +98,114 @@ async function replaceBackground(imageUrl: string, referenceImageUrl: string, gp
     return dataUrl;
   }
 
-  function base64ToBuffer(base64: string): Buffer {
-    return Buffer.from(base64, 'base64');
-  }
-
   try {
-    const FormData = require('form-data');
-    
-    // 创建FormData
-    const formData = new FormData();
-    
-    // 处理输入的图片URL（可能是base64或http URL）
-    let originalImageBuffer: Buffer;
-    let referenceImageBuffer: Buffer;
+    // 使用正确的GPT-4-vision API实现
+    const originalBase64 = extractBase64FromDataUrl(imageUrl);
+    const referenceBase64 = extractBase64FromDataUrl(referenceImageUrl);
 
-    if (imageUrl.startsWith('data:')) {
-      // base64格式
-      const base64Data = extractBase64FromDataUrl(imageUrl);
-      originalImageBuffer = base64ToBuffer(base64Data);
-    } else {
-      // HTTP URL，需要下载
-      const response = await fetch(imageUrl);
-      if (!response.ok) {
-        throw new Error('下载原始图片失败');
-      }
-      const arrayBuffer = await response.arrayBuffer();
-      originalImageBuffer = Buffer.from(arrayBuffer);
-    }
+    const prompt = `请将第二张图片中的所有产品替换为第一张图片的产品，要求：
 
-    if (referenceImageUrl.startsWith('data:')) {
-      // base64格式
-      const base64Data = extractBase64FromDataUrl(referenceImageUrl);
-      referenceImageBuffer = base64ToBuffer(base64Data);
-    } else {
-      // HTTP URL，需要下载
-      const response = await fetch(referenceImageUrl);
-      if (!response.ok) {
-        throw new Error('下载参考图片失败');
+1. 保持原图产品的形状、材质、特征比例、摆放角度及数量完全一致
+2. 仅保留产品包装外壳，不得出现任何成品材质（如口红壳中不得显示口红）
+3. 禁用背景虚化效果，确保画面清晰呈现所有产品
+4. 产品的比例一定要保持，相对瘦长就瘦长，相对粗就相对粗`;
+
+    const content = [
+      { type: "text", text: prompt },
+      {
+        type: "image_url",
+        image_url: {
+          url: `data:image/png;base64,${originalBase64}`
+        }
+      },
+      {
+        type: "image_url",
+        image_url: {
+          url: `data:image/png;base64,${referenceBase64}`
+        }
       }
-      const arrayBuffer = await response.arrayBuffer();
-      referenceImageBuffer = Buffer.from(arrayBuffer);
-    }
+    ];
     
-    formData.append('image', originalImageBuffer, {
-      filename: 'original.jpg',
-      contentType: 'image/jpeg'
-    });
-    formData.append('image', referenceImageBuffer, {
-      filename: 'reference.jpg', 
-      contentType: 'image/jpeg'
-    });
-    formData.append('prompt', '把第二张图的产品替换成第一张图的产品，其他都不要改变');
-    formData.append('n', '1');
-    formData.append('size', '1024x1024');
+    const payload = {
+      model: "gpt-4o-image-vip",
+      messages: [
+        {
+          role: "user",
+          content: content
+        }
+      ],
+      max_tokens: 124000
+    };
 
     const apiUrl = gptApiUrl.endsWith('/') ?
-      `${gptApiUrl}v1/images/edits` :
-      `${gptApiUrl}/v1/images/edits`;
+      `${gptApiUrl}v1/chat/completions` :
+      `${gptApiUrl}/v1/chat/completions`;
 
     const response = await fetchWithTimeoutAndRetry(apiUrl, {
       method: 'POST',
       headers: {
+        'Accept': 'application/json',
         'Authorization': `Bearer ${gptApiKey}`,
-        'User-Agent': 'Node.js API Client',
-        ...formData.getHeaders()
+        'Content-Type': 'application/json'
       },
-      body: formData
+      body: JSON.stringify(payload)
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`背景替换失败: ${response.statusText} - ${errorText}`);
+      throw new Error(`背景替换失败: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const result = await response.json();
     // console.log('GPT API 响应:', JSON.stringify(result, null, 2));
 
-    // 从新的API响应格式中提取base64图片
-    if (result.data && Array.isArray(result.data) && result.data.length > 0) {
-      const firstItem = result.data[0];
-      if (firstItem && firstItem.b64_json) {
-        // 返回base64格式的图片数据
-        return `data:image/png;base64,${firstItem.b64_json}`;
+    // 从GPT-4-vision响应中提取图片URL
+    if (result.choices && result.choices.length > 0) {
+      const message = result.choices[0].message;
+      if (message.content) {
+        const content = message.content;
+        let imageUrl = null;
+
+        // 尝试各种格式的图片URL匹配
+        const markdownImageMatch = content.match(/!\[.*?\]\((https?:\/\/[^\)]+)\)/);
+        if (markdownImageMatch) {
+          imageUrl = markdownImageMatch[1];
+        }
+
+        if (!imageUrl) {
+          const downloadLinkMatch = content.match(/\[点击下载\]\((https?:\/\/[^\)]+)\)/);
+          if (downloadLinkMatch) {
+            imageUrl = downloadLinkMatch[1];
+          }
+        }
+
+        if (!imageUrl) {
+          const filesystemMatch = content.match(/(https:\/\/filesystem\.site\/[^\s\)]+)/);
+          if (filesystemMatch) {
+            imageUrl = filesystemMatch[1];
+          }
+        }
+
+        if (!imageUrl) {
+          const httpMatch = content.match(/(https?:\/\/[^\s\)]+\.(?:png|jpg|jpeg|gif|webp))/i);
+          if (httpMatch) {
+            imageUrl = httpMatch[1];
+          }
+        }
+
+        if (imageUrl) {
+          // 下载图片并转换为base64
+          const imageResponse = await fetch(imageUrl, {
+            signal: AbortSignal.timeout(600000)
+          });
+          if (!imageResponse.ok) {
+            throw new Error('下载生成的图片失败');
+          }
+
+          const imageArrayBuffer = await imageResponse.arrayBuffer();
+          const imageBase64 = Buffer.from(imageArrayBuffer).toString('base64');
+          return `data:image/jpeg;base64,${imageBase64}`;
+        }
       }
     }
 
