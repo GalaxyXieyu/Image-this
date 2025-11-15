@@ -25,10 +25,11 @@ import {
   ChevronRight,
   ZoomIn,
   CheckCircle,
-  Trash2
+  Trash2,
+  Image
 } from "lucide-react";
 
-type ActiveTab = "one-click" | "background" | "expansion" | "upscaling";
+type ActiveTab = "one-click" | "background" | "expansion" | "upscaling" | "watermark";
 
 interface UploadedImage {
   id: string;
@@ -71,6 +72,20 @@ export default function WorkspacePage() {
   const [processedResults, setProcessedResults] = useState<ProcessedResult[]>([]);
   const [showResultModal, setShowResultModal] = useState(false);
   const [selectedResultIndex, setSelectedResultIndex] = useState<number | null>(null);
+  
+  // 水印相关状态
+  const [enableWatermark, setEnableWatermark] = useState(false);
+  const [watermarkText, setWatermarkText] = useState('Sample Watermark');
+  const [watermarkOpacity, setWatermarkOpacity] = useState(0.3);
+  const [watermarkPosition, setWatermarkPosition] = useState('bottom-right');
+  const [watermarkType, setWatermarkType] = useState<'text' | 'logo'>('text');
+  const [watermarkLogo, setWatermarkLogo] = useState<UploadedImage | null>(null);
+  const [showWatermarkPreview, setShowWatermarkPreview] = useState(false);
+  
+  // 输出分辨率
+  const [outputResolution, setOutputResolution] = useState('original');
+  
+  const watermarkLogoInputRef = useRef<HTMLInputElement>(null);
   
   // 新增：任务管理状态
   const [activeTasks, setActiveTasks] = useState<Task[]>([]);
@@ -206,6 +221,7 @@ export default function WorkspacePage() {
       case 'BACKGROUND_REMOVAL': return '背景替换';
       case 'IMAGE_EXPANSION': return '图像扩展';
       case 'IMAGE_UPSCALING': return '图像高清化';
+      case 'WATERMARK': return '叠加水印';
       default: return type;
     }
   };
@@ -325,7 +341,7 @@ export default function WorkspacePage() {
       id: "one-click" as ActiveTab,
       title: "一键增强",
       icon: Wand2,
-      description: "背景替换 + 扩图 + 高清化",
+      description: "背景替换 + 扩图 + 高清化 + 水印",
       color: "orange"
     },
     {
@@ -348,6 +364,13 @@ export default function WorkspacePage() {
       icon: Zap,
       description: "AI超分辨率",
       color: "orange"
+    },
+    {
+      id: "watermark" as ActiveTab,
+      title: "叠加水印",
+      icon: FileImage,
+      description: "添加文字水印",
+      color: "blue"
     }
   ];
 
@@ -481,6 +504,43 @@ export default function WorkspacePage() {
     }
   };
 
+  const handleWatermarkLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!isValidImageFile(file)) {
+      toast({
+        title: "文件格式错误",
+        description: "请选择有效的图片文件（JPG、PNG等）",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const id = `logo-${Date.now()}`;
+    const preview = URL.createObjectURL(file);
+    setWatermarkLogo({
+      id,
+      file,
+      preview,
+      name: file.name
+    });
+
+    toast({
+      title: "水印Logo上传成功",
+      description: file.name,
+    });
+
+    event.target.value = '';
+  };
+
+  const removeWatermarkLogo = () => {
+    if (watermarkLogo) {
+      URL.revokeObjectURL(watermarkLogo.preview);
+      setWatermarkLogo(null);
+    }
+  };
+
   const clearAllImages = () => {
     uploadedImages.forEach(img => URL.revokeObjectURL(img.preview));
     setUploadedImages([]);
@@ -576,6 +636,8 @@ export default function WorkspacePage() {
         await handleOneClick();
       } else if (activeTab === 'background') {
         await handleBackgroundReplace();
+      } else if (activeTab === 'watermark') {
+        await handleWatermark();
       }
     } catch (error) {
       console.error('处理失败:', error);
@@ -629,6 +691,12 @@ export default function WorkspacePage() {
     const yScale = parseFloat((document.getElementById('yScale') as HTMLInputElement)?.value || '2.0');
     const upscaleFactor = parseInt((document.getElementById('upscaleFactor') as HTMLInputElement)?.value || '2');
 
+    // 准备logo数据
+    let watermarkLogoData: string | undefined;
+    if (enableWatermark && watermarkType === 'logo' && watermarkLogo) {
+      watermarkLogoData = await resizeImageForAPI(watermarkLogo.preview);
+    }
+
     const taskData = [];
     for (let i = 0; i < uploadedImages.length; i++) {
       const image = uploadedImages[i];
@@ -648,6 +716,13 @@ export default function WorkspacePage() {
         enableBackgroundReplace: !!referenceImage,
         enableOutpaint: true,
         enableUpscale: true,
+        enableWatermark,
+        watermarkText,
+        watermarkOpacity,
+        watermarkPosition,
+        watermarkType,
+        watermarkLogoUrl: watermarkLogoData,
+        outputResolution,
       });
     }
 
@@ -675,6 +750,33 @@ export default function WorkspacePage() {
     }
 
     await createBatchTasks('BACKGROUND_REMOVAL', taskData);
+  };
+
+  const handleWatermark = async () => {
+    const taskData = [];
+    
+    // 准备logo数据
+    let watermarkLogoData: string | undefined;
+    if (watermarkType === 'logo' && watermarkLogo) {
+      watermarkLogoData = await resizeImageForAPI(watermarkLogo.preview);
+    }
+    
+    for (let i = 0; i < uploadedImages.length; i++) {
+      const image = uploadedImages[i];
+      const resizedImageUrl = await resizeImageForAPI(image.preview);
+      
+      taskData.push({
+        imageUrl: resizedImageUrl,
+        watermarkText,
+        watermarkOpacity,
+        watermarkPosition,
+        watermarkType,
+        watermarkLogoUrl: watermarkLogoData,
+        outputResolution,
+      });
+    }
+
+    await createBatchTasks('WATERMARK', taskData);
   };
 
   const renderTabContent = () => {
@@ -997,6 +1099,258 @@ export default function WorkspacePage() {
                 />
               </div>
             )}
+
+            {activeTab === "watermark" && (
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="watermarkType">水印类型</Label>
+                  <select
+                    id="watermarkType"
+                    value={watermarkType}
+                    onChange={(e) => setWatermarkType(e.target.value as 'text' | 'logo')}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
+                  >
+                    <option value="text">文字水印</option>
+                    <option value="logo">Logo水印</option>
+                  </select>
+                </div>
+                
+                {watermarkType === 'text' ? (
+                  <div>
+                    <Label htmlFor="watermarkText">水印文字</Label>
+                    <Input
+                      id="watermarkText"
+                      type="text"
+                      value={watermarkText}
+                      onChange={(e) => setWatermarkText(e.target.value)}
+                      placeholder="输入水印文字..."
+                      className="mt-1"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <Label>Logo图片（支持PNG透明背景）</Label>
+                    {!watermarkLogo ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full mt-1"
+                        onClick={() => watermarkLogoInputRef.current?.click()}
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        上传Logo
+                      </Button>
+                    ) : (
+                      <div className="mt-1 p-3 border border-gray-300 rounded-md">
+                        <div className="flex items-center gap-3">
+                          <div className="w-16 h-16 border border-gray-200 rounded overflow-hidden bg-gray-50">
+                            <img src={watermarkLogo.preview} alt="Logo" className="w-full h-full object-contain" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">{watermarkLogo.name}</p>
+                            <p className="text-xs text-gray-500">透明背景Logo</p>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={removeWatermarkLogo}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                <div>
+                  <Label htmlFor="watermarkOpacity">水印透明度: {(watermarkOpacity * 100).toFixed(0)}%</Label>
+                  <input
+                    id="watermarkOpacity"
+                    type="range"
+                    min="0.1"
+                    max="1"
+                    step="0.1"
+                    value={watermarkOpacity}
+                    onChange={(e) => setWatermarkOpacity(parseFloat(e.target.value))}
+                    className="mt-1 w-full"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="watermarkPosition">水印位置</Label>
+                  <select
+                    id="watermarkPosition"
+                    value={watermarkPosition}
+                    onChange={(e) => setWatermarkPosition(e.target.value)}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
+                  >
+                    <option value="top-left">左上</option>
+                    <option value="top-right">右上</option>
+                    <option value="bottom-left">左下</option>
+                    <option value="bottom-right">右下</option>
+                    <option value="center">居中</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <Label htmlFor="outputResolution">输出分辨率</Label>
+                  <select
+                    id="outputResolution"
+                    value={outputResolution}
+                    onChange={(e) => setOutputResolution(e.target.value)}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
+                  >
+                    <option value="original">原始分辨率</option>
+                    <option value="1920x1080">1920x1080 (Full HD)</option>
+                    <option value="2560x1440">2560x1440 (2K)</option>
+                    <option value="3840x2160">3840x2160 (4K)</option>
+                    <option value="1080x1080">1080x1080 (正方形)</option>
+                    <option value="1024x1024">1024x1024 (正方形)</option>
+                    <option value="2048x2048">2048x2048 (正方形)</option>
+                  </select>
+                </div>
+                
+                {uploadedImages.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setShowWatermarkPreview(true)}
+                  >
+                    <ZoomIn className="w-4 h-4 mr-2" />
+                    预览水印效果
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {activeTab === "one-click" && (
+              <>
+                <div className="mt-4">
+                  <Label htmlFor="oneClickOutputResolution" className="text-sm">输出分辨率</Label>
+                  <select
+                    id="oneClickOutputResolution"
+                    value={outputResolution}
+                    onChange={(e) => setOutputResolution(e.target.value)}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
+                  >
+                    <option value="original">原始分辨率</option>
+                    <option value="1920x1080">1920x1080 (Full HD)</option>
+                    <option value="2560x1440">2560x1440 (2K)</option>
+                    <option value="3840x2160">3840x2160 (4K)</option>
+                    <option value="1080x1080">1080x1080 (正方形)</option>
+                    <option value="1024x1024">1024x1024 (正方形)</option>
+                    <option value="2048x2048">2048x2048 (正方形)</option>
+                  </select>
+                </div>
+                <div className="mt-4 p-4 border border-blue-200 rounded-lg bg-blue-50">
+                  <div className="flex items-center gap-2 mb-3">
+                    <input
+                      type="checkbox"
+                      id="enableWatermark"
+                      checked={enableWatermark}
+                      onChange={(e) => setEnableWatermark(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 rounded"
+                    />
+                    <Label htmlFor="enableWatermark" className="text-sm font-medium text-gray-900 cursor-pointer">
+                      启用水印功能
+                    </Label>
+                  </div>
+                  {enableWatermark && (
+                    <div className="space-y-3 ml-6">
+                      <div>
+                        <Label htmlFor="oneClickWatermarkType" className="text-sm">水印类型</Label>
+                        <select
+                          id="oneClickWatermarkType"
+                          value={watermarkType}
+                          onChange={(e) => setWatermarkType(e.target.value as 'text' | 'logo')}
+                          className="mt-1 block w-full border border-gray-300 rounded-md px-2 py-1 bg-white text-sm"
+                        >
+                          <option value="text">文字水印</option>
+                          <option value="logo">Logo水印</option>
+                        </select>
+                      </div>
+                      {watermarkType === 'text' ? (
+                        <div>
+                          <Label htmlFor="oneClickWatermarkText" className="text-sm">水印文字</Label>
+                          <Input
+                            id="oneClickWatermarkText"
+                            type="text"
+                            value={watermarkText}
+                            onChange={(e) => setWatermarkText(e.target.value)}
+                            placeholder="输入水印文字..."
+                            className="mt-1 text-sm"
+                          />
+                        </div>
+                      ) : (
+                        <div>
+                          <Label className="text-sm">Logo图片</Label>
+                          {watermarkLogo ? (
+                            <div className="mt-1 p-2 border border-gray-300 rounded-md bg-white">
+                              <div className="flex items-center gap-2">
+                                <img src={watermarkLogo.preview} alt="Logo" className="w-8 h-8 object-contain" />
+                                <span className="text-xs flex-1 truncate">{watermarkLogo.name}</span>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={removeWatermarkLogo}
+                                  className="h-6 px-2"
+                                >
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="w-full mt-1"
+                              onClick={() => watermarkLogoInputRef.current?.click()}
+                            >
+                              <Upload className="w-3 h-3 mr-1" />
+                              上传Logo
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                      <div>
+                        <Label htmlFor="oneClickWatermarkOpacity" className="text-sm">
+                          水印透明度: {(watermarkOpacity * 100).toFixed(0)}%
+                        </Label>
+                        <input
+                          id="oneClickWatermarkOpacity"
+                          type="range"
+                          min="0.1"
+                          max="1"
+                          step="0.1"
+                          value={watermarkOpacity}
+                          onChange={(e) => setWatermarkOpacity(parseFloat(e.target.value))}
+                          className="mt-1 w-full"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="oneClickWatermarkPosition" className="text-sm">水印位置</Label>
+                        <select
+                          id="oneClickWatermarkPosition"
+                          value={watermarkPosition}
+                          onChange={(e) => setWatermarkPosition(e.target.value)}
+                          className="mt-1 block w-full border border-gray-300 rounded-md px-2 py-1 bg-white text-sm"
+                        >
+                          <option value="top-left">左上</option>
+                          <option value="top-right">右上</option>
+                          <option value="bottom-left">左下</option>
+                          <option value="bottom-right">右下</option>
+                          <option value="center">居中</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -1085,6 +1439,13 @@ export default function WorkspacePage() {
           className="hidden"
           onChange={handleReferenceUpload}
         />
+        <input
+          ref={watermarkLogoInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleWatermarkLogoUpload}
+        />
       </div>
     );
 
@@ -1094,57 +1455,65 @@ export default function WorkspacePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <div className="container mx-auto px-4 py-6 max-w-7xl">
         {/* 页面标题 */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+        <div className="text-center mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 mb-1">
             AI 图像工作台
           </h1>
-          <p className="text-gray-600">
+          <p className="text-gray-600 text-sm">
             使用先进的 AI 技术进行图像处理和增强
           </p>
         </div>
 
-        {/* 标签页导航 */}
-        <div className="mb-8">
-          <div className="flex flex-wrap justify-center gap-2">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`group flex items-center gap-3 px-6 py-3 rounded-xl font-medium transition-all duration-300 ${
-                    isActive
-                      ? tab.color === 'orange'
-                        ? 'bg-orange-500 hover:bg-orange-600 text-white shadow-lg scale-105'
-                        : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg scale-105'
-                      : 'bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-gray-200 shadow-sm'
-                  }`}
-                >
-                  <Icon className={`w-5 h-5 ${
-                    isActive 
-                      ? 'text-white' 
-                      : tab.color === 'orange' 
-                        ? 'text-orange-500' 
-                        : 'text-blue-600'
-                  }`} />
-                  <div className="text-left">
-                    <div className="font-semibold">{tab.title}</div>
-                    <div className={`text-xs ${isActive ? 'text-white text-opacity-90' : 'text-gray-500'}`}>
-                      {tab.description}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
+        {/* 侧边栏布局 */}
+        <div className="flex gap-6">
+          {/* 左侧边栏 - 功能导航 */}
+          <div className="w-64 flex-shrink-0">
+            <Card className="bg-white border-0 shadow-lg sticky top-6">
+              <CardHeader className="pb-4 px-4 pt-5">
+                <CardTitle className="text-lg font-bold text-gray-800">功能模块</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1 px-3 pb-4">
+                {tabs.map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`w-full flex items-center gap-3 px-3 py-3 rounded-md font-medium transition-all duration-200 text-left group ${
+                        isActive
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <Icon className={`w-5 h-5 flex-shrink-0 transition-transform group-hover:scale-110 ${
+                        isActive 
+                          ? 'text-white' 
+                          : 'text-gray-500'
+                      }`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold truncate">{tab.title}</div>
+                        <div className={`text-xs mt-0.5 truncate ${
+                          isActive ? 'text-blue-100' : 'text-gray-500'
+                        }`}>
+                          {tab.description}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* 右侧内容区域 */}
+          <div className="flex-1 min-w-0">
+            {renderTabContent()}
           </div>
         </div>
-
-        {/* 标签页内容 */}
-        {renderTabContent()}
 
         {/* 图片预览模态框 */}
         {showImageModal && (

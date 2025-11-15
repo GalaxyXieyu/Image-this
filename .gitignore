@@ -133,7 +133,8 @@ certbot/
 # Uploads and temporary files
 uploads/
 public/temp/
-public/uploads/
+public/uploads/*
+!public/uploads/.gitkeep
 
 # Application logs
 logs/*.log

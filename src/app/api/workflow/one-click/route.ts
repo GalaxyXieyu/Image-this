@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { uploadBase64ImageToMinio } from '@/lib/minio';
+import { uploadBase64ImageToMinio } from '@/lib/storage';
 
 // 带超时和重试的fetch函数
 async function fetchWithTimeoutAndRetry(
@@ -218,7 +218,9 @@ async function replaceBackground(imageUrl: string, referenceImageUrl: string, gp
 
 // 扩图函数
 async function outpaintImage(imageUrl: string, apiKey: string, xScale = 2.0, yScale = 2.0) {
-
+  console.log('[扩图] 开始提交任务...');
+  const submitStartTime = Date.now();
+  
   const request = {
     model: 'image-out-painting',
     input: { image_url: imageUrl },
@@ -229,8 +231,6 @@ async function outpaintImage(imageUrl: string, apiKey: string, xScale = 2.0, ySc
       limit_image_size: true
     }
   };
-
-  // console.log('扩图API请求参数:', JSON.stringify(request, null, 2));
 
   const response = await fetchWithTimeoutAndRetry(
     'https://dashscope.aliyuncs.com/api/v1/services/aigc/image2image/out-painting',
@@ -251,20 +251,29 @@ async function outpaintImage(imageUrl: string, apiKey: string, xScale = 2.0, ySc
   }
 
   const result = await response.json();
-  // console.log('扩图任务提交响应:', JSON.stringify(result, null, 2));
-
   const taskId = result.output?.task_id;
 
   if (!taskId) {
     throw new Error('扩图任务提交失败，未获取到 task_id');
   }
 
-  // console.log('扩图任务提交成功，task_id:', taskId);
-  return pollTaskResult(taskId, apiKey, 'outpaint');
+  const submitDuration = ((Date.now() - submitStartTime) / 1000).toFixed(2);
+  console.log(`[扩图] 任务提交成功，task_id: ${taskId}, 耗时: ${submitDuration}秒`);
+  console.log(`[扩图] 开始轮询任务结果...`);
+  
+  const pollStartTime = Date.now();
+  const result_blob = await pollTaskResult(taskId, apiKey, 'outpaint');
+  const pollDuration = ((Date.now() - pollStartTime) / 1000).toFixed(2);
+  console.log(`[扩图] 轮询完成，耗时: ${pollDuration}秒`);
+  
+  return result_blob;
 }
 
 // 高清化函数
 async function upscaleImage(imageUrl: string, apiKey: string, upscaleFactor = 2) {
+  console.log('[高清化] 开始上传图片到阿里云OSS...');
+  const ossStartTime = Date.now();
+  
   // 导入阿里云上传函数
   const { uploadImageToAliyun } = await import('@/lib/aliyun-upload');
 
@@ -275,6 +284,12 @@ async function upscaleImage(imageUrl: string, apiKey: string, upscaleFactor = 2)
     imageUrl,
     `upscale-workflow-${Date.now()}.jpg`
   );
+  
+  const ossDuration = ((Date.now() - ossStartTime) / 1000).toFixed(2);
+  console.log(`[高清化] OSS上传完成，耗时: ${ossDuration}秒`);
+  console.log(`[高清化] 开始提交高清化任务...`);
+  
+  const submitStartTime = Date.now();
 
   const request = {
     model: 'wanx2.1-imageedit',
@@ -313,8 +328,17 @@ async function upscaleImage(imageUrl: string, apiKey: string, upscaleFactor = 2)
   if (!taskId) {
     throw new Error('高清化任务提交失败，未获取到 task_id');
   }
-
-  return pollTaskResult(taskId, apiKey, 'upscale');
+  
+  const submitDuration = ((Date.now() - submitStartTime) / 1000).toFixed(2);
+  console.log(`[高清化] 任务提交成功，task_id: ${taskId}, 耗时: ${submitDuration}秒`);
+  console.log(`[高清化] 开始轮询任务结果...`);
+  
+  const pollStartTime = Date.now();
+  const result_blob = await pollTaskResult(taskId, apiKey, 'upscale');
+  const pollDuration = ((Date.now() - pollStartTime) / 1000).toFixed(2);
+  console.log(`[高清化] 轮询完成，耗时: ${pollDuration}秒`);
+  
+  return result_blob;
 }
 
 export async function POST(request: NextRequest) {
@@ -328,7 +352,14 @@ export async function POST(request: NextRequest) {
       upscaleFactor = 2,
       enableBackgroundReplace = true,
       enableOutpaint = true,
-      enableUpscale = true
+      enableUpscale = true,
+      enableWatermark = false,
+      watermarkText = 'Sample Watermark',
+      watermarkOpacity = 0.3,
+      watermarkPosition = 'bottom-right',
+      watermarkType = 'text',
+      watermarkLogoUrl,
+      outputResolution = 'original'
     } = body;
 
     // 一键增强只处理单张图片
@@ -378,12 +409,18 @@ export async function POST(request: NextRequest) {
           enableBackgroundReplace,
           enableOutpaint,
           enableUpscale,
+          enableWatermark,
+          watermarkText,
+          watermarkOpacity,
+          watermarkPosition,
+          watermarkType,
+          outputResolution,
           referenceImageUrl
         })
       }
     });
 
-    // console.log('创建一键增强处理记录:', processedImage.id);
+    console.log('=== 创建一键增强处理记录 ===', processedImage.id);
 
     try {
       // 检查API配置
@@ -427,30 +464,35 @@ export async function POST(request: NextRequest) {
     let outpaintResult: Blob | null = null;
     let upscaleResult: Blob | null = null;
 
-    // console.log('开始一键增强处理流程...');
-    // console.log('初始图片URL:', imageUrl);
-    // console.log('参考图片URL:', referenceImageUrl);
-    // console.log('处理选项:', { enableBackgroundReplace, enableOutpaint, enableUpscale });
+    console.log('=== 开始一键增强处理流程 ===');
+    console.log('初始图片URL:', imageUrl);
+    console.log('参考图片URL:', referenceImageUrl);
+    console.log('处理选项:', { enableBackgroundReplace, enableOutpaint, enableUpscale });
+
+    const startTime = Date.now();
 
     // 步骤1：背景替换
     if (enableBackgroundReplace && referenceImageUrl) {
-      // console.log('=== 步骤1：开始背景替换 ===');
+      console.log('=== 步骤1/3：开始背景替换 ===');
+      const bgStartTime = Date.now();
       try {
         backgroundResult = await replaceBackground(imageUrl, referenceImageUrl, gptApiKey!, gptApiUrl);
         processedImageUrl = backgroundResult;
-        // console.log('背景替换完成，新图片URL:', processedImageUrl);
+        const bgDuration = ((Date.now() - bgStartTime) / 1000).toFixed(2);
+        console.log(`背景替换完成，耗时: ${bgDuration}秒`);
       } catch (error) {
         // 背景替换失败，继续使用原图进行后续处理
-        // console.error('背景替换失败，继续使用原图:', error);
+        console.error('背景替换失败，继续使用原图:', error);
       }
     } else {
-      // console.log('=== 跳过背景替换步骤 ===');
+      console.log('=== 跳过背景替换步骤 ===');
     }
 
     // 步骤2：扩图
     if (enableOutpaint) {
-      // console.log('=== 步骤2：开始扩图处理 ===');
-      // console.log('扩图输入URL:', processedImageUrl);
+      console.log('=== 步骤2/3：开始扩图处理 ===');
+      console.log('扩图参数: xScale=' + xScale + ', yScale=' + yScale);
+      const outpaintStartTime = Date.now();
       try {
         outpaintResult = await outpaintImage(processedImageUrl, qwenApiKey, xScale, yScale);
 
@@ -458,28 +500,32 @@ export async function POST(request: NextRequest) {
         const arrayBuffer = await outpaintResult.arrayBuffer();
         const base64 = Buffer.from(arrayBuffer).toString('base64');
         processedImageUrl = `data:image/jpeg;base64,${base64}`;
-        // console.log('扩图处理完成，新图片大小:', arrayBuffer.byteLength, 'bytes');
+        const outpaintDuration = ((Date.now() - outpaintStartTime) / 1000).toFixed(2);
+        console.log(`扩图处理完成，图片大小: ${Math.round(arrayBuffer.byteLength / 1024)}KB, 耗时: ${outpaintDuration}秒`);
 
         // 步骤2.5：裁切扩图结果去除水印
         try {
+          const cropStartTime = Date.now();
           const { cropImage } = await import('@/lib/image-crop');
           processedImageUrl = await cropImage(processedImageUrl, 0.1); // 裁切10%
-          // console.log('扩图结果裁切完成，已去除水印');
+          const cropDuration = ((Date.now() - cropStartTime) / 1000).toFixed(2);
+          console.log(`扩图结果裁切完成，耗时: ${cropDuration}秒`);
         } catch (cropError) {
-          // console.error('裁切失败，继续使用原扩图结果:', cropError);
+          console.error('裁切失败，继续使用原扩图结果:', cropError);
         }
       } catch (error) {
         // 扩图失败，继续使用当前图片进行后续处理
-        // console.error('扩图失败，继续使用当前图片:', error);
+        console.error('扩图失败，继续使用当前图片:', error);
       }
     } else {
-      // console.log('=== 跳过扩图步骤 ===');
+      console.log('=== 跳过扩图步骤 ===');
     }
 
     // 步骤3：高清化
     if (enableUpscale) {
-      // console.log('=== 步骤3：开始高清化处理 ===');
-      // console.log('高清化输入URL:', processedImageUrl);
+      console.log('=== 步骤3/4：开始高清化处理 ===');
+      console.log('高清化倍数:', upscaleFactor);
+      const upscaleStartTime = Date.now();
       try {
         upscaleResult = await upscaleImage(processedImageUrl, qwenApiKey, upscaleFactor);
 
@@ -487,13 +533,37 @@ export async function POST(request: NextRequest) {
         const arrayBuffer = await upscaleResult.arrayBuffer();
         const base64 = Buffer.from(arrayBuffer).toString('base64');
         processedImageUrl = `data:image/jpeg;base64,${base64}`;
-        // console.log('高清化处理完成，新图片大小:', arrayBuffer.byteLength, 'bytes');
+        const upscaleDuration = ((Date.now() - upscaleStartTime) / 1000).toFixed(2);
+        console.log(`高清化处理完成，图片大小: ${Math.round(arrayBuffer.byteLength / 1024)}KB, 耗时: ${upscaleDuration}秒`);
       } catch (error) {
         // 高清化失败，继续使用当前图片
-        // console.error('高清化失败，继续使用当前图片:', error);
+        console.error('高清化失败，继续使用当前图片:', error);
       }
     } else {
-      // console.log('=== 跳过高清化步骤 ===');
+      console.log('=== 跳过高清化步骤 ===');
+    }
+
+    // 步骤4：添加水印
+    if (enableWatermark) {
+      console.log('=== 步骤4/4：开始添加水印 ===');
+      console.log('水印参数:', { watermarkText, watermarkOpacity, watermarkPosition, watermarkType, outputResolution });
+      try {
+        const { addWatermarkToImage } = await import('@/lib/watermark');
+        processedImageUrl = await addWatermarkToImage(
+          processedImageUrl,
+          watermarkText,
+          watermarkOpacity,
+          watermarkPosition,
+          watermarkType,
+          watermarkLogoUrl,
+          outputResolution
+        );
+        console.log('水印添加完成');
+      } catch (error) {
+        console.error('水印添加失败，继续使用当前图片:', error);
+      }
+    } else {
+      console.log('=== 跳过水印步骤 ===');
     }
 
     // 获取最终结果
@@ -510,8 +580,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
+      console.log('=== 开始上传到MinIO ===');
+      const minioStartTime = Date.now();
       // 上传到MinIO
       const minioUrl = await uploadBase64ImageToMinio(finalImageData, `one-click-${processedImage.id}.jpg`);
+      const minioDuration = ((Date.now() - minioStartTime) / 1000).toFixed(2);
+      console.log(`MinIO上传完成，耗时: ${minioDuration}秒`);
+      
+      const totalDuration = ((Date.now() - startTime) / 1000).toFixed(2);
+      console.log(`=== 一键增强流程全部完成，总耗时: ${totalDuration}秒 ===`);
 
       // 更新数据库记录
       const updatedImage = await prisma.processedImage.update({
@@ -526,7 +603,8 @@ export async function POST(request: NextRequest) {
             processSteps: {
               backgroundReplace: enableBackgroundReplace && !!backgroundResult,
               outpaint: enableOutpaint && !!outpaintResult,
-              upscale: enableUpscale && !!upscaleResult
+              upscale: enableUpscale && !!upscaleResult,
+              watermark: enableWatermark
             }
           })
         }
@@ -542,7 +620,8 @@ export async function POST(request: NextRequest) {
           processSteps: {
             backgroundReplace: enableBackgroundReplace && !!backgroundResult,
             outpaint: enableOutpaint && !!outpaintResult,
-            upscale: enableUpscale && !!upscaleResult
+            upscale: enableUpscale && !!upscaleResult,
+            watermark: enableWatermark
           }
         },
         message: '一键AI增强处理完成'

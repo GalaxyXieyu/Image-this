@@ -55,6 +55,9 @@ class TaskProcessor {
         case 'IMAGE_UPSCALING':
           result = await this.processImageUpscaling(task);
           break;
+        case 'WATERMARK':
+          result = await this.processWatermark(task);
+          break;
         default:
           throw new Error(`不支持的任务类型: ${task.type}`);
       }
@@ -170,6 +173,9 @@ class TaskProcessor {
 
   private async processSingleTask(task: { id: string; type: string; inputData: string; totalSteps: number; userId: string }) {
     try {
+      console.log(`=== 开始处理任务 ===`);
+      console.log(`任务ID: ${task.id}, 类型: ${task.type}`);
+      
       // 更新任务状态为处理中
       await prisma.taskQueue.update({
         where: { id: task.id },
@@ -181,17 +187,32 @@ class TaskProcessor {
         }
       });
 
-      // 添加超时机制 - 5分钟超时
-      const taskTimeout = 5 * 60 * 1000; // 5分钟
+      // 添加超时机制 - 10分钟超时
+      const taskTimeout = 10 * 60 * 1000; // 10分钟
       const taskPromise = this.executeTaskWithType(task);
+      
+      let timeoutHandle: NodeJS.Timeout;
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutHandle = setTimeout(async () => {
+          // 获取当前任务状态，看看卡在哪一步了
+          const currentTask = await prisma.taskQueue.findUnique({
+            where: { id: task.id },
+            select: { currentStep: true, progress: true }
+          });
+          const stepInfo = currentTask ? `当前步骤: ${currentTask.currentStep}, 进度: ${currentTask.progress}%` : '未知步骤';
+          reject(new Error(`任务处理超时（10分钟）- ${stepInfo}`));
+        }, taskTimeout);
+      });
       
       const result = await Promise.race([
         taskPromise,
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('任务处理超时')), taskTimeout)
-        )
+        timeoutPromise
       ]);
+      
+      clearTimeout(timeoutHandle!);
 
+      console.log(`任务 ${task.id} 处理成功`);
+      
       // 更新任务为完成状态
       await prisma.taskQueue.update({
         where: { id: task.id },
@@ -208,7 +229,9 @@ class TaskProcessor {
       return result;
 
     } catch (error) {
-      console.error(`[任务处理] 任务失败 ID: ${task.id}, 类型: ${task.type}`, error);
+      console.error(`=== 任务处理失败 ===`);
+      console.error(`任务ID: ${task.id}, 类型: ${task.type}`);
+      console.error(`错误信息:`, error);
       // 更新任务为失败状态
       await prisma.taskQueue.update({
         where: { id: task.id },
@@ -238,6 +261,9 @@ class TaskProcessor {
       case 'IMAGE_UPSCALING':
         result = await this.processImageUpscaling(task);
         break;
+      case 'WATERMARK':
+        result = await this.processWatermark(task);
+        break;
       default:
         throw new Error(`不支持的任务类型: ${task.type}`);
     }
@@ -254,9 +280,17 @@ class TaskProcessor {
       upscaleFactor = 2,
       enableBackgroundReplace = false,
       enableOutpaint = true,
-      enableUpscale = true
+      enableUpscale = true,
+      enableWatermark = false,
+      watermarkText = 'Sample Watermark',
+      watermarkOpacity = 0.3,
+      watermarkPosition = 'bottom-right',
+      watermarkType = 'text',
+      watermarkLogoUrl,
+      outputResolution = 'original'
     } = inputData;
     
+    console.log(`[一键工作流] 开始处理任务 ${task.id}`);
     await this.updateTaskProgress(task.id, 'Step 1/3: 准备处理...', 10, 1);
 
     try {
@@ -264,7 +298,15 @@ class TaskProcessor {
       const apiUrl = process.env.NODE_ENV === 'production' 
         ? `${process.env.NEXTAUTH_URL}/api/workflow/one-click`
         : 'http://localhost:3000/api/workflow/one-click';
+      
+      console.log(`[一键工作流] 调用API: ${apiUrl}`);
 
+      console.log(`[一键工作流] 发送请求，参数:`, { 
+        xScale, yScale, upscaleFactor, 
+        enableBackgroundReplace, enableOutpaint, enableUpscale,
+        enableWatermark, watermarkType, outputResolution 
+      });
+      
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -279,10 +321,19 @@ class TaskProcessor {
           enableBackgroundReplace,
           enableOutpaint,
           enableUpscale,
+          enableWatermark,
+          watermarkText,
+          watermarkOpacity,
+          watermarkPosition,
+          watermarkType,
+          watermarkLogoUrl,
+          outputResolution,
           userId: task.userId,
           serverCall: true
         }),
       });
+      
+      console.log(`[一键工作流] API响应状态: ${response.status}`);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -290,6 +341,7 @@ class TaskProcessor {
       }
 
       const result = await response.json();
+      console.log(`[一键工作流] 处理完成，任务ID: ${task.id}`);
       
       await this.updateTaskProgress(task.id, 'Step 3/3: 处理完成', 100, 3);
 
@@ -298,7 +350,11 @@ class TaskProcessor {
         processedImageUrl: result.data.minioUrl,
         imageData: result.data.imageData,
         processSteps: result.data.processSteps,
-        settings: { xScale, yScale, upscaleFactor, enableBackgroundReplace, enableOutpaint, enableUpscale }
+        settings: { 
+          xScale, yScale, upscaleFactor, 
+          enableBackgroundReplace, enableOutpaint, enableUpscale,
+          enableWatermark, watermarkType, outputResolution
+        }
       };
 
     } catch (error) {
@@ -441,6 +497,68 @@ class TaskProcessor {
 
     } catch (error) {
       await this.updateTaskProgress(task.id, '高清化失败', 0, 0);
+      throw error;
+    }
+  }
+
+  private async processWatermark(task: { id: string; inputData: string; userId: string }) {
+    const inputData = JSON.parse(task.inputData);
+    const { 
+      imageUrl, 
+      watermarkText = 'Sample Watermark', 
+      watermarkOpacity = 0.3, 
+      watermarkPosition = 'bottom-right',
+      watermarkType = 'text',
+      watermarkLogoUrl,
+      outputResolution = 'original'
+    } = inputData;
+    
+    await this.updateTaskProgress(task.id, '水印添加中...', 50, 1);
+    
+    try {
+      const apiUrl = process.env.NODE_ENV === 'production' 
+        ? `${process.env.NEXTAUTH_URL}/api/watermark`
+        : 'http://localhost:3000/api/watermark';
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          imageUrl,
+          watermarkText,
+          watermarkOpacity,
+          watermarkPosition,
+          watermarkType,
+          watermarkLogoUrl,
+          outputResolution,
+          userId: task.userId,
+          serverCall: true
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`水印添加失败: ${errorData.details || response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      await this.updateTaskProgress(task.id, '水印添加完成', 100, 1);
+      
+      return {
+        processedImageId: result.data.id,
+        processedImageUrl: result.data.imageData,
+        watermarkText,
+        watermarkOpacity,
+        watermarkPosition,
+        watermarkType,
+        outputResolution
+      };
+
+    } catch (error) {
+      await this.updateTaskProgress(task.id, '水印添加失败', 0, 0);
       throw error;
     }
   }
