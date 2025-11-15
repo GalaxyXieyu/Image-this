@@ -73,6 +73,10 @@ async function callJimengAPI(prompt: string, referenceImageUrl?: string, width =
     throw new Error('火山引擎即梦API配置缺失');
   }
 
+  console.log(`[即梦API-内部] 准备请求参数...`);
+  console.log(`[即梦API-内部] 分辨率: ${width}x${height}`);
+  console.log(`[即梦API-内部] 有参考图: ${!!referenceImageUrl}`);
+
   // 构建请求参数
   const requestBody: any = {
     req_key: 'jimeng_t2i_v40',
@@ -87,8 +91,10 @@ async function callJimengAPI(prompt: string, referenceImageUrl?: string, width =
   // 如果有参考图片URL，添加到请求中
   if (referenceImageUrl) {
     requestBody.image_urls = [referenceImageUrl];
+    console.log(`[即梦API-内部] 参考图URL: ${referenceImageUrl.substring(0, 50)}...`);
   }
 
+  const signStart = Date.now();
   const bodyStr = JSON.stringify(requestBody);
   const t = new Date();
   const timestamp = t.toISOString().replace(/[-:]|\.\d{3}/g, '').replace('Z', '') + 'Z';
@@ -105,17 +111,36 @@ async function callJimengAPI(prompt: string, referenceImageUrl?: string, width =
   const authorization = generateSignature('POST', '/', query, headers, bodyStr, timestamp, secretKey);
   
   headers['Authorization'] = authorization;
+  
+  const signDuration = ((Date.now() - signStart) / 1000).toFixed(3);
+  console.log(`[即梦API-内部] 签名生成完成，耗时: ${signDuration}秒`);
 
+  const fetchStart = Date.now();
+  console.log(`[即梦API-内部] 发送请求到火山引擎: https://${HOST}/?${query}`);
+  
   const response = await fetch(`https://${HOST}/?${query}`, {
     method: 'POST',
     headers,
     body: bodyStr
   });
 
+  const fetchDuration = ((Date.now() - fetchStart) / 1000).toFixed(2);
+  console.log(`[即梦API-内部] 收到响应，耗时: ${fetchDuration}秒`);
+  console.log(`[即梦API-内部] 响应状态: ${response.status}`);
+
+  const parseStart = Date.now();
   const result = await response.json();
+  const parseDuration = ((Date.now() - parseStart) / 1000).toFixed(3);
+  console.log(`[即梦API-内部] JSON解析完成，耗时: ${parseDuration}秒`);
   
   if (!response.ok || result.code !== 10000) {
+    console.error(`[即梦API-内部] API调用失败:`, result);
     throw new Error(`即梦API调用失败: ${JSON.stringify(result)}`);
+  }
+
+  console.log(`[即梦API-内部] API调用成功，返回图片数量: ${result.data?.binary_data_base64?.length || 0}`);
+  if (result.data?.binary_data_base64?.length > 0) {
+    console.log(`[即梦API-内部] 图片Base64长度: ${result.data.binary_data_base64[0].length}`);
   }
 
   return result.data;
@@ -172,37 +197,68 @@ export async function POST(request: NextRequest) {
     });
 
     try {
+      const startTime = Date.now();
+      console.log(`[即梦API] 开始处理，任务ID: ${processedImage.id}`);
+      
       // 如果有参考图片，先上传到superbed获取公网URL
       let referenceImageUrl: string | undefined;
       if (referenceImage) {
+        const uploadStart = Date.now();
+        console.log(`[即梦API] 开始上传参考图到Superbed...`);
+        
         referenceImageUrl = await uploadBase64ToSuperbed(
           referenceImage,
           `reference-${processedImage.id}.jpg`
         );
+        
+        const uploadDuration = ((Date.now() - uploadStart) / 1000).toFixed(2);
+        console.log(`[即梦API] Superbed上传完成，耗时: ${uploadDuration}秒`);
+        console.log(`[即梦API] 图片URL: ${referenceImageUrl}`);
       }
       
       // 调用即梦API同步生成图片
+      const apiStart = Date.now();
+      console.log(`[即梦API] 开始调用火山引擎即梦API...`);
+      
       const result = await callJimengAPI(prompt, referenceImageUrl, width, height);
+      
+      const apiDuration = ((Date.now() - apiStart) / 1000).toFixed(2);
+      console.log(`[即梦API] 火山引擎API调用完成，耗时: ${apiDuration}秒`);
       
       // 处理生成的图片
       let generatedImageUrl = '';
       if (result.binary_data_base64 && result.binary_data_base64.length > 0) {
-        // 将Base64数据上传到MinIO
+        const saveStart = Date.now();
+        console.log(`[即梦API] 开始保存生成图片到本地...`);
+        
+        // 将Base64数据保存到本地
         const base64Data = result.binary_data_base64[0];
         generatedImageUrl = await uploadBase64ImageToMinio(
           base64Data,
           `jimeng-generated-${processedImage.id}.jpg`
         );
+        
+        const saveDuration = ((Date.now() - saveStart) / 1000).toFixed(2);
+        console.log(`[即梦API] 图片保存完成，耗时: ${saveDuration}秒`);
       }
       
-      // 上传参考图片到MinIO（如果有）
+      // 保存参考图片到本地（如果有）
       let originalMinioUrl = 'generated';
       if (referenceImage) {
+        const refSaveStart = Date.now();
+        console.log(`[即梦API] 开始保存参考图到本地...`);
+        
         originalMinioUrl = await uploadBase64ImageToMinio(
           referenceImage,
           `reference-${processedImage.id}.jpg`
         );
+        
+        const refSaveDuration = ((Date.now() - refSaveStart) / 1000).toFixed(2);
+        console.log(`[即梦API] 参考图保存完成，耗时: ${refSaveDuration}秒`);
       }
+      
+      const totalDuration = ((Date.now() - startTime) / 1000).toFixed(2);
+      console.log(`[即梦API] 总耗时: ${totalDuration}秒`);
 
       // 更新数据库记录
       const updatedImage = await prisma.processedImage.update({

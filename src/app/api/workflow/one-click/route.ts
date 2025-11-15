@@ -308,7 +308,47 @@ export async function POST(request: NextRequest) {
       console.log('=== 跳过扩图步骤 ===');
     }
 
-    // 步骤3：添加水印（跳过高清化，即梦已生成2048x2048高分辨率）
+    // 步骤3：智能画质增强（可选，用于进一步提升质量）
+    if (enableUpscale) {
+      console.log('=== 步骤3/4：开始智能画质增强 ===');
+      const enhanceStartTime = Date.now();
+      try {
+        const apiUrl = process.env.NODE_ENV === 'production' 
+          ? `${process.env.NEXTAUTH_URL}/api/volcengine/enhance`
+          : 'http://localhost:3000/api/volcengine/enhance';
+
+        const response = await fetchWithTimeoutAndRetry(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            imageUrl: processedImageUrl,
+            resolutionBoundary: '720p',
+            enableHdr: false,
+            enableWb: false,
+            resultFormat: 1,
+            jpgQuality: 95,
+            serverCall: true
+          })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.data?.imageData) {
+            processedImageUrl = result.data.imageData;
+            const enhanceDuration = ((Date.now() - enhanceStartTime) / 1000).toFixed(2);
+            console.log(`智能画质增强完成，耗时: ${enhanceDuration}秒`);
+          }
+        }
+      } catch (error) {
+        console.error('智能画质增强失败，继续使用当前图片:', error);
+      }
+    } else {
+      console.log('=== 跳过智能画质增强步骤 ===');
+    }
+
+    // 步骤4：添加水印
     if (enableWatermark) {
       console.log('=== 步骤4/4：开始添加水印 ===');
       console.log('水印参数:', { watermarkText, watermarkOpacity, watermarkPosition, watermarkType, outputResolution });
@@ -368,7 +408,7 @@ export async function POST(request: NextRequest) {
             processSteps: {
               backgroundReplace: enableBackgroundReplace && !!backgroundResult,
               outpaint: enableOutpaint && !!outpaintResult,
-              upscale: enableUpscale && !!upscaleResult,
+              upscale: enableUpscale,
               watermark: enableWatermark
             }
           })
@@ -385,7 +425,7 @@ export async function POST(request: NextRequest) {
           processSteps: {
             backgroundReplace: enableBackgroundReplace && !!backgroundResult,
             outpaint: enableOutpaint && !!outpaintResult,
-            upscale: enableUpscale && !!upscaleResult,
+            upscale: enableUpscale,
             watermark: enableWatermark
           }
         },

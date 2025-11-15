@@ -367,44 +367,64 @@ class TaskProcessor {
     const inputData = JSON.parse(task.inputData);
     const { imageUrl, referenceImageUrl, customPrompt } = inputData;
     
-    await this.updateTaskProgress(task.id, '背景替换处理中...', 30, 1);
+    console.log(`[背景替换] 任务ID: ${task.id}`);
+    console.log(`[背景替换] 使用火山引擎即梦API（直接调用）`);
+    
+    await this.updateTaskProgress(task.id, '即梦图像生成中...', 30, 1);
     
     try {
-      const apiUrl = process.env.NODE_ENV === 'production' 
-        ? `${process.env.NEXTAUTH_URL}/api/gpt/background-replace`
-        : 'http://localhost:3000/api/gpt/background-replace';
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          originalImageUrl: imageUrl,
-          referenceImageUrl,
-          customPrompt,
-          userId: task.userId,
-          serverCall: true
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`背景替换失败: ${errorData.details || response.statusText}`);
+      // 构建提示词：如果有自定义提示词就用，否则使用默认的背景替换提示词
+      let prompt = customPrompt || '保持产品的形状、材质、特征比例、摆放角度及数量完全一致，仅替换背景，禁用背景虚化效果，确保画面清晰，专业摄影，高质量，4K分辨率';
+      
+      // 如果有参考图，在提示词中说明要参考场景风格
+      if (referenceImageUrl && !customPrompt) {
+        prompt = '保持产品主体完全不变，仅替换背景为类似参考场景的风格，保持产品的形状、材质、特征比例、摆放角度及数量完全一致，专业摄影，高质量，4K分辨率';
       }
 
-      const result = await response.json();
+      console.log(`[背景替换] 提示词: ${prompt.substring(0, 50)}...`);
+      console.log(`[背景替换] 有产品图: ${!!imageUrl}`);
+      console.log(`[背景替换] 有参考图: ${!!referenceImageUrl}`);
+      console.log(`[背景替换] 开始直接调用即梦服务...`);
 
-      await this.updateTaskProgress(task.id, '背景替换完成', 100, 1);
+      // 直接调用即梦服务
+      // 即梦API支持多张参考图（image_urls数组），会先上传到图床获取URL
+      const { generateWithJimeng } = await import('@/lib/jimeng-service');
+      
+      // 准备参考图数组：产品图 + 场景参考图（如果有）
+      const referenceImages = [imageUrl];  // 产品图（base64 Data URL）
+      if (referenceImageUrl) {
+        referenceImages.push(referenceImageUrl);  // 场景参考图（base64 Data URL）
+      }
+      
+      console.log(`[背景替换] 将上传${referenceImages.length}张图片到图床...`);
+      
+      const result = await generateWithJimeng(
+        task.userId,
+        prompt,
+        referenceImages,  // 会自动上传到Superbed获取公网URL
+        2048,
+        2048
+      );
+      
+      // 注意：
+      // - imageUrl/referenceImageUrl: 虽然名字叫URL，实际是base64编码的图片数据（data:image/jpeg;base64,...）
+      // - generateWithJimeng会自动上传到Superbed图床获取公网URL
+      // - 即梦API支持0-10张参考图，通过image_urls数组传递
+
+      console.log(`[背景替换] 服务调用成功`);
+      console.log(`[背景替换] 生成图片ID: ${result.id}`);
+
+      await this.updateTaskProgress(task.id, '图像生成完成', 100, 1);
       
       return {
-        processedImageId: result.data.id,
-        processedImageUrl: result.data.imageData,
-        prompt: result.data.prompt
+        processedImageId: result.id,
+        processedImageUrl: result.imageData,
+        prompt: result.prompt
       };
 
     } catch (error) {
-      await this.updateTaskProgress(task.id, '背景替换失败', 0, 0);
+      console.error(`[背景替换] 处理失败:`, error);
+      await this.updateTaskProgress(task.id, '图像生成失败', 0, 0);
       throw error;
     }
   }
@@ -413,12 +433,29 @@ class TaskProcessor {
     const inputData = JSON.parse(task.inputData);
     const { imageUrl, xScale = 2.0, yScale = 2.0 } = inputData;
     
-    await this.updateTaskProgress(task.id, '图像扩展处理中...', 50, 1);
+    console.log(`[智能扩图] 任务ID: ${task.id}`);
+    console.log(`[智能扩图] 使用火山引擎智能扩图API`);
+    
+    await this.updateTaskProgress(task.id, '智能扩图处理中...', 50, 1);
     
     try {
       const apiUrl = process.env.NODE_ENV === 'production' 
-        ? `${process.env.NEXTAUTH_URL}/api/qwen/outpaint`
-        : 'http://localhost:3000/api/qwen/outpaint';
+        ? `${process.env.NEXTAUTH_URL}/api/volcengine/outpaint`
+        : 'http://localhost:3000/api/volcengine/outpaint';
+
+      console.log(`[智能扩图] API地址: ${apiUrl}`);
+
+      // 计算扩展比例
+      const top = Math.min((yScale - 1) / 2, 1.0);
+      const bottom = Math.min((yScale - 1) / 2, 1.0);
+      const left = Math.min((xScale - 1) / 2, 1.0);
+      const right = Math.min((xScale - 1) / 2, 1.0);
+
+      console.log(`[智能扩图] 扩展比例 - top: ${top}, bottom: ${bottom}, left: ${left}, right: ${right}`);
+
+      // 火山扩图需要3-5秒，设置2分钟超时
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2分钟
 
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -427,21 +464,33 @@ class TaskProcessor {
         },
         body: JSON.stringify({
           imageUrl,
-          xScale,
-          yScale,
+          prompt: '扩展图像，保持风格一致',
+          top,
+          bottom,
+          left,
+          right,
+          maxHeight: 1920,
+          maxWidth: 1920,
           userId: task.userId,
           serverCall: true
         }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
+      console.log(`[智能扩图] 开始调用API...`);
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(`扩图失败: ${errorData.details || response.statusText}`);
+        console.error(`[智能扩图] API调用失败:`, errorData);
+        throw new Error(`智能扩图失败: ${errorData.details || response.statusText}`);
       }
 
       const result = await response.json();
+      console.log(`[智能扩图] API调用成功`);
+      console.log(`[智能扩图] 生成图片ID: ${result.data?.id}`);
 
-      await this.updateTaskProgress(task.id, '图像扩展完成', 100, 1);
+      await this.updateTaskProgress(task.id, '智能扩图完成', 100, 1);
       
       return {
         processedImageId: result.data.id,
@@ -451,7 +500,8 @@ class TaskProcessor {
       };
 
     } catch (error) {
-      await this.updateTaskProgress(task.id, '图像扩展失败', 0, 0);
+      console.error(`[智能扩图] 处理失败:`, error);
+      await this.updateTaskProgress(task.id, '智能扩图失败', 0, 0);
       throw error;
     }
   }
@@ -460,12 +510,21 @@ class TaskProcessor {
     const inputData = JSON.parse(task.inputData);
     const { imageUrl, upscaleFactor = 2 } = inputData;
     
-    await this.updateTaskProgress(task.id, '高清化处理中...', 50, 1);
+    console.log(`[智能画质增强] 任务ID: ${task.id}`);
+    console.log(`[智能画质增强] 使用火山引擎智能画质增强API`);
+    
+    await this.updateTaskProgress(task.id, '智能画质增强中...', 50, 1);
     
     try {
       const apiUrl = process.env.NODE_ENV === 'production' 
-        ? `${process.env.NEXTAUTH_URL}/api/qwen/upscale`
-        : 'http://localhost:3000/api/qwen/upscale';
+        ? `${process.env.NEXTAUTH_URL}/api/volcengine/enhance`
+        : 'http://localhost:3000/api/volcengine/enhance';
+
+      console.log(`[智能画质增强] API地址: ${apiUrl}`);
+
+      // 火山画质增强需要3-5秒，设置2分钟超时
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2分钟
 
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -474,20 +533,31 @@ class TaskProcessor {
         },
         body: JSON.stringify({
           imageUrl,
-          upscaleFactor,
+          resolutionBoundary: '720p',
+          enableHdr: false,
+          enableWb: false,
+          resultFormat: 1,
+          jpgQuality: 95,
           userId: task.userId,
           serverCall: true
         }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
+      console.log(`[智能画质增强] 开始调用API...`);
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(`高清化失败: ${errorData.details || response.statusText}`);
+        console.error(`[智能画质增强] API调用失败:`, errorData);
+        throw new Error(`智能画质增强失败: ${errorData.details || response.statusText}`);
       }
 
       const result = await response.json();
+      console.log(`[智能画质增强] API调用成功`);
+      console.log(`[智能画质增强] 生成图片ID: ${result.data?.id}`);
 
-      await this.updateTaskProgress(task.id, '高清化完成', 100, 1);
+      await this.updateTaskProgress(task.id, '智能画质增强完成', 100, 1);
       
       return {
         processedImageId: result.data.id,
@@ -496,7 +566,8 @@ class TaskProcessor {
       };
 
     } catch (error) {
-      await this.updateTaskProgress(task.id, '高清化失败', 0, 0);
+      console.error(`[智能画质增强] 处理失败:`, error);
+      await this.updateTaskProgress(task.id, '智能画质增强失败', 0, 0);
       throw error;
     }
   }
@@ -590,21 +661,32 @@ const processor = new TaskProcessor();
 // 手动触发任务处理
 export async function POST(request: NextRequest) {
   try {
+    console.log('=== Worker收到触发请求 ===');
+    const startTime = Date.now();
+    
     const body = await request.json();
     const { batch = false, maxTasks = parseInt(process.env.MAX_CONCURRENT_TASKS || '2') } = body;
 
+    console.log(`Worker模式: ${batch ? '批量处理' : '单任务处理'}, 最大并发: ${maxTasks}`);
+
     let result;
     if (batch) {
+      console.log('开始批量处理任务...');
       result = await processor.processBatch(maxTasks);
     } else {
+      console.log('开始处理单个任务...');
       result = await processor.processNextTask();
     }
+
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.log(`=== Worker处理完成，总耗时: ${duration}秒 ===`);
 
     return NextResponse.json({
       success: true,
       ...result
     });
   } catch (error) {
+    console.error('=== Worker处理失败 ===');
     console.error('Task worker error:', error);
     return NextResponse.json(
       { 
