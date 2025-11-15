@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { deleteImageFromMinio } from '@/lib/minio';
+import { deleteImageFromMinio } from '@/lib/storage';
 
 // 获取单个图片详情
 export async function GET(
