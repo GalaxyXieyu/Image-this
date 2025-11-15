@@ -4,6 +4,7 @@
 已成功集成火山引擎AI图像处理服务：
 - **即梦4.0图像生成**：支持文生图和图生图
 - **智能扩图(Outpainting)**：支持智能扩展图像边界
+- **智能画质增强**：低清图像高清化，高清图像超清化
 
 ## 配置
 
@@ -93,6 +94,47 @@ SUPERBED_TOKEN="00fbe01340604063b1f59aedc0481ddc"
 }
 ```
 
+### 3. POST `/api/volcengine/enhance`
+
+智能画质增强（低清图像高清化，高清图像超清化）
+
+**请求参数：**
+```json
+{
+  "imageUrl": "base64编码的图片",
+  "resolutionBoundary": "720p",
+  "enableHdr": false,
+  "enableWb": false,
+  "resultFormat": 1,
+  "jpgQuality": 95,
+  "projectId": "项目ID（可选）"
+}
+```
+
+**参数说明：**
+- `resolutionBoundary`: 分辨率边界（144p/240p/360p/480p/540p/720p/1080p/2k）
+  - 图片分辨率 < boundary：超分流程，结果分辨率x2
+  - 图片分辨率 >= boundary：去模糊流程，结果分辨率不变
+- `enableHdr`: 是否开启HDR能力
+- `enableWb`: 是否开启白平衡能力
+- `resultFormat`: 0=PNG, 1=JPEG
+- `jpgQuality`: JPEG质量（0-100）
+
+**响应：**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "记录ID",
+    "imageData": "增强后的base64数据",
+    "imageSize": 文件大小,
+    "minioUrl": "MinIO存储URL",
+    "resolutionBoundary": "720p"
+  },
+  "message": "图像智能画质增强成功"
+}
+```
+
 ## 技术实现
 
 ### 1. 图片上传流程
@@ -112,9 +154,16 @@ SUPERBED_TOKEN="00fbe01340604063b1f59aedc0481ddc"
 - 支持自定义扩展比例和最大尺寸
 - 处理时间约3-5秒
 
-### 4. 核心文件
+### 4. 智能画质增强API调用
+- 使用HMAC-SHA256签名认证
+- 同步返回Base64图片数据
+- 智能判断超分或去模糊
+- 处理时间约3-5秒
+
+### 5. 核心文件
 - `/src/app/api/jimeng/generate/route.ts` - 即梦图像生成API
 - `/src/app/api/volcengine/outpaint/route.ts` - 智能扩图API
+- `/src/app/api/volcengine/enhance/route.ts` - 智能画质增强API
 - `/src/lib/superbed-upload.ts` - Superbed图床上传服务
 - `/src/lib/storage.ts` - MinIO存储服务
 
@@ -131,6 +180,13 @@ SUPERBED_TOKEN="00fbe01340604063b1f59aedc0481ddc"
 ✅ 自动保持原图风格一致
 ✅ 支持自定义提示词引导扩展内容
 ✅ 最大支持1920x1920输出
+
+### 智能画质增强
+✅ 智能判断超分或去模糊
+✅ 低清图像高清化（分辨率x2）
+✅ 高清图像超清化（去模糊）
+✅ 支持HDR和白平衡增强
+✅ 可选PNG或JPEG输出格式
 
 ### 通用特性
 ✅ 完整的错误处理和日志记录

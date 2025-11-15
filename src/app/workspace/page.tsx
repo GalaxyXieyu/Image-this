@@ -26,7 +26,7 @@ import {
   ZoomIn,
   CheckCircle,
   Trash2,
-  Image
+  Image as ImageLucide
 } from "lucide-react";
 
 type ActiveTab = "one-click" | "background" | "expansion" | "upscaling" | "watermark";
@@ -576,11 +576,14 @@ export default function WorkspacePage() {
       }
 
       const result = await response.json();
-      const createdTasks = result.tasks.map((task: Task, index: number) => ({
-        ...task,
-        originalImageId: uploadedImages[index]?.id || '',
-        originalName: uploadedImages[index]?.name || 'Unknown'
-      }));
+      const createdTasks = result.tasks.map((task: Task, index: number) => {
+        const data = taskData[index] as any;
+        return {
+          ...task,
+          originalImageId: data.originalImageId || uploadedImages[index]?.id || '',
+          originalName: data.originalImageName || uploadedImages[index]?.name || 'Unknown'
+        };
+      });
 
       setActiveTasks(createdTasks);
       setIsProcessing(true);
@@ -604,15 +607,22 @@ export default function WorkspacePage() {
   // 触发后台任务处理器
   const triggerWorker = async () => {
     try {
-      await fetch('/api/tasks/worker', {
+      console.log('[Worker] 触发后台任务处理器...');
+      const response = await fetch('/api/tasks/worker', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ batch: true }),
       });
+      
+      if (response.ok) {
+        console.log('[Worker] 任务处理器已触发');
+      } else {
+        console.error('[Worker] 任务处理器触发失败:', response.status);
+      }
     } catch (error) {
-      console.error('触发任务处理器失败:', error);
+      console.error('[Worker] 触发任务处理器失败:', error);
     }
   };
 
@@ -663,6 +673,8 @@ export default function WorkspacePage() {
         imageUrl: resizedImageUrl,
         xScale,
         yScale,
+        originalImageId: image.id,
+        originalImageName: image.name
       });
     }
 
@@ -680,6 +692,8 @@ export default function WorkspacePage() {
       taskData.push({
         imageUrl: resizedImageUrl,
         upscaleFactor,
+        originalImageId: image.id,
+        originalImageName: image.name
       });
     }
 
@@ -723,6 +737,8 @@ export default function WorkspacePage() {
         watermarkType,
         watermarkLogoUrl: watermarkLogoData,
         outputResolution,
+        originalImageId: image.id,
+        originalImageName: image.name
       });
     }
 
@@ -745,7 +761,9 @@ export default function WorkspacePage() {
       taskData.push({
         imageUrl: resizedOriginalUrl,
         referenceImageUrl: resizedReferenceUrl,
-        customPrompt: customPrompt
+        customPrompt: customPrompt,
+        originalImageId: image.id,
+        originalImageName: image.name
       });
     }
 
@@ -773,6 +791,8 @@ export default function WorkspacePage() {
         watermarkType,
         watermarkLogoUrl: watermarkLogoData,
         outputResolution,
+        originalImageId: image.id,
+        originalImageName: image.name
       });
     }
 
