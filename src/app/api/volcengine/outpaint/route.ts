@@ -3,16 +3,15 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { uploadBase64ImageToMinio } from '@/lib/storage';
-import { uploadBase64ToSuperbed } from '@/lib/superbed-upload';
 import * as crypto from 'crypto';
 
-// 火山引擎即梦API配置
+// 火山引擎配置
 const HOST = 'visual.volcengineapi.com';
 const REGION = 'cn-north-1';
 const SERVICE = 'cv';
-const VERSION = '2022-08-31';
+const VERSION = '2024-06-06';
 
-// 生成火山引擎签名 - 基于成功的测试实现
+// 生成火山引擎签名
 function sign(key: Buffer, msg: string): Buffer {
   return crypto.createHmac('sha256', key).update(msg).digest();
 }
@@ -64,30 +63,42 @@ function generateSignature(method: string, path: string, query: string, headers:
   return `HMAC-SHA256 Credential=${process.env.VOLCENGINE_ACCESS_KEY || process.env.ARK_API_KEY}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
 }
 
-// 调用即梦生成API - 同步返回
-async function callJimengAPI(prompt: string, referenceImageUrl?: string, width = 2048, height = 2048) {
+// 调用火山引擎智能扩图API
+async function callOutpaintAPI(
+  imageBase64: string,
+  prompt: string,
+  top = 0.1,
+  bottom = 0.1,
+  left = 0.1,
+  right = 0.1,
+  maxHeight = 1920,
+  maxWidth = 1920
+) {
   const accessKey = process.env.VOLCENGINE_ACCESS_KEY || process.env.ARK_API_KEY;
   const secretKey = process.env.VOLCENGINE_SECRET_KEY;
 
   if (!accessKey || !secretKey) {
-    throw new Error('火山引擎即梦API配置缺失');
+    throw new Error('火山引擎API配置缺失');
   }
 
-  // 构建请求参数
-  const requestBody: any = {
-    req_key: 'jimeng_t2i_v40',
-    req_json: '{}',
-    prompt,
-    width,
-    height,
-    scale: 0.5,
-    force_single: true  // 强制生成单图
+  // 移除data:image前缀
+  const cleanBase64 = imageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
+
+  const requestBody = {
+    req_key: 'i2i_outpainting',
+    custom_prompt: prompt,
+    binary_data_base64: [cleanBase64],
+    scale: 7.0,
+    seed: -1,
+    steps: 30,
+    strength: 0.8,
+    top,
+    bottom,
+    left,
+    right,
+    max_height: maxHeight,
+    max_width: maxWidth
   };
-
-  // 如果有参考图片URL，添加到请求中
-  if (referenceImageUrl) {
-    requestBody.image_urls = [referenceImageUrl];
-  }
 
   const bodyStr = JSON.stringify(requestBody);
   const t = new Date();
@@ -101,7 +112,7 @@ async function callJimengAPI(prompt: string, referenceImageUrl?: string, width =
     'X-Content-Sha256': payloadHash
   };
 
-  const query = `Action=CVProcess&Version=${VERSION}`;
+  const query = `Action=Img2ImgOutpainting&Version=${VERSION}`;
   const authorization = generateSignature('POST', '/', query, headers, bodyStr, timestamp, secretKey);
   
   headers['Authorization'] = authorization;
@@ -115,38 +126,46 @@ async function callJimengAPI(prompt: string, referenceImageUrl?: string, width =
   const result = await response.json();
   
   if (!response.ok || result.code !== 10000) {
-    throw new Error(`即梦API调用失败: ${JSON.stringify(result)}`);
+    throw new Error(`智能扩图API调用失败: ${JSON.stringify(result)}`);
   }
 
   return result.data;
 }
 
-// 将Base64数据保存为图片文件
-async function saveBase64Image(base64Data: string, filename: string): Promise<string> {
-  const buffer = Buffer.from(base64Data, 'base64');
-  const filePath = `/tmp/${filename}`;
-  require('fs').writeFileSync(filePath, buffer);
-  return filePath;
-}
-
 export async function POST(request: NextRequest) {
   try {
-    // 验证用户身份
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: '未授权访问' },
-        { status: 401 }
-      );
+    const body = await request.json();
+    let userId: string;
+
+    // 检查是否是服务端调用
+    if (body.userId && body.serverCall) {
+      userId = body.userId;
+    } else {
+      const session = await getServerSession(authOptions);
+      if (!session?.user?.id) {
+        return NextResponse.json(
+          { error: '未授权访问' },
+          { status: 401 }
+        );
+      }
+      userId = session.user.id;
     }
 
-    const body = await request.json();
-    const { referenceImage, prompt, seed, projectId, width = 2048, height = 2048 } = body;
+    const {
+      imageUrl,
+      prompt = '扩展图像，保持风格一致',
+      projectId,
+      top = 0.1,
+      bottom = 0.1,
+      left = 0.1,
+      right = 0.1,
+      maxHeight = 1920,
+      maxWidth = 1920
+    } = body;
 
-    // 验证必要参数
-    if (!prompt) {
+    if (!imageUrl) {
       return NextResponse.json(
-        { error: '缺少必要参数：prompt' },
+        { error: '缺少必要参数：imageUrl' },
         { status: 400 }
       );
     }
@@ -154,85 +173,88 @@ export async function POST(request: NextRequest) {
     // 创建处理记录
     const processedImage = await prisma.processedImage.create({
       data: {
-        filename: `jimeng-generate-${Date.now()}.jpg`,
+        filename: `outpaint-${Date.now()}.jpg`,
         originalUrl: 'temp',
-        processType: 'GENERATE',
+        processType: 'IMAGE_OUTPAINTING',
         status: 'PROCESSING',
         metadata: JSON.stringify({
           prompt,
-          seed: seed || Math.floor(Math.random() * 1000000),
-          width,
-          height,
-          hasReferenceImage: !!referenceImage,
-          model: 'jimeng_t2i_v40'
+          top,
+          bottom,
+          left,
+          right,
+          maxHeight,
+          maxWidth,
+          originalImageSize: imageUrl.length
         }),
-        userId: session.user.id,
+        userId: userId,
         projectId: projectId || null
       }
     });
 
     try {
-      // 如果有参考图片，先上传到superbed获取公网URL
-      let referenceImageUrl: string | undefined;
-      if (referenceImage) {
-        referenceImageUrl = await uploadBase64ToSuperbed(
-          referenceImage,
-          `reference-${processedImage.id}.jpg`
-        );
-      }
-      
-      // 调用即梦API同步生成图片
-      const result = await callJimengAPI(prompt, referenceImageUrl, width, height);
-      
-      // 处理生成的图片
-      let generatedImageUrl = '';
+      // 调用火山引擎智能扩图API
+      const result = await callOutpaintAPI(
+        imageUrl,
+        prompt,
+        top,
+        bottom,
+        left,
+        right,
+        maxHeight,
+        maxWidth
+      );
+
+      // 处理返回的图片
+      let resultImageData: string;
       if (result.binary_data_base64 && result.binary_data_base64.length > 0) {
-        // 将Base64数据上传到MinIO
         const base64Data = result.binary_data_base64[0];
-        generatedImageUrl = await uploadBase64ImageToMinio(
-          base64Data,
-          `jimeng-generated-${processedImage.id}.jpg`
-        );
+        resultImageData = `data:image/jpeg;base64,${base64Data}`;
+      } else {
+        throw new Error('未获取到扩图结果');
       }
-      
-      // 上传参考图片到MinIO（如果有）
-      let originalMinioUrl = 'generated';
-      if (referenceImage) {
-        originalMinioUrl = await uploadBase64ImageToMinio(
-          referenceImage,
-          `reference-${processedImage.id}.jpg`
-        );
-      }
+
+      // 上传到MinIO
+      const minioUrl = await uploadBase64ImageToMinio(
+        resultImageData,
+        `outpaint-${processedImage.id}.jpg`
+      );
+
+      // 上传原始图片到MinIO
+      const originalMinioUrl = await uploadBase64ImageToMinio(
+        imageUrl,
+        `original-${processedImage.id}.jpg`
+      );
 
       // 更新数据库记录
       const updatedImage = await prisma.processedImage.update({
         where: { id: processedImage.id },
         data: {
           originalUrl: originalMinioUrl,
-          processedUrl: generatedImageUrl,
+          processedUrl: minioUrl,
           status: 'COMPLETED',
+          fileSize: Buffer.from(result.binary_data_base64[0], 'base64').length,
           metadata: JSON.stringify({
             ...(processedImage.metadata ? JSON.parse(processedImage.metadata as string) : {}),
-            jimengResponse: result,
-            processingCompletedAt: new Date().toISOString()
+            processingCompletedAt: new Date().toISOString(),
+            timeElapsed: result.time_elapsed || 'N/A'
           })
         }
       });
 
-      // 返回结果
       return NextResponse.json({
         success: true,
         data: {
           id: updatedImage.id,
-          imageUrl: generatedImageUrl,
-          originalUrl: originalMinioUrl,
-          result
+          imageData: resultImageData,
+          imageSize: Buffer.from(result.binary_data_base64[0], 'base64').length,
+          minioUrl: minioUrl,
+          expandRatio: { top, bottom, left, right }
         },
-        message: '即梦图像生成成功'
+        message: '图像智能扩图成功'
       });
 
     } catch (processingError) {
-      // 更新记录状态为失败
       await prisma.processedImage.update({
         where: { id: processedImage.id },
         data: {
@@ -246,7 +268,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     return NextResponse.json(
-      { error: '图像生成失败', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: '图像智能扩图失败', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

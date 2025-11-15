@@ -34,311 +34,98 @@ async function fetchWithTimeoutAndRetry(
   throw new Error('All retry attempts failed');
 }
 
-// 轮询任务结果
-async function pollTaskResult(taskId: string, apiKey: string, type: 'outpaint' | 'upscale' = 'outpaint'): Promise<Blob> {
-  const maxAttempts = 30;
-  const pollInterval = 2000;
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const response = await fetchWithTimeoutAndRetry(
-      `https://dashscope.aliyuncs.com/api/v1/tasks/${taskId}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`
-        }
-      }
-    );
-
-    if (!response.ok) {
-      // console.error(`任务轮询请求失败: ${response.status} ${response.statusText}`);
-      throw new Error(`Task polling error: ${response.statusText}`);
-    }
-
-    const result = await response.json();
-    const status = result.output?.task_status;
-    // console.log(`任务状态: ${status}`, result.output);
-
-    if (status === 'FAILED') {
-      // console.error(`${type === 'outpaint' ? '扩图' : '高清化'}任务失败，详细信息:`, JSON.stringify(result, null, 2));
-      const errorMessage = result.output?.message || result.message || '未知错误';
-      throw new Error(`${type === 'outpaint' ? '扩图' : '高清化'}任务失败: ${errorMessage}`);
-    }
-
-    if (status === 'SUCCEEDED') {
-      let imageUrl: string;
-      
-      if (type === 'upscale') {
-        imageUrl = result.output.results[0].url;
-      } else {
-        imageUrl = result.output.output_image_url;
-      }
-
-      const imageResponse = await fetch(imageUrl);
-      if (!imageResponse.ok) {
-        throw new Error('下载结果图像失败');
-      }
-      
-      return imageResponse.blob();
-    }
-
-    await new Promise(resolve => setTimeout(resolve, pollInterval));
-  }
-
-  throw new Error(`${type === 'outpaint' ? '扩图' : '高清化'}任务超时`);
-}
-
-// 背景替换函数
-async function replaceBackground(imageUrl: string, referenceImageUrl: string, gptApiKey: string, gptApiUrl: string): Promise<string> {
-  // console.log('开始背景替换处理...');
-  
-  function extractBase64FromDataUrl(dataUrl: string): string {
-    if (dataUrl.startsWith('data:')) {
-      return dataUrl.split(',')[1];
-    }
-    return dataUrl;
-  }
-
+// 使用即梦生成图片（替换GPT背景替换）
+async function generateWithJimeng(productImageUrl: string, referenceImageUrl: string): Promise<string> {
   try {
-    // 使用正确的GPT-4-vision API实现
-    const originalBase64 = extractBase64FromDataUrl(imageUrl);
-    const referenceBase64 = extractBase64FromDataUrl(referenceImageUrl);
+    const prompt = `将产品图片放置到场景图片中，保持产品的形状、材质、特征比例、摆放角度及数量完全一致，仅保留产品包装外壳，禁用背景虚化效果，确保画面清晰，专业摄影，高质量，4K分辨率`;
 
-    const prompt = `请将第二张图片中的所有产品替换为第一张图片的产品，要求：
-
-1. 保持原图产品的形状、材质、特征比例、摆放角度及数量完全一致
-2. 仅保留产品包装外壳，不得出现任何成品材质（如口红壳中不得显示口红）
-3. 禁用背景虚化效果，确保画面清晰呈现所有产品
-4. 产品的比例一定要保持，相对瘦长就瘦长，相对粗就相对粗`;
-
-    const content = [
-      { type: "text", text: prompt },
-      {
-        type: "image_url",
-        image_url: {
-          url: `data:image/png;base64,${originalBase64}`
-        }
-      },
-      {
-        type: "image_url",
-        image_url: {
-          url: `data:image/png;base64,${referenceBase64}`
-        }
-      }
-    ];
-    
-    const payload = {
-      model: "gpt-4o-image-vip",
-      messages: [
-        {
-          role: "user",
-          content: content
-        }
-      ],
-      max_tokens: 124000
-    };
-
-    const apiUrl = gptApiUrl.endsWith('/') ?
-      `${gptApiUrl}v1/chat/completions` :
-      `${gptApiUrl}/v1/chat/completions`;
+    const apiUrl = process.env.NODE_ENV === 'production' 
+      ? `${process.env.NEXTAUTH_URL}/api/jimeng/generate`
+      : 'http://localhost:3000/api/jimeng/generate';
 
     const response = await fetchWithTimeoutAndRetry(apiUrl, {
       method: 'POST',
       headers: {
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${gptApiKey}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        prompt,
+        referenceImage: productImageUrl,  // 产品图
+        width: 2048,
+        height: 2048,
+        serverCall: true
+      })
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`背景替换失败: ${response.status} ${response.statusText} - ${errorText}`);
+      throw new Error(`即梦生成失败: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const result = await response.json();
-    // console.log('GPT API 响应:', JSON.stringify(result, null, 2));
-
-    // 从GPT-4-vision响应中提取图片URL
-    if (result.choices && result.choices.length > 0) {
-      const message = result.choices[0].message;
-      if (message.content) {
-        const content = message.content;
-        let imageUrl = null;
-
-        // 尝试各种格式的图片URL匹配
-        const markdownImageMatch = content.match(/!\[.*?\]\((https?:\/\/[^\)]+)\)/);
-        if (markdownImageMatch) {
-          imageUrl = markdownImageMatch[1];
-        }
-
-        if (!imageUrl) {
-          const downloadLinkMatch = content.match(/\[点击下载\]\((https?:\/\/[^\)]+)\)/);
-          if (downloadLinkMatch) {
-            imageUrl = downloadLinkMatch[1];
-          }
-        }
-
-        if (!imageUrl) {
-          const filesystemMatch = content.match(/(https:\/\/filesystem\.site\/[^\s\)]+)/);
-          if (filesystemMatch) {
-            imageUrl = filesystemMatch[1];
-          }
-        }
-
-        if (!imageUrl) {
-          const httpMatch = content.match(/(https?:\/\/[^\s\)]+\.(?:png|jpg|jpeg|gif|webp))/i);
-          if (httpMatch) {
-            imageUrl = httpMatch[1];
-          }
-        }
-
-        if (imageUrl) {
-          // 下载图片并转换为base64
-          const imageResponse = await fetch(imageUrl, {
-            signal: AbortSignal.timeout(600000)
-          });
-          if (!imageResponse.ok) {
-            throw new Error('下载生成的图片失败');
-          }
-
-          const imageArrayBuffer = await imageResponse.arrayBuffer();
-          const imageBase64 = Buffer.from(imageArrayBuffer).toString('base64');
-          return `data:image/jpeg;base64,${imageBase64}`;
-        }
-      }
+    
+    if (result.success && result.data?.imageData) {
+      return result.data.imageData;  // 返回base64图片数据
     }
 
-    throw new Error('背景替换失败：无法从GPT响应中获取生成的图片');
+    throw new Error('即梦生成失败：无法获取生成的图片');
 
   } catch (error) {
     throw error;
   }
 }
 
-// 扩图函数
-async function outpaintImage(imageUrl: string, apiKey: string, xScale = 2.0, yScale = 2.0) {
-  console.log('[扩图] 开始提交任务...');
-  const submitStartTime = Date.now();
+// 使用火山引擎智能扩图（替换Qwen扩图）
+async function outpaintImage(imageUrl: string, xScale = 2.0, yScale = 2.0) {
+  console.log('[智能扩图] 开始处理...');
+  const startTime = Date.now();
   
-  const request = {
-    model: 'image-out-painting',
-    input: { image_url: imageUrl },
-    parameters: {
-      x_scale: xScale,
-      y_scale: yScale,
-      best_quality: false,
-      limit_image_size: true
-    }
-  };
+  // 计算扩展比例（火山引擎使用0-1的比例）
+  const top = Math.min((yScale - 1) / 2, 1.0);
+  const bottom = Math.min((yScale - 1) / 2, 1.0);
+  const left = Math.min((xScale - 1) / 2, 1.0);
+  const right = Math.min((xScale - 1) / 2, 1.0);
 
-  const response = await fetchWithTimeoutAndRetry(
-    'https://dashscope.aliyuncs.com/api/v1/services/aigc/image2image/out-painting',
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'X-DashScope-Async': 'enable'
-      },
-      body: JSON.stringify(request)
-    }
-  );
+  const apiUrl = process.env.NODE_ENV === 'production' 
+    ? `${process.env.NEXTAUTH_URL}/api/volcengine/outpaint`
+    : 'http://localhost:3000/api/volcengine/outpaint';
+
+  const response = await fetchWithTimeoutAndRetry(apiUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      imageUrl,
+      prompt: '扩展图像，保持风格一致',
+      top,
+      bottom,
+      left,
+      right,
+      maxHeight: 1920,
+      maxWidth: 1920,
+      serverCall: true
+    })
+  });
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`扩图任务提交失败: ${response.statusText} - ${errorText}`);
+    throw new Error(`智能扩图失败: ${response.status} ${response.statusText} - ${errorText}`);
   }
 
   const result = await response.json();
-  const taskId = result.output?.task_id;
-
-  if (!taskId) {
-    throw new Error('扩图任务提交失败，未获取到 task_id');
+  const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+  console.log(`[智能扩图] 处理完成，耗时: ${duration}秒`);
+  
+  if (result.success && result.data?.imageData) {
+    // 将base64转换为Blob
+    const base64Data = result.data.imageData.split(',')[1];
+    const binaryData = Buffer.from(base64Data, 'base64');
+    return new Blob([binaryData], { type: 'image/jpeg' });
   }
 
-  const submitDuration = ((Date.now() - submitStartTime) / 1000).toFixed(2);
-  console.log(`[扩图] 任务提交成功，task_id: ${taskId}, 耗时: ${submitDuration}秒`);
-  console.log(`[扩图] 开始轮询任务结果...`);
-  
-  const pollStartTime = Date.now();
-  const result_blob = await pollTaskResult(taskId, apiKey, 'outpaint');
-  const pollDuration = ((Date.now() - pollStartTime) / 1000).toFixed(2);
-  console.log(`[扩图] 轮询完成，耗时: ${pollDuration}秒`);
-  
-  return result_blob;
-}
-
-// 高清化函数
-async function upscaleImage(imageUrl: string, apiKey: string, upscaleFactor = 2) {
-  console.log('[高清化] 开始上传图片到阿里云OSS...');
-  const ossStartTime = Date.now();
-  
-  // 导入阿里云上传函数
-  const { uploadImageToAliyun } = await import('@/lib/aliyun-upload');
-
-  // 1. 上传图片到阿里云临时存储
-  const ossImageUrl = await uploadImageToAliyun(
-    apiKey,
-    'wanx2.1-imageedit',
-    imageUrl,
-    `upscale-workflow-${Date.now()}.jpg`
-  );
-  
-  const ossDuration = ((Date.now() - ossStartTime) / 1000).toFixed(2);
-  console.log(`[高清化] OSS上传完成，耗时: ${ossDuration}秒`);
-  console.log(`[高清化] 开始提交高清化任务...`);
-  
-  const submitStartTime = Date.now();
-
-  const request = {
-    model: 'wanx2.1-imageedit',
-    input: {
-      function: 'super_resolution',
-      prompt: '图像超分。',
-      base_image_url: ossImageUrl  // 使用OSS URL
-    },
-    parameters: {
-      upscale_factor: upscaleFactor,
-      n: 1
-    }
-  };
-
-  const response = await fetchWithTimeoutAndRetry(
-    'https://dashscope.aliyuncs.com/api/v1/services/aigc/image2image/image-synthesis',
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'X-DashScope-Async': 'enable',
-        'X-DashScope-OssResourceResolve': 'enable'  // 添加OSS资源解析头
-      },
-      body: JSON.stringify(request)
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(`高清化任务提交失败: ${response.statusText}`);
-  }
-
-  const result = await response.json();
-  const taskId = result.output?.task_id;
-
-  if (!taskId) {
-    throw new Error('高清化任务提交失败，未获取到 task_id');
-  }
-  
-  const submitDuration = ((Date.now() - submitStartTime) / 1000).toFixed(2);
-  console.log(`[高清化] 任务提交成功，task_id: ${taskId}, 耗时: ${submitDuration}秒`);
-  console.log(`[高清化] 开始轮询任务结果...`);
-  
-  const pollStartTime = Date.now();
-  const result_blob = await pollTaskResult(taskId, apiKey, 'upscale');
-  const pollDuration = ((Date.now() - pollStartTime) / 1000).toFixed(2);
-  console.log(`[高清化] 轮询完成，耗时: ${pollDuration}秒`);
-  
-  return result_blob;
+  throw new Error('智能扩图失败：无法获取结果图片');
 }
 
 export async function POST(request: NextRequest) {
@@ -476,7 +263,7 @@ export async function POST(request: NextRequest) {
       console.log('=== 步骤1/3：开始背景替换 ===');
       const bgStartTime = Date.now();
       try {
-        backgroundResult = await replaceBackground(imageUrl, referenceImageUrl, gptApiKey!, gptApiUrl);
+        backgroundResult = await generateWithJimeng(imageUrl, referenceImageUrl);
         processedImageUrl = backgroundResult;
         const bgDuration = ((Date.now() - bgStartTime) / 1000).toFixed(2);
         console.log(`背景替换完成，耗时: ${bgDuration}秒`);
@@ -494,7 +281,7 @@ export async function POST(request: NextRequest) {
       console.log('扩图参数: xScale=' + xScale + ', yScale=' + yScale);
       const outpaintStartTime = Date.now();
       try {
-        outpaintResult = await outpaintImage(processedImageUrl, qwenApiKey, xScale, yScale);
+        outpaintResult = await outpaintImage(processedImageUrl, xScale, yScale);
 
         // 将扩图结果转换为可用的 URL
         const arrayBuffer = await outpaintResult.arrayBuffer();
@@ -521,29 +308,7 @@ export async function POST(request: NextRequest) {
       console.log('=== 跳过扩图步骤 ===');
     }
 
-    // 步骤3：高清化
-    if (enableUpscale) {
-      console.log('=== 步骤3/4：开始高清化处理 ===');
-      console.log('高清化倍数:', upscaleFactor);
-      const upscaleStartTime = Date.now();
-      try {
-        upscaleResult = await upscaleImage(processedImageUrl, qwenApiKey, upscaleFactor);
-
-        // 将高清化结果转换为可用的 URL
-        const arrayBuffer = await upscaleResult.arrayBuffer();
-        const base64 = Buffer.from(arrayBuffer).toString('base64');
-        processedImageUrl = `data:image/jpeg;base64,${base64}`;
-        const upscaleDuration = ((Date.now() - upscaleStartTime) / 1000).toFixed(2);
-        console.log(`高清化处理完成，图片大小: ${Math.round(arrayBuffer.byteLength / 1024)}KB, 耗时: ${upscaleDuration}秒`);
-      } catch (error) {
-        // 高清化失败，继续使用当前图片
-        console.error('高清化失败，继续使用当前图片:', error);
-      }
-    } else {
-      console.log('=== 跳过高清化步骤 ===');
-    }
-
-    // 步骤4：添加水印
+    // 步骤3：添加水印（跳过高清化，即梦已生成2048x2048高分辨率）
     if (enableWatermark) {
       console.log('=== 步骤4/4：开始添加水印 ===');
       console.log('水印参数:', { watermarkText, watermarkOpacity, watermarkPosition, watermarkType, outputResolution });
@@ -567,7 +332,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 获取最终结果
-    const finalResult = upscaleResult || outpaintResult;
+    const finalResult = outpaintResult;  // 不再需要upscaleResult
     let finalImageData = processedImageUrl;
     let imageSize = 0;
 

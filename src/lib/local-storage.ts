@@ -26,6 +26,11 @@ export async function uploadImageToLocal(
   await fs.writeFile(filePath, imageBuffer);
   
   // 返回可访问的URL路径
+  // 如果配置了公网MinIO地址，返回完整URL；否则返回相对路径
+  const publicMinioUrl = process.env.PUBLIC_MINIO_URL;
+  if (publicMinioUrl) {
+    return `${publicMinioUrl}/uploads/${sanitizedFilename}`;
+  }
   return `/uploads/${sanitizedFilename}`;
 }
 
