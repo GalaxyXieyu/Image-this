@@ -4,8 +4,8 @@
  */
 
 import * as crypto from 'crypto';
-import { uploadBase64ToSuperbed } from './superbed-upload';
-import { prisma } from './prisma';
+import { uploadBase64ToSuperbed } from '@/lib/superbed-upload';
+import { prisma } from '@/lib/prisma';
 
 const HOST = 'visual.volcengineapi.com';
 const REGION = 'cn-north-1';

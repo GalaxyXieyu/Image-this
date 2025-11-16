@@ -3,7 +3,7 @@
  * 提供扩图功能的直接调用
  */
 
-import { prisma } from './prisma';
+import { prisma } from '@/lib/prisma';
 
 interface QwenOutpaintingRequest {
   model: string;
@@ -157,7 +157,7 @@ export async function outpaintWithQwen(
 
     // 裁切扩图结果去除水印
     try {
-      const { cropImage } = await import('./image-crop');
+      const { cropImage } = await import('@/lib/image-crop');
       imageDataUrl = await cropImage(imageDataUrl, 0.1);
       console.log(`[Qwen扩图服务] 裁切水印完成`);
     } catch (cropError) {
