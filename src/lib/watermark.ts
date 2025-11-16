@@ -1,4 +1,4 @@
-import { createCanvas, loadImage } from 'canvas';
+import { createCanvas, loadImage, CanvasRenderingContext2D as NodeCanvasRenderingContext2D } from 'canvas';
 
 export async function addWatermarkToImage(
   imageUrl: string,
@@ -59,7 +59,7 @@ export async function addWatermarkToImage(
 }
 
 function addTextWatermark(
-  ctx: CanvasRenderingContext2D,
+  ctx: NodeCanvasRenderingContext2D,
   text: string,
   opacity: number,
   position: string,
@@ -115,7 +115,7 @@ function addTextWatermark(
 }
 
 async function addLogoWatermark(
-  ctx: CanvasRenderingContext2D,
+  ctx: NodeCanvasRenderingContext2D,
   logoUrl: string,
   opacity: number,
   position: string,
