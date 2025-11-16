@@ -388,7 +388,7 @@ class TaskProcessor {
 
       // 直接调用即梦服务
       // 即梦API支持多张参考图（image_urls数组），会先上传到图床获取URL
-      const { generateWithJimeng } = await import('@/lib/jimeng-service');
+      const { generateWithJimeng } = await import('@/app/api/jimeng/service');
       
       // 准备参考图数组：产品图 + 场景参考图（如果有）
       const referenceImages = [imageUrl];  // 产品图（base64 Data URL）
@@ -433,75 +433,48 @@ class TaskProcessor {
     const inputData = JSON.parse(task.inputData);
     const { imageUrl, xScale = 2.0, yScale = 2.0 } = inputData;
     
-    console.log(`[智能扩图] 任务ID: ${task.id}`);
-    console.log(`[智能扩图] 使用火山引擎智能扩图API`);
+    console.log(`[图像扩展] 任务ID: ${task.id}`);
+    console.log(`[图像扩展] 使用火山引擎扩图服务`);
     
-    await this.updateTaskProgress(task.id, '智能扩图处理中...', 50, 1);
+    await this.updateTaskProgress(task.id, '图像扩展处理中...', 50, 1);
     
     try {
-      const apiUrl = process.env.NODE_ENV === 'production' 
-        ? `${process.env.NEXTAUTH_URL}/api/volcengine/outpaint`
-        : 'http://localhost:3000/api/volcengine/outpaint';
+      // 将xScale/yScale转换为火山引擎的扩展比例
+      // xScale=2表示左右各扩展50%，yScale=2表示上下各扩展50%
+      const top = (yScale - 1) / 2;
+      const bottom = (yScale - 1) / 2;
+      const left = (xScale - 1) / 2;
+      const right = (xScale - 1) / 2;
 
-      console.log(`[智能扩图] API地址: ${apiUrl}`);
+      console.log(`[图像扩展] 原始比例 - xScale: ${xScale}, yScale: ${yScale}`);
+      console.log(`[图像扩展] 转换后扩展比例 - 上:${top} 下:${bottom} 左:${left} 右:${right}`);
 
-      // 计算扩展比例
-      const top = Math.min((yScale - 1) / 2, 1.0);
-      const bottom = Math.min((yScale - 1) / 2, 1.0);
-      const left = Math.min((xScale - 1) / 2, 1.0);
-      const right = Math.min((xScale - 1) / 2, 1.0);
+      // 直接调用服务函数，避免HTTP超时问题
+      const { outpaintWithVolcengine } = await import('@/app/api/volcengine/service');
+      const result = await outpaintWithVolcengine(
+        task.userId,
+        imageUrl,
+        '扩展图像，保持风格一致',
+        top,
+        bottom,
+        left,
+        right
+      );
 
-      console.log(`[智能扩图] 扩展比例 - top: ${top}, bottom: ${bottom}, left: ${left}, right: ${right}`);
+      console.log(`[图像扩展] 处理成功`);
+      console.log(`[图像扩展] 生成图片ID: ${result.id}`);
 
-      // 火山扩图需要3-5秒，设置2分钟超时
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2分钟
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          imageUrl,
-          prompt: '扩展图像，保持风格一致',
-          top,
-          bottom,
-          left,
-          right,
-          maxHeight: 1920,
-          maxWidth: 1920,
-          userId: task.userId,
-          serverCall: true
-        }),
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-      console.log(`[智能扩图] 开始调用API...`);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error(`[智能扩图] API调用失败:`, errorData);
-        throw new Error(`智能扩图失败: ${errorData.details || response.statusText}`);
-      }
-
-      const result = await response.json();
-      console.log(`[智能扩图] API调用成功`);
-      console.log(`[智能扩图] 生成图片ID: ${result.data?.id}`);
-
-      await this.updateTaskProgress(task.id, '智能扩图完成', 100, 1);
+      await this.updateTaskProgress(task.id, '图像扩展完成', 100, 1);
       
       return {
-        processedImageId: result.data.id,
-        processedImageUrl: result.data.imageData,
-        xScale,
-        yScale
+        processedImageId: result.id,
+        processedImageUrl: result.imageData,
+        expandRatio: result.expandRatio
       };
 
     } catch (error) {
-      console.error(`[智能扩图] 处理失败:`, error);
-      await this.updateTaskProgress(task.id, '智能扩图失败', 0, 0);
+      console.error(`[图像扩展] 处理失败:`, error);
+      await this.updateTaskProgress(task.id, '图像扩展失败', 0, 0);
       throw error;
     }
   }

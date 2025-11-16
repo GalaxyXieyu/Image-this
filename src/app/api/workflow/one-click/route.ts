@@ -3,6 +3,9 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { uploadBase64ImageToMinio } from '@/lib/storage';
+import { generateWithJimeng } from '@/app/api/jimeng/service';
+import { outpaintWithQwen } from '@/app/api/qwen/service';
+import { enhanceWithVolcengine } from '@/app/api/volcengine/service';
 
 // 带超时和重试的fetch函数
 async function fetchWithTimeoutAndRetry(
@@ -35,98 +38,6 @@ async function fetchWithTimeoutAndRetry(
 }
 
 
-// 使用即梦生成图片（替换GPT背景替换）
-async function generateWithJimeng(productImageUrl: string, referenceImageUrl: string): Promise<string> {
-  try {
-    const prompt = `将产品图片放置到场景图片中，保持产品的形状、材质、特征比例、摆放角度及数量完全一致，仅保留产品包装外壳，禁用背景虚化效果，确保画面清晰，专业摄影，高质量，4K分辨率`;
-
-    const apiUrl = process.env.NODE_ENV === 'production' 
-      ? `${process.env.NEXTAUTH_URL}/api/jimeng/generate`
-      : 'http://localhost:3000/api/jimeng/generate';
-
-    const response = await fetchWithTimeoutAndRetry(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        prompt,
-        referenceImage: productImageUrl,  // 产品图
-        width: 2048,
-        height: 2048,
-        serverCall: true
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`即梦生成失败: ${response.status} ${response.statusText} - ${errorText}`);
-    }
-
-    const result = await response.json();
-    
-    if (result.success && result.data?.imageData) {
-      return result.data.imageData;  // 返回base64图片数据
-    }
-
-    throw new Error('即梦生成失败：无法获取生成的图片');
-
-  } catch (error) {
-    throw error;
-  }
-}
-
-// 使用火山引擎智能扩图（替换Qwen扩图）
-async function outpaintImage(imageUrl: string, xScale = 2.0, yScale = 2.0) {
-  console.log('[智能扩图] 开始处理...');
-  const startTime = Date.now();
-  
-  // 计算扩展比例（火山引擎使用0-1的比例）
-  const top = Math.min((yScale - 1) / 2, 1.0);
-  const bottom = Math.min((yScale - 1) / 2, 1.0);
-  const left = Math.min((xScale - 1) / 2, 1.0);
-  const right = Math.min((xScale - 1) / 2, 1.0);
-
-  const apiUrl = process.env.NODE_ENV === 'production' 
-    ? `${process.env.NEXTAUTH_URL}/api/volcengine/outpaint`
-    : 'http://localhost:3000/api/volcengine/outpaint';
-
-  const response = await fetchWithTimeoutAndRetry(apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      imageUrl,
-      prompt: '扩展图像，保持风格一致',
-      top,
-      bottom,
-      left,
-      right,
-      maxHeight: 1920,
-      maxWidth: 1920,
-      serverCall: true
-    })
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`智能扩图失败: ${response.status} ${response.statusText} - ${errorText}`);
-  }
-
-  const result = await response.json();
-  const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-  console.log(`[智能扩图] 处理完成，耗时: ${duration}秒`);
-  
-  if (result.success && result.data?.imageData) {
-    // 将base64转换为Blob
-    const base64Data = result.data.imageData.split(',')[1];
-    const binaryData = Buffer.from(base64Data, 'base64');
-    return new Blob([binaryData], { type: 'image/jpeg' });
-  }
-
-  throw new Error('智能扩图失败：无法获取结果图片');
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -247,9 +158,8 @@ export async function POST(request: NextRequest) {
 
     // 处理单张图片
     let processedImageUrl = imageUrl;
-    let backgroundResult: string | null = null;
-    let outpaintResult: Blob | null = null;
-    let upscaleResult: Blob | null = null;
+    let hasBackgroundReplace = false;
+    let hasOutpaint = false;
 
     console.log('=== 开始一键增强处理流程 ===');
     console.log('初始图片URL:', imageUrl);
@@ -260,15 +170,22 @@ export async function POST(request: NextRequest) {
 
     // 步骤1：背景替换
     if (enableBackgroundReplace && referenceImageUrl) {
-      console.log('=== 步骤1/3：开始背景替换 ===');
+      console.log('=== 步骤1/4：开始背景替换 ===');
       const bgStartTime = Date.now();
       try {
-        backgroundResult = await generateWithJimeng(imageUrl, referenceImageUrl);
-        processedImageUrl = backgroundResult;
+        const prompt = '保持产品主体完全不变，仅替换背景为类似参考场景的风格，保持产品的形状、材质、特征比例、摆放角度及数量完全一致，专业摄影，高质量，4K分辨率';
+        const result = await generateWithJimeng(
+          userId,
+          prompt,
+          [imageUrl, referenceImageUrl],
+          2048,
+          2048
+        );
+        processedImageUrl = result.imageData;
+        hasBackgroundReplace = true;
         const bgDuration = ((Date.now() - bgStartTime) / 1000).toFixed(2);
         console.log(`背景替换完成，耗时: ${bgDuration}秒`);
       } catch (error) {
-        // 背景替换失败，继续使用原图进行后续处理
         console.error('背景替换失败，继续使用原图:', error);
       }
     } else {
@@ -277,70 +194,44 @@ export async function POST(request: NextRequest) {
 
     // 步骤2：扩图
     if (enableOutpaint) {
-      console.log('=== 步骤2/3：开始扩图处理 ===');
+      console.log('=== 步骤2/4：开始扩图处理 ===');
       console.log('扩图参数: xScale=' + xScale + ', yScale=' + yScale);
       const outpaintStartTime = Date.now();
       try {
-        outpaintResult = await outpaintImage(processedImageUrl, xScale, yScale);
-
-        // 将扩图结果转换为可用的 URL
-        const arrayBuffer = await outpaintResult.arrayBuffer();
-        const base64 = Buffer.from(arrayBuffer).toString('base64');
-        processedImageUrl = `data:image/jpeg;base64,${base64}`;
+        const result = await outpaintWithQwen(
+          userId,
+          processedImageUrl,
+          xScale,
+          yScale
+        );
+        processedImageUrl = result.imageData;
+        hasOutpaint = true;
         const outpaintDuration = ((Date.now() - outpaintStartTime) / 1000).toFixed(2);
-        console.log(`扩图处理完成，图片大小: ${Math.round(arrayBuffer.byteLength / 1024)}KB, 耗时: ${outpaintDuration}秒`);
-
-        // 步骤2.5：裁切扩图结果去除水印
-        try {
-          const cropStartTime = Date.now();
-          const { cropImage } = await import('@/lib/image-crop');
-          processedImageUrl = await cropImage(processedImageUrl, 0.1); // 裁切10%
-          const cropDuration = ((Date.now() - cropStartTime) / 1000).toFixed(2);
-          console.log(`扩图结果裁切完成，耗时: ${cropDuration}秒`);
-        } catch (cropError) {
-          console.error('裁切失败，继续使用原扩图结果:', cropError);
-        }
+        console.log(`扩图处理完成，图片大小: ${Math.round(result.imageSize / 1024)}KB, 耗时: ${outpaintDuration}秒`);
       } catch (error) {
-        // 扩图失败，继续使用当前图片进行后续处理
         console.error('扩图失败，继续使用当前图片:', error);
       }
     } else {
       console.log('=== 跳过扩图步骤 ===');
     }
 
-    // 步骤3：智能画质增强（可选，用于进一步提升质量）
+    // 步骤3：智能画质增强
     if (enableUpscale) {
       console.log('=== 步骤3/4：开始智能画质增强 ===');
       const enhanceStartTime = Date.now();
       try {
-        const apiUrl = process.env.NODE_ENV === 'production' 
-          ? `${process.env.NEXTAUTH_URL}/api/volcengine/enhance`
-          : 'http://localhost:3000/api/volcengine/enhance';
-
-        const response = await fetchWithTimeoutAndRetry(apiUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            imageUrl: processedImageUrl,
-            resolutionBoundary: '720p',
-            enableHdr: false,
-            enableWb: false,
-            resultFormat: 1,
-            jpgQuality: 95,
-            serverCall: true
-          })
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success && result.data?.imageData) {
-            processedImageUrl = result.data.imageData;
-            const enhanceDuration = ((Date.now() - enhanceStartTime) / 1000).toFixed(2);
-            console.log(`智能画质增强完成，耗时: ${enhanceDuration}秒`);
-          }
-        }
+        const result = await enhanceWithVolcengine(
+          userId,
+          processedImageUrl,
+          '720p',
+          false,
+          false,
+          1,
+          95
+        );
+        processedImageUrl = result.imageData;
+        const enhanceDuration = ((Date.now() - enhanceStartTime) / 1000).toFixed(2);
+        console.log(`智能画质增强完成，耗时: ${enhanceDuration}秒`);
       } catch (error) {
         console.error('智能画质增强失败，继续使用当前图片:', error);
       }
@@ -372,18 +263,12 @@ export async function POST(request: NextRequest) {
     }
 
     // 获取最终结果
-    const finalResult = outpaintResult;  // 不再需要upscaleResult
     let finalImageData = processedImageUrl;
-    let imageSize = 0;
-
-    if (finalResult) {
-      const finalArrayBuffer = await finalResult.arrayBuffer();
-      imageSize = finalArrayBuffer.byteLength;
-      if (!processedImageUrl.startsWith('data:')) {
-        const finalBase64 = Buffer.from(finalArrayBuffer).toString('base64');
-        finalImageData = `data:image/jpeg;base64,${finalBase64}`;
-      }
-    }
+    
+    // 计算图片大小
+    const imageSize = finalImageData.startsWith('data:')
+      ? Math.floor(finalImageData.split(',')[1].length * 0.75)
+      : 0;
 
       console.log('=== 开始上传到MinIO ===');
       const minioStartTime = Date.now();
@@ -406,8 +291,8 @@ export async function POST(request: NextRequest) {
             ...(processedImage.metadata ? JSON.parse(processedImage.metadata as string) : {}),
             processingCompletedAt: new Date().toISOString(),
             processSteps: {
-              backgroundReplace: enableBackgroundReplace && !!backgroundResult,
-              outpaint: enableOutpaint && !!outpaintResult,
+              backgroundReplace: hasBackgroundReplace,
+              outpaint: hasOutpaint,
               upscale: enableUpscale,
               watermark: enableWatermark
             }
@@ -423,8 +308,8 @@ export async function POST(request: NextRequest) {
           imageSize,
           minioUrl,
           processSteps: {
-            backgroundReplace: enableBackgroundReplace && !!backgroundResult,
-            outpaint: enableOutpaint && !!outpaintResult,
+            backgroundReplace: hasBackgroundReplace,
+            outpaint: hasOutpaint,
             upscale: enableUpscale,
             watermark: enableWatermark
           }
