@@ -22,42 +22,60 @@ interface QwenOutpaintingRequest {
 async function pollTaskResult(taskId: string, apiKey: string): Promise<Blob> {
   const maxAttempts = 30;
   const pollInterval = 2000;
+  const timeout = 10000; // 10秒超时
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const response = await fetch(
-      `https://dashscope.aliyuncs.com/api/v1/tasks/${taskId}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
+    try {
+      const response = await fetch(
+        `https://dashscope.aliyuncs.com/api/v1/tasks/${taskId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${apiKey}`
+          },
+          signal: controller.signal
         }
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Task polling error: ${response.statusText}`);
-    }
-
-    const result = await response.json();
-    const status = result.output?.task_status;
-
-    if (status === 'FAILED') {
-      const errorMessage = result.output?.message || result.message || '未知错误';
-      const errorCode = result.output?.code || result.code || 'UNKNOWN';
-      throw new Error(`扩图任务失败: ${errorCode} - ${errorMessage}`);
-    }
-
-    if (status === 'SUCCEEDED') {
-      const imageUrl = result.output.output_image_url;
+      );
       
-      const imageResponse = await fetch(imageUrl);
-      if (!imageResponse.ok) {
-        throw new Error('下载结果图像失败');
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`Task polling error: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      const status = result.output?.task_status;
+
+      if (status === 'FAILED') {
+        const errorMessage = result.output?.message || result.message || '未知错误';
+        const errorCode = result.output?.code || result.code || 'UNKNOWN';
+        throw new Error(`扩图任务失败: ${errorCode} - ${errorMessage}`);
+      }
+
+      if (status === 'SUCCEEDED') {
+        const imageUrl = result.output.output_image_url;
+        
+        const imageResponse = await fetch(imageUrl);
+        if (!imageResponse.ok) {
+          throw new Error('下载结果图像失败');
+        }
+        
+        console.log(`[Qwen扩图] 任务完成 - 轮询次数: ${attempt + 1}`);
+        return imageResponse.blob();
+      }
+
+      // 只在每5次轮询时打印一次日志
+      if (attempt % 5 === 0) {
+        console.log(`[Qwen扩图] 轮询中... (${attempt + 1}/${maxAttempts})`);
       }
       
-      return imageResponse.blob();
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (attempt === maxAttempts - 1) throw error;
     }
-
-    await new Promise(resolve => setTimeout(resolve, pollInterval));
   }
 
   throw new Error('扩图任务超时');
@@ -81,8 +99,7 @@ export async function outpaintWithQwen(
   limitImageSize = true
 ) {
   const startTime = Date.now();
-  console.log(`[Qwen扩图服务] 开始处理，用户ID: ${userId}`);
-  console.log(`[Qwen扩图服务] 扩展比例 - xScale: ${xScale}, yScale: ${yScale}`);
+  console.log(`[Qwen扩图] 开始 - xScale: ${xScale}, yScale: ${yScale}`);
 
   const apiKey = process.env.QWEN_API_KEY;
   if (!apiKey) {
@@ -121,7 +138,9 @@ export async function outpaintWithQwen(
       }
     };
 
-    console.log(`[Qwen扩图服务] 提交扩图任务...`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
+    
     const submitResponse = await fetch(
       'https://dashscope.aliyuncs.com/api/v1/services/aigc/image2image/out-painting',
       {
@@ -131,9 +150,12 @@ export async function outpaintWithQwen(
           'Content-Type': 'application/json',
           'X-DashScope-Async': 'enable'
         },
-        body: JSON.stringify(qwenRequest)
+        body: JSON.stringify(qwenRequest),
+        signal: controller.signal
       }
     );
+    
+    clearTimeout(timeoutId);
 
     if (!submitResponse.ok) {
       const errorText = await submitResponse.text();
@@ -147,7 +169,7 @@ export async function outpaintWithQwen(
       throw new Error('任务提交失败，未获取到 task_id');
     }
 
-    console.log(`[Qwen扩图服务] 任务ID: ${taskId}，开始轮询结果...`);
+    console.log(`[Qwen扩图] 任务ID: ${taskId}`);
 
     const resultBlob = await pollTaskResult(taskId, apiKey);
 
@@ -159,20 +181,26 @@ export async function outpaintWithQwen(
     try {
       const { cropImage } = await import('@/lib/image-crop');
       imageDataUrl = await cropImage(imageDataUrl, 0.1);
-      console.log(`[Qwen扩图服务] 裁切水印完成`);
     } catch (cropError) {
-      console.error('[Qwen扩图服务] 裁切失败:', cropError);
+      console.warn('[Qwen扩图] 裁切失败，使用原图');
     }
 
     const finalImageSize = imageDataUrl.startsWith('data:')
       ? Math.floor(imageDataUrl.split(',')[1].length * 0.75)
       : arrayBuffer.byteLength;
+    
+    // 上传到本地存储
+    const { uploadBase64Image } = await import('@/lib/storage');
+    const processedUrl = await uploadBase64Image(
+      imageDataUrl,
+      `outpaint-qwen-${processedImage.id}.jpg`
+    );
 
     const updatedImage = await prisma.processedImage.update({
       where: { id: processedImage.id },
       data: {
-        originalUrl: '',
-        processedUrl: '',
+        originalUrl: imageUrl.substring(0, 100) + '...',
+        processedUrl: processedUrl,
         status: 'COMPLETED',
         fileSize: finalImageSize,
         metadata: JSON.stringify({
@@ -184,7 +212,7 @@ export async function outpaintWithQwen(
     });
 
     const totalDuration = ((Date.now() - startTime) / 1000).toFixed(2);
-    console.log(`[Qwen扩图服务] 处理完成，总耗时: ${totalDuration}秒`);
+    console.log(`[Qwen扩图] 完成 - 耗时: ${totalDuration}s, 大小: ${(finalImageSize / 1024).toFixed(0)}KB`);
 
     return {
       id: updatedImage.id,
@@ -194,7 +222,7 @@ export async function outpaintWithQwen(
     };
 
   } catch (error) {
-    console.error(`[Qwen扩图服务] 处理失败:`, error);
+    console.error(`[Qwen扩图] 失败:`, error instanceof Error ? error.message : error);
     
     await prisma.processedImage.update({
       where: { id: processedImage.id },

@@ -1,6 +1,7 @@
 /**
  * 文件存储服务
- * 开发环境使用本地文件系统，生产环境可以切换到 MinIO 或其他对象存储
+ * 使用本地文件系统存储图片到 public/uploads/ 目录
+ * 生产环境可以扩展支持云存储服务
  */
 
 import {
@@ -11,13 +12,13 @@ import {
   ensureUploadDirExists
 } from './local-storage';
 
-// 确保存储可用
+// 确保存储目录可用
 export async function ensureBucketExists() {
   return ensureUploadDirExists();
 }
 
 // 上传图片
-export async function uploadImageToMinio(
+export async function uploadImage(
   imageBuffer: Buffer,
   filename: string,
   contentType: string = 'image/jpeg'
@@ -26,7 +27,7 @@ export async function uploadImageToMinio(
 }
 
 // 从base64上传图片
-export async function uploadBase64ImageToMinio(
+export async function uploadBase64Image(
   base64Data: string,
   filename: string
 ): Promise<string> {
@@ -34,9 +35,14 @@ export async function uploadBase64ImageToMinio(
 }
 
 // 删除图片
-export async function deleteImageFromMinio(objectName: string): Promise<void> {
+export async function deleteImage(objectName: string): Promise<void> {
   return deleteImageFromLocal(objectName);
 }
+
+// 保持向后兼容的别名
+export const uploadImageToMinio = uploadImage;
+export const uploadBase64ImageToMinio = uploadBase64Image;
+export const deleteImageFromMinio = deleteImage;
 
 // 生成缩略图并上传
 export async function generateAndUploadThumbnail(

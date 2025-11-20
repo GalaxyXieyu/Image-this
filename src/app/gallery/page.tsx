@@ -442,7 +442,9 @@ export default function GalleryPage() {
   const filteredImages = images.filter(image => {
     const matchesSearch = image.filename.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesProject = selectedProject ? image.project?.id === selectedProject : true;
-    return matchesSearch && matchesProject;
+    // 只显示状态为 COMPLETED 的图片，排除 FAILED、PENDING、PROCESSING 状态
+    const isSuccessful = image.status === 'COMPLETED';
+    return matchesSearch && matchesProject && isSuccessful;
   });
 
   const getStatusColor = (status: string) => {

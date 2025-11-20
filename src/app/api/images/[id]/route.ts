@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { deleteImageFromMinio } from '@/lib/storage';
+import { deleteImage } from '@/lib/storage';
 
 // 获取单个图片详情
 export async function GET(
@@ -179,21 +179,21 @@ export async function DELETE(
       if (image.originalUrl && image.originalUrl.includes('minio')) {
         const originalObjectName = extractObjectName(image.originalUrl);
         if (originalObjectName) {
-          await deleteImageFromMinio(originalObjectName);
+          await deleteImage(originalObjectName);
         }
       }
 
       if (image.processedUrl && image.processedUrl.includes('minio')) {
         const processedObjectName = extractObjectName(image.processedUrl);
         if (processedObjectName) {
-          await deleteImageFromMinio(processedObjectName);
+          await deleteImage(processedObjectName);
         }
       }
 
       if (image.thumbnailUrl && image.thumbnailUrl.includes('minio')) {
         const thumbnailObjectName = extractObjectName(image.thumbnailUrl);
         if (thumbnailObjectName) {
-          await deleteImageFromMinio(thumbnailObjectName);
+          await deleteImage(thumbnailObjectName);
         }
       }
     } catch (minioError) {

@@ -1,14 +1,33 @@
 import { createCanvas, loadImage, CanvasRenderingContext2D as NodeCanvasRenderingContext2D } from 'canvas';
 
-export async function addWatermarkToImage(
-  imageUrl: string,
-  watermarkText: string,
-  opacity: number,
-  position: string,
-  watermarkType?: 'text' | 'logo',
-  watermarkLogoUrl?: string,
-  outputResolution?: string
-): Promise<string> {
+interface WatermarkOptions {
+  imageUrl: string;
+  watermarkType: 'text' | 'logo';
+  watermarkLogoUrl?: string;
+  watermarkPosition: string | { 
+    x: number; 
+    y: number; 
+    width?: number;
+    height?: number;
+    scale?: number; 
+    editorWidth?: number; 
+    editorHeight?: number 
+  };
+  watermarkOpacity?: number;
+  watermarkText?: string;
+  outputResolution?: string;
+}
+
+export async function addWatermarkToImage(options: WatermarkOptions): Promise<string> {
+  const {
+    imageUrl,
+    watermarkType,
+    watermarkLogoUrl,
+    watermarkPosition,
+    watermarkOpacity = 0.3,
+    watermarkText = 'Watermark',
+    outputResolution
+  } = options;
   const extractBase64FromDataUrl = (dataUrl: string): string => {
     if (dataUrl.startsWith('data:')) {
       return dataUrl.split(',')[1];
@@ -47,9 +66,9 @@ export async function addWatermarkToImage(
   
   // 添加水印
   if (watermarkType === 'logo' && watermarkLogoUrl) {
-    await addLogoWatermark(ctx, watermarkLogoUrl, opacity, position, outputWidth, outputHeight);
+    await addLogoWatermark(ctx, watermarkLogoUrl, watermarkOpacity, watermarkPosition, outputWidth, outputHeight);
   } else {
-    addTextWatermark(ctx, watermarkText, opacity, position, outputWidth, outputHeight);
+    addTextWatermark(ctx, watermarkText, watermarkOpacity, watermarkPosition, outputWidth, outputHeight);
   }
   
   const outputBuffer = canvas.toBuffer('image/jpeg', { quality: 0.95 });
@@ -62,7 +81,15 @@ function addTextWatermark(
   ctx: NodeCanvasRenderingContext2D,
   text: string,
   opacity: number,
-  position: string,
+  position: string | { 
+    x: number; 
+    y: number; 
+    width?: number;
+    height?: number;
+    scale?: number; 
+    editorWidth?: number; 
+    editorHeight?: number 
+  },
   width: number,
   height: number
 ) {
@@ -118,7 +145,15 @@ async function addLogoWatermark(
   ctx: NodeCanvasRenderingContext2D,
   logoUrl: string,
   opacity: number,
-  position: string,
+  position: string | { 
+    x: number; 
+    y: number; 
+    width?: number;
+    height?: number;
+    scale?: number; 
+    editorWidth?: number; 
+    editorHeight?: number 
+  },
   width: number,
   height: number
 ) {
@@ -133,40 +168,79 @@ async function addLogoWatermark(
   const logoBuffer = Buffer.from(logoBase64, 'base64');
   const logo = await loadImage(logoBuffer);
   
-  // Logo尺寸（最大为图片宽度的20%）
-  const maxLogoWidth = width * 0.2;
-  const scale = Math.min(maxLogoWidth / logo.width, 1);
-  const logoWidth = logo.width * scale;
-  const logoHeight = logo.height * scale;
+  // Logo尺寸和位置
+  let logoWidth: number, logoHeight: number, x: number, y: number;
   
-  const padding = 20;
-  
-  let x: number, y: number;
-  
-  switch (position) {
-    case 'top-left':
-      x = padding;
-      y = padding;
-      break;
-    case 'top-right':
-      x = width - logoWidth - padding;
-      y = padding;
-      break;
-    case 'bottom-left':
-      x = padding;
-      y = height - logoHeight - padding;
-      break;
-    case 'bottom-right':
-      x = width - logoWidth - padding;
-      y = height - logoHeight - padding;
-      break;
-    case 'center':
-      x = (width - logoWidth) / 2;
-      y = (height - logoHeight) / 2;
-      break;
-    default:
-      x = width - logoWidth - padding;
-      y = height - logoHeight - padding;
+  if (typeof position === 'object' && 'x' in position) {
+    // 使用交互式设置的位置和尺寸
+    // 注意：position.x 和 position.y 是基于编辑器画布的坐标
+    // 需要转换为实际图片尺寸的坐标
+    
+    // 使用编辑器传递的实际尺寸，如果没有则使用默认值
+    const editorWidth = position.editorWidth || 600;
+    const editorHeight = position.editorHeight || 400;
+    
+    // 计算实际图片和编辑器的比例
+    const widthRatio = width / editorWidth;
+    const heightRatio = height / editorHeight;
+    
+    // 如果提供了编辑器中 Logo 的实际显示尺寸，使用它来计算实际尺寸
+    if (position.width && position.height) {
+      // 直接按比例缩放编辑器中的 Logo 尺寸
+      logoWidth = position.width * widthRatio;
+      logoHeight = position.height * heightRatio;
+    } else if (position.scale) {
+      // 向后兼容：如果只有 scale，使用旧的计算方式
+      const avgRatio = (widthRatio + heightRatio) / 2;
+      const actualScale = position.scale * avgRatio;
+      logoWidth = logo.width * actualScale;
+      logoHeight = logo.height * actualScale;
+    } else {
+      // 默认值
+      logoWidth = logo.width * 0.2;
+      logoHeight = logo.height * 0.2;
+    }
+    
+    // 使用相对位置（百分比）来确保位置一致
+    const relativeX = position.x / editorWidth;
+    const relativeY = position.y / editorHeight;
+    
+    x = relativeX * width;
+    y = relativeY * height;
+  } else {
+    // 使用预设位置
+    const maxLogoWidth = width * 0.2;
+    const scale = Math.min(maxLogoWidth / logo.width, 1);
+    logoWidth = logo.width * scale;
+    logoHeight = logo.height * scale;
+    
+    const padding = 20;
+    
+    switch (position) {
+      case 'top-left':
+        x = padding;
+        y = padding;
+        break;
+      case 'top-right':
+        x = width - logoWidth - padding;
+        y = padding;
+        break;
+      case 'bottom-left':
+        x = padding;
+        y = height - logoHeight - padding;
+        break;
+      case 'bottom-right':
+        x = width - logoWidth - padding;
+        y = height - logoHeight - padding;
+        break;
+      case 'center':
+        x = (width - logoWidth) / 2;
+        y = (height - logoHeight) / 2;
+        break;
+      default:
+        x = width - logoWidth - padding;
+        y = height - logoHeight - padding;
+    }
   }
   
   ctx.globalAlpha = opacity;

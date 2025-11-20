@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { uploadBase64ImageToMinio } from '@/lib/storage';
+import { uploadBase64Image } from '@/lib/storage';
 import FormData from 'form-data';
 
 interface BackgroundReplaceRequest {
@@ -230,12 +230,12 @@ export async function POST(request: NextRequest) {
       const imageBase64 = Buffer.from(imageArrayBuffer).toString('base64');
       const imageDataUrl = `data:image/jpeg;base64,${imageBase64}`;
 
-      const minioUrl = await uploadBase64ImageToMinio(
+      const minioUrl = await uploadBase64Image(
         imageDataUrl,
         `background-replace-${processedImage.id}.jpg`
       );
 
-      const originalMinioUrl = await uploadBase64ImageToMinio(
+      const originalMinioUrl = await uploadBase64Image(
         originalImageUrl,
         `original-${processedImage.id}.jpg`
       );

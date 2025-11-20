@@ -120,7 +120,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const type = searchParams.get('type');
-    const limit = parseInt(searchParams.get('limit') || '50');
+    // 限制最大返回数量
+    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
     const offset = parseInt(searchParams.get('offset') || '0');
     const taskIds = searchParams.get('ids')?.split(','); // 新增：按ID列表查询
 
