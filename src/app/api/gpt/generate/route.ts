@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { uploadBase64ImageToMinio } from '@/lib/storage';
+import { uploadBase64Image } from '@/lib/storage';
 
 interface GPTImageGenerationRequest {
   model: string;
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
       // 暂时返回原始响应，后续可以根据实际情况修改
 
       // 上传参考图片到MinIO（用于记录）
-      const originalMinioUrl = await uploadBase64ImageToMinio(
+      const originalMinioUrl = await uploadBase64Image(
         referenceImage,
         `reference-${processedImage.id}.jpg`
       );

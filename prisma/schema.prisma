@@ -110,6 +110,10 @@ model ProcessedImage {
   project          Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
   taskQueue        TaskQueue[]
 
+  @@index([userId, status])
+  @@index([userId, processType])
+  @@index([userId, createdAt])
+  @@index([projectId])
   @@map("processed_images")
 }
 
@@ -158,5 +162,8 @@ model TaskQueue {
   project          Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
   processedImage   ProcessedImage? @relation(fields: [processedImageId], references: [id], onDelete: SetNull)
 
+  @@index([userId, status])
+  @@index([status, priority])
+  @@index([userId, createdAt])
   @@map("task_queue")
 }

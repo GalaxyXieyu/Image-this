@@ -29,6 +29,9 @@ import {
   Image as ImageLucide
 } from "lucide-react";
 
+import WatermarkEditor from '@/components/watermark/WatermarkEditor';
+import CollapsibleHistorySidebar from '@/components/CollapsibleHistorySidebar';
+
 type ActiveTab = "one-click" | "background" | "expansion" | "upscaling" | "watermark";
 
 interface UploadedImage {
@@ -57,6 +60,8 @@ interface Task {
   createdAt: string;
   originalImageId?: string;
   originalName?: string;
+  outputData?: string;
+  errorMessage?: string;
 }
 
 export default function WorkspacePage() {
@@ -78,9 +83,10 @@ export default function WorkspacePage() {
   const [watermarkText, setWatermarkText] = useState('Sample Watermark');
   const [watermarkOpacity, setWatermarkOpacity] = useState(0.3);
   const [watermarkPosition, setWatermarkPosition] = useState('bottom-right');
-  const [watermarkType, setWatermarkType] = useState<'text' | 'logo'>('text');
+  const [watermarkType, setWatermarkType] = useState<'text' | 'logo'>('logo');
   const [watermarkLogo, setWatermarkLogo] = useState<UploadedImage | null>(null);
   const [showWatermarkPreview, setShowWatermarkPreview] = useState(false);
+  const [watermarkSettings, setWatermarkSettings] = useState({ x: 50, y: 50, scale: 1, editorWidth: 600, editorHeight: 400 });
   
   // 输出分辨率
   const [outputResolution, setOutputResolution] = useState('original');
@@ -89,7 +95,11 @@ export default function WorkspacePage() {
   
   // 新增：任务管理状态
   const [activeTasks, setActiveTasks] = useState<Task[]>([]);
-  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const activeTasksRef = useRef<Task[]>([]);
+  const processedResultsRef = useRef<ProcessedResult[]>([]);
+  const uploadedImagesRef = useRef<UploadedImage[]>([]);
+  const referenceImageRef = useRef<UploadedImage | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -101,118 +111,189 @@ export default function WorkspacePage() {
     }
   }, [status, router]);
 
+  // 加载处理历史 - 根据当前标签页筛选
+  const loadProcessingHistory = useCallback(async () => {
+    try {
+      const response = await fetch('/api/images?limit=100&sortBy=createdAt&order=desc');
+      if (!response.ok) return;
+      
+      const data = await response.json();
+      if (data.images && Array.isArray(data.images)) {
+        // 根据当前标签页映射到对应的处理类型
+        const processTypeMap: Record<ActiveTab, string[]> = {
+          'one-click': ['ONE_CLICK_WORKFLOW'],
+          'background': ['BACKGROUND_REMOVAL'],
+          'expansion': ['IMAGE_OUTPAINTING'],
+          'upscaling': ['IMAGE_UPSCALING'],
+          'watermark': ['WATERMARK']
+        };
+        
+        const allowedTypes = processTypeMap[activeTab] || [];
+        
+        const historyResults: ProcessedResult[] = data.images
+          .filter((img: any) => 
+            img.status === 'COMPLETED' && 
+            img.processedUrl &&
+            allowedTypes.includes(img.processType)
+          )
+          .map((img: any) => ({
+            id: img.id,
+            processedImageUrl: img.processedUrl,
+            originalName: img.filename || '未命名',
+            processType: img.processType || 'UNKNOWN',
+            timestamp: new Date(img.createdAt).toLocaleString('zh-CN')
+          }))
+          .slice(0, 50); // 限制显示50条
+        
+        setProcessedResults(historyResults);
+      }
+    } catch (error) {
+      console.error('加载处理历史失败:', error);
+    }
+  }, [activeTab]);
+
+  // 组件加载时获取历史记录
+  useEffect(() => {
+    if (status === "authenticated") {
+      loadProcessingHistory();
+    }
+  }, [status, loadProcessingHistory]);
+
+  useEffect(() => {
+    activeTasksRef.current = activeTasks;
+  }, [activeTasks]);
+
+  useEffect(() => {
+    processedResultsRef.current = processedResults;
+  }, [processedResults]);
+
+  useEffect(() => {
+    uploadedImagesRef.current = uploadedImages;
+  }, [uploadedImages]);
+
+  useEffect(() => {
+    referenceImageRef.current = referenceImage;
+  }, [referenceImage]);
+
+  const stopPolling = useCallback(() => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+  }, []);
+
+  // 稳定的水印位置变化回调
+  const handleWatermarkPositionChange = useCallback((position: { x: number; y: number; scale: number; editorWidth: number; editorHeight: number }) => {
+    setWatermarkSettings(position);
+  }, []);
+
   // 轮询任务状态
   const pollTaskStatus = useCallback(async () => {
-    if (activeTasks.length === 0) return;
+    const tasksSnapshot = activeTasksRef.current;
+    if (tasksSnapshot.length === 0) return;
 
     try {
-      const taskIds = activeTasks.map(task => task.id).join(',');
+      const taskIds = tasksSnapshot.map(task => task.id).join(',');
       const response = await fetch(`/api/tasks?ids=${taskIds}`);
       
       if (!response.ok) return;
       
       const data = await response.json();
-      const updatedTasks = data.tasks;
-
-      setActiveTasks(updatedTasks);
+      const updatedTasks: Task[] = data.tasks || [];
+      const originalTaskMap = new Map(tasksSnapshot.map(task => [task.id, task]));
+      const processedResultIds = new Set(processedResultsRef.current.map(result => result.id));
 
       // 检查是否有任务完成
-      const completedTasks = updatedTasks.filter((task: Task) => 
-        task.status === 'COMPLETED' && 
-        !processedResults.find(result => result.id === task.id)
-      );
+      const completedTasks = updatedTasks.filter(task => task.status === 'COMPLETED');
+      let hasNewCompletedTasks = false;
 
-      // 处理完成的任务
       for (const task of completedTasks) {
-        if (task.outputData) {
-          try {
-            const outputData = JSON.parse(task.outputData);
-            const processedResult: ProcessedResult = {
-              id: task.id,
-              originalImageId: task.originalImageId || '',
-              originalName: task.originalName || 'Unknown',
-              processedImageUrl: outputData.imageData || outputData.processedImageUrl,
-              processType: getProcessTypeName(task.type),
-              timestamp: new Date().toLocaleString(),
-              parameters: outputData.settings || {}
-            };
-            
-            setProcessedResults(prev => [...prev, processedResult]);
-            
-            toast({
-              title: "任务完成",
-              description: `${task.originalName} ${getProcessTypeName(task.type)}处理完成`,
-            });
-          } catch (error) {
-            console.error('解析任务输出数据失败:', error);
-          }
+        if (!task.outputData || processedResultIds.has(task.id)) continue;
+
+        try {
+          const outputData = JSON.parse(task.outputData);
+          const originalTask = originalTaskMap.get(task.id);
+          
+          processedResultIds.add(task.id);
+          hasNewCompletedTasks = true;
+          
+          toast({
+            title: "任务完成",
+            description: `${originalTask?.originalName || '图片'} ${getProcessTypeName(task.type)}处理完成`,
+          });
+        } catch (error) {
+          console.error('解析任务输出数据失败:', error);
         }
       }
 
+      // 如果有新完成的任务，重新加载历史记录
+      if (hasNewCompletedTasks) {
+        loadProcessingHistory();
+      }
+
       // 检查失败的任务
-      const failedTasks = updatedTasks.filter((task: Task) => 
-        task.status === 'FAILED'
-      );
+      const failedTasks = updatedTasks.filter(task => task.status === 'FAILED');
 
       for (const task of failedTasks) {
+        const originalTask = originalTaskMap.get(task.id);
         toast({
           title: "任务失败",
-          description: `${task.originalName} ${getProcessTypeName(task.type)}处理失败`,
+          description: `${originalTask?.originalName || '图片'} ${getProcessTypeName(task.type)}处理失败`,
           variant: "destructive",
         });
       }
 
-      // 如果所有任务都完成了，停止轮询
-      const remainingActiveTasks = updatedTasks.filter((task: Task) => 
-        task.status === 'PENDING' || task.status === 'PROCESSING'
-      );
+      // 更新仍在处理的任务
+      const remainingActiveTasks = updatedTasks
+        .filter(task => task.status === 'PENDING' || task.status === 'PROCESSING')
+        .map(task => ({
+          ...task,
+          originalImageId: originalTaskMap.get(task.id)?.originalImageId || task.originalImageId,
+          originalName: originalTaskMap.get(task.id)?.originalName || task.originalName,
+        }));
+
+      setActiveTasks(remainingActiveTasks);
 
       if (remainingActiveTasks.length === 0) {
         setIsProcessing(false);
-        if (pollingInterval) {
-          clearInterval(pollingInterval);
-          setPollingInterval(null);
-        }
+        stopPolling();
       }
 
     } catch (error) {
       console.error('轮询任务状态失败:', error);
     }
-  }, [activeTasks, processedResults, pollingInterval, toast]);
+  }, [stopPolling, toast, loadProcessingHistory]);
 
   // 启动轮询
   useEffect(() => {
-    if (isProcessing && activeTasks.length > 0 && !pollingInterval) {
-      const interval = setInterval(pollTaskStatus, 2000); // 每2秒轮询一次
-      setPollingInterval(interval);
+    if (isProcessing && activeTasks.length > 0 && !pollingIntervalRef.current) {
+      pollTaskStatus();
+      pollingIntervalRef.current = setInterval(pollTaskStatus, 2000); // 每2秒轮询一次
+    }
+
+    if ((!isProcessing || activeTasks.length === 0) && pollingIntervalRef.current) {
+      stopPolling();
     }
 
     return () => {
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-      }
+      stopPolling();
     };
-  }, [isProcessing, activeTasks.length, pollingInterval, pollTaskStatus]);
+  }, [isProcessing, activeTasks.length, pollTaskStatus, stopPolling]);
 
   // 组件卸载时清理所有资源 - 修复：移除uploadedImages和referenceImage依赖
   useEffect(() => {
     return () => {
-      // 清理定时器
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-      }
-      // 清理URL对象以防止内存泄露
-      // 注意：这里使用闭包捕获当前的图片状态，避免在依赖数组中包含它们
-      uploadedImages.forEach(img => {
+      stopPolling();
+      uploadedImagesRef.current.forEach(img => {
         if (img.preview) {
           URL.revokeObjectURL(img.preview);
         }
       });
-      if (referenceImage && referenceImage.preview) {
-        URL.revokeObjectURL(referenceImage.preview);
+      if (referenceImageRef.current?.preview) {
+        URL.revokeObjectURL(referenceImageRef.current.preview);
       }
     };
-  }, [pollingInterval]); // ✅ 只依赖pollingInterval，避免过度清理
+  }, [stopPolling]);
 
   // 获取处理类型显示名称
   const getProcessTypeName = (type: string): string => {
@@ -585,7 +666,16 @@ export default function WorkspacePage() {
         };
       });
 
-      setActiveTasks(createdTasks);
+      setActiveTasks(prev => {
+        const existingIds = new Set(prev.map(task => task.id));
+        const mergedTasks = [...prev];
+        createdTasks.forEach((task: Task) => {
+          if (!existingIds.has(task.id)) {
+            mergedTasks.push(task);
+          }
+        });
+        return mergedTasks;
+      });
       setIsProcessing(true);
 
       // 启动后台任务处理
@@ -707,8 +797,11 @@ export default function WorkspacePage() {
 
     // 准备logo数据
     let watermarkLogoData: string | undefined;
+    let watermarkPositionData: any = watermarkPosition;
+    
     if (enableWatermark && watermarkType === 'logo' && watermarkLogo) {
       watermarkLogoData = await resizeImageForAPI(watermarkLogo.preview);
+      watermarkPositionData = watermarkSettings; // 使用交互式设置的位置和缩放
     }
 
     const taskData = [];
@@ -733,7 +826,7 @@ export default function WorkspacePage() {
         enableWatermark,
         watermarkText,
         watermarkOpacity,
-        watermarkPosition,
+        watermarkPosition: watermarkPositionData,
         watermarkType,
         watermarkLogoUrl: watermarkLogoData,
         outputResolution,
@@ -771,13 +864,14 @@ export default function WorkspacePage() {
   };
 
   const handleWatermark = async () => {
+    if (!watermarkLogo) {
+      throw new Error('请先上传Logo图片');
+    }
+    
     const taskData = [];
     
     // 准备logo数据
-    let watermarkLogoData: string | undefined;
-    if (watermarkType === 'logo' && watermarkLogo) {
-      watermarkLogoData = await resizeImageForAPI(watermarkLogo.preview);
-    }
+    const watermarkLogoData = await resizeImageForAPI(watermarkLogo.preview);
     
     for (let i = 0; i < uploadedImages.length; i++) {
       const image = uploadedImages[i];
@@ -785,11 +879,9 @@ export default function WorkspacePage() {
       
       taskData.push({
         imageUrl: resizedImageUrl,
-        watermarkText,
-        watermarkOpacity,
-        watermarkPosition,
-        watermarkType,
+        watermarkType: 'logo',
         watermarkLogoUrl: watermarkLogoData,
+        watermarkPosition: watermarkSettings, // 使用交互式设置的位置和缩放
         outputResolution,
         originalImageId: image.id,
         originalImageName: image.name
@@ -1122,125 +1214,93 @@ export default function WorkspacePage() {
 
             {activeTab === "watermark" && (
               <div className="space-y-4">
-                <div>
-                  <Label htmlFor="watermarkType">水印类型</Label>
-                  <select
-                    id="watermarkType"
-                    value={watermarkType}
-                    onChange={(e) => setWatermarkType(e.target.value as 'text' | 'logo')}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
-                  >
-                    <option value="text">文字水印</option>
-                    <option value="logo">Logo水印</option>
-                  </select>
+                <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg mb-4">
+                  <h4 className="text-sm font-medium text-orange-900 mb-1">📝 使用说明</h4>
+                  <ol className="text-xs text-orange-800 space-y-1 list-decimal list-inside">
+                    <li>先在左侧上传需要添加水印的<strong>目标图片</strong></li>
+                    <li>然后在下方上传透明背景的<strong>Logo图片</strong></li>
+                    <li>在编辑器中拖拽调整Logo的位置和大小</li>
+                    <li>点击"开始处理水印"批量应用到所有图片</li>
+                  </ol>
                 </div>
                 
-                {watermarkType === 'text' ? (
-                  <div>
-                    <Label htmlFor="watermarkText">水印文字</Label>
-                    <Input
-                      id="watermarkText"
-                      type="text"
-                      value={watermarkText}
-                      onChange={(e) => setWatermarkText(e.target.value)}
-                      placeholder="输入水印文字..."
-                      className="mt-1"
-                    />
-                  </div>
-                ) : (
-                  <div>
-                    <Label>Logo图片（支持PNG透明背景）</Label>
-                    {!watermarkLogo ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full mt-1"
-                        onClick={() => watermarkLogoInputRef.current?.click()}
-                      >
-                        <Upload className="w-4 h-4 mr-2" />
-                        上传Logo
-                      </Button>
-                    ) : (
-                      <div className="mt-1 p-3 border border-gray-300 rounded-md">
-                        <div className="flex items-center gap-3">
-                          <div className="w-16 h-16 border border-gray-200 rounded overflow-hidden bg-gray-50">
-                            <img src={watermarkLogo.preview} alt="Logo" className="w-full h-full object-contain" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">{watermarkLogo.name}</p>
-                            <p className="text-xs text-gray-500">透明背景Logo</p>
-                          </div>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={removeWatermarkLogo}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
+                <div>
+                  <Label>Logo图片（支持PNG透明背景）</Label>
+                  {!watermarkLogo ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full mt-1"
+                      onClick={() => watermarkLogoInputRef.current?.click()}
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      上传Logo
+                    </Button>
+                  ) : (
+                    <div className="mt-1 p-3 border border-gray-300 rounded-md">
+                      <div className="flex items-center gap-3">
+                        <div className="w-16 h-16 border border-gray-200 rounded overflow-hidden bg-gray-50">
+                          <img src={watermarkLogo.preview} alt="Logo" className="w-full h-full object-contain" />
                         </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{watermarkLogo.name}</p>
+                          <p className="text-xs text-gray-500">透明背景Logo</p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={removeWatermarkLogo}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
+                </div>
+                
+                {watermarkLogo && uploadedImages.length > 0 && (
+                  <>
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <h4 className="text-sm font-medium text-blue-900 mb-2">水印编辑器</h4>
+                      <p className="text-xs text-blue-700 mb-3">
+                        拖拽Logo调整位置，使用滑块调整大小
+                      </p>
+                      <WatermarkEditor
+                        imageUrl={uploadedImages[selectedPreviewIndex]?.preview || ''}
+                        logoUrl={watermarkLogo.preview}
+                        onPositionChange={handleWatermarkPositionChange}
+                        width={600}
+                        height={400}
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="outputResolution">输出分辨率</Label>
+                      <select
+                        id="outputResolution"
+                        value={outputResolution}
+                        onChange={(e) => setOutputResolution(e.target.value)}
+                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
+                      >
+                        <option value="original">原始分辨率</option>
+                        <option value="1920x1080">1920x1080 (Full HD)</option>
+                        <option value="2560x1440">2560x1440 (2K)</option>
+                        <option value="3840x2160">3840x2160 (4K)</option>
+                        <option value="1080x1080">1080x1080 (正方形)</option>
+                        <option value="1024x1024">1024x1024 (正方形)</option>
+                        <option value="2048x2048">2048x2048 (正方形)</option>
+                      </select>
+                    </div>
+                  </>
                 )}
                 
-                <div>
-                  <Label htmlFor="watermarkOpacity">水印透明度: {(watermarkOpacity * 100).toFixed(0)}%</Label>
-                  <input
-                    id="watermarkOpacity"
-                    type="range"
-                    min="0.1"
-                    max="1"
-                    step="0.1"
-                    value={watermarkOpacity}
-                    onChange={(e) => setWatermarkOpacity(parseFloat(e.target.value))}
-                    className="mt-1 w-full"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="watermarkPosition">水印位置</Label>
-                  <select
-                    id="watermarkPosition"
-                    value={watermarkPosition}
-                    onChange={(e) => setWatermarkPosition(e.target.value)}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
-                  >
-                    <option value="top-left">左上</option>
-                    <option value="top-right">右上</option>
-                    <option value="bottom-left">左下</option>
-                    <option value="bottom-right">右下</option>
-                    <option value="center">居中</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <Label htmlFor="outputResolution">输出分辨率</Label>
-                  <select
-                    id="outputResolution"
-                    value={outputResolution}
-                    onChange={(e) => setOutputResolution(e.target.value)}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
-                  >
-                    <option value="original">原始分辨率</option>
-                    <option value="1920x1080">1920x1080 (Full HD)</option>
-                    <option value="2560x1440">2560x1440 (2K)</option>
-                    <option value="3840x2160">3840x2160 (4K)</option>
-                    <option value="1080x1080">1080x1080 (正方形)</option>
-                    <option value="1024x1024">1024x1024 (正方形)</option>
-                    <option value="2048x2048">2048x2048 (正方形)</option>
-                  </select>
-                </div>
-                
-                {uploadedImages.length > 0 && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => setShowWatermarkPreview(true)}
-                  >
-                    <ZoomIn className="w-4 h-4 mr-2" />
-                    预览水印效果
-                  </Button>
+                {!watermarkLogo && (
+                  <div className="text-center py-8 text-gray-500">
+                    <FileImage className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                    <p className="text-sm">请先上传Logo图片</p>
+                    <p className="text-xs text-gray-400 mt-1">支持PNG透明背景格式</p>
+                  </div>
                 )}
               </div>
             )}
@@ -1279,6 +1339,9 @@ export default function WorkspacePage() {
                   </div>
                   {enableWatermark && (
                     <div className="space-y-3 ml-6">
+                      <div className="p-2 bg-blue-100 border border-blue-300 rounded text-xs text-blue-800 mb-2">
+                        💡 启用水印后，上传Logo并在编辑器中调整位置和大小
+                      </div>
                       <div>
                         <Label htmlFor="oneClickWatermarkType" className="text-sm">水印类型</Label>
                         <select
@@ -1336,36 +1399,18 @@ export default function WorkspacePage() {
                           )}
                         </div>
                       )}
-                      <div>
-                        <Label htmlFor="oneClickWatermarkOpacity" className="text-sm">
-                          水印透明度: {(watermarkOpacity * 100).toFixed(0)}%
-                        </Label>
-                        <input
-                          id="oneClickWatermarkOpacity"
-                          type="range"
-                          min="0.1"
-                          max="1"
-                          step="0.1"
-                          value={watermarkOpacity}
-                          onChange={(e) => setWatermarkOpacity(parseFloat(e.target.value))}
-                          className="mt-1 w-full"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="oneClickWatermarkPosition" className="text-sm">水印位置</Label>
-                        <select
-                          id="oneClickWatermarkPosition"
-                          value={watermarkPosition}
-                          onChange={(e) => setWatermarkPosition(e.target.value)}
-                          className="mt-1 block w-full border border-gray-300 rounded-md px-2 py-1 bg-white text-sm"
-                        >
-                          <option value="top-left">左上</option>
-                          <option value="top-right">右上</option>
-                          <option value="bottom-left">左下</option>
-                          <option value="bottom-right">右下</option>
-                          <option value="center">居中</option>
-                        </select>
-                      </div>
+                      {watermarkType === 'logo' && watermarkLogo && uploadedImages.length > 0 && (
+                        <div className="mt-3">
+                          <Label className="text-sm mb-2 block">调整Logo位置和大小</Label>
+                          <WatermarkEditor
+                            imageUrl={uploadedImages[selectedPreviewIndex]?.preview || ''}
+                            logoUrl={watermarkLogo.preview}
+                            onPositionChange={handleWatermarkPositionChange}
+                            width={400}
+                            height={300}
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1396,45 +1441,7 @@ export default function WorkspacePage() {
           </Button>
         </div>
 
-        {/* 处理结果展示 */}
-        {processedResults.length > 0 && (
-          <Card className="bg-white">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-gray-900">
-                <CheckCircle className="w-5 h-5 text-green-500" />
-                处理结果 ({processedResults.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {processedResults.map((result, index) => (
-                  <div
-                    key={result.id}
-                    className="group relative aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all duration-200"
-                    onClick={() => {
-                      setSelectedResultIndex(index);
-                      setShowResultModal(true);
-                    }}
-                  >
-                    <img
-                      src={result.processedImageUrl}
-                      alt={`${result.originalName} - ${result.processType}`}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
-                      <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-                    </div>
-                    <div className="absolute bottom-0 left-0 right-0 bg-white bg-opacity-90 p-2">
-                      <p className="text-gray-900 text-xs truncate font-medium">{result.originalName}</p>
-                      <p className="text-gray-600 text-xs">{result.processType}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
+        
         {/* 隐藏的文件输入 */}
         <input
           ref={fileInputRef}
@@ -1473,28 +1480,16 @@ export default function WorkspacePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <Navbar />
-      <div className="container mx-auto px-4 py-6 max-w-7xl">
-        {/* 页面标题 */}
-        <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-1">
-            AI 图像工作台
-          </h1>
-          <p className="text-gray-600 text-sm">
-            使用先进的 AI 技术进行图像处理和增强
-          </p>
-        </div>
-
-        {/* 侧边栏布局 */}
-        <div className="flex gap-6">
-          {/* 左侧边栏 - 功能导航 */}
-          <div className="w-64 flex-shrink-0">
-            <Card className="bg-white border-0 shadow-lg sticky top-6">
-              <CardHeader className="pb-4 px-4 pt-5">
-                <CardTitle className="text-lg font-bold text-gray-800">功能模块</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-1 px-3 pb-4">
+      <div className="flex-1 flex overflow-hidden">
+        {/* 左侧边栏 - 功能导航 */}
+        <div className="w-72 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col">
+          {/* 功能模块列表 */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-4">
+              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 px-3">功能模块</h2>
+              <div className="space-y-1">
                 {tabs.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
@@ -1503,10 +1498,10 @@ export default function WorkspacePage() {
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-3 rounded-md font-medium transition-all duration-200 text-left group ${
+                      className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg font-medium transition-all duration-200 text-left group ${
                         isActive
                           ? 'bg-blue-600 text-white shadow-sm'
-                          : 'text-gray-700 hover:bg-gray-100'
+                          : 'text-gray-700 hover:bg-gray-50'
                       }`}
                     >
                       <Icon className={`w-5 h-5 flex-shrink-0 transition-transform group-hover:scale-110 ${
@@ -1525,15 +1520,42 @@ export default function WorkspacePage() {
                     </button>
                   );
                 })}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* 右侧内容区域 */}
-          <div className="flex-1 min-w-0">
-            {renderTabContent()}
+              </div>
+            </div>
           </div>
         </div>
+
+        {/* 右侧内容区域 - 左右布局 */}
+        <div className="flex-1 overflow-hidden flex">
+          {/* 左侧 - 当前处理区域 */}
+          <div className="flex-1 overflow-y-auto border-r border-gray-200">
+            <div className="p-6">
+              {renderTabContent()}
+            </div>
+          </div>
+          
+          {/* 右侧 - 历史记录 */}
+          <CollapsibleHistorySidebar
+            items={processedResults.map(result => ({
+              id: result.id,
+              filename: result.originalName,
+              thumbnailUrl: result.processedImageUrl,
+              processedUrl: result.processedImageUrl,
+              originalUrl: result.processedImageUrl,
+              createdAt: new Date().toISOString(),
+              status: 'COMPLETED',
+              processType: result.processType
+            }))}
+            onItemClick={(item) => {
+              const index = processedResults.findIndex(r => r.id === item.id);
+              if (index !== -1) {
+                setSelectedResultIndex(index);
+                setShowResultModal(true);
+              }
+            }}
+          />
+        </div>
+      </div>
 
         {/* 图片预览模态框 */}
         {showImageModal && (
@@ -1583,35 +1605,33 @@ export default function WorkspacePage() {
           </div>
         )}
 
-        {/* 结果预览模态框 */}
+        {/* 结果预览模态框 - 优化版 */}
         {showResultModal && selectedResultIndex !== null && (
-          <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
-            <div className="relative max-w-4xl max-h-full">
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowResultModal(false)}
+          >
+            <div className="relative w-full h-full flex flex-col items-center justify-center">
+              {/* 关闭按钮 */}
               <button
                 onClick={() => setShowResultModal(false)}
-                className="absolute top-4 right-4 w-10 h-10 bg-white bg-opacity-90 text-gray-700 rounded-full flex items-center justify-center hover:bg-opacity-100 z-10 transition-all"
+                className="absolute top-4 right-4 w-12 h-12 bg-white bg-opacity-90 text-gray-700 rounded-full flex items-center justify-center hover:bg-opacity-100 z-10 transition-all shadow-lg"
               >
                 <X className="w-6 h-6" />
               </button>
               
-              <img
-                src={processedResults[selectedResultIndex]?.processedImageUrl}
-                alt={`${processedResults[selectedResultIndex]?.originalName} - ${processedResults[selectedResultIndex]?.processType}`}
-                className="max-w-full max-h-full object-contain rounded-lg"
-              />
-              
-              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white bg-opacity-95 text-gray-900 px-4 py-2 rounded-lg">
-                <p className="text-center font-medium">
-                  {processedResults[selectedResultIndex]?.originalName} - {processedResults[selectedResultIndex]?.processType}
-                </p>
-                <p className="text-center text-sm text-gray-600">
-                  处理时间: {processedResults[selectedResultIndex]?.timestamp}
-                </p>
+              {/* 图片容器 - 自动适应屏幕 */}
+              <div className="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center">
+                <img
+                  src={processedResults[selectedResultIndex]?.processedImageUrl}
+                  alt={`${processedResults[selectedResultIndex]?.originalName} - ${processedResults[selectedResultIndex]?.processType}`}
+                  className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                  onClick={(e) => e.stopPropagation()}
+                />
               </div>
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 }

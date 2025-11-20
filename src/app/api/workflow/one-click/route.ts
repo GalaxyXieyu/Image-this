@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { uploadBase64ImageToMinio } from '@/lib/storage';
+import { uploadBase64Image } from '@/lib/storage';
 import { generateWithJimeng } from '@/app/api/jimeng/service';
 import { outpaintWithQwen } from '@/app/api/qwen/service';
 import { enhanceWithVolcengine } from '@/app/api/volcengine/service';
@@ -245,15 +245,15 @@ export async function POST(request: NextRequest) {
       console.log('水印参数:', { watermarkText, watermarkOpacity, watermarkPosition, watermarkType, outputResolution });
       try {
         const { addWatermarkToImage } = await import('@/lib/watermark');
-        processedImageUrl = await addWatermarkToImage(
-          processedImageUrl,
+        processedImageUrl = await addWatermarkToImage({
+          imageUrl: processedImageUrl,
           watermarkText,
           watermarkOpacity,
           watermarkPosition,
           watermarkType,
           watermarkLogoUrl,
           outputResolution
-        );
+        });
         console.log('水印添加完成');
       } catch (error) {
         console.error('水印添加失败，继续使用当前图片:', error);
@@ -273,7 +273,7 @@ export async function POST(request: NextRequest) {
       console.log('=== 开始上传到MinIO ===');
       const minioStartTime = Date.now();
       // 上传到MinIO
-      const minioUrl = await uploadBase64ImageToMinio(finalImageData, `one-click-${processedImage.id}.jpg`);
+      const minioUrl = await uploadBase64Image(finalImageData, `one-click-${processedImage.id}.jpg`);
       const minioDuration = ((Date.now() - minioStartTime) / 1000).toFixed(2);
       console.log(`MinIO上传完成，耗时: ${minioDuration}秒`);
       

@@ -16,7 +16,8 @@ export async function GET(request: NextRequest) {
     const projectId = searchParams.get('projectId');
     const status = searchParams.get('status');
     const type = searchParams.get('type');
-    const limit = parseInt(searchParams.get('limit') || '50');
+    // 限制最大返回数量，防止单次查询过多数据
+    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
     const offset = parseInt(searchParams.get('offset') || '0');
 
     // 构建查询条件
@@ -43,13 +44,24 @@ export async function GET(request: NextRequest) {
       where.processType = type;
     }
 
-    // 查询图片
+    // 查询图片 - 优化字段选择，减少数据传输
     const images = await prisma.processedImage.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       take: limit,
       skip: offset,
-      include: {
+      select: {
+        id: true,
+        filename: true,
+        originalUrl: true,
+        processedUrl: true,
+        thumbnailUrl: true,
+        processType: true,
+        status: true,
+        fileSize: true,
+        width: true,
+        height: true,
+        createdAt: true,
         project: {
           select: {
             id: true,

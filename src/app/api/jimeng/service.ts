@@ -3,7 +3,7 @@
  */
 
 import * as crypto from 'crypto';
-import { uploadBase64ImageToMinio } from '@/lib/storage';
+import { uploadBase64Image } from '@/lib/storage';
 import { uploadBase64ToSuperbed } from '@/lib/superbed-upload';
 import { prisma } from '@/lib/prisma';
 
@@ -42,25 +42,44 @@ function generateSignature(method: string, path: string, query: string, headers:
   const signingKey = getSignatureKey(secretKey, dateStamp, REGION, SERVICE);
   const signature = crypto.createHmac('sha256', signingKey).update(stringToSign).digest('hex');
   
-  const accessKey = process.env.AccessKey || process.env.VOLCENGINE_ACCESS_KEY || process.env.ARK_API_KEY;
-  return `HMAC-SHA256 Credential=${accessKey}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+  return `HMAC-SHA256 Credential=${process.env.VOLCENGINE_ACCESS_KEY}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+}
+
+// 带超时和重试的fetch
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  retries = 2,
+  timeout = 60000
+): Promise<Response> {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+      
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      if (i === retries) throw error;
+      await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+    }
+  }
+  throw new Error('All retries failed');
 }
 
 async function callJimengAPI(
   prompt: string, 
   imageUrls?: string[], 
   width = 2048, 
-  height = 2048,
-  accessKey?: string,
-  secretKey?: string
+  height = 2048
 ) {
-  const finalAccessKey = accessKey || 
-    process.env.AccessKey || 
-    process.env.VOLCENGINE_ACCESS_KEY || 
-    process.env.ARK_API_KEY;
-  const finalSecretKey = secretKey || 
-    process.env.SecretKey || 
-    process.env.VOLCENGINE_SECRET_KEY;
+  const finalAccessKey = process.env.VOLCENGINE_ACCESS_KEY;
+  const finalSecretKey = process.env.VOLCENGINE_SECRET_KEY;
 
   if (!finalAccessKey || !finalSecretKey) {
     throw new Error('火山引擎即梦API配置缺失');
@@ -97,7 +116,7 @@ async function callJimengAPI(
   
   headers['Authorization'] = authorization;
 
-  const response = await fetch(`https://${HOST}/?${query}`, {
+  const response = await fetchWithRetry(`https://${HOST}/?${query}`, {
     method: 'POST',
     headers,
     body: bodyStr
@@ -106,7 +125,7 @@ async function callJimengAPI(
   const result = await response.json();
   
   if (!response.ok || result.code !== 10000) {
-    throw new Error(`即梦API调用失败: ${JSON.stringify(result)}`);
+    throw new Error(`即梦API调用失败: code=${result.code}, msg=${result.message || 'Unknown'}`);
   }
 
   return result.data;
@@ -142,15 +161,18 @@ export async function generateWithJimeng(
   });
 
   try {
+    const startTime = Date.now();
+    console.log(`[即梦服务] 开始处理 - 图片数: ${imageArray.length}`);
+    
+    // 并行上传参考图片
     const imageUrls: string[] = [];
     if (imageArray.length > 0) {
-      for (let i = 0; i < imageArray.length; i++) {
-        const url = await uploadBase64ToSuperbed(
-          imageArray[i],
-          `reference-${processedImage.id}-${i}.jpg`
-        );
-        imageUrls.push(url);
-      }
+      const uploadPromises = imageArray.map((img, i) =>
+        uploadBase64ToSuperbed(img, `reference-${processedImage.id}-${i}.jpg`)
+      );
+      const urls = await Promise.all(uploadPromises);
+      imageUrls.push(...urls);
+      console.log(`[即梦服务] 图片上传完成 - 数量: ${urls.length}`);
     }
     
     const result = await callJimengAPI(prompt, imageUrls.length > 0 ? imageUrls : undefined, width, height);
@@ -158,7 +180,7 @@ export async function generateWithJimeng(
     let generatedImageUrl = '';
     if (result.binary_data_base64 && result.binary_data_base64.length > 0) {
       const base64Data = result.binary_data_base64[0];
-      generatedImageUrl = await uploadBase64ImageToMinio(
+      generatedImageUrl = await uploadBase64Image(
         base64Data,
         `jimeng-generated-${processedImage.id}.jpg`
       );
@@ -166,7 +188,7 @@ export async function generateWithJimeng(
     
     let originalMinioUrl = 'generated';
     if (imageArray.length > 0) {
-      originalMinioUrl = await uploadBase64ImageToMinio(
+      originalMinioUrl = await uploadBase64Image(
         imageArray[0],
         `reference-${processedImage.id}.jpg`
       );
@@ -186,6 +208,9 @@ export async function generateWithJimeng(
       }
     });
 
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.log(`[即梦服务] 处理完成 - 耗时: ${duration}s`);
+    
     return {
       id: updatedImage.id,
       imageData: generatedImageUrl,
@@ -193,13 +218,15 @@ export async function generateWithJimeng(
     };
 
   } catch (error) {
+    console.error(`[即梦服务] 处理失败:`, error instanceof Error ? error.message : error);
+    
     await prisma.processedImage.update({
       where: { id: processedImage.id },
       data: {
         status: 'FAILED',
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
         metadata: JSON.stringify({
           ...(processedImage.metadata ? JSON.parse(processedImage.metadata as string) : {}),
-          error: error instanceof Error ? error.message : 'Unknown error',
           failedAt: new Date().toISOString()
         })
       }
