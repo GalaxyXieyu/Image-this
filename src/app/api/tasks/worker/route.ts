@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { uploadBase64Image } from '@/lib/storage';
+import { addWatermarkToImage } from '@/lib/watermark';
 
 // 任务处理器
 class TaskProcessor {
@@ -547,53 +549,70 @@ class TaskProcessor {
 
   private async processWatermark(task: { id: string; inputData: string; userId: string }) {
     const inputData = JSON.parse(task.inputData);
-    const { 
-      imageUrl, 
-      watermarkText = 'Sample Watermark', 
-      watermarkOpacity = 0.3, 
+    const {
+      imageUrl,
+      watermarkText = 'Watermark',
+      watermarkOpacity = 0.3,
       watermarkPosition = 'bottom-right',
-      watermarkType = 'text',
+      watermarkType = 'logo',
       watermarkLogoUrl,
       outputResolution = 'original'
     } = inputData;
-    
+
     await this.updateTaskProgress(task.id, '水印添加中...', 50, 1);
     
     try {
-      const apiUrl = process.env.NODE_ENV === 'production' 
-        ? `${process.env.NEXTAUTH_URL}/api/watermark`
-        : 'http://localhost:3000/api/watermark';
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          imageUrl,
-          watermarkText,
-          watermarkOpacity,
-          watermarkPosition,
-          watermarkType,
-          watermarkLogoUrl,
-          outputResolution,
+      const processedImage = await prisma.processedImage.create({
+        data: {
+          filename: `watermark-${Date.now()}.png`,
+          originalUrl: imageUrl,
+          processType: 'WATERMARK',
+          status: 'PROCESSING',
           userId: task.userId,
-          serverCall: true
-        }),
+          metadata: JSON.stringify({
+            watermarkText,
+            watermarkOpacity,
+            watermarkPosition,
+            watermarkType,
+            watermarkLogoUrl,
+            outputResolution,
+          })
+        }
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`水印添加失败: ${errorData.details || response.statusText}`);
-      }
+      const watermarkedImageData = await addWatermarkToImage({
+        imageUrl,
+        watermarkType,
+        watermarkLogoUrl,
+        watermarkPosition,
+        watermarkOpacity,
+        watermarkText,
+        outputResolution
+      });
 
-      const result = await response.json();
+      const minioUrl = await uploadBase64Image(
+        watermarkedImageData,
+        `watermark-${processedImage.id}.png`
+      );
+
+      const updatedImage = await prisma.processedImage.update({
+        where: { id: processedImage.id },
+        data: {
+          processedUrl: minioUrl,
+          status: 'COMPLETED',
+          fileSize: Buffer.from(watermarkedImageData.split(',')[1], 'base64').length,
+          metadata: JSON.stringify({
+            ...(processedImage.metadata ? JSON.parse(processedImage.metadata as string) : {}),
+            processingCompletedAt: new Date().toISOString(),
+          })
+        }
+      });
 
       await this.updateTaskProgress(task.id, '水印添加完成', 100, 1);
       
       return {
-        processedImageId: result.data.id,
-        processedImageUrl: result.data.imageData,
+        processedImageId: updatedImage.id,
+        processedImageUrl: watermarkedImageData,
         watermarkText,
         watermarkOpacity,
         watermarkPosition,
