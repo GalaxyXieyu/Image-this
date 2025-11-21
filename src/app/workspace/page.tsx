@@ -81,7 +81,7 @@ export default function WorkspacePage() {
   // 水印相关状态
   const [enableWatermark, setEnableWatermark] = useState(false);
   const [watermarkText, setWatermarkText] = useState('Sample Watermark');
-  const [watermarkOpacity, setWatermarkOpacity] = useState(0.3);
+  const [watermarkOpacity, setWatermarkOpacity] = useState(1.0); // 改为 1.0，保持 Logo 原色
   const [watermarkPosition, setWatermarkPosition] = useState('bottom-right');
   const [watermarkType, setWatermarkType] = useState<'text' | 'logo'>('logo');
   const [watermarkLogo, setWatermarkLogo] = useState<UploadedImage | null>(null);
@@ -882,6 +882,7 @@ export default function WorkspacePage() {
         watermarkType: 'logo',
         watermarkLogoUrl: watermarkLogoData,
         watermarkPosition: watermarkSettings, // 使用交互式设置的位置和缩放
+        watermarkOpacity: 1.0, // 使用 100% 不透明度保持 Logo 原色
         outputResolution,
         originalImageId: image.id,
         originalImageName: image.name
@@ -1214,94 +1215,94 @@ export default function WorkspacePage() {
 
             {activeTab === "watermark" && (
               <div className="space-y-4">
-                <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg mb-4">
-                  <h4 className="text-sm font-medium text-orange-900 mb-1">📝 使用说明</h4>
-                  <ol className="text-xs text-orange-800 space-y-1 list-decimal list-inside">
-                    <li>先在左侧上传需要添加水印的<strong>目标图片</strong></li>
-                    <li>然后在下方上传透明背景的<strong>Logo图片</strong></li>
-                    <li>在编辑器中拖拽调整Logo的位置和大小</li>
-                    <li>点击"开始处理水印"批量应用到所有图片</li>
-                  </ol>
-                </div>
-                
-                <div>
-                  <Label>Logo图片（支持PNG透明背景）</Label>
-                  {!watermarkLogo ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full mt-1"
-                      onClick={() => watermarkLogoInputRef.current?.click()}
-                    >
-                      <Upload className="w-4 h-4 mr-2" />
-                      上传Logo
-                    </Button>
-                  ) : (
-                    <div className="mt-1 p-3 border border-gray-300 rounded-md">
-                      <div className="flex items-center gap-3">
-                        <div className="w-16 h-16 border border-gray-200 rounded overflow-hidden bg-gray-50">
-                          <img src={watermarkLogo.preview} alt="Logo" className="w-full h-full object-contain" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{watermarkLogo.name}</p>
-                          <p className="text-xs text-gray-500">透明背景Logo</p>
-                        </div>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={removeWatermarkLogo}
+                  <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                    <h4 className="text-sm font-medium text-orange-900 mb-1">📝 使用说明</h4>
+                    <ol className="text-xs text-orange-800 space-y-1 list-decimal list-inside">
+                      <li>在侧显示示已上传的<strong>目标图片</strong>，右侧上传透明背景的<strong>Logo图片</strong></li>
+                      <li>上传Logo后，下方会显示编辑器，可拖拽调整Logo的位置和大小</li>
+                      <li>点击"开始处理水印"批量应用到所有图片</li>
+                    </ol>
+                  </div>
+                  
+                  {/* Logo上传区域 */}
+                  <div>
+                    <Label className="mb-2 block">Logo图片（支持PNG透明背景）</Label>
+                    {!watermarkLogo ? (
+                      <Card className="border-2 border-dashed border-blue-300 hover:border-blue-400 transition-all">
+                        <CardContent className="p-6 text-center">
+                          <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-3">
+                            <FileImage className="w-6 h-6 text-blue-600" />
+                          </div>
+                          <h3 className="text-base font-semibold text-gray-900 mb-1">上传Logo</h3>
+                          <p className="text-gray-500 text-sm mb-3">支持PNG透明背景格式</p>
+                          <Button
+                            type="button"
+                            className="bg-blue-500 hover:bg-blue-600"
+                            onClick={() => watermarkLogoInputRef.current?.click()}
+                          >
+                            <Upload className="w-4 h-4 mr-2" />
+                            选择图片
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-16 h-16 border border-gray-200 rounded overflow-hidden bg-gray-50">
+                              <img src={watermarkLogo.preview} alt="Logo" className="w-full h-full object-contain" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">{watermarkLogo.name}</p>
+                              <p className="text-xs text-gray-500">透明背景Logo</p>
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={removeWatermarkLogo}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                  
+                  {/* 水印编辑器 */}
+                  {watermarkLogo && uploadedImages.length > 0 && (
+                    <div className="space-y-4">
+                      <div className="border-t pt-4">
+                        <Label className="mb-2 block text-base font-medium">调整Logo位置和大小</Label>
+                        <WatermarkEditor
+                          imageUrl={uploadedImages[selectedPreviewIndex]?.preview || ''}
+                          logoUrl={watermarkLogo.preview}
+                          onPositionChange={handleWatermarkPositionChange}
+                          width={900}
+                          height={600}
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="outputResolution">输出分辨率</Label>
+                        <select
+                          id="outputResolution"
+                          value={outputResolution}
+                          onChange={(e) => setOutputResolution(e.target.value)}
+                          className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
                         >
-                          <X className="w-4 h-4" />
-                        </Button>
+                          <option value="original">原始分辨率</option>
+                          <option value="1920x1080">1920x1080 (Full HD)</option>
+                          <option value="2560x1440">2560x1440 (2K)</option>
+                          <option value="3840x2160">3840x2160 (4K)</option>
+                          <option value="1080x1080">1080x1080 (正方形)</option>
+                          <option value="1024x1024">1024x1024 (正方形)</option>
+                          <option value="2048x2048">2048x2048 (正方形)</option>
+                        </select>
                       </div>
                     </div>
                   )}
-                </div>
-                
-                {watermarkLogo && uploadedImages.length > 0 && (
-                  <>
-                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <h4 className="text-sm font-medium text-blue-900 mb-2">水印编辑器</h4>
-                      <p className="text-xs text-blue-700 mb-3">
-                        拖拽Logo调整位置，使用滑块调整大小
-                      </p>
-                      <WatermarkEditor
-                        imageUrl={uploadedImages[selectedPreviewIndex]?.preview || ''}
-                        logoUrl={watermarkLogo.preview}
-                        onPositionChange={handleWatermarkPositionChange}
-                        width={600}
-                        height={400}
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="outputResolution">输出分辨率</Label>
-                      <select
-                        id="outputResolution"
-                        value={outputResolution}
-                        onChange={(e) => setOutputResolution(e.target.value)}
-                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
-                      >
-                        <option value="original">原始分辨率</option>
-                        <option value="1920x1080">1920x1080 (Full HD)</option>
-                        <option value="2560x1440">2560x1440 (2K)</option>
-                        <option value="3840x2160">3840x2160 (4K)</option>
-                        <option value="1080x1080">1080x1080 (正方形)</option>
-                        <option value="1024x1024">1024x1024 (正方形)</option>
-                        <option value="2048x2048">2048x2048 (正方形)</option>
-                      </select>
-                    </div>
-                  </>
-                )}
-                
-                {!watermarkLogo && (
-                  <div className="text-center py-8 text-gray-500">
-                    <FileImage className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                    <p className="text-sm">请先上传Logo图片</p>
-                    <p className="text-xs text-gray-400 mt-1">支持PNG透明背景格式</p>
-                  </div>
-                )}
               </div>
             )}
 
@@ -1536,6 +1537,17 @@ export default function WorkspacePage() {
           
           {/* 右侧 - 历史记录 */}
           <CollapsibleHistorySidebar
+            title={(() => {
+              const titleMap: Record<ActiveTab, string> = {
+                'one-click': '一键增强历史',
+                'background': '背景替换历史',
+                'expansion': '图像扩展历史',
+                'upscaling': '图像放大历史',
+                'watermark': '水印处理历史'
+              };
+              return titleMap[activeTab];
+            })()}
+            subtitle={`共 ${processedResults.length} 条记录`}
             items={processedResults.map(result => ({
               id: result.id,
               filename: result.originalName,
