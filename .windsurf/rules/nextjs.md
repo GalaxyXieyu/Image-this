@@ -1,6 +1,5 @@
 ---
-trigger: model_decision
-description: if you need to write a NEXTJS app
+trigger: always_on
 ---
 
 # Next.js 全栈 AI 应用 - 技术架构指南

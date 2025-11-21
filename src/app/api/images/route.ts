@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     const projectId = searchParams.get('projectId');
     const status = searchParams.get('status');
     const type = searchParams.get('type');
+    const processTypes = searchParams.get('processTypes'); // 支持多个类型过滤
     // 限制最大返回数量，防止单次查询过多数据
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
     const offset = parseInt(searchParams.get('offset') || '0');
@@ -42,6 +43,16 @@ export async function GET(request: NextRequest) {
 
     if (type) {
       where.processType = type;
+    }
+
+    // 支持多个processType过滤
+    if (processTypes) {
+      const typesArray = processTypes.split(',').filter(Boolean);
+      if (typesArray.length > 0) {
+        where.processType = {
+          in: typesArray
+        };
+      }
     }
 
     // 查询图片 - 优化字段选择，减少数据传输

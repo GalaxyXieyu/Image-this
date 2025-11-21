@@ -1,4 +1,4 @@
-import { createCanvas, loadImage, CanvasRenderingContext2D as NodeCanvasRenderingContext2D } from 'canvas';
+import { createCanvas, loadImage, CanvasRenderingContext2D as NodeCanvasRenderingContext2D, Canvas } from 'canvas';
 
 interface WatermarkOptions {
   imageUrl: string;
@@ -24,7 +24,7 @@ export async function addWatermarkToImage(options: WatermarkOptions): Promise<st
     watermarkType,
     watermarkLogoUrl,
     watermarkPosition,
-    watermarkOpacity = 0.3,
+    watermarkOpacity = 1.0,
     watermarkText = 'Watermark',
     outputResolution
   } = options;
@@ -59,11 +59,15 @@ export async function addWatermarkToImage(options: WatermarkOptions): Promise<st
   }
   
   const canvas = createCanvas(outputWidth, outputHeight);
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { alpha: true });
+  
+  // 先用透明色填充整个画布，确保背景透明
+  ctx.clearRect(0, 0, outputWidth, outputHeight);
   
   // 绘制缩放后的图片
   ctx.drawImage(img, 0, 0, outputWidth, outputHeight);
   
+    
   // 添加水印
   if (watermarkType === 'logo' && watermarkLogoUrl) {
     await addLogoWatermark(ctx, watermarkLogoUrl, watermarkOpacity, watermarkPosition, outputWidth, outputHeight);
@@ -71,7 +75,10 @@ export async function addWatermarkToImage(options: WatermarkOptions): Promise<st
     addTextWatermark(ctx, watermarkText, watermarkOpacity, watermarkPosition, outputWidth, outputHeight);
   }
   
-  const outputBuffer = canvas.toBuffer('image/png');
+  // 使用PNG格式输出，保留透明度
+  const outputBuffer = canvas.toBuffer('image/png', { 
+    compressionLevel: 6
+  });
   const base64Output = outputBuffer.toString('base64');
   
   return `data:image/png;base64,${base64Output}`;
@@ -168,6 +175,7 @@ async function addLogoWatermark(
   const logoBuffer = Buffer.from(logoBase64, 'base64');
   const logo = await loadImage(logoBuffer);
   
+    
   // Logo尺寸和位置
   let logoWidth: number, logoHeight: number, x: number, y: number;
   
@@ -243,10 +251,10 @@ async function addLogoWatermark(
     }
   }
   
-  // 设置合成模式以正确处理透明度
-  ctx.globalCompositeOperation = 'source-over';
+  // 绘制Logo水印
+  ctx.save();
   ctx.globalAlpha = opacity;
+  ctx.globalCompositeOperation = 'source-over'; // 确保正确的合成模式
   ctx.drawImage(logo, x, y, logoWidth, logoHeight);
-  ctx.globalAlpha = 1.0;
-  ctx.globalCompositeOperation = 'source-over'; // 重置
+  ctx.restore();
 }
