@@ -20,6 +20,8 @@ export async function GET(request: NextRequest) {
     // 限制最大返回数量，防止单次查询过多数据
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
     const offset = parseInt(searchParams.get('offset') || '0');
+    // 图片尺寸优化参数
+    const includeFullSize = searchParams.get('includeFullSize') === 'true'; // 是否包含完整尺寸图片
 
     // 构建查询条件
     const where: any = {
@@ -59,31 +61,37 @@ export async function GET(request: NextRequest) {
     }
 
     // 查询图片 - 优化字段选择，减少数据传输
+    const selectFields: any = {
+      id: true,
+      filename: true,
+      thumbnailUrl: true, // 始终返回缩略图
+      processType: true,
+      status: true,
+      fileSize: true,
+      width: true,
+      height: true,
+      createdAt: true,
+      project: {
+        select: {
+          id: true,
+          name: true
+        }
+      }
+    };
+
+    // 只在需要时返回完整尺寸图片 URL
+    if (includeFullSize) {
+      selectFields.originalUrl = true;
+      selectFields.processedUrl = true;
+      selectFields.metadata = true;
+    }
+
     const images = await prisma.processedImage.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       take: limit,
       skip: offset,
-      select: {
-        id: true,
-        filename: true,
-        originalUrl: true,
-        processedUrl: true,
-        thumbnailUrl: true,
-        processType: true,
-        status: true,
-        metadata: true,
-        fileSize: true,
-        width: true,
-        height: true,
-        createdAt: true,
-        project: {
-          select: {
-            id: true,
-            name: true
-          }
-        }
-      }
+      select: selectFields
     });
 
     // 获取总数

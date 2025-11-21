@@ -5,18 +5,70 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import Navbar from '@/components/navigation/Navbar';
-import { Save, Key, Database, Zap, Sparkles, User, Image } from 'lucide-react';
+import { Save, Key, Zap, Sparkles, User, Image, FileText, Plus, Edit, Trash2, Star, StarOff, Cpu } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 
-type SettingSection = 'volcengine' | 'gpt' | 'gemini' | 'imagehosting' | 'profile';
+type SettingSection = 'models' | 'imagehosting' | 'profile' | 'prompts';
+
+interface PromptTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  category: string;
+  prompt: string;
+  isDefault: boolean;
+  isSystem: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+  BACKGROUND_REPLACE: '背景替换',
+  OUTPAINT: '扩图',
+  UPSCALE: '高清化',
+  ONE_CLICK: '一键增强',
+};
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { toast } = useToast();
   
-  const [activeSection, setActiveSection] = useState<SettingSection>('volcengine');
+  const [activeSection, setActiveSection] = useState<SettingSection>('models');
+  
+  // 提示词模板状态
+  const [templates, setTemplates] = useState<PromptTemplate[]>([]);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [currentTemplate, setCurrentTemplate] = useState<PromptTemplate | null>(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    category: 'BACKGROUND_REPLACE',
+    prompt: '',
+  });
   
   const [apiSettings, setApiSettings] = useState({
     // 火山引擎配置
@@ -40,13 +92,13 @@ export default function SettingsPage() {
 
   const menuItems = [
     { 
-      id: 'volcengine' as SettingSection, 
-      label: '火山引擎', 
-      subtitle: '画质增强、智能扩图',
-      icon: Zap, 
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-50',
-      borderColor: 'border-orange-500'
+      id: 'models' as SettingSection, 
+      label: 'AI模型配置', 
+      subtitle: '文生图、图生图、扩图',
+      icon: Cpu, 
+      color: 'text-pink-600',
+      bgColor: 'bg-pink-50',
+      borderColor: 'border-pink-500'
     },
     { 
       id: 'imagehosting' as SettingSection, 
@@ -58,22 +110,13 @@ export default function SettingsPage() {
       borderColor: 'border-green-500'
     },
     { 
-      id: 'gpt' as SettingSection, 
-      label: 'GPT API', 
-      subtitle: '背景替换、图片生成',
-      icon: Key, 
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50',
-      borderColor: 'border-blue-500'
-    },
-    { 
-      id: 'gemini' as SettingSection, 
-      label: 'Google Gemini', 
-      subtitle: '即将支持',
-      icon: Sparkles, 
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-50',
-      borderColor: 'border-purple-500'
+      id: 'prompts' as SettingSection, 
+      label: '提示词模板', 
+      subtitle: '管理 AI 提示词',
+      icon: FileText, 
+      color: 'text-indigo-600',
+      bgColor: 'bg-indigo-50',
+      borderColor: 'border-indigo-500'
     },
     { 
       id: 'profile' as SettingSection, 
@@ -189,104 +232,331 @@ export default function SettingsPage() {
     }));
   };
 
+  // 提示词模板管理函数
+  const loadTemplates = async () => {
+    try {
+      setIsLoadingTemplates(true);
+      const response = await fetch('/api/prompt-templates');
+      if (!response.ok) throw new Error('加载失败');
+      
+      const data = await response.json();
+      setTemplates(data.templates || []);
+    } catch (error) {
+      console.error('加载模板失败:', error);
+      toast({
+        title: '加载失败',
+        description: '无法加载提示词模板',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingTemplates(false);
+    }
+  };
+
+  const handleCreateTemplate = async () => {
+    if (!formData.name.trim() || !formData.prompt.trim()) {
+      toast({
+        title: '提示',
+        description: '请填写模板名称和提示词内容',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/prompt-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) throw new Error('创建失败');
+
+      toast({
+        title: '创建成功',
+        description: '提示词模板已创建',
+      });
+
+      setIsCreateDialogOpen(false);
+      setFormData({
+        name: '',
+        description: '',
+        category: 'BACKGROUND_REPLACE',
+        prompt: '',
+      });
+      await loadTemplates();
+    } catch (error) {
+      console.error('创建模板失败:', error);
+      toast({
+        title: '创建失败',
+        description: '无法创建提示词模板',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleEditTemplate = async () => {
+    if (!currentTemplate) return;
+
+    try {
+      const response = await fetch(`/api/prompt-templates/${currentTemplate.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+          description: formData.description,
+          prompt: formData.prompt,
+        }),
+      });
+
+      if (!response.ok) throw new Error('更新失败');
+
+      toast({
+        title: '更新成功',
+        description: '提示词模板已更新',
+      });
+
+      setIsEditDialogOpen(false);
+      setCurrentTemplate(null);
+      await loadTemplates();
+    } catch (error) {
+      console.error('更新模板失败:', error);
+      toast({
+        title: '更新失败',
+        description: '无法更新提示词模板',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteTemplate = async () => {
+    if (!currentTemplate) return;
+
+    try {
+      const response = await fetch(`/api/prompt-templates/${currentTemplate.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || '删除失败');
+      }
+
+      toast({
+        title: '删除成功',
+        description: '提示词模板已删除',
+      });
+
+      setIsDeleteDialogOpen(false);
+      setCurrentTemplate(null);
+      await loadTemplates();
+    } catch (error) {
+      console.error('删除模板失败:', error);
+      toast({
+        title: '删除失败',
+        description: error instanceof Error ? error.message : '无法删除提示词模板',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleSetDefault = async (template: PromptTemplate) => {
+    try {
+      const response = await fetch(`/api/prompt-templates/${template.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          isDefault: !template.isDefault,
+        }),
+      });
+
+      if (!response.ok) throw new Error('设置失败');
+
+      toast({
+        title: template.isDefault ? '已取消默认' : '设置成功',
+        description: template.isDefault ? '已取消默认模板' : '已设置为默认模板',
+      });
+
+      await loadTemplates();
+    } catch (error) {
+      console.error('设置默认模板失败:', error);
+      toast({
+        title: '设置失败',
+        description: '无法设置默认模板',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const openEditDialog = (template: PromptTemplate) => {
+    setCurrentTemplate(template);
+    setFormData({
+      name: template.name,
+      description: template.description || '',
+      category: template.category,
+      prompt: template.prompt,
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const openDeleteDialog = (template: PromptTemplate) => {
+    setCurrentTemplate(template);
+    setIsDeleteDialogOpen(true);
+  };
+
+  // 当切换到提示词标签时加载模板
+  useEffect(() => {
+    if (activeSection === 'prompts' && status === 'authenticated') {
+      loadTemplates();
+    }
+  }, [activeSection, status]);
+
   const renderContent = () => {
     switch (activeSection) {
-      case 'volcengine':
+      case 'models':
         return (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <Zap className="w-5 h-5 mr-2 text-orange-600" />
-                  火山引擎（Volcengine）
+          <div className="space-y-6">
+            {/* 火山引擎配置 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Zap className="w-5 h-5 mr-2 text-orange-600" />
+                    火山引擎（Volcengine）
+                  </div>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mr-2"
+                      checked={apiSettings.volcengineEnabled}
+                      onChange={(e) => handleInputChange('volcengineEnabled', e.target.checked)}
+                    />
+                    <span className="text-sm text-gray-600">启用</span>
+                  </label>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-gray-500 mb-4">
+                  支持：画质增强、智能扩图
                 </div>
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="mr-2"
-                    checked={apiSettings.volcengineEnabled}
-                    onChange={(e) => handleInputChange('volcengineEnabled', e.target.checked)}
+                <div>
+                  <Label htmlFor="volcengineAccessKey">Access Key</Label>
+                  <Input
+                    id="volcengineAccessKey"
+                    placeholder="AKLT..."
+                    value={apiSettings.volcengineAccessKey}
+                    onChange={(e) => handleInputChange('volcengineAccessKey', e.target.value)}
+                    disabled={!apiSettings.volcengineEnabled}
                   />
-                  <span className="text-sm text-gray-600">启用</span>
-                </label>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-sm text-gray-500 mb-4">
-                支持：画质增强、智能扩图
-              </div>
-              <div>
-                <Label htmlFor="volcengineAccessKey">Access Key</Label>
-                <Input
-                  id="volcengineAccessKey"
-                  placeholder="AKLT..."
-                  value={apiSettings.volcengineAccessKey}
-                  onChange={(e) => handleInputChange('volcengineAccessKey', e.target.value)}
-                  disabled={!apiSettings.volcengineEnabled}
-                />
-              </div>
-              <div>
-                <Label htmlFor="volcengineSecretKey">Secret Key</Label>
-                <Input
-                  id="volcengineSecretKey"
-                  type="password"
-                  placeholder="输入密钥"
-                  value={apiSettings.volcengineSecretKey}
-                  onChange={(e) => handleInputChange('volcengineSecretKey', e.target.value)}
-                  disabled={!apiSettings.volcengineEnabled}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        );
+                </div>
+                <div>
+                  <Label htmlFor="volcengineSecretKey">Secret Key</Label>
+                  <Input
+                    id="volcengineSecretKey"
+                    type="password"
+                    placeholder="输入密钥"
+                    value={apiSettings.volcengineSecretKey}
+                    onChange={(e) => handleInputChange('volcengineSecretKey', e.target.value)}
+                    disabled={!apiSettings.volcengineEnabled}
+                  />
+                </div>
+              </CardContent>
+            </Card>
 
-      case 'gpt':
-        return (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <Key className="w-5 h-5 mr-2 text-blue-600" />
-                  GPT API
+            {/* GPT API配置 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Key className="w-5 h-5 mr-2 text-blue-600" />
+                    GPT API
+                  </div>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mr-2"
+                      checked={apiSettings.gptEnabled}
+                      onChange={(e) => handleInputChange('gptEnabled', e.target.checked)}
+                    />
+                    <span className="text-sm text-gray-600">启用</span>
+                  </label>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-gray-500 mb-4">
+                  支持：背景替换、图片生成
                 </div>
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="mr-2"
-                    checked={apiSettings.gptEnabled}
-                    onChange={(e) => handleInputChange('gptEnabled', e.target.checked)}
+                <div>
+                  <Label htmlFor="gptApiUrl">API 地址</Label>
+                  <Input
+                    id="gptApiUrl"
+                    placeholder="https://yunwu.ai"
+                    value={apiSettings.gptApiUrl}
+                    onChange={(e) => handleInputChange('gptApiUrl', e.target.value)}
+                    disabled={!apiSettings.gptEnabled}
                   />
-                  <span className="text-sm text-gray-600">启用</span>
-                </label>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-sm text-gray-500 mb-4">
-                支持：背景替换、图片生成
-              </div>
-              <div>
-                <Label htmlFor="gptApiUrl">API 地址</Label>
-                <Input
-                  id="gptApiUrl"
-                  placeholder="https://yunwu.ai"
-                  value={apiSettings.gptApiUrl}
-                  onChange={(e) => handleInputChange('gptApiUrl', e.target.value)}
-                  disabled={!apiSettings.gptEnabled}
-                />
-              </div>
-              <div>
-                <Label htmlFor="gptApiKey">API 密钥</Label>
-                <Input
-                  id="gptApiKey"
-                  type="password"
-                  placeholder="sk-..."
-                  value={apiSettings.gptApiKey}
-                  onChange={(e) => handleInputChange('gptApiKey', e.target.value)}
-                  disabled={!apiSettings.gptEnabled}
-                />
-              </div>
-            </CardContent>
-          </Card>
+                </div>
+                <div>
+                  <Label htmlFor="gptApiKey">API 密钥</Label>
+                  <Input
+                    id="gptApiKey"
+                    type="password"
+                    placeholder="sk-..."
+                    value={apiSettings.gptApiKey}
+                    onChange={(e) => handleInputChange('gptApiKey', e.target.value)}
+                    disabled={!apiSettings.gptEnabled}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Google Gemini配置 */}
+            <Card className="border-dashed">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Sparkles className="w-5 h-5 mr-2 text-purple-600" />
+                    Google Gemini（即将支持）
+                  </div>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mr-2"
+                      checked={apiSettings.geminiEnabled}
+                      onChange={(e) => handleInputChange('geminiEnabled', e.target.checked)}
+                    />
+                    <span className="text-sm text-gray-600">启用</span>
+                  </label>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-gray-500 mb-4">
+                  支持：图片生成、图片理解（即将推出）
+                </div>
+                <div>
+                  <Label htmlFor="geminiApiKey">API 密钥</Label>
+                  <Input
+                    id="geminiApiKey"
+                    type="password"
+                    placeholder="AI..."
+                    value={apiSettings.geminiApiKey}
+                    onChange={(e) => handleInputChange('geminiApiKey', e.target.value)}
+                    disabled={!apiSettings.geminiEnabled}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="geminiProjectId">Project ID（可选）</Label>
+                  <Input
+                    id="geminiProjectId"
+                    placeholder="your-project-id"
+                    value={apiSettings.geminiProjectId}
+                    onChange={(e) => handleInputChange('geminiProjectId', e.target.value)}
+                    disabled={!apiSettings.geminiEnabled}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         );
 
       case 'imagehosting':
@@ -331,53 +601,148 @@ export default function SettingsPage() {
           </Card>
         );
 
-      case 'gemini':
+      case 'prompts':
+        const filteredTemplates = selectedCategory === 'ALL'
+          ? templates
+          : templates.filter(t => t.category === selectedCategory);
+
         return (
-          <Card className="border-dashed">
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <Sparkles className="w-5 h-5 mr-2 text-purple-600" />
-                  Google Gemini（即将支持）
+          <div className="space-y-6">
+            {/* 工具栏 */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <FileText className="w-5 h-5 text-indigo-600" />
+                      提示词模板管理
+                    </CardTitle>
+                    <CardDescription className="mt-1">
+                      管理您的 AI 提示词模板，包括背景替换、扩图、高清化和一键增强等场景
+                    </CardDescription>
+                  </div>
+                  <Button onClick={() => setIsCreateDialogOpen(true)} className="gap-2">
+                    <Plus className="w-4 h-4" />
+                    新建模板
+                  </Button>
                 </div>
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="mr-2"
-                    checked={apiSettings.geminiEnabled}
-                    onChange={(e) => handleInputChange('geminiEnabled', e.target.checked)}
-                  />
-                  <span className="text-sm text-gray-600">启用</span>
-                </label>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-sm text-gray-500 mb-4">
-                支持：图片生成、图片理解（即将推出）
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-4">
+                  <Label className="text-sm font-medium">筛选分类:</Label>
+                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">全部分类</SelectItem>
+                      {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 模板列表 */}
+            {isLoadingTemplates ? (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-gray-600">加载中...</p>
               </div>
-              <div>
-                <Label htmlFor="geminiApiKey">API 密钥</Label>
-                <Input
-                  id="geminiApiKey"
-                  type="password"
-                  placeholder="AI..."
-                  value={apiSettings.geminiApiKey}
-                  onChange={(e) => handleInputChange('geminiApiKey', e.target.value)}
-                  disabled={!apiSettings.geminiEnabled}
-                />
+            ) : filteredTemplates.length > 0 ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                {filteredTemplates.map((template) => (
+                  <Card key={template.id} className="hover:shadow-lg transition-shadow">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg flex items-center gap-2">
+                            <FileText className="w-5 h-5 text-indigo-600" />
+                            {template.name}
+                          </CardTitle>
+                          <CardDescription className="mt-1">
+                            {CATEGORY_LABELS[template.category]}
+                            {template.isSystem && (
+                              <span className="ml-2 text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
+                                系统
+                              </span>
+                            )}
+                            {template.isDefault && (
+                              <span className="ml-2 text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded">
+                                默认
+                              </span>
+                            )}
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {template.description && (
+                        <p className="text-sm text-gray-600 mb-3">{template.description}</p>
+                      )}
+                      <div className="bg-gray-50 p-3 rounded-md border border-gray-200 mb-4">
+                        <p className="text-xs text-gray-700 line-clamp-3">{template.prompt}</p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleSetDefault(template)}
+                          className="gap-1"
+                        >
+                          {template.isDefault ? (
+                            <>
+                              <StarOff className="w-4 h-4" />
+                              取消默认
+                            </>
+                          ) : (
+                            <>
+                              <Star className="w-4 h-4" />
+                              设为默认
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openEditDialog(template)}
+                          className="gap-1"
+                        >
+                          <Edit className="w-4 h-4" />
+                          编辑
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openDeleteDialog(template)}
+                          disabled={template.isSystem}
+                          className="gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          删除
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
-              <div>
-                <Label htmlFor="geminiProjectId">Project ID（可选）</Label>
-                <Input
-                  id="geminiProjectId"
-                  placeholder="your-project-id"
-                  value={apiSettings.geminiProjectId}
-                  onChange={(e) => handleInputChange('geminiProjectId', e.target.value)}
-                  disabled={!apiSettings.geminiEnabled}
-                />
-              </div>
-            </CardContent>
-          </Card>
+            ) : (
+              <Card>
+                <CardContent className="text-center py-12">
+                  <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500 mb-4">暂无提示词模板</p>
+                  <Button onClick={() => setIsCreateDialogOpen(true)} className="gap-2">
+                    <Plus className="w-4 h-4" />
+                    创建第一个模板
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         );
 
       case 'profile':
@@ -468,7 +833,7 @@ export default function SettingsPage() {
             {renderContent()}
 
             {/* 保存按钮 */}
-            {activeSection !== 'profile' && (
+            {activeSection !== 'profile' && activeSection !== 'prompts' && (
               <div className="flex justify-end">
                 <Button 
                   onClick={handleSave} 
@@ -492,6 +857,137 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* 创建对话框 */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>创建提示词模板</DialogTitle>
+            <DialogDescription>
+              创建一个新的提示词模板，方便在工作流中快速使用
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">模板名称 *</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="例如：产品背景替换"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="category">分类 *</Label>
+              <Select
+                value={formData.category}
+                onValueChange={(value) => setFormData({ ...formData, category: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">描述</Label>
+              <Input
+                id="description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="简短描述这个模板的用途"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="prompt">提示词内容 *</Label>
+              <Textarea
+                id="prompt"
+                value={formData.prompt}
+                onChange={(e) => setFormData({ ...formData, prompt: e.target.value })}
+                placeholder="输入详细的提示词内容..."
+                className="min-h-[150px] resize-none"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+              取消
+            </Button>
+            <Button onClick={handleCreateTemplate}>创建</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 编辑对话框 */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>编辑提示词模板</DialogTitle>
+            <DialogDescription>
+              修改提示词模板的内容
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">模板名称 *</Label>
+              <Input
+                id="edit-name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">描述</Label>
+              <Input
+                id="edit-description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-prompt">提示词内容 *</Label>
+              <Textarea
+                id="edit-prompt"
+                value={formData.prompt}
+                onChange={(e) => setFormData({ ...formData, prompt: e.target.value })}
+                className="min-h-[150px] resize-none"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              取消
+            </Button>
+            <Button onClick={handleEditTemplate}>保存</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 删除确认对话框 */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>确认删除</DialogTitle>
+            <DialogDescription>
+              确定要删除提示词模板 "{currentTemplate?.name}" 吗？此操作无法撤销。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+              取消
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteTemplate}>
+              删除
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

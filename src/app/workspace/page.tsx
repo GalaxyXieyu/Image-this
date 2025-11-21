@@ -108,6 +108,11 @@ export default function WorkspacePage() {
   // AI 模型选择
   const [aiModel, setAiModel] = useState('jimeng');
 
+  // 提示词状态
+  const [backgroundPrompt, setBackgroundPrompt] = useState('');
+  const [outpaintPrompt, setOutpaintPrompt] = useState('');
+  const [oneClickPrompt, setOneClickPrompt] = useState('');
+
   // 历史记录侧边栏状态
   const [isHistorySidebarOpen, setIsHistorySidebarOpen] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
@@ -543,6 +548,12 @@ export default function WorkspacePage() {
             setOutputResolution={setOutputResolution}
             aiModel={aiModel}
             setAiModel={setAiModel}
+            backgroundPrompt={backgroundPrompt}
+            setBackgroundPrompt={setBackgroundPrompt}
+            outpaintPrompt={outpaintPrompt}
+            setOutpaintPrompt={setOutpaintPrompt}
+            oneClickPrompt={oneClickPrompt}
+            setOneClickPrompt={setOneClickPrompt}
           />
 
           {/* One-click 水印设置 */}

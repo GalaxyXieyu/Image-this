@@ -1,0 +1,40 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景渐变 -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="sparkGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#fbbf24;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f59e0b;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 圆角矩形背景 -->
+  <rect width="512" height="512" rx="115" fill="url(#bgGradient)"/>
+  
+  <!-- 图像框架 -->
+  <rect x="120" y="140" width="272" height="232" rx="16" fill="white" opacity="0.95"/>
+  
+  <!-- AI 魔法棒 -->
+  <g transform="translate(280, 180)">
+    <!-- 棒身 -->
+    <rect x="0" y="60" width="12" height="100" rx="6" fill="url(#sparkGradient)" transform="rotate(45 6 110)"/>
+    
+    <!-- 星星装饰 -->
+    <path d="M 0 0 L 4 12 L 16 16 L 4 20 L 0 32 L -4 20 L -16 16 L -4 12 Z" fill="#fbbf24"/>
+    <path d="M 20 30 L 22 36 L 28 38 L 22 40 L 20 46 L 18 40 L 12 38 L 18 36 Z" fill="#fde68a"/>
+    <path d="M -10 40 L -8 44 L -4 46 L -8 48 L -10 52 L -12 48 L -16 46 L -12 44 Z" fill="#fef3c7"/>
+  </g>
+  
+  <!-- 图像图层效果 -->
+  <g opacity="0.3">
+    <rect x="140" y="160" width="232" height="192" rx="12" fill="none" stroke="white" stroke-width="3" stroke-dasharray="8 4"/>
+  </g>
+  
+  <!-- 底部装饰线 -->
+  <rect x="120" y="390" width="80" height="4" rx="2" fill="white" opacity="0.6"/>
+  <rect x="210" y="390" width="120" height="4" rx="2" fill="white" opacity="0.8"/>
+  <rect x="340" y="390" width="52" height="4" rx="2" fill="white" opacity="0.6"/>
+</svg>

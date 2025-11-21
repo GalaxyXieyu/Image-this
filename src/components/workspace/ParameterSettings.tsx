@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Settings as SettingsIcon } from "lucide-react";
 import { ActiveTab } from './WorkspaceSidebar';
+import PromptTemplateSelector from './PromptTemplateSelector';
 
 interface ParameterSettingsProps {
     activeTab: ActiveTab;
@@ -11,10 +12,13 @@ interface ParameterSettingsProps {
     setOutputResolution: (value: string) => void;
     aiModel?: string;
     setAiModel?: (value: string) => void;
-    // Additional props for specific settings can be added here or handled via children/context if complex
-    // For now, we'll use direct DOM access for some inputs as in the original code, 
-    // or better, we should lift state up. 
-    // To keep refactor simple, I will replicate the structure but ideally these should be controlled inputs.
+    // 提示词相关
+    backgroundPrompt?: string;
+    setBackgroundPrompt?: (value: string) => void;
+    outpaintPrompt?: string;
+    setOutpaintPrompt?: (value: string) => void;
+    oneClickPrompt?: string;
+    setOneClickPrompt?: (value: string) => void;
 }
 
 export default function ParameterSettings({
@@ -23,6 +27,12 @@ export default function ParameterSettings({
     setOutputResolution,
     aiModel = 'jimeng',
     setAiModel,
+    backgroundPrompt = '',
+    setBackgroundPrompt,
+    outpaintPrompt = '',
+    setOutpaintPrompt,
+    oneClickPrompt = '',
+    setOneClickPrompt,
 }: ParameterSettingsProps) {
 
     // Note: In the original code, some inputs like xScale, yScale, upscaleFactor were uncontrolled (using document.getElementById).
@@ -39,30 +49,43 @@ export default function ParameterSettings({
             </CardHeader>
             <CardContent className="pt-3">
                 {activeTab === "expansion" && (
-                    <div className="grid grid-cols-3 gap-4">
-                        <div>
-                            <Label htmlFor="xScale">X轴扩展倍数</Label>
-                            <Input
-                                id="xScale"
-                                type="number"
-                                min="1.1"
-                                max="4.0"
-                                step="0.1"
-                                defaultValue="2.0"
-                                className="mt-1"
+                    <div className="space-y-4">
+                        {/* 提示词选择器 */}
+                        {setOutpaintPrompt && (
+                            <PromptTemplateSelector
+                                category="OUTPAINT"
+                                value={outpaintPrompt}
+                                onChange={setOutpaintPrompt}
+                                label="扩图提示词"
+                                description="描述如何扩展图像边界"
                             />
-                        </div>
-                        <div>
-                            <Label htmlFor="yScale">Y轴扩展倍数</Label>
-                            <Input
-                                id="yScale"
-                                type="number"
-                                min="1.1"
-                                max="4.0"
-                                step="0.1"
-                                defaultValue="2.0"
-                                className="mt-1"
-                            />
+                        )}
+                        
+                        <div className="grid grid-cols-3 gap-4">
+                            <div>
+                                <Label htmlFor="xScale">X轴扩展倍数</Label>
+                                <Input
+                                    id="xScale"
+                                    type="number"
+                                    min="1.1"
+                                    max="4.0"
+                                    step="0.1"
+                                    defaultValue="2.0"
+                                    className="mt-1"
+                                />
+                            </div>
+                            <div>
+                                <Label htmlFor="yScale">Y轴扩展倍数</Label>
+                                <Input
+                                    id="yScale"
+                                    type="number"
+                                    min="1.1"
+                                    max="4.0"
+                                    step="0.1"
+                                    defaultValue="2.0"
+                                    className="mt-1"
+                                />
+                            </div>
                         </div>
                     </div>
                 )}
@@ -101,6 +124,17 @@ export default function ParameterSettings({
 
                 {activeTab === "background" && (
                     <div className="space-y-4">
+                        {/* 提示词选择器 */}
+                        {setBackgroundPrompt && (
+                            <PromptTemplateSelector
+                                category="BACKGROUND_REPLACE"
+                                value={backgroundPrompt}
+                                onChange={setBackgroundPrompt}
+                                label="背景替换提示词"
+                                description="描述如何替换背景，保持主体不变"
+                            />
+                        )}
+                        
                         <div>
                             <Label htmlFor="backgroundAiModel">AI 模型选择</Label>
                             <select
@@ -115,15 +149,6 @@ export default function ParameterSettings({
                             </select>
                             <p className="text-xs text-gray-500 mt-1">选择用于背景替换的 AI 模型</p>
                         </div>
-                        <div>
-                            <Label htmlFor="customPrompt">自定义提示词（可选）</Label>
-                            <textarea
-                                id="customPrompt"
-                                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                                rows={3}
-                                placeholder="描述期望的背景效果..."
-                            />
-                        </div>
                     </div>
                 )}
 
@@ -131,6 +156,17 @@ export default function ParameterSettings({
                     <div className="space-y-4">
                         {activeTab === "one-click" && (
                             <>
+                                {/* 提示词选择器 */}
+                                {setOneClickPrompt && (
+                                    <PromptTemplateSelector
+                                        category="ONE_CLICK"
+                                        value={oneClickPrompt}
+                                        onChange={setOneClickPrompt}
+                                        label="一键增强提示词"
+                                        description="综合处理：背景优化 + 扩图 + 高清化"
+                                    />
+                                )}
+                                
                                 <div className="grid grid-cols-3 gap-4">
                                     <div>
                                         <Label htmlFor="xScale">X轴扩展倍数</Label>

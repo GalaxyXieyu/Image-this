@@ -62,6 +62,7 @@ model User {
   projects      Project[]
   processedImages ProcessedImage[]
   taskQueue     TaskQueue[]
+  promptTemplates PromptTemplate[]
 
   @@map("users")
 }
@@ -172,3 +173,32 @@ model TaskQueue {
   @@index([userId, createdAt])
   @@map("task_queue")
 }
+
+// 提示词模板模型
+model PromptTemplate {
+  id          String   @id @default(cuid())
+  name        String   // 模板名称
+  description String?  // 模板描述
+  category    String   // 模板分类：BACKGROUND_REPLACE, OUTPAINT, UPSCALE, ONE_CLICK
+  prompt      String   // 提示词内容
+  isDefault   Boolean  @default(false) // 是否为默认模板
+  isSystem    Boolean  @default(false) // 是否为系统预设模板（不可删除）
+  
+  // 时间戳
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // 关联
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, category])
+  @@index([userId, isDefault])
+  @@map("prompt_templates")
+}
+
+// PromptTemplate Category 常量:
+// "BACKGROUND_REPLACE" - 背景替换提示词
+// "OUTPAINT" - 扩图提示词
+// "UPSCALE" - 高清化提示词
+// "ONE_CLICK" - 一键增强提示词

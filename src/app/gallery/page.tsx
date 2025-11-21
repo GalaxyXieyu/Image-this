@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { LazyImage } from '@/components/ui/lazy-image';
+import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 import {
   Folder,
   FolderPlus,
@@ -90,6 +92,14 @@ export default function GalleryPage() {
   
   // 请求去重
   const loadingRef = useRef(false);
+  
+  // 无限滚动
+  const loadMoreRef = useInfiniteScroll({
+    hasMore,
+    isLoading: isLoadingMore,
+    onLoadMore: () => loadImages(false),
+    threshold: 300, // 距离底部300px时开始加载
+  });
 
   // 认证检查
   useEffect(() => {
@@ -145,7 +155,8 @@ export default function GalleryPage() {
       const currentPage = reset ? 1 : page;
       
       // 根据分类筛选构建查询参数
-      let url = `/api/images?status=COMPLETED&limit=${pageSize}&offset=${(currentPage - 1) * pageSize}`;
+      // 需要返回完整图片 URL 用于显示
+      let url = `/api/images?status=COMPLETED&limit=${pageSize}&offset=${(currentPage - 1) * pageSize}&includeFullSize=true`;
       
       if (selectedCategory !== 'all') {
         url += `&type=${selectedCategory}`;
@@ -163,7 +174,14 @@ export default function GalleryPage() {
         if (reset) {
           setImages(newImages);
         } else {
-          setImages(prev => [...prev, ...newImages]);
+          // 使用 Map 去重，确保不会有重复的图片 ID
+          setImages(prev => {
+            const imageMap = new Map(prev.map(img => [img.id, img]));
+            newImages.forEach((img: ProcessedImage) => {
+              imageMap.set(img.id, img);
+            });
+            return Array.from(imageMap.values());
+          });
         }
         
         // 判断是否还有更多数据
@@ -830,10 +848,13 @@ export default function GalleryPage() {
                 >
                   <CardContent className="p-2">
                     <div className="aspect-square bg-gray-100 rounded-lg mb-2 relative overflow-hidden">
-                      <img
-                        src={image.thumbnailUrl || image.processedUrl || image.originalUrl}
+                      <LazyImage
+                        src={image.processedUrl || image.originalUrl || image.thumbnailUrl || ''}
+                        thumbnailSrc={image.thumbnailUrl}
                         alt={image.filename}
                         className="w-full h-full object-cover"
+                        containerClassName="w-full h-full"
+                        rootMargin="200px"
                       />
                       <div className="absolute top-2 right-2">
                         <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(image.status)} bg-white`}>
@@ -937,10 +958,12 @@ export default function GalleryPage() {
                       <td className="p-4">
                         <div className="flex items-center space-x-3">
                           <div className="w-10 h-10 bg-gray-100 rounded overflow-hidden">
-                            <img
-                              src={image.thumbnailUrl || image.processedUrl || image.originalUrl}
+                            <LazyImage
+                              src={image.thumbnailUrl || image.processedUrl || image.originalUrl || ''}
                               alt={image.filename}
                               className="w-full h-full object-cover"
+                              containerClassName="w-full h-full"
+                              showLoadingAnimation={false}
                             />
                           </div>
                           <span className="font-medium">{image.filename}</span>
@@ -997,7 +1020,25 @@ export default function GalleryPage() {
             </div>
           )}
 
-          {filteredImages.length === 0 && (
+          {/* 无限滚动加载触发器 */}
+          {hasMore && (
+            <div ref={loadMoreRef} className="py-8 text-center">
+              {isLoadingMore && (
+                <div className="flex items-center justify-center space-x-2">
+                  <div className="w-6 h-6 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-gray-600">加载更多...</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!hasMore && filteredImages.length > 0 && (
+            <div className="text-center py-8 text-gray-500">
+              已加载全部图片
+            </div>
+          )}
+
+          {filteredImages.length === 0 && !isLoading && (
             <div className="text-center py-12">
               <Image className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">暂无图片</h3>
