@@ -179,3 +179,11 @@ prisma/migrations/*/migration.sql
 
 # Monitoring reports
 monitor_report_*.txt
+
+# Electron
+dist-electron/
+*.dmg
+*.exe
+*.AppImage
+*.deb
+*.rpm

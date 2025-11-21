@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronRight, ChevronLeft, History, Image as ImageIcon, Clock, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -32,6 +32,17 @@ export default function CollapsibleHistorySidebar({
   subtitle = "点击图片查看详情"
 }: CollapsibleHistorySidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [validItems, setValidItems] = useState<HistoryItem[]>([]);
+  const [brokenImages, setBrokenImages] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const filtered = items.filter(item => !brokenImages.has(item.id));
+    setValidItems(filtered);
+  }, [items, brokenImages]);
+
+  const handleImageError = (itemId: string) => {
+    setBrokenImages(prev => new Set(prev).add(itemId));
+  };
 
   const toggleCollapse = () => {
     setIsCollapsed(!isCollapsed);
@@ -68,7 +79,7 @@ export default function CollapsibleHistorySidebar({
               <History className="h-5 w-5 text-gray-400" />
               <div className="h-px w-6 bg-gray-200" />
               <span className="text-xs text-gray-400 writing-mode-vertical">
-                {items.length}
+                {validItems.length}
               </span>
             </div>
           </div>
@@ -88,7 +99,7 @@ export default function CollapsibleHistorySidebar({
 
             {/* 历史列表 */}
             <div className="flex-1 overflow-y-auto p-3">
-              {items.length === 0 ? (
+              {validItems.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <ImageIcon className="h-12 w-12 text-gray-300 mb-3" />
                   <p className="text-sm text-gray-500">暂无处理历史</p>
@@ -98,7 +109,7 @@ export default function CollapsibleHistorySidebar({
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {items.map((item) => (
+                  {validItems.map((item) => (
                     <div
                       key={item.id}
                       onClick={() => onItemClick?.(item)}
@@ -111,9 +122,7 @@ export default function CollapsibleHistorySidebar({
                             src={item.thumbnailUrl || item.processedUrl || item.originalUrl}
                             alt={item.filename}
                             className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                            onError={(e) => {
-                              e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='150'%3E%3Crect width='200' height='150' fill='%23f3f4f6'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' font-size='14' fill='%239ca3af'%3E图片%3C/text%3E%3C/svg%3E";
-                            }}
+                            onError={() => handleImageError(item.id)}
                           />
                         ) : (
                           <div className="flex h-full items-center justify-center">
@@ -159,12 +168,12 @@ export default function CollapsibleHistorySidebar({
             </div>
 
             {/* 底部统计 */}
-            {items.length > 0 && (
+            {validItems.length > 0 && (
               <div className="border-t border-gray-200 bg-gray-50 p-3">
                 <div className="flex items-center justify-between text-xs text-gray-600">
-                  <span>共 {items.length} 张图片</span>
+                  <span>共 {validItems.length} 张图片</span>
                   <span className="text-orange-600">
-                    {items.filter(i => i.status === 'COMPLETED').length} 已完成
+                    {validItems.filter(i => i.status === 'COMPLETED').length} 已完成
                   </span>
                 </div>
               </div>

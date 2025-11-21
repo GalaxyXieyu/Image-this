@@ -86,7 +86,7 @@ export default function WorkspacePage() {
   const [watermarkType, setWatermarkType] = useState<'text' | 'logo'>('logo');
   const [watermarkLogo, setWatermarkLogo] = useState<UploadedImage | null>(null);
   const [showWatermarkPreview, setShowWatermarkPreview] = useState(false);
-  const [watermarkSettings, setWatermarkSettings] = useState({ x: 50, y: 50, scale: 1, editorWidth: 600, editorHeight: 400 });
+  const [watermarkSettings, setWatermarkSettings] = useState({ x: 50, y: 50, width: 150, height: 150, editorWidth: 600, editorHeight: 400 });
   
   // 输出分辨率
   const [outputResolution, setOutputResolution] = useState('original');
@@ -183,7 +183,7 @@ export default function WorkspacePage() {
   }, []);
 
   // 稳定的水印位置变化回调
-  const handleWatermarkPositionChange = useCallback((position: { x: number; y: number; scale: number; editorWidth: number; editorHeight: number }) => {
+  const handleWatermarkPositionChange = useCallback((position: { x: number; y: number; width: number; height: number; editorWidth: number; editorHeight: number }) => {
     setWatermarkSettings(position);
   }, []);
 
@@ -896,9 +896,9 @@ export default function WorkspacePage() {
     const commonUploadSection = (
       <div className="space-y-6">
         {/* 上传区域 - 左右布局 */}
-        <div className={`grid gap-6 ${(activeTab === "background" || activeTab === "one-click") ? 'grid-cols-1 lg:grid-cols-3' : 'grid-cols-1'}`}>
+        <div className={`grid gap-6 ${(activeTab === "background" || activeTab === "one-click" || activeTab === "watermark") ? 'grid-cols-1 lg:grid-cols-3' : 'grid-cols-1'}`}>
           {/* 主要图片上传区域 */}
-          <Card className={`border-2 border-dashed border-gray-300 hover:border-orange-400 transition-all duration-300 bg-white ${(activeTab === "background" || activeTab === "one-click") ? 'lg:col-span-2' : ''}`}>
+          <Card className={`border-2 border-dashed border-gray-300 hover:border-orange-400 transition-all duration-300 bg-white ${(activeTab === "background" || activeTab === "one-click" || activeTab === "watermark") ? 'lg:col-span-2' : ''}`}>
           <CardContent className="p-6">
             {uploadedImages.length === 0 ? (
               // 空状态 - 显示上传提示
@@ -1099,55 +1099,118 @@ export default function WorkspacePage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Logo上传区域 - 仅在叠加水印模式显示 */}
+          {activeTab === "watermark" && (
+            <div className="space-y-6">
+              <Card className="border-2 border-dashed border-blue-300 hover:border-blue-400 transition-all bg-white">
+                <CardContent className="p-6">
+                  <div className="text-center py-8">
+                  <div 
+                    className="w-32 h-32 mx-auto mb-3 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center cursor-pointer hover:bg-gray-200 transition-colors"
+                    onClick={() => watermarkLogoInputRef.current?.click()}
+                  >
+                    {watermarkLogo ? (
+                      <img src={watermarkLogo.preview} alt="Logo" className="w-full h-full object-contain" />
+                    ) : (
+                      <FileImage className="w-12 h-12 text-gray-400" />
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-700 mb-3 truncate px-4">
+                    {watermarkLogo ? watermarkLogo.name : '支持PNG透明背景格式'}
+                  </p>
+                  <div className="flex gap-2 justify-center">
+                    <Button
+                      type="button"
+                      className="bg-blue-500 hover:bg-blue-600"
+                      onClick={() => watermarkLogoInputRef.current?.click()}
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      {watermarkLogo ? '更换' : '选择图片'}
+                    </Button>
+                    {watermarkLogo && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={removeWatermarkLogo}
+                      >
+                        <X className="w-4 h-4 mr-1" />
+                        删除
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                </CardContent>
+              </Card>
+
+              {/* 水印编辑器 */}
+              {watermarkLogo && uploadedImages.length > 0 && (
+                <Card className="bg-white">
+                  <CardHeader>
+                    <CardTitle className="text-base">调整Logo位置和大小</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <WatermarkEditor
+                      imageUrl={uploadedImages[selectedPreviewIndex]?.preview || ''}
+                      logoUrl={watermarkLogo.preview}
+                      onPositionChange={handleWatermarkPositionChange}
+                      width={400}
+                      height={300}
+                    />
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
         </div>
 
         {/* 任务进度显示 */}
         {isProcessing && activeTasks.length > 0 && (
-          <Card className="border-orange-200 bg-orange-50">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  正在处理 {activeTasks.length} 个任务
-                </h3>
-              </div>
-              
-              <div className="space-y-3">
-                {activeTasks.map((task) => (
-                  <div key={task.id} className="bg-white rounded-lg p-4 border border-orange-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium text-gray-900">
-                        {task.originalName || 'Unknown'} - {getProcessTypeName(task.type)}
-                      </span>
-                      <span className="text-sm text-gray-500">
-                        {task.status === 'COMPLETED' ? (
-                          <CheckCircle className="w-5 h-5 text-green-500" />
-                        ) : task.status === 'FAILED' ? (
-                          <X className="w-5 h-5 text-red-500" />
-                        ) : (
-                          `${Math.round(task.progress)}%`
-                        )}
-                      </span>
-                    </div>
-                    
-                    <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                      <div
-                        className={`h-2 rounded-full transition-all duration-300 ${
-                          task.status === 'COMPLETED' ? 'bg-green-500' :
-                          task.status === 'FAILED' ? 'bg-red-500' :
-                          'bg-orange-500'
-                        }`}
-                        style={{ width: `${Math.max(task.progress, 5)}%` }}
-                      ></div>
-                    </div>
-                    
-                    <p className="text-sm text-gray-600">{task.currentStep}</p>
+              <Card className="border-orange-200 bg-orange-50">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      正在处理 {activeTasks.length} 个任务
+                    </h3>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                  
+                  <div className="space-y-3">
+                    {activeTasks.map((task) => (
+                      <div key={task.id} className="bg-white rounded-lg p-4 border border-orange-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-medium text-gray-900">
+                            {task.originalName || 'Unknown'} - {getProcessTypeName(task.type)}
+                          </span>
+                          <span className="text-sm text-gray-500">
+                            {task.status === 'COMPLETED' ? (
+                              <CheckCircle className="w-5 h-5 text-green-500" />
+                            ) : task.status === 'FAILED' ? (
+                              <X className="w-5 h-5 text-red-500" />
+                            ) : (
+                              `${Math.round(task.progress)}%`
+                            )}
+                          </span>
+                        </div>
+                        
+                        <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                          <div
+                            className={`h-2 rounded-full transition-all duration-300 ${
+                              task.status === 'COMPLETED' ? 'bg-green-500' :
+                              task.status === 'FAILED' ? 'bg-red-500' :
+                              'bg-orange-500'
+                            }`}
+                            style={{ width: `${Math.max(task.progress, 5)}%` }}
+                          ></div>
+                        </div>
+                        
+                        <p className="text-sm text-gray-600">{task.currentStep}</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
         {/* 参数设置区域 */}
         <Card className="bg-white">
@@ -1157,9 +1220,9 @@ export default function WorkspacePage() {
               参数设置
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {(activeTab === "expansion" || activeTab === "one-click") && (
-              <div className="grid grid-cols-2 gap-4">
+          <CardContent>
+            {activeTab === "expansion" && (
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="xScale">X轴扩展倍数</Label>
                   <Input
@@ -1187,17 +1250,19 @@ export default function WorkspacePage() {
               </div>
             )}
 
-            {(activeTab === "upscaling" || activeTab === "one-click") && (
-              <div>
-                <Label htmlFor="upscaleFactor">高清化倍数</Label>
-                <select
-                  id="upscaleFactor"
-                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
-                  defaultValue="2"
-                >
-                  <option value="2">2x</option>
-                  <option value="4">4x</option>
-                </select>
+            {activeTab === "upscaling" && (
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="upscaleFactor">高清化倍数</Label>
+                  <select
+                    id="upscaleFactor"
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
+                    defaultValue="2"
+                  >
+                    <option value="2">2x</option>
+                    <option value="4">4x</option>
+                  </select>
+                </div>
               </div>
             )}
 
@@ -1214,104 +1279,11 @@ export default function WorkspacePage() {
             )}
 
             {activeTab === "watermark" && (
-              <div className="space-y-4">
-                  <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                    <h4 className="text-sm font-medium text-orange-900 mb-1">📝 使用说明</h4>
-                    <ol className="text-xs text-orange-800 space-y-1 list-decimal list-inside">
-                      <li>在侧显示示已上传的<strong>目标图片</strong>，右侧上传透明背景的<strong>Logo图片</strong></li>
-                      <li>上传Logo后，下方会显示编辑器，可拖拽调整Logo的位置和大小</li>
-                      <li>点击"开始处理水印"批量应用到所有图片</li>
-                    </ol>
-                  </div>
-                  
-                  {/* Logo上传区域 */}
-                  <div>
-                    <Label className="mb-2 block">Logo图片（支持PNG透明背景）</Label>
-                    {!watermarkLogo ? (
-                      <Card className="border-2 border-dashed border-blue-300 hover:border-blue-400 transition-all">
-                        <CardContent className="p-6 text-center">
-                          <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-3">
-                            <FileImage className="w-6 h-6 text-blue-600" />
-                          </div>
-                          <h3 className="text-base font-semibold text-gray-900 mb-1">上传Logo</h3>
-                          <p className="text-gray-500 text-sm mb-3">支持PNG透明背景格式</p>
-                          <Button
-                            type="button"
-                            className="bg-blue-500 hover:bg-blue-600"
-                            onClick={() => watermarkLogoInputRef.current?.click()}
-                          >
-                            <Upload className="w-4 h-4 mr-2" />
-                            选择图片
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    ) : (
-                      <Card>
-                        <CardContent className="p-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-16 h-16 border border-gray-200 rounded overflow-hidden bg-gray-50">
-                              <img src={watermarkLogo.preview} alt="Logo" className="w-full h-full object-contain" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 truncate">{watermarkLogo.name}</p>
-                              <p className="text-xs text-gray-500">透明背景Logo</p>
-                            </div>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={removeWatermarkLogo}
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
-                  
-                  {/* 水印编辑器 */}
-                  {watermarkLogo && uploadedImages.length > 0 && (
-                    <div className="space-y-4">
-                      <div className="border-t pt-4">
-                        <Label className="mb-2 block text-base font-medium">调整Logo位置和大小</Label>
-                        <WatermarkEditor
-                          imageUrl={uploadedImages[selectedPreviewIndex]?.preview || ''}
-                          logoUrl={watermarkLogo.preview}
-                          onPositionChange={handleWatermarkPositionChange}
-                          width={900}
-                          height={600}
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="outputResolution">输出分辨率</Label>
-                        <select
-                          id="outputResolution"
-                          value={outputResolution}
-                          onChange={(e) => setOutputResolution(e.target.value)}
-                          className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
-                        >
-                          <option value="original">原始分辨率</option>
-                          <option value="1920x1080">1920x1080 (Full HD)</option>
-                          <option value="2560x1440">2560x1440 (2K)</option>
-                          <option value="3840x2160">3840x2160 (4K)</option>
-                          <option value="1080x1080">1080x1080 (正方形)</option>
-                          <option value="1024x1024">1024x1024 (正方形)</option>
-                          <option value="2048x2048">2048x2048 (正方形)</option>
-                        </select>
-                      </div>
-                    </div>
-                  )}
-              </div>
-            )}
-
-            {activeTab === "one-click" && (
-              <>
-                <div className="mt-4">
-                  <Label htmlFor="oneClickOutputResolution" className="text-sm">输出分辨率</Label>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="outputResolution">输出分辨率</Label>
                   <select
-                    id="oneClickOutputResolution"
+                    id="outputResolution"
                     value={outputResolution}
                     onChange={(e) => setOutputResolution(e.target.value)}
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
@@ -1325,7 +1297,66 @@ export default function WorkspacePage() {
                     <option value="2048x2048">2048x2048 (正方形)</option>
                   </select>
                 </div>
-                <div className="mt-4 p-4 border border-blue-200 rounded-lg bg-blue-50">
+              </div>
+            )}
+
+            {activeTab === "one-click" && (
+              <>
+                <div className="grid grid-cols-4 gap-4 mb-4">
+                  <div>
+                    <Label htmlFor="xScale">X轴扩展倍数</Label>
+                    <Input
+                      id="xScale"
+                      type="number"
+                      min="1.1"
+                      max="4.0"
+                      step="0.1"
+                      defaultValue="2.0"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="yScale">Y轴扩展倍数</Label>
+                    <Input
+                      id="yScale"
+                      type="number"
+                      min="1.1"
+                      max="4.0"
+                      step="0.1"
+                      defaultValue="2.0"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="upscaleFactor">高清化倍数</Label>
+                    <select
+                      id="upscaleFactor"
+                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
+                      defaultValue="2"
+                    >
+                      <option value="2">2x</option>
+                      <option value="4">4x</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label htmlFor="oneClickOutputResolution" className="text-sm">输出分辨率</Label>
+                    <select
+                      id="oneClickOutputResolution"
+                      value={outputResolution}
+                      onChange={(e) => setOutputResolution(e.target.value)}
+                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
+                    >
+                      <option value="original">原始分辨率</option>
+                      <option value="1920x1080">1920x1080 (Full HD)</option>
+                      <option value="2560x1440">2560x1440 (2K)</option>
+                      <option value="3840x2160">3840x2160 (4K)</option>
+                      <option value="1080x1080">1080x1080 (正方形)</option>
+                      <option value="1024x1024">1024x1024 (正方形)</option>
+                      <option value="2048x2048">2048x2048 (正方形)</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="p-4 border border-blue-200 rounded-lg bg-blue-50">
                   <div className="flex items-center gap-2 mb-3">
                     <input
                       type="checkbox"
@@ -1339,10 +1370,7 @@ export default function WorkspacePage() {
                     </Label>
                   </div>
                   {enableWatermark && (
-                    <div className="space-y-3 ml-6">
-                      <div className="p-2 bg-blue-100 border border-blue-300 rounded text-xs text-blue-800 mb-2">
-                        💡 启用水印后，上传Logo并在编辑器中调整位置和大小
-                      </div>
+                    <div className="grid grid-cols-3 gap-4">
                       <div>
                         <Label htmlFor="oneClickWatermarkType" className="text-sm">水印类型</Label>
                         <select

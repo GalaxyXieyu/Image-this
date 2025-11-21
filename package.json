@@ -1,15 +1,23 @@
 {
   "name": "imagine-this-nextjs",
   "version": "0.1.0",
+  "description": "专业的 AI 图像处理平台，支持背景替换、图像扩展、高清化等功能",
+  "author": "Imagine This Team",
   "private": true,
+  "main": "electron/main.js",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 23000",
     "build": "next build",
     "start": "next start -p 34000",
     "lint": "next lint",
     "pm2:start": "pm2 start ecosystem.config.js",
     "pm2:stop": "pm2 stop ecosystem.config.js",
-    "pm2:restart": "pm2 restart ecosystem.config.js"
+    "pm2:restart": "pm2 restart ecosystem.config.js",
+    "electron:dev": "concurrently \"NODE_ENV=development npm run dev\" \"wait-on http://localhost:23000 && NODE_ENV=development electron .\"",
+    "electron:build": "npm run build && electron-builder",
+    "electron:build:mac": "npm run build && electron-builder --mac",
+    "electron:build:win": "npm run build && electron-builder --win",
+    "electron:build:linux": "npm run build && electron-builder --linux"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -58,6 +66,7 @@
     "react-hook-form": "^7.53.0",
     "react-konva": "^19.2.0",
     "react-rnd": "^10.5.2",
+    "sharp": "^0.34.5",
     "sonner": "^1.5.0",
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",
@@ -69,11 +78,66 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^39.2.3",
+    "electron-builder": "^26.0.12",
     "eslint": "^9",
     "eslint-config-next": "15.3.4",
     "playwright": "^1.53.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.10",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wait-on": "^9.0.3"
+  },
+  "build": {
+    "appId": "com.imaginethis.app",
+    "productName": "Imagine This",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "electron/**/*",
+      ".next/**/*",
+      "public/**/*",
+      "prisma/**/*",
+      "node_modules/**/*",
+      "package.json",
+      ".env"
+    ],
+    "asarUnpack": [
+      "node_modules/@img/**/*",
+      "node_modules/canvas/**/*",
+      "node_modules/sharp/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.graphics-design",
+      "icon": "public/icon.png",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "icon": "public/icon.png",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "linux": {
+      "icon": "public/icon.png",
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Graphics"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   }
 }
