@@ -39,10 +39,7 @@ export async function deleteImage(objectName: string): Promise<void> {
   return deleteImageFromLocal(objectName);
 }
 
-// 保持向后兼容的别名
-export const uploadImageToMinio = uploadImage;
-export const uploadBase64ImageToMinio = uploadBase64Image;
-export const deleteImageFromMinio = deleteImage;
+// 已移除 MinIO 相关代码，现在使用本地存储
 
 // 生成缩略图并上传
 export async function generateAndUploadThumbnail(

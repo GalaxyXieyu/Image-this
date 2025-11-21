@@ -26,14 +26,14 @@ export default function ParameterSettings({
     // Ideally, these should be converted to controlled components in a future iteration.
 
     return (
-        <Card className="bg-white">
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-gray-900">
-                    <SettingsIcon className="w-5 h-5" />
+        <Card className="bg-white shadow-lg border-2 border-gray-200">
+            <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-gray-900 text-base">
+                    <SettingsIcon className="w-5 h-5 text-blue-600" />
                     参数设置
                 </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-3">
                 {activeTab === "expansion" && (
                     <div className="grid grid-cols-3 gap-4">
                         <div>

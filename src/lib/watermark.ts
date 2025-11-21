@@ -28,6 +28,13 @@ export async function addWatermarkToImage(options: WatermarkOptions): Promise<st
     watermarkText = 'Watermark',
     outputResolution
   } = options;
+  
+  console.log('[addWatermarkToImage] 开始处理水印:', {
+    inputPrefix: imageUrl.substring(0, 30),
+    watermarkType,
+    outputResolution
+  });
+  
   const extractBase64FromDataUrl = (dataUrl: string): string => {
     if (dataUrl.startsWith('data:')) {
       return dataUrl.split(',')[1];
@@ -80,8 +87,15 @@ export async function addWatermarkToImage(options: WatermarkOptions): Promise<st
     compressionLevel: 6
   });
   const base64Output = outputBuffer.toString('base64');
+  const result = `data:image/png;base64,${base64Output}`;
   
-  return `data:image/png;base64,${base64Output}`;
+  console.log('[addWatermarkToImage] 处理完成:', {
+    outputPrefix: result.substring(0, 30),
+    outputFormat: 'PNG',
+    bufferSize: outputBuffer.length
+  });
+  
+  return result;
 }
 
 function addTextWatermark(

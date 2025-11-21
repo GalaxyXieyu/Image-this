@@ -96,15 +96,19 @@ export async function outpaintWithQwen(
   xScale = 2.0,
   yScale = 2.0,
   bestQuality = false,
-  limitImageSize = true
+  limitImageSize = true,
+  qwenConfig?: { apiKey: string }
 ) {
   const startTime = Date.now();
   console.log(`[Qwen扩图] 开始 - xScale: ${xScale}, yScale: ${yScale}`);
 
-  const apiKey = process.env.QWEN_API_KEY;
+  // 优先使用传入的配置，否则使用环境变量
+  const apiKey = qwenConfig?.apiKey || process.env.QWEN_API_KEY || '';
   if (!apiKey) {
-    throw new Error('通义千问 API 配置缺失');
+    throw new Error('QWEN_NOT_CONFIGURED:请先在设置页面配置 GPT API 密钥（通义千问使用 GPT 配置）');
   }
+
+  console.log(`[Qwen扩图] 使用配置源: ${qwenConfig ? '用户设置' : '环境变量'}`);
 
   const processedImage = await prisma.processedImage.create({
     data: {

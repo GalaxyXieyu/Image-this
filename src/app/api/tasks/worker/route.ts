@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { uploadBase64Image } from '@/lib/storage';
 import { addWatermarkToImage } from '@/lib/watermark';
+import { getUserConfig } from '@/lib/user-config';
 
 // 任务处理器
 class TaskProcessor {
@@ -110,7 +111,60 @@ class TaskProcessor {
   }
 
   // 批量处理多个任务 - 修复：循环处理直到队列清空
-  async processBatch(maxTasks = this.maxConcurrentTasks) {
+  /**
+   * 并发控制：限制同时执行的任务数量
+   * @param items 要处理的任务列表
+   * @param processor 处理函数
+   * @param concurrency 最大并发数
+   */
+  private async processConcurrently<T, R>(
+    items: T[],
+    processor: (item: T) => Promise<R>,
+    concurrency: number
+  ): Promise<PromiseSettledResult<R>[]> {
+    const results: PromiseSettledResult<R>[] = [];
+    const executing: Promise<void>[] = [];
+    let completed = 0;
+    
+    console.log(`[并发控制] 开始处理 ${items.length} 个任务，最大并发数: ${concurrency}`);
+    
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const promise = processor(item)
+        .then(
+          (value) => {
+            completed++;
+            console.log(`[并发控制] 任务完成 (${completed}/${items.length})，当前并发: ${executing.length}`);
+            results.push({ status: 'fulfilled', value });
+          },
+          (reason) => {
+            completed++;
+            console.log(`[并发控制] 任务失败 (${completed}/${items.length})，当前并发: ${executing.length}`);
+            results.push({ status: 'rejected', reason });
+          }
+        )
+        .finally(() => {
+          executing.splice(executing.indexOf(promise), 1);
+        });
+      
+      executing.push(promise);
+      
+      // 当达到并发限制时，等待其中一个完成
+      if (executing.length >= concurrency) {
+        console.log(`[并发控制] 达到并发限制 (${concurrency})，等待任务完成...`);
+        await Promise.race(executing);
+      }
+    }
+    
+    // 等待所有剩余任务完成
+    console.log(`[并发控制] 等待剩余 ${executing.length} 个任务完成...`);
+    await Promise.all(executing);
+    
+    console.log(`[并发控制] 所有任务处理完成`);
+    return results;
+  }
+
+  async processBatch(maxTasks = 10, maxRounds = 5) {
     try {
       let totalProcessed = 0;
       let totalSuccessful = 0;
@@ -135,13 +189,15 @@ class TaskProcessor {
 
         console.log(`第${rounds + 1}轮处理: 发现${pendingTasks.length}个待处理任务`);
 
-        // 并行处理这批任务
-        const results = await Promise.allSettled(
-          pendingTasks.map(task => this.processSingleTask(task))
+        // 限制并发处理任务（最多同时3个）
+        const results = await this.processConcurrently(
+          pendingTasks,
+          (task: any) => this.processSingleTask(task),
+          3 // 最大并发数
         );
 
-        const successful = results.filter(r => r.status === 'fulfilled').length;
-        const failed = results.filter(r => r.status === 'rejected').length;
+        const successful = results.filter((r: any) => r.status === 'fulfilled').length;
+        const failed = results.filter((r: any) => r.status === 'rejected').length;
 
         totalProcessed += pendingTasks.length;
         totalSuccessful += successful;
@@ -177,6 +233,16 @@ class TaskProcessor {
     try {
       console.log(`=== 开始处理任务 ===`);
       console.log(`任务ID: ${task.id}, 类型: ${task.type}`);
+      
+      // 获取用户配置
+      const userConfig = await getUserConfig(task.userId);
+      console.log(`[Worker] 获取用户配置 - 火山引擎: ${!!userConfig.volcengine}, 图床: ${!!userConfig.imagehosting}`);
+      
+      // 将用户配置注入到 inputData 中
+      const inputData = JSON.parse(task.inputData);
+      inputData.volcengineConfig = userConfig.volcengine;
+      inputData.imagehostingConfig = userConfig.imagehosting;
+      task.inputData = JSON.stringify(inputData);
       
       // 更新任务状态为处理中
       await prisma.taskQueue.update({
@@ -289,69 +355,53 @@ class TaskProcessor {
       watermarkPosition = 'bottom-right',
       watermarkType = 'text',
       watermarkLogoUrl,
-      outputResolution = 'original'
+      outputResolution = 'original',
+      volcengineConfig
     } = inputData;
     
     console.log(`[一键工作流] 开始处理任务 ${task.id}`);
+    console.log(`[一键工作流] 配置来源: ${volcengineConfig ? '用户设置' : '环境变量'}`);
     await this.updateTaskProgress(task.id, 'Step 1/3: 准备处理...', 10, 1);
 
     try {
-      // 调用一键工作流API
-      const apiUrl = process.env.NODE_ENV === 'production' 
-        ? `${process.env.NEXTAUTH_URL}/api/workflow/one-click`
-        : 'http://localhost:3000/api/workflow/one-click';
+      // 直接调用服务函数，避免 HTTP 循环调用
+      const { executeOneClickWorkflow } = await import('@/app/api/workflow/one-click/service');
       
-      console.log(`[一键工作流] 调用API: ${apiUrl}`);
-
-      console.log(`[一键工作流] 发送请求，参数:`, { 
+      console.log(`[一键工作流] 调用服务函数，参数:`, { 
         xScale, yScale, upscaleFactor, 
         enableBackgroundReplace, enableOutpaint, enableUpscale,
         enableWatermark, watermarkType, outputResolution 
       });
       
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          imageUrl,
-          referenceImageUrl,
-          xScale,
-          yScale,
-          upscaleFactor,
-          enableBackgroundReplace,
-          enableOutpaint,
-          enableUpscale,
-          enableWatermark,
-          watermarkText,
-          watermarkOpacity,
-          watermarkPosition,
-          watermarkType,
-          watermarkLogoUrl,
-          outputResolution,
-          userId: task.userId,
-          serverCall: true
-        }),
+      const result = await executeOneClickWorkflow({
+        imageUrl,
+        referenceImageUrl,
+        xScale,
+        yScale,
+        upscaleFactor,
+        enableBackgroundReplace,
+        enableOutpaint,
+        enableUpscale,
+        enableWatermark,
+        watermarkText,
+        watermarkOpacity,
+        watermarkPosition: watermarkPosition as 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center',
+        watermarkType: watermarkType as 'text' | 'logo',
+        watermarkLogoUrl,
+        outputResolution,
+        userId: task.userId,
+        volcengineConfig
       });
       
-      console.log(`[一键工作流] API响应状态: ${response.status}`);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`一键工作流处理失败: ${errorData.details || response.statusText}`);
-      }
-
-      const result = await response.json();
       console.log(`[一键工作流] 处理完成，任务ID: ${task.id}`);
       
       await this.updateTaskProgress(task.id, 'Step 3/3: 处理完成', 100, 3);
 
       return {
-        processedImageId: result.data.id,
-        processedImageUrl: result.data.minioUrl,
-        imageData: result.data.imageData,
-        processSteps: result.data.processSteps,
+        processedImageId: result.id,
+        processedImageUrl: result.minioUrl,
+        imageData: result.imageData,
+        processSteps: result.processSteps,
         settings: { 
           xScale, yScale, upscaleFactor, 
           enableBackgroundReplace, enableOutpaint, enableUpscale,
@@ -367,10 +417,11 @@ class TaskProcessor {
 
   private async processBackgroundRemoval(task: { id: string; inputData: string; userId: string }) {
     const inputData = JSON.parse(task.inputData);
-    const { imageUrl, referenceImageUrl, customPrompt } = inputData;
+    const { imageUrl, referenceImageUrl, customPrompt, volcengineConfig, imagehostingConfig } = inputData;
     
     console.log(`[背景替换] 任务ID: ${task.id}`);
     console.log(`[背景替换] 使用火山引擎即梦API（直接调用）`);
+    console.log(`[背景替换] 配置来源: ${volcengineConfig ? '用户设置' : '环境变量'}`);
     
     await this.updateTaskProgress(task.id, '即梦图像生成中...', 30, 1);
     
@@ -405,7 +456,9 @@ class TaskProcessor {
         prompt,
         referenceImages,  // 会自动上传到Superbed获取公网URL
         2048,
-        2048
+        2048,
+        volcengineConfig,  // 传递火山引擎配置
+        imagehostingConfig  // 传递图床配置
       );
       
       // 注意：
@@ -433,7 +486,7 @@ class TaskProcessor {
 
   private async processImageExpansion(task: { id: string; inputData: string; userId: string }) {
     const inputData = JSON.parse(task.inputData);
-    const { imageUrl, xScale = 2.0, yScale = 2.0 } = inputData;
+    const { imageUrl, xScale = 2.0, yScale = 2.0, volcengineConfig, imagehostingConfig } = inputData;
     
     console.log(`[图像扩展] 任务ID: ${task.id}`);
     console.log(`[图像扩展] 使用火山引擎扩图服务`);
@@ -460,7 +513,11 @@ class TaskProcessor {
         top,
         bottom,
         left,
-        right
+        right,
+        1920,
+        1920,
+        volcengineConfig,
+        imagehostingConfig
       );
 
       console.log(`[图像扩展] 处理成功`);
@@ -483,7 +540,7 @@ class TaskProcessor {
 
   private async processImageUpscaling(task: { id: string; inputData: string; userId: string }) {
     const inputData = JSON.parse(task.inputData);
-    const { imageUrl, upscaleFactor = 2 } = inputData;
+    const { imageUrl, upscaleFactor = 2, volcengineConfig, imagehostingConfig } = inputData;
     
     console.log(`[智能画质增强] 任务ID: ${task.id}`);
     console.log(`[智能画质增强] 使用火山引擎智能画质增强API`);
@@ -561,6 +618,14 @@ class TaskProcessor {
 
     await this.updateTaskProgress(task.id, '水印添加中...', 50, 1);
     
+    console.log('[Worker WATERMARK] 收到水印任务:', {
+      taskId: task.id,
+      imageUrlPrefix: imageUrl.substring(0, 30),
+      watermarkType,
+      hasLogoUrl: !!watermarkLogoUrl,
+      logoUrlPrefix: watermarkLogoUrl?.substring(0, 30)
+    });
+    
     try {
       const processedImage = await prisma.processedImage.create({
         data: {
@@ -589,16 +654,26 @@ class TaskProcessor {
         watermarkText,
         outputResolution
       });
+      
+      console.log('[Worker WATERMARK] 水印处理完成:', {
+        taskId: task.id,
+        resultPrefix: watermarkedImageData.substring(0, 30)
+      });
 
-      const minioUrl = await uploadBase64Image(
+      const uploadedUrl = await uploadBase64Image(
         watermarkedImageData,
         `watermark-${processedImage.id}.png`
       );
+      
+      console.log('[Worker WATERMARK] 上传完成:', {
+        taskId: task.id,
+        uploadedUrl
+      });
 
       const updatedImage = await prisma.processedImage.update({
         where: { id: processedImage.id },
         data: {
-          processedUrl: minioUrl,
+          processedUrl: uploadedUrl,
           status: 'COMPLETED',
           fileSize: Buffer.from(watermarkedImageData.split(',')[1], 'base64').length,
           metadata: JSON.stringify({

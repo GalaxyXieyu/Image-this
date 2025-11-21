@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
         outputResolution
       });
 
-      const minioUrl = await uploadBase64Image(
+      const uploadedUrl = await uploadBase64Image(
         watermarkedImageData,
         `watermark-${processedImage.id}.png`
       );
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
       const updatedImage = await prisma.processedImage.update({
         where: { id: processedImage.id },
         data: {
-          processedUrl: minioUrl,
+          processedUrl: uploadedUrl,
           status: 'COMPLETED',
           fileSize: Buffer.from(watermarkedImageData.split(',')[1], 'base64').length,
           metadata: JSON.stringify({
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
         data: {
           id: updatedImage.id,
           imageData: watermarkedImageData,
-          minioUrl,
+          uploadedUrl,
         },
         message: '水印添加完成'
       });

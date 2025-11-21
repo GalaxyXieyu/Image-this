@@ -53,9 +53,14 @@ export function useTaskPolling({
 
     try {
       const taskIds = tasksSnapshot.map(task => task.id).join(',');
-      const response = await fetch(`/api/tasks?ids=${taskIds}`);
+      const response = await fetch(`/api/tasks?ids=${taskIds}`, {
+        signal: AbortSignal.timeout(5000) // 5秒超时
+      });
 
-      if (!response.ok) return;
+      if (!response.ok) {
+        console.warn('轮询任务状态失败:', response.status);
+        return;
+      }
 
       const data = await response.json();
       const updatedTasks: Task[] = data.tasks || [];
@@ -121,7 +126,8 @@ export function useTaskPolling({
   useEffect(() => {
     if (isProcessing && activeTasks.length > 0 && !pollingIntervalRef.current) {
       pollTaskStatus();
-      pollingIntervalRef.current = setInterval(pollTaskStatus, 2000);
+      // 调整轮询间隔为 5 秒，减少服务器压力
+      pollingIntervalRef.current = setInterval(pollTaskStatus, 5000);
     }
 
     if ((!isProcessing || activeTasks.length === 0) && pollingIntervalRef.current) {

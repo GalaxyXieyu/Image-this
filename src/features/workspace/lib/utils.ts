@@ -35,7 +35,13 @@ export function resizeImageForAPI(imageDataUrl: string): Promise<string> {
       }
 
       ctx.drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', 0.9));
+      
+      // 检测原始图片格式，保持 PNG 透明度
+      const isPNG = imageDataUrl.startsWith('data:image/png');
+      const resizedDataUrl = isPNG 
+        ? canvas.toDataURL('image/png')
+        : canvas.toDataURL('image/jpeg', 0.9);
+      resolve(resizedDataUrl);
     };
     
     img.onerror = () => {

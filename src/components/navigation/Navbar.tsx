@@ -15,6 +15,7 @@ import {
   ListTodo
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import TaskStatsPopover from './TaskStatsPopover';
 
 
 
@@ -102,6 +103,8 @@ export default function Navbar() {
 
           {/* User Menu */}
           <div className="flex items-center space-x-3">
+            {/* 任务统计悬浮按钮 */}
+            <TaskStatsPopover />
 
             <div className="hidden md:flex items-center space-x-2 text-sm text-gray-600">
               <User className="w-4 h-4" />

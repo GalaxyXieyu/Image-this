@@ -105,6 +105,9 @@ export default function WorkspacePage() {
   // 输出分辨率
   const [outputResolution, setOutputResolution] = useState('original');
 
+  // 历史记录侧边栏状态
+  const [isHistorySidebarOpen, setIsHistorySidebarOpen] = useState(false);
+
   const watermarkLogoInputRef = useRef<HTMLInputElement>(null);
 
   // 新增：任务管理状态
@@ -438,6 +441,13 @@ export default function WorkspacePage() {
           onLogoUpload={handleWatermarkLogoUpload}
           onFolderUpload={handleFolderUpload}
           folderInputRef={folderInputRef}
+          onRemoveImage={(id: string) => {
+            const imageToRemove = uploadedImages.find(img => img.id === id);
+            if (imageToRemove) {
+              imageUploadHook.removeImage(imageToRemove);
+              setUploadedImages(uploadedImages.filter(img => img.id !== id));
+            }
+          }}
         />
       );
     }
@@ -447,9 +457,9 @@ export default function WorkspacePage() {
     const isFullWidthUpload = showReferenceUpload;
 
     const commonUploadSection = (
-      <div className="space-y-6">
-        {/* 上传区域 - 左右布局 */}
-        <div className={`grid gap-6 ${isFullWidthUpload ? 'grid-cols-1 lg:grid-cols-3' : 'grid-cols-1'}`}>
+      <div className="flex flex-col h-full overflow-hidden">
+        {/* 上传区域 - 自动撑满，可滚动 */}
+        <div className={`flex-1 grid gap-6 ${isFullWidthUpload ? 'grid-cols-1 lg:grid-cols-3' : 'grid-cols-1'} overflow-y-auto min-h-0 pb-4`}>
           {/* 主要图片上传区域 */}
           <ImageUploadArea
             uploadedImages={uploadedImages}
@@ -483,49 +493,53 @@ export default function WorkspacePage() {
           )}
         </div>
 
-        {/* 任务进度显示 */}
-        <TaskProgress
-          tasks={activeTasks}
-          isProcessing={isProcessing}
-          getProcessTypeName={getProcessTypeName}
-        />
-
-        {/* 参数设置区域 */}
-        <ParameterSettings
-          activeTab={activeTab}
-          outputResolution={outputResolution}
-          setOutputResolution={setOutputResolution}
-        />
-
-        {/* One-click 水印设置 */}
-        {activeTab === "one-click" && (
-          <OneClickWatermarkSettings
-            enableWatermark={enableWatermark}
-            setEnableWatermark={setEnableWatermark}
-            watermarkType={watermarkType}
-            setWatermarkType={setWatermarkType}
-            watermarkText={watermarkText}
-            setWatermarkText={setWatermarkText}
-            watermarkLogo={watermarkLogo}
-            removeWatermarkLogo={removeWatermarkLogo}
-            watermarkLogoInputRef={watermarkLogoInputRef}
-            uploadedImages={uploadedImages}
-            selectedPreviewIndex={selectedPreviewIndex}
-            onPositionChange={handleWatermarkPositionChange}
+        {/* 底部固定区域 - 参数设置和操作按钮 */}
+        <div className="flex-shrink-0 bg-gradient-to-t from-gray-50 via-gray-50 to-transparent pt-4 pb-2 space-y-4 border-t border-gray-200 mt-4">
+          {/* 任务进度显示 - 如果有任务则显示 */}
+          {activeTasks.length > 0 && (
+            <TaskProgress
+              tasks={activeTasks}
+              isProcessing={isProcessing}
+              getProcessTypeName={getProcessTypeName}
+            />
+          )}
+          {/* 参数设置区域 */}
+          <ParameterSettings
+            activeTab={activeTab}
+            outputResolution={outputResolution}
+            setOutputResolution={setOutputResolution}
           />
-        )}
 
-        {/* 处理按钮 */}
-        <ActionButtons
-          isProcessing={isProcessing}
-          onProcess={handleProcess}
-          disabled={
-            uploadedImages.length === 0 || 
-            (activeTab === "background" && !referenceImage)
-          }
-          activeTab={activeTab}
-          tabs={tabs}
-        />
+          {/* One-click 水印设置 */}
+          {activeTab === "one-click" && (
+            <OneClickWatermarkSettings
+              enableWatermark={enableWatermark}
+              setEnableWatermark={setEnableWatermark}
+              watermarkType={watermarkType}
+              setWatermarkType={setWatermarkType}
+              watermarkText={watermarkText}
+              setWatermarkText={setWatermarkText}
+              watermarkLogo={watermarkLogo}
+              removeWatermarkLogo={removeWatermarkLogo}
+              watermarkLogoInputRef={watermarkLogoInputRef}
+              uploadedImages={uploadedImages}
+              selectedPreviewIndex={selectedPreviewIndex}
+              onPositionChange={handleWatermarkPositionChange}
+            />
+          )}
+
+          {/* 处理按钮 */}
+          <ActionButtons
+            isProcessing={isProcessing}
+            onProcess={handleProcess}
+            disabled={
+              uploadedImages.length === 0 || 
+              (activeTab === "background" && !referenceImage)
+            }
+            activeTab={activeTab}
+            tabs={tabs}
+          />
+        </div>
 
 
         {/* 隐藏的文件输入 */}
@@ -563,7 +577,7 @@ export default function WorkspacePage() {
     );
 
     return (
-      <div>
+      <div className="h-full">
         {commonUploadSection}
       </div>
     );
@@ -583,14 +597,30 @@ export default function WorkspacePage() {
         {/* 右侧内容区域 - 左右布局 */}
         <div className="flex-1 overflow-hidden flex">
           {/* 左侧 - 当前处理区域 */}
-          <div className="flex-1 overflow-y-auto border-r border-gray-200">
-            <div className="p-6">
+          <div className="flex-1 overflow-hidden border-r border-gray-200 flex flex-col">
+            {/* 顶部工具栏 */}
+            <div className="flex items-center justify-end px-6 py-3 border-b border-gray-200 bg-white">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsHistorySidebarOpen(!isHistorySidebarOpen)}
+                className="flex items-center gap-2"
+              >
+                <ChevronLeft className={`w-4 h-4 transition-transform ${isHistorySidebarOpen ? 'rotate-0' : 'rotate-180'}`} />
+                {isHistorySidebarOpen ? '隐藏历史' : '显示历史'}
+              </Button>
+            </div>
+            
+            {/* 主内容区域 - 可滚动 */}
+            <div className="flex-1 flex flex-col p-6 overflow-hidden">
               {renderTabContent()}
             </div>
           </div>
 
           {/* 右侧 - 历史记录 */}
           <CollapsibleHistorySidebar
+            isOpen={isHistorySidebarOpen}
+            onToggle={() => setIsHistorySidebarOpen(!isHistorySidebarOpen)}
             title={(() => {
               const titleMap: Record<ActiveTab, string> = {
                 'one-click': '一键增强历史',
@@ -617,6 +647,30 @@ export default function WorkspacePage() {
               if (index !== -1) {
                 setSelectedResultIndex(index);
                 setShowResultModal(true);
+              }
+            }}
+            onItemDelete={async (itemId) => {
+              try {
+                const response = await fetch(`/api/images/${itemId}`, {
+                  method: 'DELETE',
+                });
+                
+                if (response.ok) {
+                  setProcessedResults(prev => prev.filter(r => r.id !== itemId));
+                  toast({
+                    title: "删除成功",
+                    description: "历史记录已删除",
+                  });
+                } else {
+                  throw new Error('删除失败');
+                }
+              } catch (error) {
+                console.error('删除历史记录失败:', error);
+                toast({
+                  title: "删除失败",
+                  description: error instanceof Error ? error.message : '未知错误',
+                  variant: "destructive",
+                });
               }
             }}
           />

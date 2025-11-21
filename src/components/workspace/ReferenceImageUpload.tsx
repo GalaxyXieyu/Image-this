@@ -28,10 +28,10 @@ export default function ReferenceImageUpload({
     description = "选择背景参考图片"
 }: ReferenceImageUploadProps) {
     return (
-        <Card className="border-2 border-dashed border-blue-300 hover:border-blue-300 transition-all duration-300 bg-white">
-            <CardContent className="p-6">
+        <Card className="border-2 border-dashed border-blue-300 hover:border-blue-300 transition-all duration-300 bg-white h-full flex flex-col">
+            <CardContent className="p-6 flex-1 flex flex-col">
                 {!referenceImage ? (
-                    <div className="text-center">
+                    <div className="text-center flex flex-col items-center justify-center h-full">
                         <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-3">
                             <ImageIcon className="w-6 h-6 text-blue-600" />
                         </div>
@@ -49,16 +49,16 @@ export default function ReferenceImageUpload({
                         </Button>
                     </div>
                 ) : (
-                    <div className="relative">
-                        <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden mb-3">
+                    <div className="relative flex flex-col h-full">
+                        <div className="flex-1 bg-gray-100 rounded-lg overflow-hidden mb-3 min-h-0">
                             <img
                                 src={referenceImage.preview}
                                 alt={referenceImage.name}
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-contain"
                             />
                         </div>
-                        <p className="text-sm text-gray-700 mb-2 truncate">{referenceImage.name}</p>
-                        <div className="flex gap-2">
+                        <p className="text-sm text-gray-700 mb-2 truncate flex-shrink-0">{referenceImage.name}</p>
+                        <div className="flex gap-2 flex-shrink-0">
                             <Button
                                 size="sm"
                                 variant="outline"

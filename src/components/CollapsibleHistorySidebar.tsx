@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { ChevronRight, ChevronLeft, History, Image as ImageIcon, Clock, CheckCircle } from 'lucide-react';
+import { ChevronRight, ChevronLeft, History, Image as ImageIcon, Clock, CheckCircle, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -19,19 +19,25 @@ interface HistoryItem {
 interface CollapsibleHistorySidebarProps {
   items: HistoryItem[];
   onItemClick?: (item: HistoryItem) => void;
+  onItemDelete?: (itemId: string) => void;
   className?: string;
   title?: string;
   subtitle?: string;
+  isOpen?: boolean;
+  onToggle?: () => void;
 }
 
 export default function CollapsibleHistorySidebar({
   items,
   onItemClick,
+  onItemDelete,
   className,
   title = "处理历史",
-  subtitle = "点击图片查看详情"
+  subtitle = "点击图片查看详情",
+  isOpen = false,
+  onToggle
 }: CollapsibleHistorySidebarProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const isCollapsed = !isOpen;
   const [validItems, setValidItems] = useState<HistoryItem[]>([]);
   const [brokenImages, setBrokenImages] = useState<Set<string>>(new Set());
 
@@ -44,61 +50,22 @@ export default function CollapsibleHistorySidebar({
     setBrokenImages(prev => new Set(prev).add(itemId));
   };
 
-  const toggleCollapse = () => {
-    setIsCollapsed(!isCollapsed);
-  };
-
   return (
     <div
       className={cn(
         "relative h-full bg-white border-l border-gray-200 transition-all duration-300 ease-in-out",
-        isCollapsed ? "w-12" : "w-80",
+        isCollapsed ? "w-0 border-0" : "w-80",
         className
       )}
     >
-      {/* 折叠按钮 */}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={toggleCollapse}
-        className="absolute -left-3 top-4 z-10 h-6 w-6 rounded-full border border-gray-200 bg-white p-0 shadow-sm hover:bg-gray-50"
-      >
-        {isCollapsed ? (
-          <ChevronLeft className="h-4 w-4" />
-        ) : (
-          <ChevronRight className="h-4 w-4" />
-        )}
-      </Button>
 
       {/* 侧边栏内容 */}
       <div className="h-full overflow-hidden">
-        {isCollapsed ? (
-          /* 折叠状态 - 只显示图标 */
-          <div className="flex flex-col items-center gap-4 p-2 pt-16">
-            <div className="flex flex-col items-center gap-2">
-              <History className="h-5 w-5 text-gray-400" />
-              <div className="h-px w-6 bg-gray-200" />
-              <span className="text-xs text-gray-400 writing-mode-vertical">
-                {validItems.length}
-              </span>
-            </div>
-          </div>
-        ) : (
+        {!isCollapsed && (
           /* 展开状态 - 显示完整内容 */
           <div className="flex h-full flex-col">
-            {/* 标题 */}
-            <div className="border-b border-gray-200 bg-gradient-to-r from-orange-50 to-white p-4">
-              <div className="flex items-center gap-2">
-                <History className="h-5 w-5 text-orange-500" />
-                <h3 className="font-semibold text-gray-900">{title}</h3>
-              </div>
-              <p className="mt-1 text-xs text-gray-500">
-                {subtitle}
-              </p>
-            </div>
-
-            {/* 历史列表 */}
-            <div className="flex-1 overflow-y-auto p-3">
+            {/* 历史列表 - 直接显示，无标题 */}
+            <div className="flex-1 overflow-y-auto p-3" style={{ maxHeight: 'calc(100vh - 120px)' }}>
               {validItems.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <ImageIcon className="h-12 w-12 text-gray-300 mb-3" />
@@ -112,11 +79,13 @@ export default function CollapsibleHistorySidebar({
                   {validItems.map((item) => (
                     <div
                       key={item.id}
-                      onClick={() => onItemClick?.(item)}
-                      className="group relative cursor-pointer overflow-hidden rounded-lg border border-gray-200 bg-white p-2 transition-all hover:border-orange-300 hover:shadow-md"
+                      className="group relative overflow-hidden rounded-lg border border-gray-200 bg-white p-2 transition-all hover:border-orange-300 hover:shadow-md"
                     >
                       {/* 图片预览 */}
-                      <div className="relative aspect-video overflow-hidden rounded-md bg-gray-100">
+                      <div 
+                        className="relative aspect-video overflow-hidden rounded-md bg-gray-100 cursor-pointer"
+                        onClick={() => onItemClick?.(item)}
+                      >
                         {item.thumbnailUrl || item.processedUrl || item.originalUrl ? (
                           <img
                             src={item.thumbnailUrl || item.processedUrl || item.originalUrl}
@@ -140,9 +109,24 @@ export default function CollapsibleHistorySidebar({
 
                       {/* 文件信息 */}
                       <div className="mt-2">
-                        <p className="truncate text-xs font-medium text-gray-900">
-                          {item.filename}
-                        </p>
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="flex-1 truncate text-xs font-medium text-gray-900">
+                            {item.filename}
+                          </p>
+                          {/* 删除按钮 */}
+                          {onItemDelete && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onItemDelete(item.id);
+                              }}
+                              className="flex-shrink-0 rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                              title="删除"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
                         <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
@@ -153,7 +137,7 @@ export default function CollapsibleHistorySidebar({
                           </span>
                           {item.processType && (
                             <span className="rounded bg-orange-100 px-1.5 py-0.5 text-xs text-orange-700">
-                              {item.processType}
+                              WATERMARK
                             </span>
                           )}
                         </div>
@@ -167,17 +151,6 @@ export default function CollapsibleHistorySidebar({
               )}
             </div>
 
-            {/* 底部统计 */}
-            {validItems.length > 0 && (
-              <div className="border-t border-gray-200 bg-gray-50 p-3">
-                <div className="flex items-center justify-between text-xs text-gray-600">
-                  <span>共 {validItems.length} 张图片</span>
-                  <span className="text-orange-600">
-                    {validItems.filter(i => i.status === 'COMPLETED').length} 已完成
-                  </span>
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>

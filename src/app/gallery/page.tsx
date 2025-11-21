@@ -17,7 +17,12 @@ import {
   MoreHorizontal,
   Check,
   X,
-  Edit
+  Edit,
+  Zap,
+  Sparkles,
+  Maximize2,
+  RefreshCw,
+  Wand2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -63,6 +68,7 @@ export default function GalleryPage() {
   
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all'); // 新增：分类筛选
   const [projects, setProjects] = useState<Project[]>([]);
   const [images, setImages] = useState<ProcessedImage[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -88,7 +94,7 @@ export default function GalleryPage() {
       loadProjects();
       loadImages();
     }
-  }, [session]);
+  }, [session, selectedCategory]); // 分类变化时重新加载
 
   const loadProjects = async () => {
     try {
@@ -104,7 +110,18 @@ export default function GalleryPage() {
 
   const loadImages = async () => {
     try {
-      const response = await fetch('/api/images');
+      // 根据分类筛选构建查询参数
+      let url = '/api/images?status=COMPLETED'; // 只获取成功的图片
+      
+      if (selectedCategory !== 'all') {
+        url += `&type=${selectedCategory}`;
+      }
+      
+      if (selectedProject) {
+        url += `&projectId=${selectedProject}`;
+      }
+      
+      const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
         setImages(data.images || []);
@@ -604,6 +621,46 @@ export default function GalleryPage() {
       <div className="flex">
         {/* 侧边栏 */}
         <div className="w-64 bg-white border-r h-screen overflow-y-auto">
+          {/* 图片分类 */}
+          <div className="p-4 border-b">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-gray-900">图片分类</h3>
+            </div>
+            <div className="space-y-1">
+              {[
+                { id: 'all', label: '全部图片', icon: Image },
+                { id: 'ONE_CLICK_WORKFLOW', label: '一键增强', icon: Zap },
+                { id: 'IMAGE_ENHANCEMENT', label: '画质增强', icon: Sparkles },
+                { id: 'IMAGE_OUTPAINTING', label: '智能扩图', icon: Maximize2 },
+                { id: 'BACKGROUND_REPLACE', label: '背景替换', icon: RefreshCw },
+                { id: 'IMAGE_GENERATION', label: '图片生成', icon: Wand2 },
+              ].map(category => {
+                const Icon = category.icon;
+                const count = category.id === 'all' 
+                  ? images.length 
+                  : images.filter(img => img.processType === category.id).length;
+                
+                return (
+                  <button
+                    key={category.id}
+                    onClick={() => setSelectedCategory(category.id)}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg hover:bg-gray-100 transition-colors ${
+                      selectedCategory === category.id ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+                    }`}
+                  >
+                    <div className="flex items-center min-w-0 flex-1">
+                      <Icon className="w-4 h-4 mr-3 flex-shrink-0" />
+                      <span className="truncate">{category.label}</span>
+                    </div>
+                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full min-w-[24px] text-center">
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          
           {/* 文件夹列表 */}
           <div className="p-4">
             <div className="flex items-center justify-between mb-3">

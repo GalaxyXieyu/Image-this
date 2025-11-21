@@ -24,7 +24,9 @@ import {
   MoreHorizontal,
   Eye,
   AlertCircle,
-  Loader
+  Loader,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
@@ -125,6 +127,9 @@ export default function TaskCenterPage() {
     failed: 0,
     total: 0
   });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [pageSize] = useState(20);
 
   // 重定向未登录用户
   useEffect(() => {
@@ -134,17 +139,21 @@ export default function TaskCenterPage() {
   }, [status, router]);
 
   // 获取任务列表
-  const fetchTasks = useCallback(async () => {
+  const fetchTasks = useCallback(async (page = currentPage) => {
     if (!session) return;
 
     try {
-      const response = await fetch('/api/tasks?limit=50');
+      const offset = (page - 1) * pageSize;
+      const response = await fetch(`/api/tasks?limit=${pageSize}&offset=${offset}`);
       if (!response.ok) {
         throw new Error('获取任务列表失败');
       }
       const data = await response.json();
       if (data.success) {
         setTasks(data.tasks);
+        if (data.pagination) {
+          setTotalPages(Math.ceil(data.pagination.total / pageSize));
+        }
       } else {
         throw new Error(data.error || '获取任务列表失败');
       }
@@ -152,7 +161,7 @@ export default function TaskCenterPage() {
       console.error('获取任务失败:', err);
       setError(err instanceof Error ? err.message : '获取任务失败');
     }
-  }, [session]);
+  }, [session, currentPage, pageSize]);
 
   // 获取队列统计
   const fetchQueueStats = useCallback(async () => {
@@ -459,115 +468,79 @@ export default function TaskCenterPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="max-w-7xl mx-auto px-6 py-6">
         {/* 页面标题 */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            任务中心
-          </h1>
-          <p className="text-gray-600">
-            查看您的所有图像处理任务状态和历史记录
-          </p>
-        </div>
-
-        {/* 简化的统计信息 */}
-        <div className="bg-white rounded-lg border p-4 mb-6">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center space-x-6">
-              <span>等待: <strong>{queueStats.pending}</strong></span>
-              <span>处理中: <strong>{queueStats.processing}</strong></span>
-              <span>已完成: <strong>{queueStats.completed}</strong></span>
-              <span>失败: <strong>{queueStats.failed}</strong></span>
-            </div>
-            <span>总计: <strong>{queueStats.total}</strong></span>
-          </div>
+          <h1 className="text-2xl font-bold text-gray-900">任务中心</h1>
+          <p className="text-sm text-gray-600 mt-1">管理和查看所有图像处理任务</p>
         </div>
 
         {/* 操作栏 */}
-        <Card className="mb-6">
-          <CardContent className="p-6">
-            <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-              <div className="flex flex-col md:flex-row gap-4 flex-1">
-                {/* 搜索 */}
-                <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <Input
-                    placeholder="搜索任务..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-
-                {/* 筛选器 */}
-                <div className="flex gap-2">
-                  <select
-                    value={filterType}
-                    onChange={(e) => setFilterType(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-md"
-                  >
-                    <option value="all">所有类型</option>
-                    <option value="ONE_CLICK_WORKFLOW">一键增强</option>
-                    <option value="BACKGROUND_REMOVAL">背景替换</option>
-                    <option value="IMAGE_EXPANSION">图像扩展</option>
-                    <option value="IMAGE_UPSCALING">图像高清化</option>
-                  </select>
-
-                  <select
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-md"
-                  >
-                    <option value="all">所有状态</option>
-                    <option value="PENDING">等待中</option>
-                    <option value="PROCESSING">处理中</option>
-                    <option value="COMPLETED">已完成</option>
-                    <option value="FAILED">失败</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* 操作按钮 */}
-              <div className="flex gap-2">
-                <Button
-                  onClick={triggerWorker}
-                  disabled={queueStats.pending === 0}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Play className="w-4 h-4 mr-2" />
-                  处理队列
-                </Button>
-                <Button
-                  onClick={() => initializeData()}
-                  variant="outline"
-                >
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  刷新
-                </Button>
-                {selectedTasks.size > 0 && (
-                  <Button
-                    onClick={deleteSelectedTasks}
-                    variant="destructive"
-                    size="sm"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    删除选中 ({selectedTasks.size})
-                  </Button>
-                )}
-                {tasks.length > 0 && (
-                  <Button
-                    onClick={deleteAllTasks}
-                    variant="destructive"
-                    size="sm"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    清空所有
-                  </Button>
-                )}
-              </div>
+        <div className="bg-white rounded-lg border shadow-sm p-4 mb-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* 搜索 */}
+            <div className="relative flex-1 min-w-[200px] max-w-xs">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Input
+                placeholder="搜索任务..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 h-9 text-sm"
+              />
             </div>
-          </CardContent>
-        </Card>
+
+            {/* 筛选器 */}
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="px-3 py-2 text-sm border border-gray-300 rounded-md h-9 bg-white hover:bg-gray-50 transition-colors"
+            >
+              <option value="all">所有类型</option>
+              <option value="ONE_CLICK_WORKFLOW">一键增强</option>
+              <option value="BACKGROUND_REMOVAL">背景替换</option>
+              <option value="IMAGE_EXPANSION">图像扩展</option>
+              <option value="IMAGE_UPSCALING">图像高清化</option>
+            </select>
+
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="px-3 py-2 text-sm border border-gray-300 rounded-md h-9 bg-white hover:bg-gray-50 transition-colors"
+            >
+              <option value="all">所有状态</option>
+              <option value="PENDING">等待中</option>
+              <option value="PROCESSING">处理中</option>
+              <option value="COMPLETED">已完成</option>
+              <option value="FAILED">失败</option>
+            </select>
+
+            <div className="flex-1"></div>
+
+            {/* 操作按钮 */}
+            <div className="flex gap-2">
+              <Button
+                onClick={() => initializeData()}
+                variant="outline"
+                size="sm"
+                className="h-9"
+              >
+                <RefreshCw className="w-4 h-4 mr-1.5" />
+                刷新
+              </Button>
+              {selectedTasks.size > 0 && (
+                <Button
+                  onClick={deleteSelectedTasks}
+                  variant="destructive"
+                  size="sm"
+                  className="h-9"
+                >
+                  <Trash2 className="w-4 h-4 mr-1.5" />
+                  删除 ({selectedTasks.size})
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* 任务列表 */}
         {loading ? (
@@ -586,215 +559,243 @@ export default function TaskCenterPage() {
             </CardContent>
           </Card>
         ) : filteredTasks.length === 0 ? (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <ListTodo className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">暂无任务</h3>
-              <p className="text-gray-600 mb-4">
-                {searchTerm || filterType !== 'all' || filterStatus !== 'all' 
-                  ? '没有找到符合条件的任务' 
-                  : '开始您的第一次 AI 图像处理吧'
-                }
-              </p>
-              <Button onClick={() => router.push('/workspace')} className="bg-blue-600 hover:bg-blue-700">
-                前往工作台
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="bg-white rounded-lg border shadow-sm p-12 text-center">
+            <ListTodo className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">暂无任务</h3>
+            <p className="text-gray-600 mb-4">
+              {searchTerm || filterType !== 'all' || filterStatus !== 'all' 
+                ? '没有找到符合条件的任务' 
+                : '开始您的第一次 AI 图像处理吧'
+              }
+            </p>
+            <Button onClick={() => router.push('/workspace')} className="bg-orange-500 hover:bg-orange-600">
+              前往工作台
+            </Button>
+          </div>
         ) : (
-          <div className="space-y-4">
-            {/* 批量操作控制栏 */}
-            {filteredTasks.length > 0 && (
-              <Card className="bg-gray-50">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedTasks.size === filteredTasks.length && filteredTasks.length > 0}
-                        onChange={toggleSelectAll}
-                        className="w-4 h-4 text-blue-600"
-                      />
-                      <span className="text-sm text-gray-700">
-                        {selectedTasks.size === 0 
-                          ? '全选' 
-                          : selectedTasks.size === filteredTasks.length 
-                            ? '取消全选' 
-                            : `已选择 ${selectedTasks.size} 个任务`
-                        }
-                      </span>
-                    </div>
-                    {selectedTasks.size > 0 && (
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-600">
-                          共选择了 {selectedTasks.size} 个任务
-                        </span>
-                        <Button
-                          onClick={deleteSelectedTasks}
-                          variant="destructive"
-                          size="sm"
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          删除选中
-                        </Button>
-                      </div>
-                    )}
+          <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
+            {/* 表格容器 - 限制最大高度 */}
+            <div className="max-h-[calc(100vh-20rem)] overflow-y-auto">
+              {/* 表头 */}
+              <div className="sticky top-0 bg-gray-50 border-b z-10">
+                <div className="flex items-center px-4 py-3 text-xs font-medium text-gray-700">
+                  <div className="w-10 flex-shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={selectedTasks.size === filteredTasks.length && filteredTasks.length > 0}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 text-orange-600 rounded border-gray-300"
+                    />
                   </div>
-                </CardContent>
-              </Card>
-            )}
-            
-            {filteredTasks.map((task) => {
-              const TaskIcon = taskTypeIcons[task.type as keyof typeof taskTypeIcons] || ListTodo;
-              const statusInfo = statusConfig[task.status as keyof typeof statusConfig];
-              const StatusIcon = statusInfo?.icon || Clock;
-              const isExpanded = expandedTasks.has(task.id);
+                  <div className="flex-1 min-w-0 flex items-center gap-8">
+                    <div className="w-48">任务类型</div>
+                    <div className="flex-1 min-w-0">当前步骤</div>
+                    <div className="w-32">状态</div>
+                    <div className="w-24 text-center">进度</div>
+                    <div className="w-32">创建时间</div>
+                    <div className="w-20 text-right">操作</div>
+                  </div>
+                </div>
+              </div>
 
-              return (
-                <Card key={task.id} className="border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4 flex-1">
+              {/* 任务列表 */}
+              {filteredTasks.map((task) => {
+                const TaskIcon = taskTypeIcons[task.type as keyof typeof taskTypeIcons] || ListTodo;
+                const statusInfo = statusConfig[task.status as keyof typeof statusConfig];
+                const isExpanded = expandedTasks.has(task.id);
+
+                return (
+                  <div key={task.id}>
+                    {/* 任务行 */}
+                    <div className="flex items-center px-4 py-3 border-b hover:bg-gray-50 transition-colors">
+                      <div className="w-10 flex-shrink-0">
                         <input
                           type="checkbox"
                           checked={selectedTasks.has(task.id)}
                           onChange={() => handleSelectTask(task.id)}
-                          className="w-4 h-4 text-blue-600"
+                          className="w-4 h-4 text-orange-600 rounded border-gray-300"
                         />
-                        
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                            <TaskIcon className="w-5 h-5 text-blue-600" />
-                          </div>
-                          <div>
-                            <h3 className="font-semibold text-gray-900">
-                              {getTaskTypeName(task.type)}
-                            </h3>
-                            <p className="text-sm text-gray-600">
-                              任务 ID: {task.id.slice(-8)}
-                            </p>
-                          </div>
-                        </div>
                       </div>
-
-                      <div className="flex items-center space-x-4">
-                        {/* 进度条 */}
-                        {task.status === 'PROCESSING' && (
-                          <div className="w-32">
-                            <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
-                              <span>{Math.round(task.progress)}%</span>
-                              <span>{task.completedSteps}/{task.totalSteps}</span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div
-                                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                                style={{ width: `${Math.max(task.progress, 5)}%` }}
-                              ></div>
-                            </div>
+                      
+                      <div className="flex-1 min-w-0 flex items-center gap-8">
+                        {/* 任务类型 */}
+                        <div className="w-48 flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0">
+                            <TaskIcon className="w-4 h-4 text-orange-600" />
                           </div>
-                        )}
+                          <span className="text-sm font-medium text-gray-900 truncate">
+                            {getTaskTypeName(task.type)}
+                          </span>
+                        </div>
 
-                        {/* 状态标签 */}
-                        <div className="flex items-center space-x-2">
-                          <StatusIcon className={`w-4 h-4 ${statusInfo?.iconColor || 'text-gray-600'}`} />
-                          <Badge className={statusInfo?.color || 'bg-gray-100 text-gray-800'}>
+                        {/* 当前步骤 */}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-600 truncate">
+                            {task.currentStep}
+                          </p>
+                        </div>
+
+                        {/* 状态 */}
+                        <div className="w-32">
+                          <Badge className={`${statusInfo?.color || 'bg-gray-100 text-gray-800'} text-xs`}>
                             {statusInfo?.label || task.status}
                           </Badge>
                         </div>
 
-                        {/* 操作按钮 */}
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => deleteTask(task.id)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                        {/* 进度 */}
+                        <div className="w-24 text-center">
+                          {task.status === 'PROCESSING' ? (
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 bg-gray-200 rounded-full h-1.5">
+                                <div
+                                  className="bg-orange-500 h-1.5 rounded-full transition-all duration-300"
+                                  style={{ width: `${Math.max(task.progress, 5)}%` }}
+                                ></div>
+                              </div>
+                              <span className="text-xs text-gray-600 w-10 text-right">
+                                {Math.round(task.progress)}%
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-500">-</span>
+                          )}
+                        </div>
+
+                        {/* 创建时间 */}
+                        <div className="w-32">
+                          <span className="text-xs text-gray-600">
+                            {new Date(task.createdAt).toLocaleDateString('zh-CN', { 
+                              month: '2-digit', 
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        </div>
+
+                        {/* 操作 */}
+                        <div className="w-20 flex items-center justify-end gap-1">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => toggleTaskExpansion(task.id)}
+                            className="h-7 w-7 p-0 hover:bg-gray-100"
                           >
-                            <MoreHorizontal className="w-4 h-4" />
+                            <Eye className="w-3.5 h-3.5 text-gray-600" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deleteTask(task.id)}
+                            className="h-7 w-7 p-0 hover:bg-red-50 text-gray-600 hover:text-red-600"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
                           </Button>
                         </div>
                       </div>
                     </div>
 
-                    {/* 当前状态 */}
-                    <div className="mt-4">
-                      <p className="text-sm text-gray-700">{task.currentStep}</p>
-                    </div>
-
                     {/* 展开的详细信息 */}
                     {isExpanded && (
-                      <div className="mt-6 pt-6 border-t border-gray-200">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      <div className="px-4 py-4 bg-gray-50 border-b">
+                        <div className="grid grid-cols-3 gap-6 text-sm">
                           <div>
-                            <h4 className="font-medium text-gray-900 mb-2">时间信息</h4>
-                            <div className="text-sm text-gray-600 space-y-1">
-                              <div>创建时间: {formatTime(task.createdAt)}</div>
-                              {task.startedAt && (
-                                <div>开始时间: {formatTime(task.startedAt)}</div>
-                              )}
-                              {task.completedAt && (
-                                <div>完成时间: {formatTime(task.completedAt)}</div>
-                              )}
-                              <div>处理时长: {getProcessingDuration(task)}</div>
+                            <h4 className="font-medium text-gray-900 mb-2 text-xs">时间信息</h4>
+                            <div className="text-xs text-gray-600 space-y-1">
+                              <div>创建: {formatTime(task.createdAt)}</div>
+                              {task.startedAt && <div>开始: {formatTime(task.startedAt)}</div>}
+                              {task.completedAt && <div>完成: {formatTime(task.completedAt)}</div>}
+                              <div>时长: {getProcessingDuration(task)}</div>
                             </div>
                           </div>
 
                           <div>
-                            <h4 className="font-medium text-gray-900 mb-2">任务详情</h4>
-                            <div className="text-sm text-gray-600 space-y-1">
+                            <h4 className="font-medium text-gray-900 mb-2 text-xs">任务详情</h4>
+                            <div className="text-xs text-gray-600 space-y-1">
                               <div>优先级: {task.priority}</div>
-                              <div>总步骤: {task.totalSteps}</div>
-                              <div>已完成: {task.completedSteps}</div>
+                              <div>步骤: {task.completedSteps}/{task.totalSteps}</div>
                               <div>进度: {Math.round(task.progress)}%</div>
                             </div>
                           </div>
 
                           {task.errorMessage && (
                             <div>
-                              <h4 className="font-medium text-red-900 mb-2">错误信息</h4>
-                              <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
+                              <h4 className="font-medium text-red-900 mb-2 text-xs">错误信息</h4>
+                              <div className="text-xs text-red-600 bg-red-100 p-2 rounded">
                                 {task.errorMessage}
-                              </div>
-                            </div>
-                          )}
-
-                          {task.processedImage && (
-                            <div>
-                              <h4 className="font-medium text-gray-900 mb-2">处理结果</h4>
-                              <div className="flex items-center space-x-3">
-                                <img
-                                  src={task.processedImage.processedUrl}
-                                  alt="处理结果"
-                                  className="w-16 h-16 object-cover rounded-lg"
-                                />
-                                <div className="text-sm text-gray-600">
-                                  <div>{task.processedImage.filename}</div>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="mt-2"
-                                  >
-                                    <Eye className="w-4 h-4 mr-2" />
-                                    查看
-                                  </Button>
-                                </div>
                               </div>
                             </div>
                           )}
                         </div>
                       </div>
                     )}
-                  </CardContent>
-                </Card>
-              );
-            })}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 分页 */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 py-4 border-t bg-gray-50">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const newPage = Math.max(1, currentPage - 1);
+                    setCurrentPage(newPage);
+                    fetchTasks(newPage);
+                  }}
+                  disabled={currentPage === 1}
+                  className="h-8"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={currentPage === pageNum ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => {
+                          setCurrentPage(pageNum);
+                          fetchTasks(pageNum);
+                        }}
+                        className={`h-8 w-8 ${currentPage === pageNum ? 'bg-orange-500 hover:bg-orange-600' : ''}`}
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const newPage = Math.min(totalPages, currentPage + 1);
+                    setCurrentPage(newPage);
+                    fetchTasks(newPage);
+                  }}
+                  disabled={currentPage === totalPages}
+                  className="h-8"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>

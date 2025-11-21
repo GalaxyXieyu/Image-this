@@ -48,42 +48,42 @@ export default function ImageUploadArea({
     };
 
     return (
-        <Card className={`border-2 border-dashed border-gray-300 hover:border-orange-400 transition-all duration-300 bg-white ${isFullWidth ? 'lg:col-span-2' : ''}`}>
-            <CardContent className="p-6">
+        <Card className={`border-2 border-dashed border-gray-300 hover:border-orange-400 transition-all duration-300 bg-white h-full flex flex-col ${isFullWidth ? 'lg:col-span-2' : ''}`}>
+            <CardContent className="p-6 flex-1 flex flex-col overflow-hidden">
                 {uploadedImages.length === 0 ? (
                     // Empty State
-                    <div className="text-center">
-                        <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center mx-auto mb-3">
-                            <FileImage className="w-6 h-6 text-orange-600" />
+                    <div className="text-center flex flex-col items-center justify-center h-full">
+                        <div className="w-16 h-16 rounded-full bg-orange-100 flex items-center justify-center mx-auto mb-4">
+                            <FileImage className="w-8 h-8 text-orange-600" />
                         </div>
-                        <h3 className="text-base font-semibold text-gray-900 mb-1">上传图片</h3>
-                        <p className="text-gray-500 text-sm mb-3">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">上传图片</h3>
+                        <p className="text-gray-500 text-base mb-6 max-w-md">
                             支持 JPG, PNG 格式，支持批量上传或文件夹上传
                         </p>
-                        <div className="flex gap-2 justify-center">
+                        <div className="flex gap-3 justify-center">
                             <Button
-                                size="sm"
-                                className="bg-orange-500 hover:bg-orange-600 text-white"
+                                size="lg"
+                                className="bg-orange-500 hover:bg-orange-600 text-white shadow-lg hover:shadow-xl transition-all"
                                 onClick={() => fileInputRef.current?.click()}
                             >
-                                <Upload className="w-4 h-4 mr-2" />
+                                <Upload className="w-5 h-5 mr-2" />
                                 选择图片
                             </Button>
                             <Button
-                                size="sm"
+                                size="lg"
                                 variant="outline"
-                                className="border-orange-300 text-orange-600 hover:bg-orange-50"
+                                className="border-orange-300 text-orange-600 hover:bg-orange-50 shadow-md hover:shadow-lg transition-all"
                                 onClick={() => folderInputRef.current?.click()}
                             >
-                                <FileImage className="w-4 h-4 mr-2" />
+                                <FileImage className="w-5 h-5 mr-2" />
                                 选择文件夹
                             </Button>
                         </div>
                     </div>
                 ) : (
                     // Image Preview State
-                    <div>
-                        <div className="flex items-center justify-between mb-4">
+                    <div className="flex flex-col h-full overflow-hidden">
+                        <div className="flex items-center justify-between mb-4 flex-shrink-0">
                             <span className="text-sm font-medium text-gray-700">已选择 {uploadedImages.length} 张图片</span>
                             <div className="flex gap-2">
                                 <Button
@@ -106,15 +106,15 @@ export default function ImageUploadArea({
                         </div>
 
                         {/* Large Preview */}
-                        <div className="mb-4">
+                        <div className="flex-1 mb-4 min-h-0 relative">
                             <div
-                                className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden border-2 border-gray-200 cursor-pointer hover:border-orange-300 transition-colors"
+                                className="absolute inset-0 bg-gray-100 rounded-lg border-2 border-gray-200 cursor-pointer hover:border-orange-300 transition-colors flex items-center justify-center"
                                 onClick={() => onPreview(selectedIndex)}
                             >
                                 <img
                                     src={uploadedImages[selectedIndex]?.preview}
                                     alt={uploadedImages[selectedIndex]?.name}
-                                    className="w-full h-full object-contain"
+                                    className="max-h-full max-w-full object-contain"
                                 />
 
                                 {/* Zoom Overlay */}
@@ -151,7 +151,7 @@ export default function ImageUploadArea({
 
                         {/* Thumbnail Grid */}
                         {uploadedImages.length > 1 && (
-                            <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2">
+                            <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2 flex-shrink-0 max-h-24 overflow-y-auto">
                                 {uploadedImages.map((image, index) => (
                                     <div
                                         key={image.id}

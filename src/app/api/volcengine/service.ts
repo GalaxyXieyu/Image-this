@@ -24,7 +24,7 @@ function getSignatureKey(secretKey: string, dateStamp: string, regionName: strin
   return kSigning;
 }
 
-function generateSignature(method: string, path: string, query: string, headers: Record<string, string>, body: string, timestamp: string, secretKey: string) {
+function generateSignature(method: string, path: string, query: string, headers: Record<string, string>, body: string, timestamp: string, secretKey: string, accessKey: string) {
   const sortedHeaders = Object.keys(headers).sort();
   const canonicalHeaders = sortedHeaders
     .map(key => `${key.toLowerCase()}:${headers[key].trim()}`)
@@ -60,7 +60,6 @@ function generateSignature(method: string, path: string, query: string, headers:
   const signingKey = getSignatureKey(secretKey, date, REGION, SERVICE);
   const signature = crypto.createHmac('sha256', signingKey).update(stringToSign).digest('hex');
   
-  const accessKey = process.env.AccessKey || process.env.VOLCENGINE_ACCESS_KEY || process.env.ARK_API_KEY;
   return `HMAC-SHA256 Credential=${accessKey}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
 }
 
@@ -108,19 +107,27 @@ export async function enhanceWithVolcengine(
   enableHdr = false,
   enableWb = false,
   resultFormat = 1,
-  jpgQuality = 95
+  jpgQuality = 95,
+  skipDbSave = false, // 是否跳过数据库保存（工作流中间步骤使用）
+  volcengineConfig?: { accessKey: string; secretKey: string },
+  imagehostingConfig?: { superbedToken: string }
 ) {
   const startTime = Date.now();
   console.log(`[火山增强] 开始 - 分辨率: ${resolutionBoundary}`);
 
-  const accessKey = process.env.VOLCENGINE_ACCESS_KEY;
-  const secretKey = process.env.VOLCENGINE_SECRET_KEY;
+  // 优先使用传入的配置，否则使用环境变量
+  const accessKey = volcengineConfig?.accessKey || process.env.VOLCENGINE_ACCESS_KEY || '';
+  const secretKey = volcengineConfig?.secretKey || process.env.VOLCENGINE_SECRET_KEY || '';
 
   if (!accessKey || !secretKey) {
-    throw new Error('火山引擎API配置缺失');
+    throw new Error('VOLCENGINE_NOT_CONFIGURED:请先在设置页面配置火山引擎 Access Key 和 Secret Key');
   }
 
-  const processedImage = await prisma.processedImage.create({
+  console.log(`[火山增强] 使用配置源: ${volcengineConfig ? '用户设置' : '环境变量'}`);
+  console.log(`[火山增强] AccessKey: ${accessKey.substring(0, 10)}...`);
+
+  // 如果是工作流中间步骤，不保存到数据库
+  const processedImage = skipDbSave ? null : await prisma.processedImage.create({
     data: {
       filename: `enhance-${Date.now()}.jpg`,
       originalUrl: 'temp',
@@ -141,7 +148,8 @@ export async function enhanceWithVolcengine(
   try {
     const imageUrl = await uploadBase64ToSuperbed(
       imageBase64,
-      `enhance-input-${processedImage.id}.jpg`
+      `enhance-input-${processedImage?.id || Date.now()}.jpg`,
+      imagehostingConfig?.superbedToken
     );
     console.log(`[火山增强] 图片上传完成`);
     const requestBody = {
@@ -166,7 +174,7 @@ export async function enhanceWithVolcengine(
     };
 
     const query = `Action=CVProcess&Version=${VERSION}`;
-    const authorization = generateSignature('POST', '/', query, headers, bodyStr, timestamp, secretKey);
+    const authorization = generateSignature('POST', '/', query, headers, bodyStr, timestamp, secretKey, accessKey);
     headers['Authorization'] = authorization;
 
     console.log(`[火山增强] 发送API请求...`);
@@ -190,22 +198,35 @@ export async function enhanceWithVolcengine(
       throw new Error('未获取到增强结果');
     }
     
+    // 如果跳过数据库保存，直接返回结果
+    if (skipDbSave) {
+      const imageSize = Buffer.from(result.data.binary_data_base64[0], 'base64').length;
+      const totalDuration = ((Date.now() - startTime) / 1000).toFixed(2);
+      console.log(`[火山增强] 完成（中间步骤） - 耗时: ${totalDuration}s, 大小: ${(imageSize / 1024).toFixed(0)}KB`);
+      
+      return {
+        id: `temp-${Date.now()}`,
+        imageData: resultImageData,
+        imageSize
+      };
+    }
+    
     // 上传到本地存储
     const { uploadBase64Image } = await import('@/lib/storage');
     const processedUrl = await uploadBase64Image(
       resultImageData,
-      `enhance-${processedImage.id}.jpg`
+      `enhance-${processedImage!.id}.jpg`
     );
     
     const updatedImage = await prisma.processedImage.update({
-      where: { id: processedImage.id },
+      where: { id: processedImage!.id },
       data: {
         originalUrl: imageUrl,
         processedUrl: processedUrl,
         status: 'COMPLETED',
         fileSize: Buffer.from(result.data.binary_data_base64[0], 'base64').length,
         metadata: JSON.stringify({
-          ...(processedImage.metadata ? JSON.parse(processedImage.metadata as string) : {}),
+          ...(processedImage!.metadata ? JSON.parse(processedImage!.metadata as string) : {}),
           processingCompletedAt: new Date().toISOString(),
           timeElapsed: result.data.time_elapsed || 'N/A'
         })
@@ -225,13 +246,15 @@ export async function enhanceWithVolcengine(
   } catch (error) {
     console.error(`[火山增强] 失败:`, error instanceof Error ? error.message : error);
     
-    await prisma.processedImage.update({
-      where: { id: processedImage.id },
-      data: {
-        status: 'FAILED',
-        errorMessage: error instanceof Error ? error.message : 'Unknown processing error'
-      }
-    });
+    if (!skipDbSave && processedImage) {
+      await prisma.processedImage.update({
+        where: { id: processedImage.id },
+        data: {
+          status: 'FAILED',
+          errorMessage: error instanceof Error ? error.message : 'Unknown processing error'
+        }
+      });
+    }
 
     throw error;
   }
@@ -258,17 +281,23 @@ export async function outpaintWithVolcengine(
   left = 0.1,
   right = 0.1,
   maxHeight = 1920,
-  maxWidth = 1920
+  maxWidth = 1920,
+  volcengineConfig?: { accessKey: string; secretKey: string },
+  imagehostingConfig?: { superbedToken: string }
 ) {
   const startTime = Date.now();
   console.log(`[火山扩图] 开始 - 比例: 上${top} 下${bottom} 左${left} 右${right}`);
 
-  const accessKey = process.env.AccessKey || process.env.VOLCENGINE_ACCESS_KEY || process.env.ARK_API_KEY;
-  const secretKey = process.env.SecretKey || process.env.VOLCENGINE_SECRET_KEY;
+  // 优先使用传入的配置，否则使用环境变量
+  const accessKey = volcengineConfig?.accessKey || process.env.VOLCENGINE_ACCESS_KEY || '';
+  const secretKey = volcengineConfig?.secretKey || process.env.VOLCENGINE_SECRET_KEY || '';
 
   if (!accessKey || !secretKey) {
-    throw new Error('火山引擎API配置缺失');
+    throw new Error('VOLCENGINE_NOT_CONFIGURED:请先在设置页面配置火山引擎 Access Key 和 Secret Key');
   }
+
+  console.log(`[火山扩图] 使用配置源: ${volcengineConfig ? '用户设置' : '环境变量'}`);
+  console.log(`[火山扩图] AccessKey: ${accessKey.substring(0, 10)}...`);
 
   const processedImage = await prisma.processedImage.create({
     data: {
@@ -320,7 +349,7 @@ export async function outpaintWithVolcengine(
     };
 
     const query = `Action=CVProcess&Version=${VERSION}`;
-    const authorization = generateSignature('POST', '/', query, headers, bodyStr, timestamp, secretKey);
+    const authorization = generateSignature('POST', '/', query, headers, bodyStr, timestamp, secretKey, accessKey);
     headers['Authorization'] = authorization;
 
     const response = await fetchWithRetry(`https://${HOST}/?${query}`, {

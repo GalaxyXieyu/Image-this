@@ -26,7 +26,7 @@ export function useImageProcessing({
   const { toast } = useToast();
 
   // 调整图片尺寸以符合API要求
-  const resizeImageForAPI = useCallback((imageDataUrl: string): Promise<string> => {
+  const resizeImageForAPI = useCallback((imageDataUrl: string, mimeType?: string): Promise<string> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => {
@@ -63,7 +63,29 @@ export function useImageProcessing({
         canvas.height = height;
         ctx.drawImage(img, 0, 0, width, height);
 
-        const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        // 检测原始图片格式，保持 PNG 透明度
+        // 优先使用传入的 mimeType，其次检测 data URL 前缀
+        const isPNG = mimeType 
+          ? mimeType === 'image/png'
+          : imageDataUrl.startsWith('data:image/png');
+        
+        console.log('[resizeImageForAPI] 输入格式检测:', {
+          isPNG,
+          mimeType,
+          inputPrefix: imageDataUrl.substring(0, 50),
+          originalSize: { width: img.width, height: img.height },
+          resizedSize: { width, height }
+        });
+        
+        const resizedDataUrl = isPNG 
+          ? canvas.toDataURL('image/png')
+          : canvas.toDataURL('image/jpeg', 0.9);
+        
+        console.log('[resizeImageForAPI] 输出格式:', {
+          outputPrefix: resizedDataUrl.substring(0, 30),
+          outputFormat: isPNG ? 'PNG' : 'JPEG'
+        });
+        
         resolve(resizedDataUrl);
       };
 
@@ -131,7 +153,7 @@ export function useImageProcessing({
     const taskData = [];
     for (let i = 0; i < uploadedImages.length; i++) {
       const image = uploadedImages[i];
-      const resizedImageUrl = await resizeImageForAPI(image.preview);
+      const resizedImageUrl = await resizeImageForAPI(image.preview, image.file.type);
 
       taskData.push({
         imageUrl: resizedImageUrl,
@@ -154,7 +176,7 @@ export function useImageProcessing({
     const taskData = [];
     for (let i = 0; i < uploadedImages.length; i++) {
       const image = uploadedImages[i];
-      const resizedImageUrl = await resizeImageForAPI(image.preview);
+      const resizedImageUrl = await resizeImageForAPI(image.preview, image.file.type);
 
       taskData.push({
         imageUrl: resizedImageUrl,
@@ -185,18 +207,18 @@ export function useImageProcessing({
     let watermarkPositionData: any = watermarkPosition;
 
     if (enableWatermark && watermarkType === 'logo' && watermarkLogo) {
-      watermarkLogoData = await resizeImageForAPI(watermarkLogo.preview);
+      watermarkLogoData = await resizeImageForAPI(watermarkLogo.preview, watermarkLogo.file.type);
       watermarkPositionData = watermarkSettings;
     }
 
     const taskData = [];
     for (let i = 0; i < uploadedImages.length; i++) {
       const image = uploadedImages[i];
-      const resizedImageUrl = await resizeImageForAPI(image.preview);
+      const resizedImageUrl = await resizeImageForAPI(image.preview, image.file.type);
 
       let resizedReferenceUrl = undefined;
       if (referenceImage) {
-        resizedReferenceUrl = await resizeImageForAPI(referenceImage.preview);
+        resizedReferenceUrl = await resizeImageForAPI(referenceImage.preview, referenceImage.file.type);
       }
 
       taskData.push({
@@ -236,8 +258,8 @@ export function useImageProcessing({
     const taskData = [];
     for (let i = 0; i < uploadedImages.length; i++) {
       const image = uploadedImages[i];
-      const resizedOriginalUrl = await resizeImageForAPI(image.preview);
-      const resizedReferenceUrl = await resizeImageForAPI(referenceImage.preview);
+      const resizedOriginalUrl = await resizeImageForAPI(image.preview, image.file.type);
+      const resizedReferenceUrl = await resizeImageForAPI(referenceImage.preview, referenceImage.file.type);
 
       taskData.push({
         imageUrl: resizedOriginalUrl,
@@ -260,11 +282,11 @@ export function useImageProcessing({
     }
 
     const taskData = [];
-    const watermarkLogoData = await resizeImageForAPI(watermarkLogo.preview);
+    const watermarkLogoData = await resizeImageForAPI(watermarkLogo.preview, watermarkLogo.file.type);
 
     for (let i = 0; i < uploadedImages.length; i++) {
       const image = uploadedImages[i];
-      const resizedImageUrl = await resizeImageForAPI(image.preview);
+      const resizedImageUrl = await resizeImageForAPI(image.preview, image.file.type);
 
       taskData.push({
         imageUrl: resizedImageUrl,

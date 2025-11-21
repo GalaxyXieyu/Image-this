@@ -23,7 +23,9 @@ export async function GET(request: NextRequest) {
 
     // 构建查询条件
     const where: any = {
-      userId: session.user.id
+      userId: session.user.id,
+      // 默认只返回成功的图片
+      status: status || 'COMPLETED'
     };
 
     if (search) {
@@ -37,7 +39,8 @@ export async function GET(request: NextRequest) {
       where.projectId = projectId;
     }
 
-    if (status) {
+    // status 参数已在初始化时处理
+    if (status && status !== 'COMPLETED') {
       where.status = status;
     }
 
@@ -69,6 +72,7 @@ export async function GET(request: NextRequest) {
         thumbnailUrl: true,
         processType: true,
         status: true,
+        metadata: true,
         fileSize: true,
         width: true,
         height: true,

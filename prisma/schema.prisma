@@ -51,6 +51,11 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   
+  // API 配置
+  volcengineAccessKey String? // 火山引擎 Access Key
+  volcengineSecretKey String? // 火山引擎 Secret Key
+  superbedToken       String? // Superbed 图床 Token
+  
   // Relations
   accounts      Account[]
   sessions      Session[]
