@@ -71,10 +71,10 @@ export async function addWatermarkToImage(options: WatermarkOptions): Promise<st
     addTextWatermark(ctx, watermarkText, watermarkOpacity, watermarkPosition, outputWidth, outputHeight);
   }
   
-  const outputBuffer = canvas.toBuffer('image/jpeg', { quality: 0.95 });
+  const outputBuffer = canvas.toBuffer('image/png');
   const base64Output = outputBuffer.toString('base64');
   
-  return `data:image/jpeg;base64,${base64Output}`;
+  return `data:image/png;base64,${base64Output}`;
 }
 
 function addTextWatermark(
@@ -243,7 +243,10 @@ async function addLogoWatermark(
     }
   }
   
+  // 设置合成模式以正确处理透明度
+  ctx.globalCompositeOperation = 'source-over';
   ctx.globalAlpha = opacity;
   ctx.drawImage(logo, x, y, logoWidth, logoHeight);
   ctx.globalAlpha = 1.0;
+  ctx.globalCompositeOperation = 'source-over'; // 重置
 }

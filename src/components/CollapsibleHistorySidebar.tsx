@@ -20,12 +20,16 @@ interface CollapsibleHistorySidebarProps {
   items: HistoryItem[];
   onItemClick?: (item: HistoryItem) => void;
   className?: string;
+  title?: string;
+  subtitle?: string;
 }
 
 export default function CollapsibleHistorySidebar({
   items,
   onItemClick,
-  className
+  className,
+  title = "处理历史",
+  subtitle = "点击图片查看详情"
 }: CollapsibleHistorySidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -75,10 +79,10 @@ export default function CollapsibleHistorySidebar({
             <div className="border-b border-gray-200 bg-gradient-to-r from-orange-50 to-white p-4">
               <div className="flex items-center gap-2">
                 <History className="h-5 w-5 text-orange-500" />
-                <h3 className="font-semibold text-gray-900">处理历史</h3>
+                <h3 className="font-semibold text-gray-900">{title}</h3>
               </div>
               <p className="mt-1 text-xs text-gray-500">
-                点击图片查看详情
+                {subtitle}
               </p>
             </div>
 

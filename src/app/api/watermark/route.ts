@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     const processedImage = await prisma.processedImage.create({
       data: {
-        filename: `watermark-${Date.now()}.jpg`,
+        filename: `watermark-${Date.now()}.png`,
         originalUrl: imageUrl,
         processType: 'WATERMARK',
         status: 'PROCESSING',
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
 
       const minioUrl = await uploadBase64Image(
         watermarkedImageData,
-        `watermark-${processedImage.id}.jpg`
+        `watermark-${processedImage.id}.png`
       );
 
       const updatedImage = await prisma.processedImage.update({
