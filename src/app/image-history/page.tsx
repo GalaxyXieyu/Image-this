@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/navigation/Navbar';
@@ -30,6 +30,12 @@ export default function ImageHistoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<HistoryImage | null>(null);
+  
+  // 分页状态
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const pageSize = 20;
+  const loadingRef = useRef(false);
 
   // 重定向未登录用户
   useEffect(() => {
@@ -39,29 +45,46 @@ export default function ImageHistoryPage() {
   }, [status, router]);
 
   // 获取图片列表
-  const fetchImages = useCallback(async () => {
-    if (!session) return;
+  const fetchImages = useCallback(async (reset = false) => {
+    if (!session || loadingRef.current) return;
 
     try {
-      const response = await fetch('/api/images?limit=100');
+      loadingRef.current = true;
+      const currentPage = reset ? 1 : page;
+      const offset = (currentPage - 1) * pageSize;
+      
+      const response = await fetch(`/api/images?status=COMPLETED&limit=${pageSize}&offset=${offset}`);
       if (!response.ok) {
         throw new Error('获取图片列表失败');
       }
       const data = await response.json();
-      if (data.success) {
+      if (data.success || data.images) {
         // 只显示已完成的图片
-        const completedImages = data.images.filter((img: HistoryImage) => 
-          img.status === 'COMPLETED' && (img.processedUrl || img.thumbnailUrl || img.originalUrl)
+        const completedImages = (data.images || []).filter((img: HistoryImage) => 
+          img.processedUrl || img.thumbnailUrl || img.originalUrl
         );
-        setImages(completedImages);
+        
+        if (reset) {
+          setImages(completedImages);
+          setPage(1);
+        } else {
+          setImages(prev => [...prev, ...completedImages]);
+        }
+        
+        setHasMore(completedImages.length === pageSize);
+        if (!reset) {
+          setPage(prev => prev + 1);
+        }
       } else {
         throw new Error(data.error || '获取图片列表失败');
       }
     } catch (err) {
       console.error('获取图片失败:', err);
       setError(err instanceof Error ? err.message : '获取图片失败');
+    } finally {
+      loadingRef.current = false;
     }
-  }, [session]);
+  }, [session, page, pageSize]);
 
   // 下载图片
   const downloadImage = useCallback(async (image: HistoryImage) => {
@@ -150,11 +173,12 @@ export default function ImageHistoryPage() {
     }
   }, [fetchImages]);
 
+  // 初始加载
   useEffect(() => {
-    if (session) {
-      initializeData();
+    if (session && !loadingRef.current) {
+      fetchImages(true).finally(() => setLoading(false));
     }
-  }, [session, initializeData]);
+  }, [session]);
 
   if (status === "loading" || loading) {
     return (

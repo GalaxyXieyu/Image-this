@@ -30,7 +30,6 @@ export async function addWatermarkToImage(options: WatermarkOptions): Promise<st
   } = options;
   
   console.log('[addWatermarkToImage] 开始处理水印:', {
-    inputPrefix: imageUrl.substring(0, 30),
     watermarkType,
     outputResolution
   });
@@ -90,7 +89,6 @@ export async function addWatermarkToImage(options: WatermarkOptions): Promise<st
   const result = `data:image/png;base64,${base64Output}`;
   
   console.log('[addWatermarkToImage] 处理完成:', {
-    outputPrefix: result.substring(0, 30),
     outputFormat: 'PNG',
     bufferSize: outputBuffer.length
   });

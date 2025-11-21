@@ -7,7 +7,7 @@ import { getUserConfig } from '@/lib/user-config';
 // 任务处理器
 class TaskProcessor {
   private isProcessing = false;
-  private maxConcurrentTasks = parseInt(process.env.MAX_CONCURRENT_TASKS || '2'); // 最大并发任务数，从环境变量读取，默认2
+  private maxConcurrentTasks = parseInt(process.env.MAX_CONCURRENT_TASKS || '1'); // 串行处理，避免即梦API并发限制
 
   async processNextTask() {
     if (this.isProcessing) {
@@ -126,41 +126,31 @@ class TaskProcessor {
     const executing: Promise<void>[] = [];
     let completed = 0;
     
-    console.log(`[并发控制] 开始处理 ${items.length} 个任务，最大并发数: ${concurrency}`);
-    
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       const promise = processor(item)
         .then(
-          (value) => {
+          (value: R) => {
             completed++;
-            console.log(`[并发控制] 任务完成 (${completed}/${items.length})，当前并发: ${executing.length}`);
             results.push({ status: 'fulfilled', value });
           },
-          (reason) => {
+          (reason: any) => {
             completed++;
-            console.log(`[并发控制] 任务失败 (${completed}/${items.length})，当前并发: ${executing.length}`);
             results.push({ status: 'rejected', reason });
           }
         )
-        .finally(() => {
+        .then(() => {
           executing.splice(executing.indexOf(promise), 1);
         });
       
       executing.push(promise);
       
-      // 当达到并发限制时，等待其中一个完成
       if (executing.length >= concurrency) {
-        console.log(`[并发控制] 达到并发限制 (${concurrency})，等待任务完成...`);
         await Promise.race(executing);
       }
     }
     
-    // 等待所有剩余任务完成
-    console.log(`[并发控制] 等待剩余 ${executing.length} 个任务完成...`);
     await Promise.all(executing);
-    
-    console.log(`[并发控制] 所有任务处理完成`);
     return results;
   }
 
@@ -187,24 +177,17 @@ class TaskProcessor {
           break; // 没有更多任务，退出循环
         }
 
-        console.log(`第${rounds + 1}轮处理: 发现${pendingTasks.length}个待处理任务`);
-
-        // 限制并发处理任务（最多同时3个）
-        const results = await this.processConcurrently(
+        const results = await this.processConcurrently<typeof pendingTasks[0], any>(
           pendingTasks,
-          (task: any) => this.processSingleTask(task),
-          3 // 最大并发数
+          (task) => this.processSingleTask(task as { id: string; type: string; inputData: string; totalSteps: number; userId: string }),
+          1
         );
 
-        const successful = results.filter((r: any) => r.status === 'fulfilled').length;
-        const failed = results.filter((r: any) => r.status === 'rejected').length;
-
-        totalProcessed += pendingTasks.length;
+        const successful = results.filter(r => r.status === 'fulfilled').length;
+        const failed = results.filter(r => r.status === 'rejected').length;
         totalSuccessful += successful;
         totalFailed += failed;
         rounds++;
-
-        console.log(`第${rounds}轮完成: 成功${successful}个, 失败${failed}个`);
 
         // 如果处理的任务数少于maxTasks，说明队列基本清空了
         if (pendingTasks.length < maxTasks) {
@@ -231,12 +214,7 @@ class TaskProcessor {
 
   private async processSingleTask(task: { id: string; type: string; inputData: string; totalSteps: number; userId: string }) {
     try {
-      console.log(`=== 开始处理任务 ===`);
-      console.log(`任务ID: ${task.id}, 类型: ${task.type}`);
-      
-      // 获取用户配置
       const userConfig = await getUserConfig(task.userId);
-      console.log(`[Worker] 获取用户配置 - 火山引擎: ${!!userConfig.volcengine}, 图床: ${!!userConfig.imagehosting}`);
       
       // 将用户配置注入到 inputData 中
       const inputData = JSON.parse(task.inputData);
@@ -278,8 +256,6 @@ class TaskProcessor {
       ]);
       
       clearTimeout(timeoutHandle!);
-
-      console.log(`任务 ${task.id} 处理成功`);
       
       // 更新任务为完成状态
       await prisma.taskQueue.update({
@@ -356,22 +332,14 @@ class TaskProcessor {
       watermarkType = 'text',
       watermarkLogoUrl,
       outputResolution = 'original',
+      aiModel = 'jimeng',
       volcengineConfig
     } = inputData;
     
-    console.log(`[一键工作流] 开始处理任务 ${task.id}`);
-    console.log(`[一键工作流] 配置来源: ${volcengineConfig ? '用户设置' : '环境变量'}`);
     await this.updateTaskProgress(task.id, 'Step 1/3: 准备处理...', 10, 1);
 
     try {
-      // 直接调用服务函数，避免 HTTP 循环调用
       const { executeOneClickWorkflow } = await import('@/app/api/workflow/one-click/service');
-      
-      console.log(`[一键工作流] 调用服务函数，参数:`, { 
-        xScale, yScale, upscaleFactor, 
-        enableBackgroundReplace, enableOutpaint, enableUpscale,
-        enableWatermark, watermarkType, outputResolution 
-      });
       
       const result = await executeOneClickWorkflow({
         imageUrl,
@@ -389,11 +357,10 @@ class TaskProcessor {
         watermarkType: watermarkType as 'text' | 'logo',
         watermarkLogoUrl,
         outputResolution,
+        aiModel,
         userId: task.userId,
         volcengineConfig
       });
-      
-      console.log(`[一键工作流] 处理完成，任务ID: ${task.id}`);
       
       await this.updateTaskProgress(task.id, 'Step 3/3: 处理完成', 100, 3);
 
@@ -417,13 +384,9 @@ class TaskProcessor {
 
   private async processBackgroundRemoval(task: { id: string; inputData: string; userId: string }) {
     const inputData = JSON.parse(task.inputData);
-    const { imageUrl, referenceImageUrl, customPrompt, volcengineConfig, imagehostingConfig } = inputData;
+    const { imageUrl, referenceImageUrl, customPrompt, aiModel = 'jimeng', volcengineConfig, imagehostingConfig } = inputData;
     
-    console.log(`[背景替换] 任务ID: ${task.id}`);
-    console.log(`[背景替换] 使用火山引擎即梦API（直接调用）`);
-    console.log(`[背景替换] 配置来源: ${volcengineConfig ? '用户设置' : '环境变量'}`);
-    
-    await this.updateTaskProgress(task.id, '即梦图像生成中...', 30, 1);
+    await this.updateTaskProgress(task.id, `使用 ${aiModel} 生成图像中...`, 30, 1);
     
     try {
       // 构建提示词：如果有自定义提示词就用，否则使用默认的背景替换提示词
@@ -434,41 +397,35 @@ class TaskProcessor {
         prompt = '保持产品主体完全不变，仅替换背景为类似参考场景的风格，保持产品的形状、材质、特征比例、摆放角度及数量完全一致，专业摄影，高质量，4K分辨率';
       }
 
-      console.log(`[背景替换] 提示词: ${prompt.substring(0, 50)}...`);
-      console.log(`[背景替换] 有产品图: ${!!imageUrl}`);
-      console.log(`[背景替换] 有参考图: ${!!referenceImageUrl}`);
-      console.log(`[背景替换] 开始直接调用即梦服务...`);
-
-      // 直接调用即梦服务
-      // 即梦API支持多张参考图（image_urls数组），会先上传到图床获取URL
-      const { generateWithJimeng } = await import('@/app/api/jimeng/service');
-      
-      // 准备参考图数组：产品图 + 场景参考图（如果有）
-      const referenceImages = [imageUrl];  // 产品图（base64 Data URL）
+      const referenceImages = [imageUrl];
       if (referenceImageUrl) {
-        referenceImages.push(referenceImageUrl);  // 场景参考图（base64 Data URL）
+        referenceImages.push(referenceImageUrl);
       }
       
-      console.log(`[背景替换] 将上传${referenceImages.length}张图片到图床...`);
+      let result;
       
-      const result = await generateWithJimeng(
-        task.userId,
-        prompt,
-        referenceImages,  // 会自动上传到Superbed获取公网URL
-        2048,
-        2048,
-        volcengineConfig,  // 传递火山引擎配置
-        imagehostingConfig  // 传递图床配置
-      );
+      // 根据选择的 AI 模型调用不同的服务
+      if (aiModel === 'jimeng') {
+        const { generateWithJimeng } = await import('@/app/api/jimeng/service');
+        result = await generateWithJimeng(
+          task.userId,
+          prompt,
+          referenceImages,  // 会自动上传到Superbed获取公网URL
+          2048,
+          2048,
+          volcengineConfig,  // 传递火山引擎配置
+          imagehostingConfig  // 传递图床配置
+        );
+      } else if (aiModel === 'gpt') {
+        // TODO: 实现 GPT-4 Vision 背景替换
+        throw new Error('GPT-4 Vision 背景替换功能即将推出');
+      } else if (aiModel === 'gemini') {
+        // TODO: 实现 Gemini 背景替换
+        throw new Error('Gemini 背景替换功能即将推出');
+      } else {
+        throw new Error(`不支持的 AI 模型: ${aiModel}`);
+      }
       
-      // 注意：
-      // - imageUrl/referenceImageUrl: 虽然名字叫URL，实际是base64编码的图片数据（data:image/jpeg;base64,...）
-      // - generateWithJimeng会自动上传到Superbed图床获取公网URL
-      // - 即梦API支持0-10张参考图，通过image_urls数组传递
-
-      console.log(`[背景替换] 服务调用成功`);
-      console.log(`[背景替换] 生成图片ID: ${result.id}`);
-
       await this.updateTaskProgress(task.id, '图像生成完成', 100, 1);
       
       return {
@@ -488,9 +445,6 @@ class TaskProcessor {
     const inputData = JSON.parse(task.inputData);
     const { imageUrl, xScale = 2.0, yScale = 2.0, volcengineConfig, imagehostingConfig } = inputData;
     
-    console.log(`[图像扩展] 任务ID: ${task.id}`);
-    console.log(`[图像扩展] 使用火山引擎扩图服务`);
-    
     await this.updateTaskProgress(task.id, '图像扩展处理中...', 50, 1);
     
     try {
@@ -501,10 +455,6 @@ class TaskProcessor {
       const left = (xScale - 1) / 2;
       const right = (xScale - 1) / 2;
 
-      console.log(`[图像扩展] 原始比例 - xScale: ${xScale}, yScale: ${yScale}`);
-      console.log(`[图像扩展] 转换后扩展比例 - 上:${top} 下:${bottom} 左:${left} 右:${right}`);
-
-      // 直接调用服务函数，避免HTTP超时问题
       const { outpaintWithVolcengine } = await import('@/app/api/volcengine/service');
       const result = await outpaintWithVolcengine(
         task.userId,
@@ -519,9 +469,6 @@ class TaskProcessor {
         volcengineConfig,
         imagehostingConfig
       );
-
-      console.log(`[图像扩展] 处理成功`);
-      console.log(`[图像扩展] 生成图片ID: ${result.id}`);
 
       await this.updateTaskProgress(task.id, '图像扩展完成', 100, 1);
       
@@ -540,60 +487,32 @@ class TaskProcessor {
 
   private async processImageUpscaling(task: { id: string; inputData: string; userId: string }) {
     const inputData = JSON.parse(task.inputData);
-    const { imageUrl, upscaleFactor = 2, volcengineConfig, imagehostingConfig } = inputData;
-    
-    console.log(`[智能画质增强] 任务ID: ${task.id}`);
-    console.log(`[智能画质增强] 使用火山引擎智能画质增强API`);
+    const { imageUrl, upscaleFactor = 2, aiModel = 'jimeng', volcengineConfig, imagehostingConfig } = inputData;
     
     await this.updateTaskProgress(task.id, '智能画质增强中...', 50, 1);
     
     try {
-      const apiUrl = process.env.NODE_ENV === 'production' 
-        ? `${process.env.NEXTAUTH_URL}/api/volcengine/enhance`
-        : 'http://localhost:3000/api/volcengine/enhance';
-
-      console.log(`[智能画质增强] API地址: ${apiUrl}`);
-
-      // 火山画质增强需要3-5秒，设置2分钟超时
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2分钟
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          imageUrl,
-          resolutionBoundary: '720p',
-          enableHdr: false,
-          enableWb: false,
-          resultFormat: 1,
-          jpgQuality: 95,
-          userId: task.userId,
-          serverCall: true
-        }),
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-      console.log(`[智能画质增强] 开始调用API...`);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error(`[智能画质增强] API调用失败:`, errorData);
-        throw new Error(`智能画质增强失败: ${errorData.details || response.statusText}`);
-      }
-
-      const result = await response.json();
-      console.log(`[智能画质增强] API调用成功`);
-      console.log(`[智能画质增强] 生成图片ID: ${result.data?.id}`);
+      // 直接调用 service，不通过 HTTP
+      const { enhanceWithVolcengine } = await import('@/app/api/volcengine/service');
+      
+      const result = await enhanceWithVolcengine(
+        task.userId,
+        imageUrl,
+        '720p',
+        false,
+        false,
+        1,
+        95,
+        false, // skipDbSave
+        volcengineConfig,
+        imagehostingConfig
+      );
 
       await this.updateTaskProgress(task.id, '智能画质增强完成', 100, 1);
       
       return {
-        processedImageId: result.data.id,
-        processedImageUrl: result.data.imageData,
+        processedImageId: result.id,
+        processedImageUrl: result.imageData,
         upscaleFactor
       };
 

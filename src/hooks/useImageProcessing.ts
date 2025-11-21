@@ -14,6 +14,7 @@ interface UseImageProcessingProps {
   watermarkLogo: UploadedImage | null;
   watermarkSettings: any;
   outputResolution: string;
+  aiModel?: string;
 }
 
 export function useImageProcessing({
@@ -21,7 +22,8 @@ export function useImageProcessing({
   referenceImage,
   watermarkLogo,
   watermarkSettings,
-  outputResolution
+  outputResolution,
+  aiModel = 'jimeng'
 }: UseImageProcessingProps) {
   const { toast } = useToast();
 
@@ -181,6 +183,7 @@ export function useImageProcessing({
       taskData.push({
         imageUrl: resizedImageUrl,
         upscaleFactor,
+        aiModel,
         originalImageId: image.id,
         originalImageName: image.name
       });
@@ -189,7 +192,7 @@ export function useImageProcessing({
     const tasks = await createBatchTasks('IMAGE_UPSCALING', taskData);
     await triggerWorker();
     return tasks;
-  }, [uploadedImages, resizeImageForAPI, createBatchTasks, triggerWorker]);
+  }, [uploadedImages, aiModel, resizeImageForAPI, createBatchTasks, triggerWorker]);
 
   // 一键增强处理
   const handleOneClick = useCallback(async (
@@ -212,14 +215,16 @@ export function useImageProcessing({
     }
 
     const taskData = [];
+    
+    // 处理参考图（只处理一次）
+    let resizedReferenceUrl = undefined;
+    if (referenceImage) {
+      resizedReferenceUrl = await resizeImageForAPI(referenceImage.preview, referenceImage.file.type);
+    }
+    
     for (let i = 0; i < uploadedImages.length; i++) {
       const image = uploadedImages[i];
       const resizedImageUrl = await resizeImageForAPI(image.preview, image.file.type);
-
-      let resizedReferenceUrl = undefined;
-      if (referenceImage) {
-        resizedReferenceUrl = await resizeImageForAPI(referenceImage.preview, referenceImage.file.type);
-      }
 
       taskData.push({
         imageUrl: resizedImageUrl,
@@ -237,6 +242,7 @@ export function useImageProcessing({
         watermarkType,
         watermarkLogoUrl: watermarkLogoData,
         outputResolution,
+        aiModel,
         originalImageId: image.id,
         originalImageName: image.name
       });
@@ -245,7 +251,7 @@ export function useImageProcessing({
     const tasks = await createBatchTasks('ONE_CLICK_WORKFLOW', taskData);
     await triggerWorker();
     return tasks;
-  }, [uploadedImages, referenceImage, watermarkLogo, watermarkSettings, outputResolution, resizeImageForAPI, createBatchTasks, triggerWorker]);
+  }, [uploadedImages, referenceImage, watermarkLogo, watermarkSettings, outputResolution, aiModel, resizeImageForAPI, createBatchTasks, triggerWorker]);
 
   // 背景替换处理
   const handleBackgroundReplace = useCallback(async () => {
@@ -255,16 +261,19 @@ export function useImageProcessing({
 
     const customPrompt = (document.getElementById('customPrompt') as HTMLTextAreaElement)?.value || '';
 
+    // 先处理参考图（只处理一次）
+    const resizedReferenceUrl = await resizeImageForAPI(referenceImage.preview, referenceImage.file.type);
+
     const taskData = [];
     for (let i = 0; i < uploadedImages.length; i++) {
       const image = uploadedImages[i];
       const resizedOriginalUrl = await resizeImageForAPI(image.preview, image.file.type);
-      const resizedReferenceUrl = await resizeImageForAPI(referenceImage.preview, referenceImage.file.type);
 
       taskData.push({
         imageUrl: resizedOriginalUrl,
         referenceImageUrl: resizedReferenceUrl,
         customPrompt: customPrompt,
+        aiModel,
         originalImageId: image.id,
         originalImageName: image.name
       });
@@ -273,7 +282,7 @@ export function useImageProcessing({
     const tasks = await createBatchTasks('BACKGROUND_REMOVAL', taskData);
     await triggerWorker();
     return tasks;
-  }, [uploadedImages, referenceImage, resizeImageForAPI, createBatchTasks, triggerWorker]);
+  }, [uploadedImages, referenceImage, aiModel, resizeImageForAPI, createBatchTasks, triggerWorker]);
 
   // 水印处理
   const handleWatermark = useCallback(async () => {

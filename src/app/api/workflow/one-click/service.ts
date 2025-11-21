@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { uploadBase64Image } from '@/lib/storage';
 import { generateWithJimeng } from '@/app/api/jimeng/service';
-import { outpaintWithQwen } from '@/app/api/qwen/service';
+import { outpaintWithVolcengine } from '@/app/api/volcengine/service';
 import { enhanceWithVolcengine } from '@/app/api/volcengine/service';
 
 export interface OneClickWorkflowParams {
@@ -20,6 +20,7 @@ export interface OneClickWorkflowParams {
   watermarkType?: 'text' | 'logo';
   watermarkLogoUrl?: string;
   outputResolution?: string;
+  aiModel?: string;
   userId: string;
   volcengineConfig?: { accessKey: string; secretKey: string };
   imagehostingConfig?: { superbedToken: string };
@@ -61,6 +62,7 @@ export async function executeOneClickWorkflow(
     watermarkType = 'text',
     watermarkLogoUrl,
     outputResolution = 'original',
+    aiModel = 'jimeng',
     userId,
     volcengineConfig,
     imagehostingConfig
@@ -98,6 +100,7 @@ export async function executeOneClickWorkflow(
         watermarkPosition,
         watermarkType,
         outputResolution,
+        aiModel,
         referenceImageUrl,
         isWorkflowFinal: true
       })
@@ -112,31 +115,42 @@ export async function executeOneClickWorkflow(
     let hasOutpaint = false;
 
     console.log('=== 开始一键增强处理流程 ===');
-    console.log('初始图片URL:', imageUrl);
-    console.log('参考图片URL:', referenceImageUrl);
     console.log('处理选项:', { enableBackgroundReplace, enableOutpaint, enableUpscale });
 
     const startTime = Date.now();
 
     // 步骤1：背景替换
     if (enableBackgroundReplace && referenceImageUrl) {
-      console.log('=== 步骤1/4：开始背景替换 ===');
+      console.log(`=== 步骤1/4：开始背景替换 (使用 ${aiModel}) ===`);
       const bgStartTime = Date.now();
       try {
         const prompt = '保持产品主体完全不变，仅替换背景为类似参考场景的风格，保持产品的形状、材质、特征比例、摆放角度及数量完全一致，专业摄影，高质量，4K分辨率';
-        const result = await generateWithJimeng(
-          userId,
-          prompt,
-          [imageUrl, referenceImageUrl],
-          2048,
-          2048,
-          volcengineConfig,
-          imagehostingConfig
-        );
-        processedImageUrl = result.imageData;
+        
+        // 根据选择的 AI 模型调用不同的服务
+        if (aiModel === 'jimeng') {
+          const result = await generateWithJimeng(
+            userId,
+            prompt,
+            [imageUrl, referenceImageUrl],
+            2048,
+            2048,
+            volcengineConfig,
+            imagehostingConfig
+          );
+          processedImageUrl = result.imageData;
+        } else if (aiModel === 'gpt') {
+          // TODO: 实现 GPT-4 Vision 背景替换
+          throw new Error('GPT-4 Vision 背景替换功能即将推出');
+        } else if (aiModel === 'gemini') {
+          // TODO: 实现 Gemini 背景替换
+          throw new Error('Gemini 背景替换功能即将推出');
+        } else {
+          throw new Error(`不支持的 AI 模型: ${aiModel}`);
+        }
+        
         hasBackgroundReplace = true;
         const bgDuration = ((Date.now() - bgStartTime) / 1000).toFixed(2);
-        console.log(`背景替换完成，耗时: ${bgDuration}秒`);
+        console.log(`背景替换完成 (${aiModel})，耗时: ${bgDuration}秒`);
       } catch (error) {
         console.error('背景替换失败，继续使用原图:', error);
       }
@@ -144,20 +158,32 @@ export async function executeOneClickWorkflow(
       console.log('=== 跳过背景替换步骤 ===');
     }
 
-    // 步骤2：扩图
+    // 步骤2：扩图（使用火山引擎）
     if (enableOutpaint) {
-      console.log('=== 步骤2/4：开始扩图处理 ===');
+      console.log('=== 步骤2/4：开始扩图处理（火山引擎）===');
       console.log('扩图参数: xScale=' + xScale + ', yScale=' + yScale);
       const outpaintStartTime = Date.now();
       try {
-        const result = await outpaintWithQwen(
+        // 将 xScale/yScale 转换为火山引擎的扩展比例
+        // xScale=2 表示宽度扩展到原来的2倍，即左右各扩展50%
+        const expandRatio = Math.max(xScale - 1, yScale - 1) / 2;
+        const top = expandRatio;
+        const bottom = expandRatio;
+        const left = expandRatio;
+        const right = expandRatio;
+        
+        const result = await outpaintWithVolcengine(
           userId,
           processedImageUrl,
-          xScale,
-          yScale,
-          false,
-          true,
-          volcengineConfig ? { apiKey: volcengineConfig.accessKey } : undefined
+          '扩展图像，保持产品主体和风格完全一致，自然延伸背景',
+          top,
+          bottom,
+          left,
+          right,
+          2048,
+          2048,
+          volcengineConfig,
+          imagehostingConfig
         );
         processedImageUrl = result.imageData;
         hasOutpaint = true;
@@ -172,24 +198,31 @@ export async function executeOneClickWorkflow(
 
     // 步骤3：智能画质增强
     if (enableUpscale) {
-      console.log('=== 步骤3/4：开始智能画质增强 ===');
+      console.log(`=== 步骤3/4：开始智能画质增强 (使用 ${aiModel}) ===`);
       const enhanceStartTime = Date.now();
       try {
-        const result = await enhanceWithVolcengine(
-          userId,
-          processedImageUrl,
-          '720p',
-          false,
-          false,
-          1,
-          95,
-          true, // 跳过数据库保存，这是工作流中间步骤
-          volcengineConfig,
-          imagehostingConfig
-        );
-        processedImageUrl = result.imageData;
+        // 根据选择的 AI 模型调用不同的服务
+        // 注意：目前所有模型都使用火山引擎的画质增强，未来可以扩展
+        if (aiModel === 'jimeng' || aiModel === 'gpt' || aiModel === 'gemini') {
+          const result = await enhanceWithVolcengine(
+            userId,
+            processedImageUrl,
+            '720p',
+            false,
+            false,
+            1,
+            95,
+            true, // 跳过数据库保存，这是工作流中间步骤
+            volcengineConfig,
+            imagehostingConfig
+          );
+          processedImageUrl = result.imageData;
+        } else {
+          throw new Error(`不支持的 AI 模型: ${aiModel}`);
+        }
+        
         const enhanceDuration = ((Date.now() - enhanceStartTime) / 1000).toFixed(2);
-        console.log(`智能画质增强完成，耗时: ${enhanceDuration}秒`);
+        console.log(`智能画质增强完成 (${aiModel})，耗时: ${enhanceDuration}秒`);
       } catch (error) {
         console.error('智能画质增强失败，继续使用当前图片:', error);
       }
@@ -200,7 +233,6 @@ export async function executeOneClickWorkflow(
     // 步骤4：添加水印
     if (enableWatermark) {
       console.log('=== 步骤4/4：开始添加水印 ===');
-      console.log('水印参数:', { watermarkText, watermarkOpacity, watermarkPosition, watermarkType, outputResolution });
       try {
         const { addWatermarkToImage } = await import('@/lib/watermark');
         processedImageUrl = await addWatermarkToImage({
@@ -228,12 +260,12 @@ export async function executeOneClickWorkflow(
       ? Math.floor(finalImageData.split(',')[1].length * 0.75)
       : 0;
 
-    console.log('=== 开始上传到MinIO ===');
-    const minioStartTime = Date.now();
-    // 上传到MinIO
-    const minioUrl = await uploadBase64Image(finalImageData, `one-click-${processedImage.id}.jpg`);
-    const minioDuration = ((Date.now() - minioStartTime) / 1000).toFixed(2);
-    console.log(`MinIO上传完成，耗时: ${minioDuration}秒`);
+    console.log('=== 开始保存图片 ===');
+    const saveStartTime = Date.now();
+    // 保存到本地存储
+    const savedUrl = await uploadBase64Image(finalImageData, `one-click-${processedImage.id}.jpg`);
+    const saveDuration = ((Date.now() - saveStartTime) / 1000).toFixed(2);
+    console.log(`图片保存完成，耗时: ${saveDuration}秒`);
     
     const totalDuration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log(`=== 一键增强流程全部完成，总耗时: ${totalDuration}秒 ===`);
@@ -242,7 +274,7 @@ export async function executeOneClickWorkflow(
     const updatedImage = await prisma.processedImage.update({
       where: { id: processedImage.id },
       data: {
-        processedUrl: minioUrl,
+        processedUrl: savedUrl,
         status: 'COMPLETED',
         fileSize: imageSize,
         metadata: JSON.stringify({
@@ -262,7 +294,7 @@ export async function executeOneClickWorkflow(
       id: updatedImage.id,
       imageData: finalImageData,
       imageSize,
-      minioUrl,
+      minioUrl: savedUrl,
       processSteps: {
         backgroundReplace: hasBackgroundReplace,
         outpaint: hasOutpaint,

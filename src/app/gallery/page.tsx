@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import {
@@ -71,6 +71,7 @@ export default function GalleryPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all'); // 新增：分类筛选
   const [projects, setProjects] = useState<Project[]>([]);
   const [images, setImages] = useState<ProcessedImage[]>([]);
+  const [categoryStats, setCategoryStats] = useState<Record<string, number>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
@@ -80,6 +81,15 @@ export default function GalleryPage() {
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [showImageModal, setShowImageModal] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  
+  // 分页状态
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const pageSize = 20; // 每页20张图片
+  
+  // 请求去重
+  const loadingRef = useRef(false);
 
   // 认证检查
   useEffect(() => {
@@ -90,11 +100,22 @@ export default function GalleryPage() {
 
   // 加载项目和图片
   useEffect(() => {
-    if (session?.user) {
+    if (session?.user && !loadingRef.current) {
       loadProjects();
-      loadImages();
+      loadCategoryStats();
+      loadImages(true); // 重置加载
     }
-  }, [session, selectedCategory]); // 分类变化时重新加载
+  }, [session]); // 只在 session 变化时加载
+  
+  // 分类或项目变化时重新加载
+  useEffect(() => {
+    if (session?.user && !loadingRef.current) {
+      setPage(1);
+      setImages([]);
+      loadImages(true);
+      loadCategoryStats();
+    }
+  }, [selectedCategory, selectedProject]);
 
   const loadProjects = async () => {
     try {
@@ -108,10 +129,23 @@ export default function GalleryPage() {
     }
   };
 
-  const loadImages = async () => {
+  const loadImages = async (reset = false) => {
+    // 防止重复请求
+    if (loadingRef.current) return;
+    
     try {
+      loadingRef.current = true;
+      if (reset) {
+        setIsLoading(true);
+        setPage(1);
+      } else {
+        setIsLoadingMore(true);
+      }
+      
+      const currentPage = reset ? 1 : page;
+      
       // 根据分类筛选构建查询参数
-      let url = '/api/images?status=COMPLETED'; // 只获取成功的图片
+      let url = `/api/images?status=COMPLETED&limit=${pageSize}&offset=${(currentPage - 1) * pageSize}`;
       
       if (selectedCategory !== 'all') {
         url += `&type=${selectedCategory}`;
@@ -124,12 +158,50 @@ export default function GalleryPage() {
       const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
-        setImages(data.images || []);
+        const newImages = data.images || [];
+        
+        if (reset) {
+          setImages(newImages);
+        } else {
+          setImages(prev => [...prev, ...newImages]);
+        }
+        
+        // 判断是否还有更多数据
+        setHasMore(newImages.length === pageSize);
+        
+        if (!reset) {
+          setPage(prev => prev + 1);
+        }
       }
-    } catch {
-      // console.error('Failed to load images:', error);
+    } catch (error) {
+      console.error('Failed to load images:', error);
     } finally {
       setIsLoading(false);
+      setIsLoadingMore(false);
+      loadingRef.current = false;
+    }
+  };
+
+  // 加载分类统计数据
+  const loadCategoryStats = async () => {
+    try {
+      const response = await fetch('/api/images?status=COMPLETED&limit=1000');
+      if (response.ok) {
+        const data = await response.json();
+        const allImages = data.images || [];
+        
+        const stats: Record<string, number> = {
+          all: allImages.length
+        };
+        
+        allImages.forEach((img: ProcessedImage) => {
+          stats[img.processType] = (stats[img.processType] || 0) + 1;
+        });
+        
+        setCategoryStats(stats);
+      }
+    } catch (error) {
+      console.error('Failed to load category stats:', error);
     }
   };
 
@@ -478,8 +550,11 @@ export default function GalleryPage() {
     switch (type) {
       case 'ONE_CLICK_WORKFLOW': return '一键增强';
       case 'BACKGROUND_REMOVAL': return '背景替换';
-      case 'IMAGE_EXPANSION': return '图像扩展';
+      case 'IMAGE_OUTPAINTING': return '智能扩图';
       case 'IMAGE_UPSCALING': return '高清化';
+      case 'IMAGE_ENHANCEMENT': return '画质增强';
+      case 'WATERMARK': return '叠加水印';
+      case 'IMAGE_GENERATION': return '图片生成';
       default: return type;
     }
   };
@@ -632,13 +707,13 @@ export default function GalleryPage() {
                 { id: 'ONE_CLICK_WORKFLOW', label: '一键增强', icon: Zap },
                 { id: 'IMAGE_ENHANCEMENT', label: '画质增强', icon: Sparkles },
                 { id: 'IMAGE_OUTPAINTING', label: '智能扩图', icon: Maximize2 },
-                { id: 'BACKGROUND_REPLACE', label: '背景替换', icon: RefreshCw },
+                { id: 'IMAGE_UPSCALING', label: '图像高清化', icon: Sparkles },
+                { id: 'BACKGROUND_REMOVAL', label: '背景替换', icon: RefreshCw },
+                { id: 'WATERMARK', label: '叠加水印', icon: Wand2 },
                 { id: 'IMAGE_GENERATION', label: '图片生成', icon: Wand2 },
               ].map(category => {
                 const Icon = category.icon;
-                const count = category.id === 'all' 
-                  ? images.length 
-                  : images.filter(img => img.processType === category.id).length;
+                const count = categoryStats[category.id] || 0;
                 
                 return (
                   <button

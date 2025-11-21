@@ -102,7 +102,14 @@ export async function uploadBase64ToSuperbed(
 ): Promise<string> {
   // 移除data:image/jpeg;base64,前缀
   const base64String = base64Data.replace(/^data:image\/[a-z]+;base64,/, '');
+  
+  // 验证 base64 字符串
+  if (!base64String || base64String.length < 100) {
+    throw new Error(`无效的 base64 数据: 长度=${base64String.length}`);
+  }
+  
   const imageBuffer = Buffer.from(base64String, 'base64');
+  console.log(`[Superbed] 准备上传: ${filename}, 大小: ${(imageBuffer.length / 1024).toFixed(0)}KB`);
   
   return await uploadImageToSuperbed(imageBuffer, filename, 3, superbedToken);
 }

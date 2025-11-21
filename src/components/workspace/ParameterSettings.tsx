@@ -9,6 +9,8 @@ interface ParameterSettingsProps {
     activeTab: ActiveTab;
     outputResolution: string;
     setOutputResolution: (value: string) => void;
+    aiModel?: string;
+    setAiModel?: (value: string) => void;
     // Additional props for specific settings can be added here or handled via children/context if complex
     // For now, we'll use direct DOM access for some inputs as in the original code, 
     // or better, we should lift state up. 
@@ -19,6 +21,8 @@ export default function ParameterSettings({
     activeTab,
     outputResolution,
     setOutputResolution,
+    aiModel = 'jimeng',
+    setAiModel,
 }: ParameterSettingsProps) {
 
     // Note: In the original code, some inputs like xScale, yScale, upscaleFactor were uncontrolled (using document.getElementById).
@@ -64,71 +68,119 @@ export default function ParameterSettings({
                 )}
 
                 {activeTab === "upscaling" && (
-                    <div className="grid grid-cols-3 gap-4">
-                        <div>
-                            <Label htmlFor="upscaleFactor">高清化倍数</Label>
-                            <select
-                                id="upscaleFactor"
-                                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
-                                defaultValue="2"
-                            >
-                                <option value="2">2x</option>
-                                <option value="4">4x</option>
-                            </select>
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <Label htmlFor="upscaleFactor">高清化倍数</Label>
+                                <select
+                                    id="upscaleFactor"
+                                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
+                                    defaultValue="2"
+                                >
+                                    <option value="2">2x</option>
+                                    <option value="4">4x</option>
+                                </select>
+                            </div>
+                            <div>
+                                <Label htmlFor="upscalingAiModel">AI 模型选择</Label>
+                                <select
+                                    id="upscalingAiModel"
+                                    value={aiModel}
+                                    onChange={(e) => setAiModel?.(e.target.value)}
+                                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
+                                >
+                                    <option value="jimeng">即梦 (推荐)</option>
+                                    <option value="gpt">GPT-4 Vision</option>
+                                    <option value="gemini" disabled>Gemini (即将支持)</option>
+                                </select>
+                            </div>
                         </div>
+                        <p className="text-xs text-gray-500">注意：目前所有模型都使用火山引擎的画质增强服务</p>
                     </div>
                 )}
 
                 {activeTab === "background" && (
-                    <div>
-                        <Label htmlFor="customPrompt">自定义提示词（可选）</Label>
-                        <textarea
-                            id="customPrompt"
-                            className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                            rows={3}
-                            placeholder="描述期望的背景效果..."
-                        />
+                    <div className="space-y-4">
+                        <div>
+                            <Label htmlFor="backgroundAiModel">AI 模型选择</Label>
+                            <select
+                                id="backgroundAiModel"
+                                value={aiModel}
+                                onChange={(e) => setAiModel?.(e.target.value)}
+                                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
+                            >
+                                <option value="jimeng">即梦 (推荐)</option>
+                                <option value="gpt">GPT-4 Vision</option>
+                                <option value="gemini" disabled>Gemini (即将支持)</option>
+                            </select>
+                            <p className="text-xs text-gray-500 mt-1">选择用于背景替换的 AI 模型</p>
+                        </div>
+                        <div>
+                            <Label htmlFor="customPrompt">自定义提示词（可选）</Label>
+                            <textarea
+                                id="customPrompt"
+                                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                                rows={3}
+                                placeholder="描述期望的背景效果..."
+                            />
+                        </div>
                     </div>
                 )}
 
                 {(activeTab === "watermark" || activeTab === "one-click") && (
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-4">
                         {activeTab === "one-click" && (
                             <>
-                                <div>
-                                    <Label htmlFor="xScale">X轴扩展倍数</Label>
-                                    <Input
-                                        id="xScale"
-                                        type="number"
-                                        min="1.1"
-                                        max="4.0"
-                                        step="0.1"
-                                        defaultValue="2.0"
-                                        className="mt-1"
-                                    />
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div>
+                                        <Label htmlFor="xScale">X轴扩展倍数</Label>
+                                        <Input
+                                            id="xScale"
+                                            type="number"
+                                            min="1.1"
+                                            max="4.0"
+                                            step="0.1"
+                                            defaultValue="2.0"
+                                            className="mt-1"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="yScale">Y轴扩展倍数</Label>
+                                        <Input
+                                            id="yScale"
+                                            type="number"
+                                            min="1.1"
+                                            max="4.0"
+                                            step="0.1"
+                                            defaultValue="2.0"
+                                            className="mt-1"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="upscaleFactor">高清化倍数</Label>
+                                        <select
+                                            id="upscaleFactor"
+                                            className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
+                                            defaultValue="2"
+                                        >
+                                            <option value="2">2x</option>
+                                            <option value="4">4x</option>
+                                        </select>
+                                    </div>
                                 </div>
                                 <div>
-                                    <Label htmlFor="yScale">Y轴扩展倍数</Label>
-                                    <Input
-                                        id="yScale"
-                                        type="number"
-                                        min="1.1"
-                                        max="4.0"
-                                        step="0.1"
-                                        defaultValue="2.0"
-                                        className="mt-1"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="upscaleFactor">高清化倍数</Label>
+                                    <Label htmlFor="oneClickAiModel">AI 模型选择</Label>
                                     <select
-                                        id="upscaleFactor"
+                                        id="oneClickAiModel"
+                                        value={aiModel}
+                                        onChange={(e) => setAiModel?.(e.target.value)}
                                         className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
-                                        defaultValue="2"
                                     >
-                                        <option value="2">2x</option>
-                                        <option value="4">4x</option>
+                                        <option value="jimeng">即梦 (推荐)</option>
+                                        <option value="gpt">GPT-4 Vision</option>
+                                        <option value="gemini" disabled>Gemini (即将支持)</option>
                                     </select>
+                                    <p className="text-xs text-gray-500 mt-1">用于背景替换和画质增强</p>
                                 </div>
                             </>
                         )}

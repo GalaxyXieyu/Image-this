@@ -146,12 +146,36 @@ export async function enhanceWithVolcengine(
   });
 
   try {
-    const imageUrl = await uploadBase64ToSuperbed(
-      imageBase64,
-      `enhance-input-${processedImage?.id || Date.now()}.jpg`,
-      imagehostingConfig?.superbedToken
-    );
+    // 先保存图片到本地，然后上传到 Superbed 获取公网 URL
+    let imageUrl: string;
+    
+    // 如果传入的是本地路径（如 /uploads/xxx.jpg），需要转换为 base64 再上传
+    if (imageBase64.startsWith('/uploads/')) {
+      console.log(`[火山增强] 检测到本地路径`);
+      // 读取本地文件
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      const filePath = path.join(process.cwd(), 'public', imageBase64);
+      const imageBuffer = await fs.readFile(filePath);
+      const base64Data = imageBuffer.toString('base64');
+      const dataUrl = `data:image/jpeg;base64,${base64Data}`;
+      
+      imageUrl = await uploadBase64ToSuperbed(
+        dataUrl,
+        `enhance-input-${processedImage?.id || Date.now()}.jpg`,
+        imagehostingConfig?.superbedToken
+      );
+    } else {
+      // 直接上传 base64 数据
+      imageUrl = await uploadBase64ToSuperbed(
+        imageBase64,
+        `enhance-input-${processedImage?.id || Date.now()}.jpg`,
+        imagehostingConfig?.superbedToken
+      );
+    }
+    
     console.log(`[火山增强] 图片上传完成`);
+    
     const requestBody = {
       req_key: 'lens_nnsr2_pic_common',
       image_urls: [imageUrl],
@@ -274,7 +298,7 @@ export async function enhanceWithVolcengine(
  */
 export async function outpaintWithVolcengine(
   userId: string,
-  imageBase64: string,
+  imageInput: string, // 支持 base64 或 URL
   prompt = '扩展图像，保持风格一致',
   top = 0.1,
   bottom = 0.1,
@@ -320,23 +344,85 @@ export async function outpaintWithVolcengine(
   });
 
   try {
-    const cleanBase64 = imageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
-
-    const requestBody = {
-      req_key: 'i2i_outpainting',
-      custom_prompt: prompt,
-      binary_data_base64: [cleanBase64],
-      scale: 7.0,
-      seed: -1,
-      steps: 30,
-      strength: 0.8,
-      top,
-      bottom,
-      left,
-      right,
-      max_height: maxHeight,
-      max_width: maxWidth
-    };
+    // 判断输入是 URL、本地路径还是 base64
+    const isUrl = imageInput.startsWith('http://') || imageInput.startsWith('https://');
+    const isBase64 = imageInput.startsWith('data:image/');
+    const isLocalPath = imageInput.startsWith('/uploads/');
+    
+    let requestBody: any;
+    
+    if (isUrl) {
+      // 使用 URL 方式（推荐）
+      console.log(`[火山扩图] 使用 URL 输入: ${imageInput.substring(0, 50)}...`);
+      requestBody = {
+        req_key: 'i2i_outpainting',
+        custom_prompt: prompt,
+        image_urls: [imageInput],
+        scale: 7.0,
+        seed: -1,
+        steps: 30,
+        strength: 0.8,
+        top,
+        bottom,
+        left,
+        right,
+        max_height: maxHeight,
+        max_width: maxWidth
+      };
+    } else if (isLocalPath) {
+      // 本地路径：先上传到 Superbed 获取公网 URL
+      console.log(`[火山扩图] 检测到本地路径，上传到图床...`);
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      const filePath = path.join(process.cwd(), 'public', imageInput);
+      const imageBuffer = await fs.readFile(filePath);
+      const base64Data = imageBuffer.toString('base64');
+      const dataUrl = `data:image/jpeg;base64,${base64Data}`;
+      
+      const publicUrl = await uploadBase64ToSuperbed(
+        dataUrl,
+        `outpaint-input-${processedImage.id}.jpg`,
+        imagehostingConfig?.superbedToken
+      );
+      
+      console.log(`[火山扩图] 已上传到图床，使用 URL: ${publicUrl.substring(0, 50)}...`);
+      requestBody = {
+        req_key: 'i2i_outpainting',
+        custom_prompt: prompt,
+        image_urls: [publicUrl],
+        scale: 7.0,
+        seed: -1,
+        steps: 30,
+        strength: 0.8,
+        top,
+        bottom,
+        left,
+        right,
+        max_height: maxHeight,
+        max_width: maxWidth
+      };
+    } else if (isBase64) {
+      // 使用 base64 方式
+      console.log(`[火山扩图] 使用 base64 输入`);
+      const cleanBase64 = imageInput.replace(/^data:image\/[a-z]+;base64,/, '');
+      requestBody = {
+        req_key: 'i2i_outpainting',
+        custom_prompt: prompt,
+        binary_data_base64: [cleanBase64],
+        scale: 7.0,
+        seed: -1,
+        steps: 30,
+        strength: 0.8,
+        top,
+        bottom,
+        left,
+        right,
+        max_height: maxHeight,
+        max_width: maxWidth
+      };
+    } else {
+      throw new Error('不支持的图片输入格式，请提供 URL、本地路径(/uploads/xxx.jpg) 或 base64 数据');
+    }
 
     const bodyStr = JSON.stringify(requestBody);
     const t = new Date();
@@ -384,7 +470,7 @@ export async function outpaintWithVolcengine(
     const updatedImage = await prisma.processedImage.update({
       where: { id: processedImage.id },
       data: {
-        originalUrl: imageBase64.substring(0, 100) + '...',
+        originalUrl: isUrl ? imageInput : imageInput.substring(0, 100) + '...',
         processedUrl: processedUrl,
         status: 'COMPLETED',
         fileSize: imageSize,

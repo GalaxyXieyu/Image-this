@@ -104,9 +104,14 @@ export default function WorkspacePage() {
 
   // 输出分辨率
   const [outputResolution, setOutputResolution] = useState('original');
+  
+  // AI 模型选择
+  const [aiModel, setAiModel] = useState('jimeng');
 
   // 历史记录侧边栏状态
   const [isHistorySidebarOpen, setIsHistorySidebarOpen] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const historyLoadingRef = useRef(false);
 
   const watermarkLogoInputRef = useRef<HTMLInputElement>(null);
 
@@ -129,7 +134,8 @@ export default function WorkspacePage() {
     referenceImage,
     watermarkLogo,
     watermarkSettings,
-    outputResolution
+    outputResolution,
+    aiModel
   });
 
   useEffect(() => {
@@ -140,51 +146,61 @@ export default function WorkspacePage() {
 
   // 加载处理历史 - 根据当前标签页筛选
   const loadProcessingHistory = useCallback(async () => {
+    // 防止重复请求
+    if (historyLoadingRef.current) return;
+    
     try {
-      const response = await fetch('/api/images?limit=100&sortBy=createdAt&order=desc');
+      historyLoadingRef.current = true;
+      
+      // 根据当前标签页映射到对应的处理类型
+      const processTypeMap: Record<ActiveTab, string[]> = {
+        'one-click': ['ONE_CLICK_WORKFLOW'],
+        'background': ['BACKGROUND_REMOVAL'],
+        'expansion': ['IMAGE_OUTPAINTING'],
+        'upscaling': ['IMAGE_UPSCALING'],
+        'watermark': ['WATERMARK']
+      };
+
+      const allowedTypes = processTypeMap[activeTab] || [];
+      const typeQuery = allowedTypes.map(t => `type=${t}`).join('&');
+      
+      const response = await fetch(`/api/images?status=COMPLETED&limit=30&sortBy=createdAt&order=desc&${typeQuery}`);
       if (!response.ok) return;
 
       const data = await response.json();
       if (data.images && Array.isArray(data.images)) {
-        // 根据当前标签页映射到对应的处理类型
-        const processTypeMap: Record<ActiveTab, string[]> = {
-          'one-click': ['ONE_CLICK_WORKFLOW'],
-          'background': ['BACKGROUND_REMOVAL'],
-          'expansion': ['IMAGE_OUTPAINTING'],
-          'upscaling': ['IMAGE_UPSCALING'],
-          'watermark': ['WATERMARK']
-        };
-
-        const allowedTypes = processTypeMap[activeTab] || [];
-
         const historyResults: ProcessedResult[] = data.images
-          .filter((img: any) =>
-            img.status === 'COMPLETED' &&
-            img.processedUrl &&
-            allowedTypes.includes(img.processType)
-          )
+          .filter((img: any) => img.processedUrl)
           .map((img: any) => ({
             id: img.id,
             processedImageUrl: img.processedUrl,
             originalName: img.filename || '未命名',
             processType: img.processType || 'UNKNOWN',
             timestamp: new Date(img.createdAt).toLocaleString('zh-CN')
-          }))
-          .slice(0, 50); // 限制显示50条
+          }));
 
         setProcessedResults(historyResults);
+        setHistoryLoaded(true);
       }
     } catch (error) {
       console.error('加载处理历史失败:', error);
+    } finally {
+      historyLoadingRef.current = false;
     }
   }, [activeTab]);
 
-  // 组件加载时获取历史记录
+  // 只在打开历史侧边栏时加载历史记录
   useEffect(() => {
-    if (status === "authenticated") {
+    if (status === "authenticated" && isHistorySidebarOpen && !historyLoaded) {
       loadProcessingHistory();
     }
-  }, [status, loadProcessingHistory]);
+  }, [status, isHistorySidebarOpen, historyLoaded, loadProcessingHistory]);
+  
+  // 标签页变化时重置历史加载状态
+  useEffect(() => {
+    setHistoryLoaded(false);
+    setProcessedResults([]);
+  }, [activeTab]);
 
   useEffect(() => {
     activeTasksRef.current = activeTasks;
@@ -362,6 +378,23 @@ export default function WorkspacePage() {
       return;
     }
 
+    // 立即显示点击反馈
+    const getTabName = () => {
+      switch (activeTab) {
+        case 'one-click': return '一键增强';
+        case 'background': return '背景替换';
+        case 'expansion': return '图像扩展';
+        case 'upscaling': return '图像高清化';
+        case 'watermark': return '叠加水印';
+        default: return '处理';
+      }
+    };
+
+    toast({
+      title: "正在启动",
+      description: `${getTabName()}任务正在准备中...`,
+    });
+
     try {
       let tasks;
       // 根据当前标签页选择不同的处理方式
@@ -405,7 +438,7 @@ export default function WorkspacePage() {
 
         toast({
           title: "任务创建成功",
-          description: `已创建 ${mappedTasks.length} 个${getProcessTypeName(mappedTasks[0]?.type || '')}任务`,
+          description: `已创建 ${mappedTasks.length} 个${getProcessTypeName(mappedTasks[0]?.type || '')}任务，正在处理中...`,
         });
       }
     } catch (error) {
@@ -508,6 +541,8 @@ export default function WorkspacePage() {
             activeTab={activeTab}
             outputResolution={outputResolution}
             setOutputResolution={setOutputResolution}
+            aiModel={aiModel}
+            setAiModel={setAiModel}
           />
 
           {/* One-click 水印设置 */}

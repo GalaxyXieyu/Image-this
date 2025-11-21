@@ -30,7 +30,9 @@ export async function POST(request: NextRequest) {
     const {
       imageUrl,
       resultFormat = 1,
-      jpgQuality = 95
+      jpgQuality = 95,
+      volcengineConfig,
+      imagehostingConfig
     } = body;
 
     if (!imageUrl) {
@@ -49,7 +51,10 @@ export async function POST(request: NextRequest) {
       false,
       false,
       resultFormat,
-      jpgQuality
+      jpgQuality,
+      false, // skipDbSave
+      volcengineConfig,
+      imagehostingConfig
     );
 
     const totalDuration = ((Date.now() - startTime) / 1000).toFixed(2);
