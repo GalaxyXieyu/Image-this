@@ -22,6 +22,7 @@ export interface UserConfig {
   gemini?: {
     enabled: boolean;
     apiKey: string;
+    baseUrl: string;
     projectId: string;
   };
 }

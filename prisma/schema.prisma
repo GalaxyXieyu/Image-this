@@ -57,6 +57,7 @@ model User {
   gptApiUrl           String? // GPT API 地址
   gptApiKey           String? // GPT API Key
   geminiApiKey        String? // Gemini API Key
+  geminiBaseUrl       String? // Gemini Base URL
   geminiProjectId     String? // Gemini Project ID
   superbedToken       String? // Superbed 图床 Token
   

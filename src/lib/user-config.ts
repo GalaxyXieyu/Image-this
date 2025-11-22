@@ -16,6 +16,7 @@ export interface UserConfig {
   };
   gemini?: {
     apiKey: string;
+    baseUrl: string;
     projectId: string;
   };
   imagehosting?: {
@@ -37,6 +38,7 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
       gptApiUrl: true,
       gptApiKey: true,
       geminiApiKey: true,
+      geminiBaseUrl: true,
       geminiProjectId: true,
       superbedToken: true,
     }
@@ -68,6 +70,7 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
   if (user.geminiApiKey) {
     config.gemini = {
       apiKey: user.geminiApiKey,
+      baseUrl: user.geminiBaseUrl || 'https://yunwu.ai',
       projectId: user.geminiProjectId || '',
     };
   }
@@ -96,6 +99,7 @@ export async function saveUserConfig(userId: string, config: UserConfig): Promis
       gptApiUrl: config.gpt?.apiUrl || null,
       gptApiKey: config.gpt?.apiKey || null,
       geminiApiKey: config.gemini?.apiKey || null,
+      geminiBaseUrl: config.gemini?.baseUrl || null,
       geminiProjectId: config.gemini?.projectId || null,
       superbedToken: config.imagehosting?.superbedToken || null,
     }

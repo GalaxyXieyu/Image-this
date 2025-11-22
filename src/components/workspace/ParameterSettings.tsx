@@ -114,7 +114,7 @@ export default function ParameterSettings({
                                 >
                                     <option value="jimeng">即梦 (推荐)</option>
                                     <option value="gpt">GPT-4 Vision</option>
-                                    <option value="gemini" disabled>Gemini (即将支持)</option>
+                                    <option value="gemini">Gemini</option>
                                 </select>
                             </div>
                         </div>
@@ -145,7 +145,7 @@ export default function ParameterSettings({
                             >
                                 <option value="jimeng">即梦 (推荐)</option>
                                 <option value="gpt">GPT-4 Vision</option>
-                                <option value="gemini" disabled>Gemini (即将支持)</option>
+                                <option value="gemini">Gemini</option>
                             </select>
                             <p className="text-xs text-gray-500 mt-1">选择用于背景替换的 AI 模型</p>
                         </div>
@@ -214,7 +214,7 @@ export default function ParameterSettings({
                                     >
                                         <option value="jimeng">即梦 (推荐)</option>
                                         <option value="gpt">GPT-4 Vision</option>
-                                        <option value="gemini" disabled>Gemini (即将支持)</option>
+                                        <option value="gemini">Gemini</option>
                                     </select>
                                     <p className="text-xs text-gray-500 mt-1">用于背景替换和画质增强</p>
                                 </div>

@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
     if (body.gemini?.enabled && body.gemini?.apiKey) {
       userConfig.gemini = {
         apiKey: body.gemini.apiKey,
+        baseUrl: body.gemini.baseUrl || 'https://yunwu.ai',
         projectId: body.gemini.projectId || '',
       };
     }
@@ -95,6 +96,7 @@ export async function GET(request: NextRequest) {
       gemini: {
         enabled: !!userConfig.gemini,
         apiKey: userConfig.gemini?.apiKey || '',
+        baseUrl: userConfig.gemini?.baseUrl || 'https://yunwu.ai',
         projectId: userConfig.gemini?.projectId || ''
       },
       imagehosting: {

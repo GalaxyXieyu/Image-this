@@ -1,30 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { generateWithJimeng } from '../service';
+import { getUserIdFromRequest, handleApiError, validateRequiredParams } from '@/lib/api-utils';
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: '未授权访问' },
-        { status: 401 }
-      );
+    const body = await request.json();
+
+    // 验证必需参数
+    const paramError = validateRequiredParams(body, ['prompt']);
+    if (paramError) {
+      return NextResponse.json({ error: paramError }, { status: 400 });
     }
 
-    const body = await request.json();
+    // 获取用户ID
+    const userId = await getUserIdFromRequest(body);
+
     const { referenceImage, prompt, width = 2048, height = 2048 } = body;
 
-    if (!prompt) {
-      return NextResponse.json(
-        { error: '缺少必要参数：prompt' },
-        { status: 400 }
-      );
-    }
-
     const result = await generateWithJimeng(
-      session.user.id,
+      userId,
       prompt,
       referenceImage,
       width,
@@ -36,11 +30,11 @@ export async function POST(request: NextRequest) {
       data: result,
       message: '即梦图像生成成功'
     });
-
   } catch (error) {
-    return NextResponse.json(
-      { error: '图像生成失败', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    if (error instanceof Error && error.message === 'UNAUTHORIZED') {
+      return NextResponse.json({ error: '未授权访问' }, { status: 401 });
+    }
+
+    return handleApiError(error, '图像生成失败');
   }
 }

@@ -79,9 +79,10 @@ export default function SettingsPage() {
     gptEnabled: false,
     gptApiUrl: 'https://yunwu.ai',
     gptApiKey: '',
-    // Gemini 配置（预留）
+    // Gemini 配置
     geminiEnabled: false,
     geminiApiKey: '',
+    geminiBaseUrl: 'https://yunwu.ai',
     geminiProjectId: '',
     // 图床配置
     imagehostingEnabled: false,
@@ -152,6 +153,7 @@ export default function SettingsPage() {
               gptApiKey: '',
               geminiEnabled: false,
               geminiApiKey: '',
+              geminiBaseUrl: 'https://yunwu.ai',
               geminiProjectId: '',
               imagehostingEnabled: data.config.imagehosting?.enabled || false,
               superbedToken: data.config.imagehosting?.superbedToken || ''
@@ -198,6 +200,7 @@ export default function SettingsPage() {
         gemini: {
           enabled: apiSettings.geminiEnabled,
           apiKey: apiSettings.geminiApiKey,
+          baseUrl: apiSettings.geminiBaseUrl,
           projectId: apiSettings.geminiProjectId
         },
         imagehosting: {
@@ -516,7 +519,7 @@ export default function SettingsPage() {
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center">
                     <Sparkles className="w-5 h-5 mr-2 text-purple-600" />
-                    Google Gemini（即将支持）
+                    Google Gemini
                   </div>
                   <label className="flex items-center cursor-pointer">
                     <input
@@ -534,11 +537,22 @@ export default function SettingsPage() {
                   支持：图片生成、图片理解（即将推出）
                 </div>
                 <div>
+                  <Label htmlFor="geminiBaseUrl">API 地址</Label>
+                  <Input
+                    id="geminiBaseUrl"
+                    placeholder="https://yunwu.ai"
+                    value={apiSettings.geminiBaseUrl}
+                    onChange={(e) => handleInputChange('geminiBaseUrl', e.target.value)}
+                    disabled={!apiSettings.geminiEnabled}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Gemini API 的基础 URL</p>
+                </div>
+                <div>
                   <Label htmlFor="geminiApiKey">API 密钥</Label>
                   <Input
                     id="geminiApiKey"
                     type="password"
-                    placeholder="AI..."
+                    placeholder="sk-..."
                     value={apiSettings.geminiApiKey}
                     onChange={(e) => handleInputChange('geminiApiKey', e.target.value)}
                     disabled={!apiSettings.geminiEnabled}
