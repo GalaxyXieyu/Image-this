@@ -144,8 +144,19 @@ logs/*.txt
 test-*.js
 test-*.txt
 test-image.*
+test-gpt-api.*
 target.jpeg
+target.JPG
+target.jpg
 reference.jpg
+*.JPG
+*.jpeg
+*.jpg
+*.png
+*.gif
+*.webp
+volcengine-result-*.jpg
+IMG_*.JPG
 
 # Backup files
 *.bak
@@ -172,6 +183,8 @@ postgres_data/
 
 # Prisma
 prisma/migrations/*/migration.sql
+prisma/*.db
+prisma/*.db-journal
 
 # Local development files
 .local
