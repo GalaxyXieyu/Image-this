@@ -153,10 +153,11 @@ export async function DELETE(
     });
 
     if (!image) {
-      return NextResponse.json(
-        { error: '图片不存在' },
-        { status: 404 }
-      );
+      // 图片记录不存在，可能已被删除，返回成功
+      return NextResponse.json({
+        success: true,
+        message: '图片已删除或不存在'
+      });
     }
 
     // 从MinIO删除图片文件

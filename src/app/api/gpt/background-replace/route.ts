@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { uploadBase64Image } from '@/lib/storage';
+import { getUserConfig } from '@/lib/user-config';
 import FormData from 'form-data';
 
 interface BackgroundReplaceRequest {
@@ -37,27 +38,48 @@ function extractBase64FromDataUrl(dataUrl: string): string {
   return dataUrl;
 }
 
+// 检查 base64 数据大小（单位：KB）
+function getBase64Size(base64: string): number {
+  return Math.round((base64.length * 3) / 4 / 1024);
+}
+
 async function generateImageWithTwoImages(
-  originalImageBase64: string,
-  referenceImageBase64: string,
-  prompt: string
+  originalImageUrl: string,
+  referenceImageUrl: string,
+  prompt: string,
+  userId: string
 ): Promise<string | null> {
   try {
+    // 获取用户配置
+    const userConfig = await getUserConfig(userId);
+    const baseUrl = userConfig.gpt?.apiUrl || process.env.GPT_API_URL || 'https://yunwu.ai';
+    const apiKey = userConfig.gpt?.apiKey || process.env.GPT_API_KEY;
+
+    if (!apiKey) {
+      throw new Error('GPT API Key未配置');
+    }
+
+    // 判断是 URL 还是 base64
+    const isOriginalUrl = originalImageUrl.startsWith('http://') || originalImageUrl.startsWith('https://');
+    const isReferenceUrl = referenceImageUrl.startsWith('http://') || referenceImageUrl.startsWith('https://');
+
+    // 构建 content，优先使用 URL
     const content = [
       { type: "text", text: prompt },
       {
         type: "image_url",
         image_url: {
-          url: `data:image/png;base64,${originalImageBase64}`
+          url: isOriginalUrl ? originalImageUrl : (originalImageUrl.startsWith('data:') ? originalImageUrl : `data:image/png;base64,${originalImageUrl}`)
         }
       },
       {
         type: "image_url",
         image_url: {
-          url: `data:image/png;base64,${referenceImageBase64}`
+          url: isReferenceUrl ? referenceImageUrl : (referenceImageUrl.startsWith('data:') ? referenceImageUrl : `data:image/png;base64,${referenceImageUrl}`)
         }
       }
     ];
+    
     
     const payload = {
       model: "gpt-4o-image-vip",
@@ -70,30 +92,41 @@ async function generateImageWithTwoImages(
       max_tokens: 124000
     };
 
-    const baseUrl = process.env.GPT_API_URL || 'https://yunwu.ai';
-    const apiKey = process.env.GPT_API_KEY;
-
-    if (!apiKey) {
-      throw new Error('GPT API Key未配置');
-    }
-
     const apiUrl = baseUrl.endsWith('/') ?
       `${baseUrl}v1/chat/completions` :
       `${baseUrl}/v1/chat/completions`;
 
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(600000)
-    });
+    const requestBody = JSON.stringify(payload);
+    console.log('[GPT API] 发送请求到:', apiUrl);
+
+    // 使用更长的超时时间，因为图片生成需要时间
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 300000); // 5分钟超时
+
+    let response;
+    try {
+      response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'Connection': 'keep-alive'
+        },
+        body: requestBody,
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      throw fetchError;
+    }
+
+    console.log('[GPT API] 响应状态:', response.status, response.statusText);
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error('[GPT API] 错误响应:', errorText);
       throw new Error(`GPT API请求失败: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
@@ -140,6 +173,10 @@ async function generateImageWithTwoImages(
     return null;
 
   } catch (error) {
+    console.error('[GPT API] 请求失败:', error instanceof Error ? error.message : 'Unknown error');
+    if (error instanceof Error) {
+      throw new Error(`GPT API 请求失败: ${error.message}`);
+    }
     throw error;
   }
 }
@@ -178,8 +215,11 @@ export async function POST(request: NextRequest) {
 
     const finalPrompt = customPrompt || prompt || DEFAULT_PROMPT_TEMPLATE;
 
-    const originalBase64 = extractBase64FromDataUrl(originalImageUrl);
-    const referenceBase64 = extractBase64FromDataUrl(referenceImageUrl);
+    // 不再提前转换为 base64，直接传递原始 URL
+    console.log('[背景替换] 图片来源:', {
+      original: originalImageUrl.substring(0, 50) + '...',
+      reference: referenceImageUrl.substring(0, 50) + '...'
+    });
 
     const processedImage = await prisma.processedImage.create({
       data: {
@@ -199,9 +239,10 @@ export async function POST(request: NextRequest) {
 
     try {
       const resultImageUrl = await generateImageWithTwoImages(
-        originalBase64,
-        referenceBase64,
-        finalPrompt
+        originalImageUrl,
+        referenceImageUrl,
+        finalPrompt,
+        userId
       );
 
       if (!resultImageUrl) {

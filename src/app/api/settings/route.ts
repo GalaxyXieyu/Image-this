@@ -31,6 +31,20 @@ export async function POST(request: NextRequest) {
       };
     }
     
+    if (body.gpt?.enabled && body.gpt?.apiUrl && body.gpt?.apiKey) {
+      userConfig.gpt = {
+        apiUrl: body.gpt.apiUrl,
+        apiKey: body.gpt.apiKey,
+      };
+    }
+    
+    if (body.gemini?.enabled && body.gemini?.apiKey) {
+      userConfig.gemini = {
+        apiKey: body.gemini.apiKey,
+        projectId: body.gemini.projectId || '',
+      };
+    }
+    
     if (body.imagehosting?.enabled && body.imagehosting?.superbedToken) {
       userConfig.imagehosting = {
         superbedToken: body.imagehosting.superbedToken,
@@ -72,6 +86,16 @@ export async function GET(request: NextRequest) {
         enabled: !!userConfig.volcengine,
         accessKey: userConfig.volcengine?.accessKey || '',
         secretKey: userConfig.volcengine?.secretKey || ''
+      },
+      gpt: {
+        enabled: !!userConfig.gpt,
+        apiUrl: userConfig.gpt?.apiUrl || 'https://yunwu.ai',
+        apiKey: userConfig.gpt?.apiKey || ''
+      },
+      gemini: {
+        enabled: !!userConfig.gemini,
+        apiKey: userConfig.gemini?.apiKey || '',
+        projectId: userConfig.gemini?.projectId || ''
       },
       imagehosting: {
         enabled: !!userConfig.imagehosting,

@@ -92,7 +92,7 @@
   },
   "build": {
     "appId": "com.imaginethis.app",
-    "productName": "Imagine This",
+    "productName": "ImagineThis",
     "directories": {
       "output": "dist-electron"
     },

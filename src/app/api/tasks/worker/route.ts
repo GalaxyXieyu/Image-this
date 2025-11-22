@@ -417,8 +417,39 @@ class TaskProcessor {
           imagehostingConfig  // 传递图床配置
         );
       } else if (aiModel === 'gpt') {
-        // TODO: 实现 GPT-4 Vision 背景替换
-        throw new Error('GPT-4 Vision 背景替换功能即将推出');
+        console.log('[Worker] 使用 GPT 模型');
+        try {
+          // 使用 GPT Processor
+          const { GPTProcessor } = await import('@/lib/image-processor/providers/gpt');
+          const gptProcessor = new GPTProcessor({ enabled: true, apiUrl: '', apiKey: '' }); // 配置会从用户设置中读取
+          
+          result = await gptProcessor.backgroundReplace(task.userId, {
+            originalImageUrl: imageUrl,
+            referenceImageUrl: referenceImageUrl || imageUrl,
+            prompt: prompt,
+            customPrompt: customPrompt
+          });
+          
+          console.log('[Worker] GPT 处理成功');
+        } catch (gptError) {
+          // GPT 失败，降级到即梦
+          console.warn('[Worker] GPT 处理失败，降级到即梦:', gptError instanceof Error ? gptError.message : 'Unknown error');
+          console.log('[Worker] 使用即梦模型重试...');
+          
+          // 使用即梦 API
+          const { generateWithJimeng } = await import('@/app/api/jimeng/service');
+          const referenceImages = [referenceImageUrl || imageUrl];
+          
+          result = await generateWithJimeng(
+            task.userId,
+            prompt,
+            referenceImages,
+            2048,
+            2048,
+            volcengineConfig,
+            imagehostingConfig
+          );
+        }
       } else if (aiModel === 'gemini') {
         // TODO: 实现 Gemini 背景替换
         throw new Error('Gemini 背景替换功能即将推出');
@@ -431,7 +462,7 @@ class TaskProcessor {
       return {
         processedImageId: result.id,
         processedImageUrl: result.imageData,
-        prompt: result.prompt
+        prompt: prompt || customPrompt || ''
       };
 
     } catch (error) {

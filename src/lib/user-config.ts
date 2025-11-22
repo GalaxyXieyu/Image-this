@@ -10,6 +10,14 @@ export interface UserConfig {
     accessKey: string;
     secretKey: string;
   };
+  gpt?: {
+    apiUrl: string;
+    apiKey: string;
+  };
+  gemini?: {
+    apiKey: string;
+    projectId: string;
+  };
   imagehosting?: {
     superbedToken: string;
   };
@@ -26,6 +34,10 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
     select: {
       volcengineAccessKey: true,
       volcengineSecretKey: true,
+      gptApiUrl: true,
+      gptApiKey: true,
+      geminiApiKey: true,
+      geminiProjectId: true,
       superbedToken: true,
     }
   });
@@ -41,6 +53,22 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
     config.volcengine = {
       accessKey: user.volcengineAccessKey,
       secretKey: user.volcengineSecretKey,
+    };
+  }
+
+  // GPT 配置
+  if (user.gptApiUrl && user.gptApiKey) {
+    config.gpt = {
+      apiUrl: user.gptApiUrl,
+      apiKey: user.gptApiKey,
+    };
+  }
+
+  // Gemini 配置
+  if (user.geminiApiKey) {
+    config.gemini = {
+      apiKey: user.geminiApiKey,
+      projectId: user.geminiProjectId || '',
     };
   }
 
@@ -65,6 +93,10 @@ export async function saveUserConfig(userId: string, config: UserConfig): Promis
     data: {
       volcengineAccessKey: config.volcengine?.accessKey || null,
       volcengineSecretKey: config.volcengine?.secretKey || null,
+      gptApiUrl: config.gpt?.apiUrl || null,
+      gptApiKey: config.gpt?.apiKey || null,
+      geminiApiKey: config.gemini?.apiKey || null,
+      geminiProjectId: config.gemini?.projectId || null,
       superbedToken: config.imagehosting?.superbedToken || null,
     }
   });

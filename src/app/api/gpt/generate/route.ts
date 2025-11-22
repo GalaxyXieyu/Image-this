@@ -40,12 +40,12 @@ export async function POST(request: NextRequest) {
     }
 
     // 从环境变量获取 API 配置
-    const apiUrl = process.env.GPT_API_URL;
+    const baseUrl = process.env.GPT_API_URL || 'https://yunwu.ai';
     const apiKey = process.env.GPT_API_KEY;
 
-    if (!apiUrl || !apiKey) {
+    if (!apiKey) {
       return NextResponse.json(
-        { error: 'GPT API 配置缺失' },
+        { error: 'GPT API Key 未配置' },
         { status: 500 }
       );
     }
@@ -85,9 +85,12 @@ export async function POST(request: NextRequest) {
       seed: seed || Math.floor(Math.random() * 1000000)
     };
 
-    // 调用 GPT API - 使用正确的端点
-    const fullApiUrl = `${apiUrl}/v1/chat/completions`;
-    const response = await fetch(fullApiUrl, {
+    // 调用 GPT API - 自动拼接 /v1 路径
+    const apiUrl = baseUrl.endsWith('/') ?
+      `${baseUrl}v1/chat/completions` :
+      `${baseUrl}/v1/chat/completions`;
+    
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,

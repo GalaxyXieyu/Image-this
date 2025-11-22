@@ -130,17 +130,6 @@ DATABASE_URL="file:./dev.db"
 # NextAuth.js 配置
 NEXTAUTH_URL="http://localhost:23000"
 NEXTAUTH_SECRET="your-super-secret-key-change-this"
-
-# 火山引擎即梦API配置
-VOLCENGINE_ACCESS_KEY="your-volcengine-access-key"
-VOLCENGINE_SECRET_KEY="your-volcengine-secret-key"
-ARK_API_KEY="your-ark-api-key"
-
-# Superbed图床配置
-SUPERBED_TOKEN="your-superbed-token"
-
-# GPT API配置 (可选)
-GPT_API_BASE_URL="http://localhost:8001"
 ```
 
 4. **初始化数据库**

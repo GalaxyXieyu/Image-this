@@ -54,6 +54,10 @@ model User {
   // API 配置
   volcengineAccessKey String? // 火山引擎 Access Key
   volcengineSecretKey String? // 火山引擎 Secret Key
+  gptApiUrl           String? // GPT API 地址
+  gptApiKey           String? // GPT API Key
+  geminiApiKey        String? // Gemini API Key
+  geminiProjectId     String? // Gemini Project ID
   superbedToken       String? // Superbed 图床 Token
   
   // Relations
