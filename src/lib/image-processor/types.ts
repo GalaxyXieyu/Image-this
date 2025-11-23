@@ -6,6 +6,8 @@ export enum ImageProvider {
   VOLCENGINE = 'volcengine',
   GPT = 'gpt',
   GEMINI = 'gemini',
+  QWEN = 'qwen',
+  JIMENG = 'jimeng',
 }
 
 export enum ProcessType {
@@ -30,13 +32,20 @@ export interface GPTConfig {
 export interface GeminiConfig {
   enabled: boolean;
   apiKey: string;
-  projectId?: string;
+  baseUrl?: string;
+}
+
+export interface QwenConfig {
+  enabled: boolean;
+  apiKey: string;
 }
 
 export interface ProvidersConfig {
   volcengine: VolcengineConfig;
   gpt: GPTConfig;
   gemini: GeminiConfig;
+  qwen: QwenConfig;
+  jimeng: VolcengineConfig; // Jimeng 使用火山引擎配置
 }
 
 export interface ProcessResult {

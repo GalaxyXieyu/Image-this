@@ -24,7 +24,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import Navbar from '@/components/navigation/Navbar';
-import { Save, Key, Zap, Sparkles, User, Image, FileText, Plus, Edit, Trash2, Star, StarOff, Cpu } from 'lucide-react';
+import { Save, Key, Zap, Sparkles, User, Image, FileText, Plus, Edit, Trash2, Star, StarOff, Cpu, HardDrive, FolderOpen, Folder } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 type SettingSection = 'models' | 'imagehosting' | 'profile' | 'prompts';
@@ -83,10 +83,11 @@ export default function SettingsPage() {
     geminiEnabled: false,
     geminiApiKey: '',
     geminiBaseUrl: 'https://yunwu.ai',
-    geminiProjectId: '',
     // 图床配置
     imagehostingEnabled: false,
-    superbedToken: ''
+    superbedToken: '',
+    // 本地存储配置
+    localStoragePath: ''
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -154,9 +155,9 @@ export default function SettingsPage() {
               geminiEnabled: false,
               geminiApiKey: '',
               geminiBaseUrl: 'https://yunwu.ai',
-              geminiProjectId: '',
               imagehostingEnabled: data.config.imagehosting?.enabled || false,
-              superbedToken: data.config.imagehosting?.superbedToken || ''
+              superbedToken: data.config.imagehosting?.superbedToken || '',
+              localStoragePath: data.config.localStorage?.savePath || ''
             });
           }
         }
@@ -200,12 +201,14 @@ export default function SettingsPage() {
         gemini: {
           enabled: apiSettings.geminiEnabled,
           apiKey: apiSettings.geminiApiKey,
-          baseUrl: apiSettings.geminiBaseUrl,
-          projectId: apiSettings.geminiProjectId
+          baseUrl: apiSettings.geminiBaseUrl
         },
         imagehosting: {
           enabled: apiSettings.imagehostingEnabled,
           superbedToken: apiSettings.superbedToken
+        },
+        localStorage: {
+          savePath: apiSettings.localStoragePath
         }
       };
       
@@ -233,6 +236,39 @@ export default function SettingsPage() {
       ...prev,
       [field]: value
     }));
+  };
+
+  // 文件夹选择器
+  const handleSelectFolder = async () => {
+    try {
+      // 检查是否在 Electron 环境中
+      if (typeof window !== 'undefined' && (window as any).electron?.selectDirectory) {
+        // Electron 桌面应用：使用原生对话框
+        const paths = await (window as any).electron.selectDirectory();
+        if (paths && paths.length > 0) {
+          handleInputChange('localStoragePath', paths[0]);
+          toast({
+            title: '路径已选择',
+            description: paths[0],
+          });
+        }
+      } else {
+        // Web 浏览器：提示用户手动输入
+        // 注意：浏览器出于安全考虑，无法直接获取文件系统的绝对路径
+        toast({
+          title: '浏览器环境提示',
+          description: '请直接在输入框中手动输入完整的文件夹路径，例如：/Users/yourname/Pictures/ai-images',
+          duration: 5000,
+        });
+      }
+    } catch (error) {
+      console.error('选择文件夹失败:', error);
+      toast({
+        title: '选择失败',
+        description: '无法打开文件夹选择器',
+        variant: 'destructive',
+      });
+    }
   };
 
   // 提示词模板管理函数
@@ -558,16 +594,6 @@ export default function SettingsPage() {
                     disabled={!apiSettings.geminiEnabled}
                   />
                 </div>
-                <div>
-                  <Label htmlFor="geminiProjectId">Project ID（可选）</Label>
-                  <Input
-                    id="geminiProjectId"
-                    placeholder="your-project-id"
-                    value={apiSettings.geminiProjectId}
-                    onChange={(e) => handleInputChange('geminiProjectId', e.target.value)}
-                    disabled={!apiSettings.geminiEnabled}
-                  />
-                </div>
               </CardContent>
             </Card>
           </div>
@@ -575,44 +601,97 @@ export default function SettingsPage() {
 
       case 'imagehosting':
         return (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <Image className="w-5 h-5 mr-2 text-green-600" />
-                  图床服务
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Image className="w-5 h-5 mr-2 text-green-600" />
+                    图床服务
+                  </div>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mr-2"
+                      checked={apiSettings.imagehostingEnabled}
+                      onChange={(e) => handleInputChange('imagehostingEnabled', e.target.checked)}
+                    />
+                    <span className="text-sm text-gray-600">启用</span>
+                  </label>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-gray-500 mb-4">
+                  支持：Superbed 图床服务，用于存储和访问生成的图片
                 </div>
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="mr-2"
-                    checked={apiSettings.imagehostingEnabled}
-                    onChange={(e) => handleInputChange('imagehostingEnabled', e.target.checked)}
+                <div>
+                  <Label htmlFor="superbedToken">Superbed Token</Label>
+                  <Input
+                    id="superbedToken"
+                    type="password"
+                    placeholder="输入 Superbed API Token"
+                    value={apiSettings.superbedToken}
+                    onChange={(e) => handleInputChange('superbedToken', e.target.value)}
+                    disabled={!apiSettings.imagehostingEnabled}
                   />
-                  <span className="text-sm text-gray-600">启用</span>
-                </label>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-sm text-gray-500 mb-4">
-                支持：Superbed 图床服务，用于存储和访问生成的图片
-              </div>
-              <div>
-                <Label htmlFor="superbedToken">Superbed Token</Label>
-                <Input
-                  id="superbedToken"
-                  type="password"
-                  placeholder="输入 Superbed API Token"
-                  value={apiSettings.superbedToken}
-                  onChange={(e) => handleInputChange('superbedToken', e.target.value)}
-                  disabled={!apiSettings.imagehostingEnabled}
-                />
-                <div className="text-xs text-gray-500 mt-1">
-                  访问 <a href="https://superbed.cn/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">superbed.cn</a> 获取 API Token
+                  <div className="text-xs text-gray-500 mt-1">
+                    访问 <a href="https://superbed.cn/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">superbed.cn</a> 获取 API Token
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            {/* 本地存储配置 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <div className="flex items-center">
+                    <HardDrive className="w-5 h-5 mr-2 text-blue-600" />
+                    本地存储配置
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-gray-500 mb-4">
+                  配置图片本地保存路径，默认为应用目录下的 public/uploads/
+                </div>
+                <div>
+                  <Label htmlFor="localStoragePath">
+                    <div className="flex items-center gap-2 mb-2">
+                      <FolderOpen className="w-4 h-4" />
+                      保存路径
+                    </div>
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="localStoragePath"
+                      type="text"
+                      placeholder="例如：/Users/yourname/Pictures/ai-images 或 ~/Pictures/ai-images"
+                      value={apiSettings.localStoragePath}
+                      onChange={(e) => handleInputChange('localStoragePath', e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleSelectFolder}
+                      className="gap-2 whitespace-nowrap"
+                    >
+                      <Folder className="w-4 h-4" />
+                      浏览
+                    </Button>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-2 space-y-1">
+                    <div>• 留空使用默认路径：public/uploads/</div>
+                    <div>• 支持绝对路径：/Users/yourname/Pictures/ai-images</div>
+                    <div>• 支持相对路径：./my-images（相对于项目根目录）</div>
+                    <div>• 支持 ~ 符号：~/Pictures/ai-images（用户主目录）</div>
+                    <div>• "浏览"按钮：桌面版可选择文件夹，Web 版请手动输入路径</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         );
 
       case 'prompts':

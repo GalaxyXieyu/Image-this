@@ -332,14 +332,14 @@ class TaskProcessor {
       watermarkType = 'text',
       watermarkLogoUrl,
       outputResolution = 'original',
-      aiModel = 'jimeng',
+      aiModel = 'gemini',
       volcengineConfig
     } = inputData;
     
     await this.updateTaskProgress(task.id, 'Step 1/3: 准备处理...', 10, 1);
 
     try {
-      const { executeOneClickWorkflow } = await import('@/app/api/workflow/one-click/service');
+      const { executeOneClickWorkflow } = await import('@/app/api/images-process/workflow/one-click/service');
       
       const result = await executeOneClickWorkflow({
         imageUrl,
@@ -366,7 +366,7 @@ class TaskProcessor {
 
       return {
         processedImageId: result.id,
-        processedImageUrl: result.minioUrl,
+        processedImageUrl: result.processedUrl,
         imageData: result.imageData,
         processSteps: result.processSteps,
         settings: { 
@@ -384,7 +384,7 @@ class TaskProcessor {
 
   private async processBackgroundRemoval(task: { id: string; inputData: string; userId: string }) {
     const inputData = JSON.parse(task.inputData);
-    const { imageUrl, referenceImageUrl, customPrompt, aiModel = 'jimeng', volcengineConfig, imagehostingConfig } = inputData;
+    const { imageUrl, referenceImageUrl, customPrompt, aiModel = 'gemini', volcengineConfig, imagehostingConfig } = inputData;
     
     await this.updateTaskProgress(task.id, `使用 ${aiModel} 生成图像中...`, 30, 1);
     
@@ -405,56 +405,134 @@ class TaskProcessor {
       let result;
       
       // 根据选择的 AI 模型调用不同的服务
-      if (aiModel === 'jimeng') {
-        const { generateWithJimeng } = await import('@/app/api/jimeng/service');
-        result = await generateWithJimeng(
-          task.userId,
-          prompt,
-          referenceImages,  // 会自动上传到Superbed获取公网URL
-          2048,
-          2048,
-          volcengineConfig,  // 传递火山引擎配置
-          imagehostingConfig  // 传递图床配置
-        );
-      } else if (aiModel === 'gpt') {
+      if (aiModel === 'gpt') {
         console.log('[Worker] 使用 GPT 模型');
-        try {
-          // 使用 GPT Processor
-          const { GPTProcessor } = await import('@/lib/image-processor/providers/gpt');
-          const gptProcessor = new GPTProcessor({ enabled: true, apiUrl: '', apiKey: '' }); // 配置会从用户设置中读取
-          
-          result = await gptProcessor.backgroundReplace(task.userId, {
-            originalImageUrl: imageUrl,
-            referenceImageUrl: referenceImageUrl || imageUrl,
-            prompt: prompt,
-            customPrompt: customPrompt
-          });
-          
-          console.log('[Worker] GPT 处理成功');
-        } catch (gptError) {
-          // GPT 失败，降级到即梦
-          console.warn('[Worker] GPT 处理失败，降级到即梦:', gptError instanceof Error ? gptError.message : 'Unknown error');
-          console.log('[Worker] 使用即梦模型重试...');
-          
-          // 使用即梦 API
-          const { generateWithJimeng } = await import('@/app/api/jimeng/service');
-          const referenceImages = [referenceImageUrl || imageUrl];
-          
-          result = await generateWithJimeng(
-            task.userId,
-            prompt,
-            referenceImages,
-            2048,
-            2048,
-            volcengineConfig,
-            imagehostingConfig
-          );
-        }
+        const { processWithGPT } = await import('@/lib/image-processor/service');
+        const { uploadBase64Image } = await import('@/lib/storage');
+        const { prisma } = await import('@/lib/prisma');
+        
+        const gptResult = await processWithGPT(
+          imageUrl,
+          referenceImageUrl || imageUrl,
+          prompt,
+          task.userId
+        );
+        
+        // 保存到本地存储
+        const processedUrl = await uploadBase64Image(
+          gptResult.imageData,
+          `gpt-bg-replace-${Date.now()}.jpg`
+        );
+        
+        const processedImage = await prisma.processedImage.create({
+          data: {
+            filename: `gpt-bg-replace-${Date.now()}.jpg`,
+            originalUrl: imageUrl,
+            processedUrl: processedUrl,
+            processType: 'BACKGROUND_REMOVAL',
+            status: 'COMPLETED',
+            fileSize: gptResult.imageSize,
+            metadata: JSON.stringify({
+              provider: 'gpt',
+              prompt,
+              processingCompletedAt: new Date().toISOString()
+            }),
+            userId: task.userId
+          }
+        });
+        
+        result = {
+          id: processedImage.id,
+          imageData: gptResult.imageData,
+          imageSize: gptResult.imageSize
+        };
+        console.log('[Worker] GPT 处理成功，已保存到数据库');
       } else if (aiModel === 'gemini') {
-        // TODO: 实现 Gemini 背景替换
-        throw new Error('Gemini 背景替换功能即将推出');
+        console.log('[Worker] 使用 Gemini 模型');
+        const { processWithGemini } = await import('@/lib/image-processor/service');
+        const { uploadBase64Image } = await import('@/lib/storage');
+        const { prisma } = await import('@/lib/prisma');
+        
+        const resultImageUrl = await processWithGemini(
+          imageUrl,
+          referenceImageUrl || imageUrl,
+          prompt,
+          task.userId
+        );
+        
+        // 保存到本地存储
+        const processedUrl = await uploadBase64Image(
+          resultImageUrl || '',
+          `gemini-bg-replace-${Date.now()}.jpg`
+        );
+        
+        const processedImage = await prisma.processedImage.create({
+          data: {
+            filename: `gemini-bg-replace-${Date.now()}.jpg`,
+            originalUrl: imageUrl,
+            processedUrl: processedUrl,
+            processType: 'BACKGROUND_REMOVAL',
+            status: 'COMPLETED',
+            fileSize: resultImageUrl?.length || 0,
+            metadata: JSON.stringify({
+              provider: 'gemini',
+              prompt,
+              processingCompletedAt: new Date().toISOString()
+            }),
+            userId: task.userId
+          }
+        });
+        
+        result = {
+          id: processedImage.id,
+          imageData: resultImageUrl || '',
+          imageSize: resultImageUrl?.length || 0
+        };
+        console.log('[Worker] Gemini 处理成功，已保存到数据库');
+      } else if (aiModel === 'jimeng') {
+        console.log('[Worker] 使用 Jimeng 模型');
+        const { processWithJimeng } = await import('@/lib/image-processor/service');
+        const { uploadBase64Image } = await import('@/lib/storage');
+        const { prisma } = await import('@/lib/prisma');
+        
+        const jimengResult = await processWithJimeng(
+          imageUrl,
+          referenceImageUrl || imageUrl,
+          prompt,
+          task.userId
+        );
+        
+        // 保存到本地存储
+        const processedUrl = await uploadBase64Image(
+          jimengResult.imageData,
+          `jimeng-bg-replace-${Date.now()}.jpg`
+        );
+        
+        const processedImage = await prisma.processedImage.create({
+          data: {
+            filename: `jimeng-bg-replace-${Date.now()}.jpg`,
+            originalUrl: imageUrl,
+            processedUrl: processedUrl,
+            processType: 'BACKGROUND_REMOVAL',
+            status: 'COMPLETED',
+            fileSize: jimengResult.imageSize,
+            metadata: JSON.stringify({
+              provider: 'jimeng',
+              prompt,
+              processingCompletedAt: new Date().toISOString()
+            }),
+            userId: task.userId
+          }
+        });
+        
+        result = {
+          id: processedImage.id,
+          imageData: jimengResult.imageData,
+          imageSize: jimengResult.imageSize
+        };
+        console.log('[Worker] Jimeng 处理成功，已保存到数据库');
       } else {
-        throw new Error(`不支持的 AI 模型: ${aiModel}`);
+        throw new Error(`不支持的 AI 模型: ${aiModel}，请使用 gpt、gemini 或 jimeng`);
       }
       
       await this.updateTaskProgress(task.id, '图像生成完成', 100, 1);
@@ -486,7 +564,10 @@ class TaskProcessor {
       const left = (xScale - 1) / 2;
       const right = (xScale - 1) / 2;
 
-      const { outpaintWithVolcengine } = await import('@/app/api/volcengine/service');
+      const { outpaintWithVolcengine } = await import('@/lib/image-processor/service');
+      const { uploadBase64Image } = await import('@/lib/storage');
+      const { prisma } = await import('@/lib/prisma');
+      
       const result = await outpaintWithVolcengine(
         task.userId,
         imageUrl,
@@ -501,12 +582,35 @@ class TaskProcessor {
         imagehostingConfig
       );
 
+      // 保存到本地存储
+      const processedUrl = await uploadBase64Image(
+        result.imageData,
+        `outpaint-${Date.now()}.jpg`
+      );
+      
+      const processedImage = await prisma.processedImage.create({
+        data: {
+          filename: `outpaint-${Date.now()}.jpg`,
+          originalUrl: imageUrl,
+          processedUrl: processedUrl,
+          processType: 'IMAGE_OUTPAINTING',
+          status: 'COMPLETED',
+          fileSize: result.imageSize,
+          metadata: JSON.stringify({
+            provider: 'volcengine',
+            expandRatio: { top, bottom, left, right },
+            processingCompletedAt: new Date().toISOString()
+          }),
+          userId: task.userId
+        }
+      });
+
       await this.updateTaskProgress(task.id, '图像扩展完成', 100, 1);
       
       return {
-        processedImageId: result.id,
+        processedImageId: processedImage.id,
         processedImageUrl: result.imageData,
-        expandRatio: result.expandRatio
+        expandRatio: result.metadata?.expandRatio || { top, bottom, left, right }
       };
 
     } catch (error) {
@@ -518,13 +622,15 @@ class TaskProcessor {
 
   private async processImageUpscaling(task: { id: string; inputData: string; userId: string }) {
     const inputData = JSON.parse(task.inputData);
-    const { imageUrl, upscaleFactor = 2, aiModel = 'jimeng', volcengineConfig, imagehostingConfig } = inputData;
+    const { imageUrl, upscaleFactor = 2, aiModel = 'volcengine', volcengineConfig, imagehostingConfig } = inputData;
     
     await this.updateTaskProgress(task.id, '智能画质增强中...', 50, 1);
     
     try {
       // 直接调用 service，不通过 HTTP
-      const { enhanceWithVolcengine } = await import('@/app/api/volcengine/service');
+      const { enhanceWithVolcengine } = await import('@/lib/image-processor/service');
+      const { uploadBase64Image } = await import('@/lib/storage');
+      const { prisma } = await import('@/lib/prisma');
       
       const result = await enhanceWithVolcengine(
         task.userId,
@@ -539,10 +645,33 @@ class TaskProcessor {
         imagehostingConfig
       );
 
+      // 保存到本地存储
+      const processedUrl = await uploadBase64Image(
+        result.imageData,
+        `enhance-${Date.now()}.jpg`
+      );
+      
+      const processedImage = await prisma.processedImage.create({
+        data: {
+          filename: `enhance-${Date.now()}.jpg`,
+          originalUrl: imageUrl,
+          processedUrl: processedUrl,
+          processType: 'IMAGE_UPSCALING',
+          status: 'COMPLETED',
+          fileSize: result.imageSize,
+          metadata: JSON.stringify({
+            provider: 'volcengine',
+            upscaleFactor,
+            processingCompletedAt: new Date().toISOString()
+          }),
+          userId: task.userId
+        }
+      });
+
       await this.updateTaskProgress(task.id, '智能画质增强完成', 100, 1);
       
       return {
-        processedImageId: result.id,
+        processedImageId: processedImage.id,
         processedImageUrl: result.imageData,
         upscaleFactor
       };

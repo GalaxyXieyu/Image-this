@@ -17,7 +17,9 @@
     "electron:build": "npm run build && electron-builder",
     "electron:build:mac": "npm run build && electron-builder --mac",
     "electron:build:win": "npm run build && electron-builder --win",
-    "electron:build:linux": "npm run build && electron-builder --linux"
+    "electron:build:linux": "npm run build && electron-builder --linux",
+    "build:windows": "node scripts/build-windows.mjs --auto",
+    "build:icon": "node scripts/generate-windows-icon.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -116,14 +118,22 @@
       "target": [
         "dmg",
         "zip"
-      ]
+      ],
+      "executableName": "ImagineThis"
     },
     "win": {
       "icon": "public/icon.png",
       "target": [
-        "nsis",
-        "portable"
-      ]
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "linux": {
       "icon": "public/icon.png",

@@ -17,10 +17,12 @@ export interface UserConfig {
   gemini?: {
     apiKey: string;
     baseUrl: string;
-    projectId: string;
   };
   imagehosting?: {
     superbedToken: string;
+  };
+  localStorage?: {
+    savePath: string;
   };
 }
 
@@ -39,8 +41,8 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
       gptApiKey: true,
       geminiApiKey: true,
       geminiBaseUrl: true,
-      geminiProjectId: true,
       superbedToken: true,
+      localStoragePath: true,
     }
   });
 
@@ -71,7 +73,6 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
     config.gemini = {
       apiKey: user.geminiApiKey,
       baseUrl: user.geminiBaseUrl || 'https://yunwu.ai',
-      projectId: user.geminiProjectId || '',
     };
   }
 
@@ -79,6 +80,13 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
   if (user.superbedToken) {
     config.imagehosting = {
       superbedToken: user.superbedToken,
+    };
+  }
+
+  // 本地存储配置
+  if (user.localStoragePath) {
+    config.localStorage = {
+      savePath: user.localStoragePath,
     };
   }
 
@@ -100,8 +108,8 @@ export async function saveUserConfig(userId: string, config: UserConfig): Promis
       gptApiKey: config.gpt?.apiKey || null,
       geminiApiKey: config.gemini?.apiKey || null,
       geminiBaseUrl: config.gemini?.baseUrl || null,
-      geminiProjectId: config.gemini?.projectId || null,
       superbedToken: config.imagehosting?.superbedToken || null,
+      localStoragePath: config.localStorage?.savePath || null,
     }
   });
 }

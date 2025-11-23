@@ -77,7 +77,7 @@ export async function createBatchTasks(
 
 export async function triggerWorker(): Promise<void> {
   try {
-    const response = await fetch('/api/workflow/trigger', {
+    const response = await fetch('/api/images-process/workflow/trigger', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     });

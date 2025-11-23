@@ -58,8 +58,8 @@ model User {
   gptApiKey           String? // GPT API Key
   geminiApiKey        String? // Gemini API Key
   geminiBaseUrl       String? // Gemini Base URL
-  geminiProjectId     String? // Gemini Project ID
   superbedToken       String? // Superbed 图床 Token
+  localStoragePath    String? // 本地文件保存路径（默认为 public/uploads）
   
   // Relations
   accounts      Account[]

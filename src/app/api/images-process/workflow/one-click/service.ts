@@ -1,8 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { uploadBase64Image } from '@/lib/storage';
-import { generateWithJimeng } from '@/app/api/jimeng/service';
-import { outpaintWithVolcengine } from '@/app/api/volcengine/service';
-import { enhanceWithVolcengine } from '@/app/api/volcengine/service';
+import { ImageProcessorFactory, ImageProvider } from '@/lib/image-processor';
 
 export interface OneClickWorkflowParams {
   imageUrl: string;
@@ -30,7 +28,7 @@ export interface OneClickWorkflowResult {
   id: string;
   imageData: string;
   imageSize: number;
-  minioUrl: string;
+  processedUrl: string;
   processSteps: {
     backgroundReplace: boolean;
     outpaint: boolean;
@@ -127,25 +125,14 @@ export async function executeOneClickWorkflow(
         const prompt = '保持产品主体完全不变，仅替换背景为类似参考场景的风格，保持产品的形状、材质、特征比例、摆放角度及数量完全一致，专业摄影，高质量，4K分辨率';
         
         // 根据选择的 AI 模型调用不同的服务
-        if (aiModel === 'jimeng') {
-          const result = await generateWithJimeng(
-            userId,
-            prompt,
-            [imageUrl, referenceImageUrl],
-            2048,
-            2048,
-            volcengineConfig,
-            imagehostingConfig
-          );
-          processedImageUrl = result.imageData;
-        } else if (aiModel === 'gpt') {
+        if (aiModel === 'gpt') {
           // TODO: 实现 GPT-4 Vision 背景替换
           throw new Error('GPT-4 Vision 背景替换功能即将推出');
         } else if (aiModel === 'gemini') {
           // TODO: 实现 Gemini 背景替换
           throw new Error('Gemini 背景替换功能即将推出');
         } else {
-          throw new Error(`不支持的 AI 模型: ${aiModel}`);
+          throw new Error(`不支持的 AI 模型: ${aiModel}，请使用 gpt 或 gemini`);
         }
         
         hasBackgroundReplace = true;
@@ -172,19 +159,29 @@ export async function executeOneClickWorkflow(
         const left = expandRatio;
         const right = expandRatio;
         
-        const result = await outpaintWithVolcengine(
-          userId,
-          processedImageUrl,
-          '扩展图像，保持产品主体和风格完全一致，自然延伸背景',
+        // 初始化火山引擎 Provider
+        ImageProcessorFactory.initialize({
+          volcengine: {
+            enabled: true,
+            accessKey: volcengineConfig?.accessKey || '',
+            secretKey: volcengineConfig?.secretKey || ''
+          },
+          gpt: { enabled: false, apiUrl: '', apiKey: '' },
+          gemini: { enabled: false, apiKey: '', baseUrl: '' },
+          qwen: { enabled: false, apiKey: '' },
+          jimeng: { enabled: false, accessKey: '', secretKey: '' }
+        });
+        const processor = ImageProcessorFactory.getProcessor(ImageProvider.VOLCENGINE);
+        
+        const result = await processor.outpaint!(userId, processedImageUrl, {
+          prompt: '扩展图像，保持产品主体和风格完全一致，自然延伸背景',
           top,
           bottom,
           left,
           right,
-          2048,
-          2048,
-          volcengineConfig,
-          imagehostingConfig
-        );
+          maxHeight: 2048,
+          maxWidth: 2048
+        });
         processedImageUrl = result.imageData;
         hasOutpaint = true;
         const outpaintDuration = ((Date.now() - outpaintStartTime) / 1000).toFixed(2);
@@ -204,18 +201,28 @@ export async function executeOneClickWorkflow(
         // 根据选择的 AI 模型调用不同的服务
         // 注意：目前所有模型都使用火山引擎的画质增强，未来可以扩展
         if (aiModel === 'jimeng' || aiModel === 'gpt' || aiModel === 'gemini') {
-          const result = await enhanceWithVolcengine(
-            userId,
-            processedImageUrl,
-            '720p',
-            false,
-            false,
-            1,
-            95,
-            true, // 跳过数据库保存，这是工作流中间步骤
-            volcengineConfig,
-            imagehostingConfig
-          );
+          // 初始化火山引擎 Provider
+          ImageProcessorFactory.initialize({
+            volcengine: {
+              enabled: true,
+              accessKey: volcengineConfig?.accessKey || '',
+              secretKey: volcengineConfig?.secretKey || ''
+            },
+            gpt: { enabled: false, apiUrl: '', apiKey: '' },
+            gemini: { enabled: false, apiKey: '', baseUrl: '' },
+            qwen: { enabled: false, apiKey: '' },
+            jimeng: { enabled: false, accessKey: '', secretKey: '' }
+          });
+          const processor = ImageProcessorFactory.getProcessor(ImageProvider.VOLCENGINE);
+          
+          const result = await processor.enhance!(userId, processedImageUrl, {
+            resolutionBoundary: '720p',
+            enableHdr: false,
+            enableWb: false,
+            resultFormat: 1,
+            jpgQuality: 95,
+            skipDbSave: true // 跳过数据库保存，这是工作流中间步骤
+          });
           processedImageUrl = result.imageData;
         } else {
           throw new Error(`不支持的 AI 模型: ${aiModel}`);
@@ -294,7 +301,7 @@ export async function executeOneClickWorkflow(
       id: updatedImage.id,
       imageData: finalImageData,
       imageSize,
-      minioUrl: savedUrl,
+      processedUrl: savedUrl,
       processSteps: {
         backgroundReplace: hasBackgroundReplace,
         outpaint: hasOutpaint,

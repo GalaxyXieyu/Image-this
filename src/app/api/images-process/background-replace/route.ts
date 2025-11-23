@@ -1,13 +1,17 @@
+/**
+ * 统一的背景替换 API
+ * 支持 Gemini、GPT 等多个提供商
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { uploadBase64Image } from '@/lib/storage';
 import { getUserIdFromRequest, handleApiError, validateRequiredParams } from '@/lib/api-utils';
-import { processWithGemini } from '../service';
+import { processWithGemini, processWithGPT, processWithJimeng } from '@/lib/image-processor/service';
 
-const DEFAULT_PROMPT_TEMPLATE = `请将第二张图片中的所有产品替换为第一张图片的产品，要求：
-
+const DEFAULT_PROMPT = `请将第二张图片中的所有产品替换为第一张图片的产品，要求：
 1. 保持原图产品的形状、材质、特征比例、摆放角度及数量完全一致
-2. 仅保留产品包装外壳，不得出现任何成品材质（如口红壳中不得显示口红）
+2. 仅保留产品包装外壳，不得出现任何成品材质
 3. 禁用背景虚化效果，确保画面清晰呈现所有产品
 4. 产品的比例一定要保持，相对瘦长就瘦长，相对粗就相对粗`;
 
@@ -21,47 +25,75 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: paramError }, { status: 400 });
     }
 
-    // 获取用户ID
     const userId = await getUserIdFromRequest(body);
-
     const {
       originalImageUrl,
       referenceImageUrl,
       prompt,
       customPrompt,
-      projectId
+      projectId,
+      provider = 'gemini' // 默认使用 Gemini
     } = body;
 
-    const finalPrompt = customPrompt || prompt || DEFAULT_PROMPT_TEMPLATE;
+    const finalPrompt = customPrompt || prompt || DEFAULT_PROMPT;
 
-    console.log('[Gemini背景替换] 图片来源:', {
-      original: originalImageUrl.substring(0, 50) + '...',
-      reference: referenceImageUrl.substring(0, 50) + '...'
-    });
+    console.log(`[背景替换API] 使用提供商: ${provider}`);
 
+    // 创建处理记录
     const processedImage = await prisma.processedImage.create({
       data: {
-        filename: `gemini-replace-${Date.now()}.jpg`,
+        filename: `bg-replace-${Date.now()}.jpg`,
         originalUrl: 'temp',
         processType: 'BACKGROUND_REMOVAL',
         status: 'PROCESSING',
         metadata: JSON.stringify({
+          provider,
           prompt: finalPrompt,
           originalImageSize: originalImageUrl.length,
           referenceImageSize: referenceImageUrl.length
         }),
-        userId: userId,
+        userId,
         projectId: projectId || null
       }
     });
 
     try {
-      const resultImageUrl = await processWithGemini(
-        originalImageUrl,
-        referenceImageUrl,
-        finalPrompt,
-        userId
-      );
+      let resultImageUrl: string | null = null;
+
+      // 根据提供商调用不同的服务
+      switch (provider.toLowerCase()) {
+        case 'gemini':
+          resultImageUrl = await processWithGemini(
+            originalImageUrl,
+            referenceImageUrl,
+            finalPrompt,
+            userId
+          );
+          break;
+
+        case 'gpt':
+          const gptResult = await processWithGPT(
+            originalImageUrl,
+            referenceImageUrl,
+            finalPrompt,
+            userId
+          );
+          resultImageUrl = gptResult.imageData;
+          break;
+
+        case 'jimeng':
+          const jimengResult = await processWithJimeng(
+            originalImageUrl,
+            referenceImageUrl,
+            finalPrompt,
+            userId
+          );
+          resultImageUrl = jimengResult.imageData;
+          break;
+
+        default:
+          throw new Error(`不支持的提供商: ${provider}`);
+      }
 
       if (!resultImageUrl) {
         await prisma.processedImage.update({
@@ -78,23 +110,15 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const imageResponse = await fetch(resultImageUrl, {
-        signal: AbortSignal.timeout(600000)
-      });
-      if (!imageResponse.ok) {
-        throw new Error('下载生成的图片失败');
-      }
+      const imageDataUrl = resultImageUrl;
 
-      const imageArrayBuffer = await imageResponse.arrayBuffer();
-      const imageBase64 = Buffer.from(imageArrayBuffer).toString('base64');
-      const imageDataUrl = `data:image/jpeg;base64,${imageBase64}`;
-
-      const minioUrl = await uploadBase64Image(
+      // 上传到本地存储
+      const processedUrl = await uploadBase64Image(
         imageDataUrl,
-        `gemini-replace-${processedImage.id}.jpg`
+        `bg-replace-${processedImage.id}.jpg`
       );
 
-      const originalMinioUrl = await uploadBase64Image(
+      const originalUrl = await uploadBase64Image(
         originalImageUrl,
         `original-${processedImage.id}.jpg`
       );
@@ -102,13 +126,12 @@ export async function POST(request: NextRequest) {
       const updatedImage = await prisma.processedImage.update({
         where: { id: processedImage.id },
         data: {
-          originalUrl: originalMinioUrl,
-          processedUrl: minioUrl,
+          originalUrl: originalUrl,
+          processedUrl: processedUrl,
           status: 'COMPLETED',
-          fileSize: imageArrayBuffer.byteLength,
+          fileSize: imageDataUrl.length,
           metadata: JSON.stringify({
             ...(processedImage.metadata ? JSON.parse(processedImage.metadata as string) : {}),
-            originalUrl: resultImageUrl,
             processingCompletedAt: new Date().toISOString()
           })
         }
@@ -119,12 +142,12 @@ export async function POST(request: NextRequest) {
         data: {
           id: updatedImage.id,
           imageData: imageDataUrl,
-          imageSize: imageArrayBuffer.byteLength,
-          originalUrl: resultImageUrl,
-          minioUrl: minioUrl,
-          prompt: finalPrompt
+          imageSize: imageDataUrl.length,
+          processedUrl: processedUrl,
+          prompt: finalPrompt,
+          provider
         },
-        message: 'Gemini背景替换成功'
+        message: '背景替换成功'
       });
 
     } catch (processingError) {
@@ -144,6 +167,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '未授权访问' }, { status: 401 });
     }
 
-    return handleApiError(error, 'Gemini背景替换失败');
+    return handleApiError(error, '背景替换失败');
   }
 }

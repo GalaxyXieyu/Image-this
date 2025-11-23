@@ -42,13 +42,18 @@ export async function POST(request: NextRequest) {
       userConfig.gemini = {
         apiKey: body.gemini.apiKey,
         baseUrl: body.gemini.baseUrl || 'https://yunwu.ai',
-        projectId: body.gemini.projectId || '',
       };
     }
     
     if (body.imagehosting?.enabled && body.imagehosting?.superbedToken) {
       userConfig.imagehosting = {
         superbedToken: body.imagehosting.superbedToken,
+      };
+    }
+    
+    if (body.localStorage?.savePath) {
+      userConfig.localStorage = {
+        savePath: body.localStorage.savePath,
       };
     }
     
@@ -96,12 +101,14 @@ export async function GET(request: NextRequest) {
       gemini: {
         enabled: !!userConfig.gemini,
         apiKey: userConfig.gemini?.apiKey || '',
-        baseUrl: userConfig.gemini?.baseUrl || 'https://yunwu.ai',
-        projectId: userConfig.gemini?.projectId || ''
+        baseUrl: userConfig.gemini?.baseUrl || 'https://yunwu.ai'
       },
       imagehosting: {
         enabled: !!userConfig.imagehosting,
         superbedToken: userConfig.imagehosting?.superbedToken || ''
+      },
+      localStorage: {
+        savePath: userConfig.localStorage?.savePath || ''
       }
     };
     

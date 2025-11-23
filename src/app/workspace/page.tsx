@@ -106,7 +106,8 @@ export default function WorkspacePage() {
   const [outputResolution, setOutputResolution] = useState('original');
   
   // AI 模型选择
-  const [aiModel, setAiModel] = useState('jimeng');
+  const [aiModel, setAiModel] = useState('gemini'); // 默认使用 gemini
+  const [availableProviders, setAvailableProviders] = useState<string[]>([]);
 
   // 提示词状态
   const [backgroundPrompt, setBackgroundPrompt] = useState('');
@@ -148,6 +149,43 @@ export default function WorkspacePage() {
       router.push("/auth/login");
     }
   }, [status, router]);
+
+  // 加载用户配置并设置默认 AI 模型
+  useEffect(() => {
+    const loadUserConfig = async () => {
+      try {
+        const response = await fetch('/api/settings');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.config) {
+            const providers: string[] = [];
+            
+            // 检查哪些提供商已配置
+            if (data.config.gemini?.enabled) providers.push('gemini');
+            if (data.config.gpt?.enabled) providers.push('gpt');
+            if (data.config.volcengine?.enabled) {
+              providers.push('jimeng'); // jimeng 使用火山引擎配置
+              providers.push('volcengine');
+            }
+            if (data.config.qwen?.enabled) providers.push('qwen');
+            
+            setAvailableProviders(providers);
+            
+            // 自动选择第一个可用的提供商
+            if (providers.length > 0 && !providers.includes(aiModel)) {
+              setAiModel(providers[0]);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('加载用户配置失败:', error);
+      }
+    };
+
+    if (status === 'authenticated') {
+      loadUserConfig();
+    }
+  }, [status]);
 
   // 加载处理历史 - 根据当前标签页筛选
   const loadProcessingHistory = useCallback(async () => {
@@ -548,6 +586,7 @@ export default function WorkspacePage() {
             setOutputResolution={setOutputResolution}
             aiModel={aiModel}
             setAiModel={setAiModel}
+            availableProviders={availableProviders}
             backgroundPrompt={backgroundPrompt}
             setBackgroundPrompt={setBackgroundPrompt}
             outpaintPrompt={outpaintPrompt}

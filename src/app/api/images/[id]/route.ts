@@ -160,46 +160,40 @@ export async function DELETE(
       });
     }
 
-    // 从MinIO删除图片文件
-    const extractObjectName = (url: string): string | null => {
+    // 从本地存储删除图片文件
+    const extractFilename = (url: string): string | null => {
       try {
-        const urlObj = new URL(url);
-        const pathname = urlObj.pathname;
-        // 移除开头的 /bucket-name/ 部分，只保留对象名称
-        const parts = pathname.split('/');
-        if (parts.length >= 3) {
-          return parts.slice(2).join('/'); // 跳过空字符串和bucket名称
-        }
-        return null;
-      } catch (error) {
-        return null;
+        // 从 URL 中提取文件名，例如 /uploads/filename.jpg -> uploads/filename.jpg
+        return url.startsWith('/') ? url.substring(1) : url;
+      } catch {
+        return url;
       }
     };
 
     try {
-      if (image.originalUrl && image.originalUrl.includes('minio')) {
-        const originalObjectName = extractObjectName(image.originalUrl);
-        if (originalObjectName) {
-          await deleteImage(originalObjectName);
+      if (image.originalUrl) {
+        const filename = extractFilename(image.originalUrl);
+        if (filename) {
+          await deleteImage(filename);
         }
       }
 
-      if (image.processedUrl && image.processedUrl.includes('minio')) {
-        const processedObjectName = extractObjectName(image.processedUrl);
-        if (processedObjectName) {
-          await deleteImage(processedObjectName);
+      if (image.processedUrl) {
+        const filename = extractFilename(image.processedUrl);
+        if (filename) {
+          await deleteImage(filename);
         }
       }
 
-      if (image.thumbnailUrl && image.thumbnailUrl.includes('minio')) {
-        const thumbnailObjectName = extractObjectName(image.thumbnailUrl);
-        if (thumbnailObjectName) {
-          await deleteImage(thumbnailObjectName);
+      if (image.thumbnailUrl) {
+        const filename = extractFilename(image.thumbnailUrl);
+        if (filename) {
+          await deleteImage(filename);
         }
       }
-    } catch (minioError) {
-      // console.error('删除MinIO文件失败:', minioError);
-      // 继续删除数据库记录，即使MinIO删除失败
+    } catch (deleteError) {
+      // console.error('删除本地文件失败:', deleteError);
+      // 继续删除数据库记录，即使文件删除失败
     }
 
     // 从数据库删除记录

@@ -39,8 +39,6 @@ export async function deleteImage(objectName: string): Promise<void> {
   return deleteImageFromLocal(objectName);
 }
 
-// 已移除 MinIO 相关代码，现在使用本地存储
-
 // 生成缩略图并上传
 export async function generateAndUploadThumbnail(
   originalImageBuffer: Buffer,

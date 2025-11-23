@@ -12,6 +12,7 @@ interface ParameterSettingsProps {
     setOutputResolution: (value: string) => void;
     aiModel?: string;
     setAiModel?: (value: string) => void;
+    availableProviders?: string[]; // 可用的提供商列表
     // 提示词相关
     backgroundPrompt?: string;
     setBackgroundPrompt?: (value: string) => void;
@@ -25,8 +26,9 @@ export default function ParameterSettings({
     activeTab,
     outputResolution,
     setOutputResolution,
-    aiModel = 'jimeng',
+    aiModel = 'gemini',
     setAiModel,
+    availableProviders = [],
     backgroundPrompt = '',
     setBackgroundPrompt,
     outpaintPrompt = '',
@@ -34,6 +36,35 @@ export default function ParameterSettings({
     oneClickPrompt = '',
     setOneClickPrompt,
 }: ParameterSettingsProps) {
+    
+    // 根据功能类型获取可用的提供商
+    const getProvidersForTab = (tab: ActiveTab): string[] => {
+        switch (tab) {
+            case 'background':
+            case 'one-click':
+                // 背景替换支持 gemini, gpt, jimeng
+                return availableProviders.filter(p => ['gemini', 'gpt', 'jimeng'].includes(p));
+            case 'expansion':
+                // 扩图支持 qwen, volcengine
+                return availableProviders.filter(p => ['qwen', 'volcengine'].includes(p));
+            case 'upscaling':
+                // 画质增强支持 volcengine
+                return availableProviders.filter(p => p === 'volcengine');
+            default:
+                return availableProviders;
+        }
+    };
+    
+    const providersForCurrentTab = getProvidersForTab(activeTab);
+    
+    // 提供商名称映射
+    const providerNames: Record<string, string> = {
+        'gemini': 'Gemini',
+        'gpt': 'GPT-4 Vision',
+        'jimeng': '即梦 (火山引擎)',
+        'volcengine': '火山引擎',
+        'qwen': '通义千问'
+    };
 
     // Note: In the original code, some inputs like xScale, yScale, upscaleFactor were uncontrolled (using document.getElementById).
     // We will keep them as uncontrolled for now to minimize logic changes, but render them here.
@@ -111,10 +142,17 @@ export default function ParameterSettings({
                                     value={aiModel}
                                     onChange={(e) => setAiModel?.(e.target.value)}
                                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
+                                    disabled={providersForCurrentTab.length === 0}
                                 >
-                                    <option value="jimeng">即梦 (推荐)</option>
-                                    <option value="gpt">GPT-4 Vision</option>
-                                    <option value="gemini">Gemini</option>
+                                    {providersForCurrentTab.length === 0 ? (
+                                        <option value="">请先配置 AI 提供商</option>
+                                    ) : (
+                                        providersForCurrentTab.map(provider => (
+                                            <option key={provider} value={provider}>
+                                                {providerNames[provider] || provider}
+                                            </option>
+                                        ))
+                                    )}
                                 </select>
                             </div>
                         </div>
@@ -142,10 +180,17 @@ export default function ParameterSettings({
                                 value={aiModel}
                                 onChange={(e) => setAiModel?.(e.target.value)}
                                 className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
+                                disabled={providersForCurrentTab.length === 0}
                             >
-                                <option value="jimeng">即梦 (推荐)</option>
-                                <option value="gpt">GPT-4 Vision</option>
-                                <option value="gemini">Gemini</option>
+                                {providersForCurrentTab.length === 0 ? (
+                                    <option value="">请先配置 AI 提供商</option>
+                                ) : (
+                                    providersForCurrentTab.map(provider => (
+                                        <option key={provider} value={provider}>
+                                            {providerNames[provider] || provider}
+                                        </option>
+                                    ))
+                                )}
                             </select>
                             <p className="text-xs text-gray-500 mt-1">选择用于背景替换的 AI 模型</p>
                         </div>
@@ -211,10 +256,17 @@ export default function ParameterSettings({
                                         value={aiModel}
                                         onChange={(e) => setAiModel?.(e.target.value)}
                                         className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
+                                        disabled={providersForCurrentTab.length === 0}
                                     >
-                                        <option value="jimeng">即梦 (推荐)</option>
-                                        <option value="gpt">GPT-4 Vision</option>
-                                        <option value="gemini">Gemini</option>
+                                        {providersForCurrentTab.length === 0 ? (
+                                            <option value="">请先配置 AI 提供商</option>
+                                        ) : (
+                                            providersForCurrentTab.map(provider => (
+                                                <option key={provider} value={provider}>
+                                                    {providerNames[provider] || provider}
+                                                </option>
+                                            ))
+                                        )}
                                     </select>
                                     <p className="text-xs text-gray-500 mt-1">用于背景替换和画质增强</p>
                                 </div>

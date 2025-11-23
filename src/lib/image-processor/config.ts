@@ -21,7 +21,16 @@ export const defaultConfig: ProvidersConfig = {
   gemini: {
     enabled: false,
     apiKey: '',
-    projectId: '',
+    baseUrl: 'https://yunwu.ai',
+  },
+  qwen: {
+    enabled: false,
+    apiKey: '',
+  },
+  jimeng: {
+    enabled: false,
+    accessKey: '',
+    secretKey: '',
   },
 };
 
@@ -41,7 +50,16 @@ export function loadConfigFromEnv(): ProvidersConfig {
     gemini: {
       enabled: !!process.env.GEMINI_API_KEY,
       apiKey: process.env.GEMINI_API_KEY || '',
-      projectId: process.env.GEMINI_PROJECT_ID,
+      baseUrl: process.env.GEMINI_BASE_URL || 'https://yunwu.ai',
+    },
+    qwen: {
+      enabled: !!process.env.QWEN_API_KEY,
+      apiKey: process.env.QWEN_API_KEY || '',
+    },
+    jimeng: {
+      enabled: !!(process.env.VOLCENGINE_ACCESS_KEY && process.env.VOLCENGINE_SECRET_KEY),
+      accessKey: process.env.VOLCENGINE_ACCESS_KEY || '',
+      secretKey: process.env.VOLCENGINE_SECRET_KEY || '',
     },
   };
 }
@@ -96,7 +114,16 @@ export function loadMergedConfig(): ProvidersConfig {
     gemini: {
       enabled: envConfig.gemini.enabled || storageConfig.gemini.enabled,
       apiKey: storageConfig.gemini.apiKey || envConfig.gemini.apiKey,
-      projectId: storageConfig.gemini.projectId || envConfig.gemini.projectId,
+      baseUrl: storageConfig.gemini.baseUrl || envConfig.gemini.baseUrl,
+    },
+    qwen: {
+      enabled: envConfig.qwen.enabled || storageConfig.qwen.enabled,
+      apiKey: storageConfig.qwen.apiKey || envConfig.qwen.apiKey,
+    },
+    jimeng: {
+      enabled: envConfig.jimeng.enabled || storageConfig.jimeng.enabled,
+      accessKey: storageConfig.jimeng.accessKey || envConfig.jimeng.accessKey,
+      secretKey: storageConfig.jimeng.secretKey || envConfig.jimeng.secretKey,
     },
   };
 }

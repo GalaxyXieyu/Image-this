@@ -3,8 +3,8 @@
  */
 
 import { IImageProcessor, ProcessResult, GPTConfig } from '../types';
-import { getUserConfig } from '@/lib/user-config';
-import { prisma } from '@/lib/prisma';
+import { convertToGptImageUrl } from '../utils';
+import { postJson } from '../utils/api-client';
 
 export class GPTProcessor implements IImageProcessor {
   constructor(private config: GPTConfig) {}
@@ -12,38 +12,21 @@ export class GPTProcessor implements IImageProcessor {
   async backgroundReplace(userId: string, params: any): Promise<ProcessResult> {
     const { originalImageUrl, referenceImageUrl, prompt, customPrompt } = params;
 
+    if (!this.config.apiKey) {
+      throw new Error('GPT API Key未配置');
+    }
+
+    const baseUrl = this.config.apiUrl || 'https://yunwu.ai';
+    const finalPrompt = customPrompt || prompt || '保持产品主体完全不变，仅替换背景为类似参考场景的风格，保持产品的形状、材质、特征比例、摆放角度及数量完全一致，专业摄影，高质量，4K分辨率';
+
+    console.log('[GPT Processor] 发送请求到:', baseUrl);
+
     try {
-      // 获取用户配置
-      const userConfig = await getUserConfig(userId);
-      const baseUrl = userConfig.gpt?.apiUrl || process.env.GPT_API_URL || 'https://yunwu.ai';
-      const apiKey = userConfig.gpt?.apiKey || process.env.GPT_API_KEY;
-
-      if (!apiKey) {
-        throw new Error('GPT API Key未配置');
-      }
-
-      // 构建最终 prompt
-      const finalPrompt = customPrompt || prompt || '保持产品主体完全不变，仅替换背景为类似参考场景的风格，保持产品的形状、材质、特征比例、摆放角度及数量完全一致，专业摄影，高质量，4K分辨率';
-
-      // 判断是 URL 还是 base64
-      const isOriginalUrl = originalImageUrl.startsWith('http://') || originalImageUrl.startsWith('https://');
-      const isReferenceUrl = referenceImageUrl.startsWith('http://') || referenceImageUrl.startsWith('https://');
-
       // 构建 content
       const content = [
         { type: "text", text: finalPrompt },
-        {
-          type: "image_url",
-          image_url: {
-            url: isOriginalUrl ? originalImageUrl : (originalImageUrl.startsWith('data:') ? originalImageUrl : `data:image/png;base64,${originalImageUrl}`)
-          }
-        },
-        {
-          type: "image_url",
-          image_url: {
-            url: isReferenceUrl ? referenceImageUrl : (referenceImageUrl.startsWith('data:') ? referenceImageUrl : `data:image/png;base64,${referenceImageUrl}`)
-          }
-        }
+        convertToGptImageUrl(originalImageUrl),
+        convertToGptImageUrl(referenceImageUrl)
       ];
 
       const payload = {
@@ -61,40 +44,18 @@ export class GPTProcessor implements IImageProcessor {
         `${baseUrl}v1/chat/completions` :
         `${baseUrl}/v1/chat/completions`;
 
-      const requestBody = JSON.stringify(payload);
-      console.log('[GPT Processor] 发送请求到:', apiUrl);
+      const data = await postJson(
+        apiUrl,
+        payload,
+        {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${this.config.apiKey}`,
+          'Connection': 'keep-alive'
+        },
+        { timeout: 300000 } // 5分钟超时
+      );
 
-      // 使用更长的超时时间
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5分钟超时
-
-      let response;
-      try {
-        response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-            'Connection': 'keep-alive'
-          },
-          body: requestBody,
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-      } catch (fetchError) {
-        clearTimeout(timeoutId);
-        throw fetchError;
-      }
-
-      console.log('[GPT Processor] 响应状态:', response.status, response.statusText);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`GPT API 返回错误: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json();
+      console.log('[GPT Processor] 响应状态: 成功');
 
       // 从响应中提取图片 URL
       const content_response = data.choices?.[0]?.message?.content;
@@ -103,20 +64,8 @@ export class GPTProcessor implements IImageProcessor {
         if (imageUrlMatch && imageUrlMatch[1]) {
           const imageUrl = imageUrlMatch[1];
 
-          // 保存到数据库
-          const processedImage = await prisma.processedImage.create({
-            data: {
-              userId,
-              filename: `gpt-background-${Date.now()}.png`,
-              originalUrl: originalImageUrl,
-              processedUrl: imageUrl,
-              processType: 'BACKGROUND_REMOVAL',
-              status: 'COMPLETED'
-            }
-          });
-
           return {
-            id: processedImage.id,
+            id: `gpt-${Date.now()}`,
             imageData: imageUrl,
             imageSize: 0 // GPT 返回的是 URL，无法获取大小
           };
