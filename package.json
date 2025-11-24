@@ -16,10 +16,14 @@
     "electron:dev": "concurrently \"NODE_ENV=development npm run dev\" \"wait-on http://localhost:23000 && NODE_ENV=development electron .\"",
     "electron:build": "npm run build && electron-builder",
     "electron:build:mac": "npm run build && electron-builder --mac",
+    "electron:build:mac:x64": "npm run build && electron-builder --mac --x64",
+    "electron:build:mac:arm64": "npm run build && electron-builder --mac --arm64",
     "electron:build:win": "npm run build && electron-builder --win",
     "electron:build:linux": "npm run build && electron-builder --linux",
     "build:windows": "node scripts/build-windows.mjs --auto",
-    "build:icon": "node scripts/generate-windows-icon.js"
+    "build:mac": "node scripts/build-mac.mjs",
+    "build:icon": "node scripts/generate-windows-icon.js",
+    "build:icon:mac": "node scripts/generate-mac-icon.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -114,12 +118,23 @@
     ],
     "mac": {
       "category": "public.app-category.graphics-design",
-      "icon": "public/icon.png",
+      "icon": "public/icon.icns",
       "target": [
-        "dmg",
-        "zip"
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64", "arm64"]
+        }
       ],
-      "executableName": "ImagineThis"
+      "executableName": "ImagineThis",
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "electron/entitlements.mac.plist",
+      "entitlementsInherit": "electron/entitlements.mac.plist"
     },
     "win": {
       "icon": "public/icon.png",
