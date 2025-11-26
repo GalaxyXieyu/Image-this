@@ -48,6 +48,9 @@ import { useImageUpload } from '@/hooks/useImageUpload';
 import { useImageProcessing } from '@/hooks/useImageProcessing';
 import { useTaskPolling } from '@/hooks/useTaskPolling';
 
+// Zustand Store
+import { useWorkspaceTabStore, UploadedImage as StoreUploadedImage } from '@/stores/useWorkspaceTabStore';
+
 interface UploadedImage {
   id: string;
   file: File;
@@ -82,37 +85,61 @@ export default function WorkspacePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<ActiveTab>("one-click");
+  
+  // 使用 Zustand store 管理每个 tab 的独立状态
+  const {
+    activeTab,
+    setActiveTab,
+    tabStates,
+    setUploadedImages,
+    addUploadedImages,
+    removeUploadedImage,
+    clearUploadedImages,
+    setReferenceImage,
+    setSelectedPreviewIndex,
+    setOutputResolution,
+    setAiModel,
+    setPrompt,
+    setBackgroundPrompt,
+    setOutpaintPrompt,
+    setEnableWatermark,
+    setWatermarkType,
+    setWatermarkText,
+    setWatermarkLogo,
+    setWatermarkSettings,
+    getCurrentTabState,
+  } = useWorkspaceTabStore();
+  
+  // 从当前 tab 状态中获取值
+  const currentTabState = tabStates[activeTab];
+  const uploadedImages = currentTabState.uploadedImages;
+  const referenceImage = currentTabState.referenceImage;
+  const selectedPreviewIndex = currentTabState.selectedPreviewIndex;
+  const outputResolution = currentTabState.outputResolution;
+  const aiModel = currentTabState.aiModel;
+  const enableWatermark = currentTabState.enableWatermark;
+  const watermarkType = currentTabState.watermarkType;
+  const watermarkText = currentTabState.watermarkText;
+  const watermarkLogo = currentTabState.watermarkLogo;
+  const watermarkSettings = currentTabState.watermarkSettings;
+  
+  // 提示词根据 tab 类型获取
+  const backgroundPrompt = activeTab === 'background' ? currentTabState.prompt : '';
+  const outpaintPrompt = activeTab === 'expansion' ? currentTabState.prompt : '';
+  // 一键增强专用：独立的背景替换和扩图提示词
+  const oneClickBackgroundPrompt = currentTabState.backgroundPrompt;
+  const oneClickOutpaintPrompt = currentTabState.outpaintPrompt;
+  
+  // 本地状态（不需要跨 tab 保持）
   const [isProcessing, setIsProcessing] = useState(false);
-  const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
-  const [referenceImage, setReferenceImage] = useState<UploadedImage | null>(null);
   const [showImageModal, setShowImageModal] = useState(false);
-  const [selectedPreviewIndex, setSelectedPreviewIndex] = useState<number>(0); // 用于大图预览的选中索引
   const [processedResults, setProcessedResults] = useState<ProcessedResult[]>([]);
   const [showResultModal, setShowResultModal] = useState(false);
   const [selectedResultIndex, setSelectedResultIndex] = useState<number | null>(null);
-
-  // 水印相关状态
-  const [enableWatermark, setEnableWatermark] = useState(false);
-  const [watermarkText, setWatermarkText] = useState('Sample Watermark');
-  const [watermarkOpacity, setWatermarkOpacity] = useState(1.0); // 改为 1.0，保持 Logo 原色
+  const [watermarkOpacity, setWatermarkOpacity] = useState(1.0);
   const [watermarkPosition, setWatermarkPosition] = useState('bottom-right');
-  const [watermarkType, setWatermarkType] = useState<'text' | 'logo'>('logo');
-  const [watermarkLogo, setWatermarkLogo] = useState<UploadedImage | null>(null);
   const [showWatermarkPreview, setShowWatermarkPreview] = useState(false);
-  const [watermarkSettings, setWatermarkSettings] = useState({ x: 50, y: 50, width: 150, height: 150, editorWidth: 600, editorHeight: 400 });
-
-  // 输出分辨率
-  const [outputResolution, setOutputResolution] = useState('original');
-  
-  // AI 模型选择
-  const [aiModel, setAiModel] = useState('gemini'); // 默认使用 gemini
   const [availableProviders, setAvailableProviders] = useState<string[]>([]);
-
-  // 提示词状态
-  const [backgroundPrompt, setBackgroundPrompt] = useState('');
-  const [outpaintPrompt, setOutpaintPrompt] = useState('');
-  const [oneClickPrompt, setOneClickPrompt] = useState('');
 
   // 历史记录侧边栏状态
   const [isHistorySidebarOpen, setIsHistorySidebarOpen] = useState(false);
@@ -266,19 +293,19 @@ export default function WorkspacePage() {
     setWatermarkSettings(position);
   }, []);
 
-  // 组件卸载时清理所有资源
-  useEffect(() => {
-    return () => {
-      uploadedImagesRef.current.forEach(img => {
-        if (img.preview) {
-          URL.revokeObjectURL(img.preview);
-        }
-      });
-      if (referenceImageRef.current?.preview) {
-        URL.revokeObjectURL(referenceImageRef.current.preview);
-      }
-    };
-  }, []);
+  // 组件卸载时清理所有资源 - 移除，防止切换页面图片失效
+  // useEffect(() => {
+  //   return () => {
+  //     uploadedImagesRef.current.forEach(img => {
+  //       if (img.preview) {
+  //         URL.revokeObjectURL(img.preview);
+  //       }
+  //     });
+  //     if (referenceImageRef.current?.preview) {
+  //       URL.revokeObjectURL(referenceImageRef.current.preview);
+  //     }
+  //   };
+  // }, []);
 
   // 获取处理类型显示名称
   const getProcessTypeName = (type: string): string => {
@@ -361,16 +388,31 @@ export default function WorkspacePage() {
       }
     ];
 
+  // 提示词 setter 函数（根据当前 tab 设置对应的 prompt）
+  const handleSetBackgroundPrompt = (value: string) => {
+    if (activeTab === 'background') setPrompt(value);
+  };
+  const handleSetOutpaintPrompt = (value: string) => {
+    if (activeTab === 'expansion') setPrompt(value);
+  };
+  // 一键增强专用：独立的背景替换和扩图提示词 setter
+  const handleSetOneClickBackgroundPrompt = (value: string) => {
+    setBackgroundPrompt(value);
+  };
+  const handleSetOneClickOutpaintPrompt = (value: string) => {
+    setOutpaintPrompt(value);
+  };
+
   // 使用 Hook 中的上传方法
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     imageUploadHook.handleFileUpload(event, (images) => {
-      setUploadedImages(prev => [...prev, ...images]);
+      addUploadedImages(images);
     });
   };
 
   const handleFolderUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     imageUploadHook.handleFolderUpload(event, (images) => {
-      setUploadedImages(prev => [...prev, ...images]);
+      addUploadedImages(images);
     });
   };
 
@@ -385,7 +427,7 @@ export default function WorkspacePage() {
   const removeImage = (id: string) => {
     const imageToRemove = uploadedImages.find(img => img.id === id);
     imageUploadHook.removeImage(imageToRemove || null);
-    setUploadedImages(prev => prev.filter(img => img.id !== id));
+    removeUploadedImage(id);
   };
 
   const removeReferenceImage = () => {
@@ -400,14 +442,14 @@ export default function WorkspacePage() {
 
   const clearAllImages = () => {
     imageUploadHook.clearAllImages(uploadedImages);
-    setUploadedImages([]);
+    clearUploadedImages();
   };
 
   const navigateImage = (direction: 'prev' | 'next') => {
     if (direction === 'prev') {
-      setSelectedPreviewIndex(prev => prev > 0 ? prev - 1 : uploadedImages.length - 1);
+      setSelectedPreviewIndex(selectedPreviewIndex > 0 ? selectedPreviewIndex - 1 : uploadedImages.length - 1);
     } else {
-      setSelectedPreviewIndex(prev => prev < uploadedImages.length - 1 ? prev + 1 : 0);
+      setSelectedPreviewIndex(selectedPreviewIndex < uploadedImages.length - 1 ? selectedPreviewIndex + 1 : 0);
     }
   };
 
@@ -521,7 +563,7 @@ export default function WorkspacePage() {
             const imageToRemove = uploadedImages.find(img => img.id === id);
             if (imageToRemove) {
               imageUploadHook.removeImage(imageToRemove);
-              setUploadedImages(uploadedImages.filter(img => img.id !== id));
+              removeUploadedImage(id);
             }
           }}
         />
@@ -544,9 +586,6 @@ export default function WorkspacePage() {
             onClear={clearAllImages}
             onRemove={(id) => {
               removeImage(id);
-              if (uploadedImages.findIndex(img => img.id === id) === selectedPreviewIndex && uploadedImages.length > 1) {
-                setSelectedPreviewIndex(prev => prev > 0 ? prev - 1 : 0);
-              }
             }}
             onPreview={() => setShowImageModal(true)}
             fileInputRef={fileInputRef}
@@ -588,11 +627,13 @@ export default function WorkspacePage() {
             setAiModel={setAiModel}
             availableProviders={availableProviders}
             backgroundPrompt={backgroundPrompt}
-            setBackgroundPrompt={setBackgroundPrompt}
+            setBackgroundPrompt={handleSetBackgroundPrompt}
             outpaintPrompt={outpaintPrompt}
-            setOutpaintPrompt={setOutpaintPrompt}
-            oneClickPrompt={oneClickPrompt}
-            setOneClickPrompt={setOneClickPrompt}
+            setOutpaintPrompt={handleSetOutpaintPrompt}
+            oneClickBackgroundPrompt={oneClickBackgroundPrompt}
+            setOneClickBackgroundPrompt={handleSetOneClickBackgroundPrompt}
+            oneClickOutpaintPrompt={oneClickOutpaintPrompt}
+            setOneClickOutpaintPrompt={handleSetOneClickOutpaintPrompt}
           />
 
           {/* One-click 水印设置 */}

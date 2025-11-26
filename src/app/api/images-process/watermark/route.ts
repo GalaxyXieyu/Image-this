@@ -70,7 +70,8 @@ export async function POST(request: NextRequest) {
 
       const uploadedUrl = await uploadBase64Image(
         watermarkedImageData,
-        `watermark-${processedImage.id}.png`
+        `watermark-${processedImage.id}.png`,
+        userId
       );
 
       const updatedImage = await prisma.processedImage.update({

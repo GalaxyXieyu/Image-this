@@ -18,7 +18,7 @@
     "electron:build:mac": "npm run build && electron-builder --mac",
     "electron:build:mac:x64": "npm run build && electron-builder --mac --x64",
     "electron:build:mac:arm64": "npm run build && electron-builder --mac --arm64",
-    "electron:build:win": "npm run build && electron-builder --win",
+    "electron:build:win": "electron-builder --win",
     "electron:build:linux": "npm run build && electron-builder --linux",
     "build:windows": "node scripts/build-windows.mjs --auto",
     "build:mac": "node scripts/build-mac.mjs",
@@ -76,7 +76,8 @@
     "sonner": "^1.5.0",
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -104,17 +105,29 @@
     },
     "files": [
       "electron/**/*",
+      {
+        "from": ".next",
+        "to": ".next"
+      },
+      {
+        "from": "public",
+        "to": "public"
+      },
+      {
+        "from": "prisma",
+        "to": "prisma"
+      },
+      "package.json",
+      ".env.production"
+    ],
+    "asar": true,
+    "asarUnpack": [
       ".next/**/*",
       "public/**/*",
       "prisma/**/*",
-      "node_modules/**/*",
-      "package.json",
-      ".env"
-    ],
-    "asarUnpack": [
+      "node_modules/sharp/**/*",
       "node_modules/@img/**/*",
-      "node_modules/canvas/**/*",
-      "node_modules/sharp/**/*"
+      ".env.production"
     ],
     "mac": {
       "category": "public.app-category.graphics-design",
@@ -122,11 +135,17 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         },
         {
           "target": "zip",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "executableName": "ImagineThis",
@@ -141,11 +160,15 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "artifactName": "${productName}-${version}-${arch}.${ext}"

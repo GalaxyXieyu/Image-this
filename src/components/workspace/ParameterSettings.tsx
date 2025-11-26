@@ -18,8 +18,11 @@ interface ParameterSettingsProps {
     setBackgroundPrompt?: (value: string) => void;
     outpaintPrompt?: string;
     setOutpaintPrompt?: (value: string) => void;
-    oneClickPrompt?: string;
-    setOneClickPrompt?: (value: string) => void;
+    // 一键增强专用：独立的背景替换和扩图提示词
+    oneClickBackgroundPrompt?: string;
+    setOneClickBackgroundPrompt?: (value: string) => void;
+    oneClickOutpaintPrompt?: string;
+    setOneClickOutpaintPrompt?: (value: string) => void;
 }
 
 export default function ParameterSettings({
@@ -33,8 +36,10 @@ export default function ParameterSettings({
     setBackgroundPrompt,
     outpaintPrompt = '',
     setOutpaintPrompt,
-    oneClickPrompt = '',
-    setOneClickPrompt,
+    oneClickBackgroundPrompt = '',
+    setOneClickBackgroundPrompt,
+    oneClickOutpaintPrompt = '',
+    setOneClickOutpaintPrompt,
 }: ParameterSettingsProps) {
     
     // 根据功能类型获取可用的提供商
@@ -201,14 +206,25 @@ export default function ParameterSettings({
                     <div className="space-y-4">
                         {activeTab === "one-click" && (
                             <>
-                                {/* 提示词选择器 */}
-                                {setOneClickPrompt && (
+                                {/* 背景替换提示词 */}
+                                {setOneClickBackgroundPrompt && (
                                     <PromptTemplateSelector
-                                        category="ONE_CLICK"
-                                        value={oneClickPrompt}
-                                        onChange={setOneClickPrompt}
-                                        label="一键增强提示词"
-                                        description="综合处理：背景优化 + 扩图 + 高清化"
+                                        category="BACKGROUND_REPLACE"
+                                        value={oneClickBackgroundPrompt}
+                                        onChange={setOneClickBackgroundPrompt}
+                                        label="背景替换提示词"
+                                        description="描述如何替换背景，保持产品主体不变"
+                                    />
+                                )}
+                                
+                                {/* 扩图提示词 */}
+                                {setOneClickOutpaintPrompt && (
+                                    <PromptTemplateSelector
+                                        category="OUTPAINT"
+                                        value={oneClickOutpaintPrompt}
+                                        onChange={setOneClickOutpaintPrompt}
+                                        label="扩图提示词"
+                                        description="描述如何扩展图像边界，自然延伸背景"
                                     />
                                 )}
                                 

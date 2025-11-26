@@ -1,4 +1,5 @@
-import sharp from 'sharp';
+// Sharp 在 Electron 打包时可能有兼容性问题，使用动态导入
+// import sharp from 'sharp';
 
 /**
  * 裁切图片，去除上下左右的指定百分比
@@ -11,6 +12,15 @@ export async function cropImageBorders(
   cropPercentage: number = 0.1
 ): Promise<Buffer> {
   try {
+    // 动态导入 sharp，如果失败则返回原图
+    let sharp;
+    try {
+      sharp = (await import('sharp')).default;
+    } catch (e) {
+      console.warn('Sharp 模块不可用，返回原图');
+      return imageBuffer;
+    }
+    
     // 获取图片信息
     const image = sharp(imageBuffer);
     const metadata = await image.metadata();
@@ -39,7 +49,8 @@ export async function cropImageBorders(
     return croppedBuffer;
   } catch (error) {
     console.error('图片裁切失败:', error);
-    throw new Error('图片裁切失败');
+    // 返回原图而不是抛出错误
+    return imageBuffer;
   }
 }
 
@@ -56,7 +67,12 @@ export async function cropBase64Image(
   try {
     // 移除data:image前缀
     let base64String = base64Data;
+    let mimeType = 'image/jpeg';
     if (base64Data.startsWith('data:')) {
+      const match = base64Data.match(/^data:([^;]+);base64,/);
+      if (match) {
+        mimeType = match[1];
+      }
       base64String = base64Data.split(',')[1];
     }
 
@@ -68,10 +84,11 @@ export async function cropBase64Image(
     
     // 转换回base64
     const croppedBase64 = croppedBuffer.toString('base64');
-    return `data:image/jpeg;base64,${croppedBase64}`;
+    return `data:${mimeType};base64,${croppedBase64}`;
   } catch (error) {
-    console.error('Base64图片裁切失败:', error);
-    throw new Error('Base64图片裁切失败');
+    console.error('Base64图片裁切失败，返回原图:', error);
+    // 返回原图而不是抛出错误
+    return base64Data;
   }
 }
 
@@ -89,7 +106,8 @@ export async function cropUrlImage(
     // 下载图片
     const response = await fetch(imageUrl);
     if (!response.ok) {
-      throw new Error(`下载图片失败: ${response.statusText}`);
+      console.error(`下载图片失败: ${response.statusText}`);
+      return imageUrl; // 返回原URL
     }
     
     const imageBuffer = Buffer.from(await response.arrayBuffer());
@@ -101,8 +119,8 @@ export async function cropUrlImage(
     const croppedBase64 = croppedBuffer.toString('base64');
     return `data:image/jpeg;base64,${croppedBase64}`;
   } catch (error) {
-    console.error('URL图片裁切失败:', error);
-    throw new Error('URL图片裁切失败');
+    console.error('URL图片裁切失败，返回原URL:', error);
+    return imageUrl; // 返回原URL而不是抛出错误
   }
 }
 

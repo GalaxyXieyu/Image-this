@@ -4,6 +4,10 @@ import { uploadBase64Image } from '@/lib/storage';
 import { addWatermarkToImage } from '@/lib/watermark';
 import { getUserConfig } from '@/lib/user-config';
 
+// 告诉 Next.js 这是一个动态路由，不要在构建时预渲染
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 // 任务处理器
 class TaskProcessor {
   private isProcessing = false;
@@ -390,12 +394,7 @@ class TaskProcessor {
     
     try {
       // 构建提示词：如果有自定义提示词就用，否则使用默认的背景替换提示词
-      let prompt = customPrompt || '保持产品的形状、材质、特征比例、摆放角度及数量完全一致，仅替换背景，禁用背景虚化效果，确保画面清晰，专业摄影，高质量，4K分辨率';
-      
-      // 如果有参考图，在提示词中说明要参考场景风格
-      if (referenceImageUrl && !customPrompt) {
-        prompt = '保持产品主体完全不变，仅替换背景为类似参考场景的风格，保持产品的形状、材质、特征比例、摆放角度及数量完全一致，专业摄影，高质量，4K分辨率';
-      }
+      let prompt = customPrompt || '保持第一张图的产品主体完全不变，仅替换第二张图的背景为类似参考场景的风格（要完全把第二张图的产品去掉），不要有同时出现的情况，保持第一张产品的形状、材质、特征比例、摆放角度及数量完全一致，专业摄影，高质量，4K分辨率';
 
       const referenceImages = [imageUrl];
       if (referenceImageUrl) {
@@ -418,10 +417,11 @@ class TaskProcessor {
           task.userId
         );
         
-        // 保存到本地存储
+        // 保存到本地存储（使用用户配置的保存路径）
         const processedUrl = await uploadBase64Image(
           gptResult.imageData,
-          `gpt-bg-replace-${Date.now()}.jpg`
+          `gpt-bg-replace-${Date.now()}.jpg`,
+          task.userId
         );
         
         const processedImage = await prisma.processedImage.create({
@@ -443,6 +443,7 @@ class TaskProcessor {
         
         result = {
           id: processedImage.id,
+          processedUrl: processedUrl,
           imageData: gptResult.imageData,
           imageSize: gptResult.imageSize
         };
@@ -460,10 +461,11 @@ class TaskProcessor {
           task.userId
         );
         
-        // 保存到本地存储
+        // 保存到本地存储（使用用户配置的保存路径）
         const processedUrl = await uploadBase64Image(
           resultImageUrl || '',
-          `gemini-bg-replace-${Date.now()}.jpg`
+          `gemini-bg-replace-${Date.now()}.jpg`,
+          task.userId
         );
         
         const processedImage = await prisma.processedImage.create({
@@ -485,6 +487,7 @@ class TaskProcessor {
         
         result = {
           id: processedImage.id,
+          processedUrl: processedUrl,
           imageData: resultImageUrl || '',
           imageSize: resultImageUrl?.length || 0
         };
@@ -502,10 +505,11 @@ class TaskProcessor {
           task.userId
         );
         
-        // 保存到本地存储
+        // 保存到本地存储（使用用户配置的保存路径）
         const processedUrl = await uploadBase64Image(
           jimengResult.imageData,
-          `jimeng-bg-replace-${Date.now()}.jpg`
+          `jimeng-bg-replace-${Date.now()}.jpg`,
+          task.userId
         );
         
         const processedImage = await prisma.processedImage.create({
@@ -527,6 +531,7 @@ class TaskProcessor {
         
         result = {
           id: processedImage.id,
+          processedUrl: processedUrl,
           imageData: jimengResult.imageData,
           imageSize: jimengResult.imageSize
         };
@@ -539,7 +544,8 @@ class TaskProcessor {
       
       return {
         processedImageId: result.id,
-        processedImageUrl: result.imageData,
+        processedImageUrl: result.processedUrl,
+        imageData: result.imageData,
         prompt: prompt || customPrompt || ''
       };
 
@@ -582,10 +588,11 @@ class TaskProcessor {
         imagehostingConfig
       );
 
-      // 保存到本地存储
+      // 保存到本地存储（使用用户配置的保存路径）
       const processedUrl = await uploadBase64Image(
         result.imageData,
-        `outpaint-${Date.now()}.jpg`
+        `outpaint-${Date.now()}.jpg`,
+        task.userId
       );
       
       const processedImage = await prisma.processedImage.create({
@@ -609,7 +616,8 @@ class TaskProcessor {
       
       return {
         processedImageId: processedImage.id,
-        processedImageUrl: result.imageData,
+        processedImageUrl: processedUrl,
+        imageData: result.imageData,
         expandRatio: result.metadata?.expandRatio || { top, bottom, left, right }
       };
 
@@ -645,10 +653,11 @@ class TaskProcessor {
         imagehostingConfig
       );
 
-      // 保存到本地存储
+      // 保存到本地存储（使用用户配置的保存路径）
       const processedUrl = await uploadBase64Image(
         result.imageData,
-        `enhance-${Date.now()}.jpg`
+        `enhance-${Date.now()}.jpg`,
+        task.userId
       );
       
       const processedImage = await prisma.processedImage.create({
@@ -672,7 +681,8 @@ class TaskProcessor {
       
       return {
         processedImageId: processedImage.id,
-        processedImageUrl: result.imageData,
+        processedImageUrl: processedUrl,
+        imageData: result.imageData,
         upscaleFactor
       };
 
@@ -741,7 +751,8 @@ class TaskProcessor {
 
       const uploadedUrl = await uploadBase64Image(
         watermarkedImageData,
-        `watermark-${processedImage.id}.png`
+        `watermark-${processedImage.id}.png`,
+        task.userId
       );
       
       console.log('[Worker WATERMARK] 上传完成:', {

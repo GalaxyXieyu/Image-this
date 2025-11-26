@@ -112,15 +112,17 @@ export async function POST(request: NextRequest) {
 
       const imageDataUrl = resultImageUrl;
 
-      // 上传到本地存储
+      // 上传到本地存储（使用用户配置的保存路径）
       const processedUrl = await uploadBase64Image(
         imageDataUrl,
-        `bg-replace-${processedImage.id}.jpg`
+        `bg-replace-${processedImage.id}.jpg`,
+        userId
       );
 
       const originalUrl = await uploadBase64Image(
         originalImageUrl,
-        `original-${processedImage.id}.jpg`
+        `original-${processedImage.id}.jpg`,
+        userId
       );
 
       const updatedImage = await prisma.processedImage.update({

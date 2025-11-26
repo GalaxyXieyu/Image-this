@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { uploadBase64Image } from '@/lib/storage';
 import { ImageProcessorFactory, ImageProvider } from '@/lib/image-processor';
+import { processWithGemini, processWithGPT, processWithJimeng } from '@/lib/image-processor/service';
 
 export interface OneClickWorkflowParams {
   imageUrl: string;
@@ -34,6 +35,12 @@ export interface OneClickWorkflowResult {
     outpaint: boolean;
     upscale: boolean;
     watermark: boolean;
+  };
+  errors?: {
+    backgroundReplace?: string;
+    outpaint?: string;
+    upscale?: string;
+    watermark?: string;
   };
 }
 
@@ -111,6 +118,7 @@ export async function executeOneClickWorkflow(
     let processedImageUrl = imageUrl;
     let hasBackgroundReplace = false;
     let hasOutpaint = false;
+    const stepErrors: Record<string, string> = {};
 
     console.log('=== 开始一键增强处理流程 ===');
     console.log('处理选项:', { enableBackgroundReplace, enableOutpaint, enableUpscale });
@@ -122,24 +130,35 @@ export async function executeOneClickWorkflow(
       console.log(`=== 步骤1/4：开始背景替换 (使用 ${aiModel}) ===`);
       const bgStartTime = Date.now();
       try {
-        const prompt = '保持产品主体完全不变，仅替换背景为类似参考场景的风格，保持产品的形状、材质、特征比例、摆放角度及数量完全一致，专业摄影，高质量，4K分辨率';
+        const prompt = '保持第一张图的产品主体完全不变，仅替换第二张图的背景为类似参考场景的风格（要完全把第二张图的产品去掉），不要有同时出现的情况，保持第一张产品的形状、材质、特征比例、摆放角度及数量完全一致，专业摄影，高质量，4K分辨率';
         
+        let bgResultImageData: string | undefined;
+
         // 根据选择的 AI 模型调用不同的服务
         if (aiModel === 'gpt') {
-          // TODO: 实现 GPT-4 Vision 背景替换
-          throw new Error('GPT-4 Vision 背景替换功能即将推出');
+          const result = await processWithGPT(imageUrl, referenceImageUrl, prompt, userId);
+          bgResultImageData = result.imageData;
         } else if (aiModel === 'gemini') {
-          // TODO: 实现 Gemini 背景替换
-          throw new Error('Gemini 背景替换功能即将推出');
+          const result = await processWithGemini(imageUrl, referenceImageUrl, prompt, userId);
+          if (result) bgResultImageData = result;
+        } else if (aiModel === 'jimeng') {
+          const result = await processWithJimeng(imageUrl, referenceImageUrl, prompt, userId);
+          bgResultImageData = result.imageData;
         } else {
-          throw new Error(`不支持的 AI 模型: ${aiModel}，请使用 gpt 或 gemini`);
+          throw new Error(`不支持的 AI 模型: ${aiModel}，请使用 gpt, gemini 或 jimeng`);
         }
         
-        hasBackgroundReplace = true;
-        const bgDuration = ((Date.now() - bgStartTime) / 1000).toFixed(2);
-        console.log(`背景替换完成 (${aiModel})，耗时: ${bgDuration}秒`);
+        if (bgResultImageData) {
+          processedImageUrl = bgResultImageData;
+          hasBackgroundReplace = true;
+          const bgDuration = ((Date.now() - bgStartTime) / 1000).toFixed(2);
+          console.log(`背景替换完成 (${aiModel})，耗时: ${bgDuration}秒`);
+        } else {
+          throw new Error('背景替换返回结果为空');
+        }
       } catch (error) {
         console.error('背景替换失败，继续使用原图:', error);
+        stepErrors.backgroundReplace = error instanceof Error ? error.message : String(error);
       }
     } else {
       console.log('=== 跳过背景替换步骤 ===');
@@ -188,6 +207,7 @@ export async function executeOneClickWorkflow(
         console.log(`扩图处理完成，图片大小: ${Math.round(result.imageSize / 1024)}KB, 耗时: ${outpaintDuration}秒`);
       } catch (error) {
         console.error('扩图失败，继续使用当前图片:', error);
+        stepErrors.outpaint = error instanceof Error ? error.message : String(error);
       }
     } else {
       console.log('=== 跳过扩图步骤 ===');
@@ -232,6 +252,7 @@ export async function executeOneClickWorkflow(
         console.log(`智能画质增强完成 (${aiModel})，耗时: ${enhanceDuration}秒`);
       } catch (error) {
         console.error('智能画质增强失败，继续使用当前图片:', error);
+        stepErrors.upscale = error instanceof Error ? error.message : String(error);
       }
     } else {
       console.log('=== 跳过智能画质增强步骤 ===');
@@ -254,6 +275,7 @@ export async function executeOneClickWorkflow(
         console.log('水印添加完成');
       } catch (error) {
         console.error('水印添加失败，继续使用当前图片:', error);
+        stepErrors.watermark = error instanceof Error ? error.message : String(error);
       }
     } else {
       console.log('=== 跳过水印步骤 ===');
@@ -269,8 +291,8 @@ export async function executeOneClickWorkflow(
 
     console.log('=== 开始保存图片 ===');
     const saveStartTime = Date.now();
-    // 保存到本地存储
-    const savedUrl = await uploadBase64Image(finalImageData, `one-click-${processedImage.id}.jpg`);
+    // 保存到本地存储（使用用户配置的保存路径）
+    const savedUrl = await uploadBase64Image(finalImageData, `one-click-${processedImage.id}.jpg`, userId);
     const saveDuration = ((Date.now() - saveStartTime) / 1000).toFixed(2);
     console.log(`图片保存完成，耗时: ${saveDuration}秒`);
     
@@ -292,7 +314,8 @@ export async function executeOneClickWorkflow(
             outpaint: hasOutpaint,
             upscale: enableUpscale,
             watermark: enableWatermark
-          }
+          },
+          stepErrors // 记录每一步的错误
         })
       }
     });
@@ -307,7 +330,8 @@ export async function executeOneClickWorkflow(
         outpaint: hasOutpaint,
         upscale: enableUpscale,
         watermark: enableWatermark
-      }
+      },
+      errors: stepErrors
     };
 
   } catch (processingError) {

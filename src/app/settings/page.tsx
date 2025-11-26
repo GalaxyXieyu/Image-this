@@ -72,19 +72,15 @@ export default function SettingsPage() {
   
   const [apiSettings, setApiSettings] = useState({
     // 火山引擎配置
-    volcengineEnabled: false,
     volcengineAccessKey: '',
     volcengineSecretKey: '',
     // GPT 配置
-    gptEnabled: false,
     gptApiUrl: 'https://yunwu.ai',
     gptApiKey: '',
     // Gemini 配置
-    geminiEnabled: false,
     geminiApiKey: '',
     geminiBaseUrl: 'https://yunwu.ai',
     // 图床配置
-    imagehostingEnabled: false,
     superbedToken: '',
     // 本地存储配置
     localStoragePath: ''
@@ -146,16 +142,12 @@ export default function SettingsPage() {
           const data = await response.json();
           if (data.success && data.config) {
             setApiSettings({
-              volcengineEnabled: data.config.volcengine?.enabled || false,
               volcengineAccessKey: data.config.volcengine?.accessKey || '',
               volcengineSecretKey: data.config.volcengine?.secretKey || '',
-              gptEnabled: false,
-              gptApiUrl: 'https://yunwu.ai',
-              gptApiKey: '',
-              geminiEnabled: false,
-              geminiApiKey: '',
-              geminiBaseUrl: 'https://yunwu.ai',
-              imagehostingEnabled: data.config.imagehosting?.enabled || false,
+              gptApiUrl: data.config.gpt?.apiUrl || 'https://yunwu.ai',
+              gptApiKey: data.config.gpt?.apiKey || '',
+              geminiApiKey: data.config.gemini?.apiKey || '',
+              geminiBaseUrl: data.config.gemini?.baseUrl || 'https://yunwu.ai',
               superbedToken: data.config.imagehosting?.superbedToken || '',
               localStoragePath: data.config.localStorage?.savePath || ''
             });
@@ -186,25 +178,25 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // 转换为标准配置格式
+      // 转换为标准配置格式，根据是否填写了必要字段自动判断是否启用
       const config = {
         volcengine: {
-          enabled: apiSettings.volcengineEnabled,
+          enabled: !!(apiSettings.volcengineAccessKey && apiSettings.volcengineSecretKey),
           accessKey: apiSettings.volcengineAccessKey,
           secretKey: apiSettings.volcengineSecretKey
         },
         gpt: {
-          enabled: apiSettings.gptEnabled,
+          enabled: !!(apiSettings.gptApiKey),
           apiUrl: apiSettings.gptApiUrl,
           apiKey: apiSettings.gptApiKey
         },
         gemini: {
-          enabled: apiSettings.geminiEnabled,
+          enabled: !!(apiSettings.geminiApiKey),
           apiKey: apiSettings.geminiApiKey,
           baseUrl: apiSettings.geminiBaseUrl
         },
         imagehosting: {
-          enabled: apiSettings.imagehostingEnabled,
+          enabled: !!(apiSettings.superbedToken),
           superbedToken: apiSettings.superbedToken
         },
         localStorage: {
@@ -458,20 +450,9 @@ export default function SettingsPage() {
             {/* 火山引擎配置 */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <Zap className="w-5 h-5 mr-2 text-orange-600" />
-                    火山引擎（Volcengine）
-                  </div>
-                  <label className="flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="mr-2"
-                      checked={apiSettings.volcengineEnabled}
-                      onChange={(e) => handleInputChange('volcengineEnabled', e.target.checked)}
-                    />
-                    <span className="text-sm text-gray-600">启用</span>
-                  </label>
+                <CardTitle className="flex items-center">
+                  <Zap className="w-5 h-5 mr-2 text-orange-600" />
+                  火山引擎（Volcengine）
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -485,7 +466,6 @@ export default function SettingsPage() {
                     placeholder="AKLT..."
                     value={apiSettings.volcengineAccessKey}
                     onChange={(e) => handleInputChange('volcengineAccessKey', e.target.value)}
-                    disabled={!apiSettings.volcengineEnabled}
                   />
                 </div>
                 <div>
@@ -496,7 +476,6 @@ export default function SettingsPage() {
                     placeholder="输入密钥"
                     value={apiSettings.volcengineSecretKey}
                     onChange={(e) => handleInputChange('volcengineSecretKey', e.target.value)}
-                    disabled={!apiSettings.volcengineEnabled}
                   />
                 </div>
               </CardContent>
@@ -505,20 +484,9 @@ export default function SettingsPage() {
             {/* GPT API配置 */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <Key className="w-5 h-5 mr-2 text-blue-600" />
-                    GPT API
-                  </div>
-                  <label className="flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="mr-2"
-                      checked={apiSettings.gptEnabled}
-                      onChange={(e) => handleInputChange('gptEnabled', e.target.checked)}
-                    />
-                    <span className="text-sm text-gray-600">启用</span>
-                  </label>
+                <CardTitle className="flex items-center">
+                  <Key className="w-5 h-5 mr-2 text-blue-600" />
+                  GPT API
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -532,7 +500,6 @@ export default function SettingsPage() {
                     placeholder="https://yunwu.ai"
                     value={apiSettings.gptApiUrl}
                     onChange={(e) => handleInputChange('gptApiUrl', e.target.value)}
-                    disabled={!apiSettings.gptEnabled}
                   />
                 </div>
                 <div>
@@ -543,29 +510,17 @@ export default function SettingsPage() {
                     placeholder="sk-..."
                     value={apiSettings.gptApiKey}
                     onChange={(e) => handleInputChange('gptApiKey', e.target.value)}
-                    disabled={!apiSettings.gptEnabled}
                   />
                 </div>
               </CardContent>
             </Card>
 
             {/* Google Gemini配置 */}
-            <Card className="border-dashed">
+            <Card>
               <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <Sparkles className="w-5 h-5 mr-2 text-purple-600" />
-                    Google Gemini
-                  </div>
-                  <label className="flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="mr-2"
-                      checked={apiSettings.geminiEnabled}
-                      onChange={(e) => handleInputChange('geminiEnabled', e.target.checked)}
-                    />
-                    <span className="text-sm text-gray-600">启用</span>
-                  </label>
+                <CardTitle className="flex items-center">
+                  <Sparkles className="w-5 h-5 mr-2 text-purple-600" />
+                  Google Gemini
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -579,7 +534,6 @@ export default function SettingsPage() {
                     placeholder="https://yunwu.ai"
                     value={apiSettings.geminiBaseUrl}
                     onChange={(e) => handleInputChange('geminiBaseUrl', e.target.value)}
-                    disabled={!apiSettings.geminiEnabled}
                   />
                   <p className="text-xs text-gray-500 mt-1">Gemini API 的基础 URL</p>
                 </div>
@@ -591,7 +545,6 @@ export default function SettingsPage() {
                     placeholder="sk-..."
                     value={apiSettings.geminiApiKey}
                     onChange={(e) => handleInputChange('geminiApiKey', e.target.value)}
-                    disabled={!apiSettings.geminiEnabled}
                   />
                 </div>
               </CardContent>
@@ -604,20 +557,9 @@ export default function SettingsPage() {
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <Image className="w-5 h-5 mr-2 text-green-600" />
-                    图床服务
-                  </div>
-                  <label className="flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="mr-2"
-                      checked={apiSettings.imagehostingEnabled}
-                      onChange={(e) => handleInputChange('imagehostingEnabled', e.target.checked)}
-                    />
-                    <span className="text-sm text-gray-600">启用</span>
-                  </label>
+                <CardTitle className="flex items-center">
+                  <Image className="w-5 h-5 mr-2 text-green-600" />
+                  图床服务
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -632,7 +574,6 @@ export default function SettingsPage() {
                     placeholder="输入 Superbed API Token"
                     value={apiSettings.superbedToken}
                     onChange={(e) => handleInputChange('superbedToken', e.target.value)}
-                    disabled={!apiSettings.imagehostingEnabled}
                   />
                   <div className="text-xs text-gray-500 mt-1">
                     访问 <a href="https://superbed.cn/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">superbed.cn</a> 获取 API Token

@@ -26,7 +26,7 @@ export class JimengProcessor implements IImageProcessor {
       throw new Error('VOLCENGINE_NOT_CONFIGURED:请先配置火山引擎 Access Key 和 Secret Key');
     }
 
-    const finalPrompt = customPrompt || prompt || '保持产品主体完全不变，仅替换背景为类似参考场景的风格';
+    const finalPrompt = customPrompt || prompt || '保持第一张图的产品主体完全不变，仅替换第二张图的背景为类似参考场景的风格（要完全把第二张图的产品去掉），不要有同时出现的情况，保持第一张产品的形状、材质、特征比例、摆放角度及数量完全一致，专业摄影，高质量，4K分辨率';
 
     console.log('[Jimeng Processor] 开始背景替换');
 
