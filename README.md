@@ -29,7 +29,7 @@
 - **异步任务队列** - 非阻塞式处理，实时进度反馈
 - **项目管理** - 完善的项目组织和图像管理功能
 
-## 功能特性
+本平台采用现代化技术栈，架构清晰，易于扩展和部署。
 
 ### AI 图像处理能力
 
@@ -51,7 +51,8 @@
 - **图床集成** - 支持 Superbed 等图床服务
 - **响应式设计** - 完美适配桌面和移动设备
 
-## 技术栈
+![Architecture Diagram](https://i.imgur.com/your-architecture-diagram.png)
+*(这是一个占位符，您可以用实际的架构图替换)*
 
 ### 前端技术
 
@@ -96,9 +97,19 @@ Docker                   - 容器化部署
 Nginx                    - 反向代理
 ```
 
-## 快速开始
+*   **前端 (Frontend):**
+    *   **框架:** [Next.js 15](https://nextjs.org/) (使用 App Router)
+    *   **语言:** [TypeScript](https://www.typescriptlang.org/)
+    *   **UI 库:** [Tailwind CSS](https://tailwindcss.com/) 结合 [shadcn/ui](https://ui.shadcn.com/)，提供了一套美观、可定制的组件。
+    *   **状态管理:** 主要通过 React Hooks 和组件状态，配合 Next.js 的服务端能力进行数据管理。
+    *   **表单处理:** 使用 [React Hook Form](https://react-hook-form.com/) 和 [Zod](https://zod.dev/) 进行高效、类型安全的表单验证。
 
-### 环境要求
+*   **后端 (Backend):**
+    *   **框架:** 基于 Next.js API Routes 构建，实现了 BFF (Backend for Frontend) 模式。
+    *   **数据库 ORM:** [Prisma](https://www.prisma.io/)，提供了类型安全的数据库访问。
+    *   **数据库:** 开发环境使用 [SQLite](https://www.sqlite.org/index.html)，生产环境可配置为 PostgreSQL 或 MySQL。
+    *   **用户认证:** [NextAuth.js](https://next-auth.js.org/)，轻松集成多种登录方式（如邮箱/密码、OAuth）。
+    *   **异步任务队列:** 内置了一个基于数据库的任务队列系统 (`TaskQueue` 模型)，用于处理耗时的 AI 计算任务，避免阻塞 API 请求，提升用户体验。
 
 - Node.js 20.x 或更高版本
 - pnpm 9.x (推荐) 或 npm
@@ -239,7 +250,11 @@ pnpm electron:build:linux  # Linux
 - `PUT /api/prompt-templates/:id` - 更新模板
 - `DELETE /api/prompt-templates/:id` - 删除模板
 
-## 项目结构
+4.  **初始化数据库**
+    Prisma 会根据 `schema.prisma` 文件创建数据库和表结构。
+    ```bash
+    pnpm prisma migrate dev --name init
+    ```
 
 ```
 ai-images-generated/
