@@ -26,6 +26,9 @@ interface OneClickWatermarkSettingsProps {
     uploadedImages: UploadedImage[];
     selectedPreviewIndex: number;
     onPositionChange: (position: any) => void;
+    // 扩图比例（用于水印预览）
+    xScale?: number;
+    yScale?: number;
 }
 
 export default function OneClickWatermarkSettings({
@@ -40,7 +43,9 @@ export default function OneClickWatermarkSettings({
     watermarkLogoInputRef,
     uploadedImages,
     selectedPreviewIndex,
-    onPositionChange
+    onPositionChange,
+    xScale = 1,
+    yScale = 1
 }: OneClickWatermarkSettingsProps) {
     return (
         <Card className="bg-white mt-6">
@@ -142,7 +147,14 @@ export default function OneClickWatermarkSettings({
                                 <div className="pt-2">
                                     <div className="mb-3">
                                         <Label className="text-sm font-medium">调整Logo位置和大小</Label>
-                                        <p className="text-xs text-gray-500 mt-1">拖动Logo调整位置，拖动边角调整大小</p>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            拖动Logo调整位置，拖动边角调整大小
+                                            {(xScale > 1 || yScale > 1) && (
+                                                <span className="ml-2 text-blue-600">
+                                                    （灰色区域为扩图后的范围，蓝色虚线为原图边界）
+                                                </span>
+                                            )}
+                                        </p>
                                     </div>
                                     <div className="rounded-lg border-2 border-gray-200 overflow-hidden bg-white shadow-sm">
                                         <WatermarkEditor
@@ -151,6 +163,8 @@ export default function OneClickWatermarkSettings({
                                             onPositionChange={onPositionChange}
                                             width={400}
                                             height={300}
+                                            xScale={xScale}
+                                            yScale={yScale}
                                         />
                                     </div>
                                 </div>

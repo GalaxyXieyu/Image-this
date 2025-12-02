@@ -107,6 +107,8 @@ export default function WorkspacePage() {
     setWatermarkText,
     setWatermarkLogo,
     setWatermarkSettings,
+    setXScale,
+    setYScale,
     getCurrentTabState,
   } = useWorkspaceTabStore();
   
@@ -122,6 +124,8 @@ export default function WorkspacePage() {
   const watermarkText = currentTabState.watermarkText;
   const watermarkLogo = currentTabState.watermarkLogo;
   const watermarkSettings = currentTabState.watermarkSettings;
+  const xScale = parseFloat(currentTabState.xScale) || 2.0;
+  const yScale = parseFloat(currentTabState.yScale) || 2.0;
   
   // 提示词根据 tab 类型获取
   const backgroundPrompt = activeTab === 'background' ? currentTabState.prompt : '';
@@ -634,6 +638,10 @@ export default function WorkspacePage() {
             setOneClickBackgroundPrompt={handleSetOneClickBackgroundPrompt}
             oneClickOutpaintPrompt={oneClickOutpaintPrompt}
             setOneClickOutpaintPrompt={handleSetOneClickOutpaintPrompt}
+            xScale={currentTabState.xScale}
+            setXScale={setXScale}
+            yScale={currentTabState.yScale}
+            setYScale={setYScale}
           />
 
           {/* One-click 水印设置 */}
@@ -651,6 +659,8 @@ export default function WorkspacePage() {
               uploadedImages={uploadedImages}
               selectedPreviewIndex={selectedPreviewIndex}
               onPositionChange={handleWatermarkPositionChange}
+              xScale={xScale}
+              yScale={yScale}
             />
           )}
 

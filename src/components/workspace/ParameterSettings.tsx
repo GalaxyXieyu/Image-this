@@ -23,6 +23,11 @@ interface ParameterSettingsProps {
     setOneClickBackgroundPrompt?: (value: string) => void;
     oneClickOutpaintPrompt?: string;
     setOneClickOutpaintPrompt?: (value: string) => void;
+    // 扩图比例参数
+    xScale?: string;
+    setXScale?: (value: string) => void;
+    yScale?: string;
+    setYScale?: (value: string) => void;
 }
 
 export default function ParameterSettings({
@@ -40,6 +45,10 @@ export default function ParameterSettings({
     setOneClickBackgroundPrompt,
     oneClickOutpaintPrompt = '',
     setOneClickOutpaintPrompt,
+    xScale = '2.0',
+    setXScale,
+    yScale = '2.0',
+    setYScale,
 }: ParameterSettingsProps) {
     
     // 根据功能类型获取可用的提供商
@@ -106,7 +115,8 @@ export default function ParameterSettings({
                                     min="1.1"
                                     max="4.0"
                                     step="0.1"
-                                    defaultValue="2.0"
+                                    value={xScale}
+                                    onChange={(e) => setXScale?.(e.target.value)}
                                     className="mt-1"
                                 />
                             </div>
@@ -118,7 +128,8 @@ export default function ParameterSettings({
                                     min="1.1"
                                     max="4.0"
                                     step="0.1"
-                                    defaultValue="2.0"
+                                    value={yScale}
+                                    onChange={(e) => setYScale?.(e.target.value)}
                                     className="mt-1"
                                 />
                             </div>
@@ -237,7 +248,8 @@ export default function ParameterSettings({
                                             min="1.1"
                                             max="4.0"
                                             step="0.1"
-                                            defaultValue="2.0"
+                                            value={xScale}
+                                            onChange={(e) => setXScale?.(e.target.value)}
                                             className="mt-1"
                                         />
                                     </div>
@@ -249,7 +261,8 @@ export default function ParameterSettings({
                                             min="1.1"
                                             max="4.0"
                                             step="0.1"
-                                            defaultValue="2.0"
+                                            value={yScale}
+                                            onChange={(e) => setYScale?.(e.target.value)}
                                             className="mt-1"
                                         />
                                     </div>

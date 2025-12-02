@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Stage, Layer, Image as KonvaImage, Transformer } from 'react-konva';
+import { Stage, Layer, Image as KonvaImage, Transformer, Rect } from 'react-konva';
 import Konva from 'konva';
 
 interface WatermarkEditorProps {
@@ -17,6 +17,9 @@ interface WatermarkEditorProps {
   }) => void;
   width?: number;
   height?: number;
+  // 扩图比例（用于一键增强预览）
+  xScale?: number;
+  yScale?: number;
 }
 
 export default function WatermarkEditor({
@@ -24,12 +27,16 @@ export default function WatermarkEditor({
   logoUrl,
   onPositionChange,
   width: containerWidth = 800,
-  height: containerHeight = 600
+  height: containerHeight = 600,
+  xScale = 1,
+  yScale = 1
 }: WatermarkEditorProps) {
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
   const [logoImage, setLogoImage] = useState<HTMLImageElement | null>(null);
   const [selectedId, setSelectedId] = useState<string>('logo'); // 默认选中 logo
   const [canvasSize, setCanvasSize] = useState({ width: containerWidth, height: containerHeight });
+  // 原图在画布中的位置和尺寸（用于扩图预览）
+  const [imageRect, setImageRect] = useState({ x: 0, y: 0, width: containerWidth, height: containerHeight });
   const [logoProps, setLogoProps] = useState({
     x: 50,
     y: 50,
@@ -44,32 +51,51 @@ export default function WatermarkEditor({
   const transformerRef = useRef<Konva.Transformer>(null);
   const stageRef = useRef<Konva.Stage>(null);
 
-  // 加载背景图片并计算画布尺寸（允许空白）
+  // 加载背景图片并计算画布尺寸（考虑扩图比例）
   useEffect(() => {
+    console.log('[WatermarkEditor] useEffect 触发, xScale:', xScale, 'yScale:', yScale);
+    
     if (!imageUrl) {
       setBackgroundImage(null);
       setCanvasSize({ width: containerWidth, height: containerHeight });
+      setImageRect({ x: 0, y: 0, width: containerWidth, height: containerHeight });
       return;
     }
     const img = new window.Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       setBackgroundImage(img);
-      // 计算适应容器的画布尺寸（保持原图比例）
-      const imgAspect = img.width / img.height;
+      
+      console.log('[WatermarkEditor] 图片加载完成, 原图尺寸:', img.width, 'x', img.height);
+      console.log('[WatermarkEditor] 扩图比例 xScale:', xScale, 'yScale:', yScale);
+      
+      // 计算扩图后的画布比例
+      const expandedWidth = img.width * xScale;
+      const expandedHeight = img.height * yScale;
+      console.log('[WatermarkEditor] 扩图后尺寸:', expandedWidth, 'x', expandedHeight);
+      const expandedAspect = expandedWidth / expandedHeight;
       const containerAspect = containerWidth / containerHeight;
+      
       let canvasW, canvasH;
-      if (imgAspect > containerAspect) {
+      if (expandedAspect > containerAspect) {
         canvasW = containerWidth;
-        canvasH = containerWidth / imgAspect;
+        canvasH = containerWidth / expandedAspect;
       } else {
         canvasH = containerHeight;
-        canvasW = containerHeight * imgAspect;
+        canvasW = containerHeight * expandedAspect;
       }
       setCanvasSize({ width: canvasW, height: canvasH });
+      
+      // 计算原图在扩图后画布中的位置和尺寸
+      // 原图应该居中放置
+      const imgW = canvasW / xScale;
+      const imgH = canvasH / yScale;
+      const imgX = (canvasW - imgW) / 2;
+      const imgY = (canvasH - imgH) / 2;
+      setImageRect({ x: imgX, y: imgY, width: imgW, height: imgH });
     };
     img.src = imageUrl;
-  }, [imageUrl, containerWidth, containerHeight]);
+  }, [imageUrl, containerWidth, containerHeight, xScale, yScale]);
 
   // 加载 Logo 图片（可选）并检查透明度
   useEffect(() => {
@@ -141,7 +167,14 @@ export default function WatermarkEditor({
   return (
     <div className="space-y-4 max-w-5xl mx-auto">
       {/* Konva 画布 */}
-      <div className="relative border-2 border-gray-300 rounded-lg overflow-hidden shadow-lg bg-gray-100 flex items-center justify-center" style={{ minHeight: containerHeight }}>
+      <div 
+        className="relative border-2 border-gray-300 rounded-lg overflow-hidden shadow-lg bg-gray-100 flex items-center justify-center"
+        style={{ 
+          width: canvasSize.width, 
+          height: canvasSize.height,
+          margin: '0 auto'
+        }}
+      >
         <Stage
           width={canvasSize.width}
           height={canvasSize.height}
@@ -155,14 +188,40 @@ export default function WatermarkEditor({
           }}
         >
           <Layer>
-            {/* 背景图片层 */}
-            {backgroundImage && (
-              <KonvaImage
-                image={backgroundImage}
+            {/* 扩展区域背景（当 xScale 或 yScale > 1 时显示）*/}
+            {(xScale > 1 || yScale > 1) && (
+              <Rect
                 x={0}
                 y={0}
                 width={canvasSize.width}
                 height={canvasSize.height}
+                fill="#f3f4f6"
+                listening={false}
+              />
+            )}
+            
+            {/* 背景图片层（扩图模式下居中显示）*/}
+            {backgroundImage && (
+              <KonvaImage
+                image={backgroundImage}
+                x={imageRect.x}
+                y={imageRect.y}
+                width={imageRect.width}
+                height={imageRect.height}
+                listening={false}
+              />
+            )}
+            
+            {/* 扩展区域边界线（当 xScale 或 yScale > 1 时显示）*/}
+            {(xScale > 1 || yScale > 1) && backgroundImage && (
+              <Rect
+                x={imageRect.x}
+                y={imageRect.y}
+                width={imageRect.width}
+                height={imageRect.height}
+                stroke="#3b82f6"
+                strokeWidth={2}
+                dash={[5, 5]}
                 listening={false}
               />
             )}
