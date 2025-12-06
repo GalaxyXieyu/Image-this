@@ -126,8 +126,10 @@ async function main() {
     log('✅ sharp 模块安装完成\n', 'green');
 
     // 4. 生成数据库
-    log('📋 步骤 4/7: 准备数据库', 'blue');
-    log('🔨 生成 Prisma Client...', 'yellow');
+    log('📋 步骤 4/8: 准备数据库', 'blue');
+    log('🔨 生成 Prisma Client（包含 Windows 引擎）...', 'yellow');
+    // 设置环境变量以生成 Windows 平台的 Prisma 引擎
+    process.env.PRISMA_CLI_BINARY_TARGETS = 'windows,darwin,darwin-arm64,linux-musl-openssl-3.0.x';
     await runCommand('npx', ['prisma', 'generate']);
     log('✅ 数据库准备完成\n', 'green');
 
@@ -176,6 +178,42 @@ async function main() {
       log('✅ @img 模块复制完成', 'green');
     }
     
+    // 复制 prisma 目录到 standalone
+    const prismaSrc = join(projectRoot, 'prisma');
+    const prismaDest = join(standaloneDir, 'prisma');
+    if (existsSync(prismaSrc)) {
+      log('📁 复制 prisma 目录到 standalone...', 'yellow');
+      cpSync(prismaSrc, prismaDest, { recursive: true });
+      log('✅ prisma 目录复制完成', 'green');
+    }
+    
+    // 复制 .prisma client（包含 Windows 引擎）
+    const prismaClientSrc = join(projectRoot, 'node_modules', '.prisma');
+    const prismaClientDest = join(standaloneDir, 'node_modules', '.prisma');
+    if (existsSync(prismaClientSrc)) {
+      log('📁 复制 .prisma client 到 standalone/node_modules...', 'yellow');
+      cpSync(prismaClientSrc, prismaClientDest, { recursive: true });
+      log('✅ .prisma client 复制完成', 'green');
+    }
+    
+    // 复制 @prisma/client
+    const prismaClientPkgSrc = join(projectRoot, 'node_modules', '@prisma');
+    const prismaClientPkgDest = join(standaloneDir, 'node_modules', '@prisma');
+    if (existsSync(prismaClientPkgSrc)) {
+      log('📁 复制 @prisma 到 standalone/node_modules...', 'yellow');
+      cpSync(prismaClientPkgSrc, prismaClientPkgDest, { recursive: true });
+      log('✅ @prisma 复制完成', 'green');
+    }
+    
+    // 复制 .env.production 到 standalone
+    const envProdSrc = join(projectRoot, '.env.production');
+    const envProdDest = join(standaloneDir, '.env.production');
+    if (existsSync(envProdSrc)) {
+      log('📁 复制 .env.production 到 standalone...', 'yellow');
+      copyFileSync(envProdSrc, envProdDest);
+      log('✅ .env.production 复制完成', 'green');
+    }
+    
     log('✅ 静态资源复制完成\n', 'green');
 
     // 7. 打包 Electron 应用
@@ -184,12 +222,20 @@ async function main() {
     log('⏳ 这可能需要几分钟时间，请耐心等待...\n', 'yellow');
     await runCommand('npm', ['run', 'electron:build:win']);
 
+    // 8. 验证构建
+    log('📋 步骤 8/8: 验证构建', 'blue');
+    try {
+      await runCommand('node', ['scripts/verify-build.js']);
+    } catch (e) {
+      log('⚠️ 构建验证有警告，请检查输出', 'yellow');
+    }
+
     // 完成
     log('\n✨ 构建完成！', 'green');
     log('\n📦 输出目录: dist-electron/', 'cyan');
     log('📁 查找生成的安装包：', 'cyan');
-    log('   - NSIS 安装包：ImagineThis-*-x64.exe', 'cyan');
-    log('   - Portable 版本：ImagineThis-*-x64.exe', 'cyan');
+    log('   - NSIS 安装包：ImagineThis-*-x64-Setup.exe', 'cyan');
+    log('   - Portable 版本：ImagineThis-*-x64-Portable.exe', 'cyan');
     log('\n💡 提示：', 'yellow');
     log('   - NSIS 安装包：适合需要安装的用户', 'yellow');
     log('   - Portable 版本：适合免安装直接运行', 'yellow');

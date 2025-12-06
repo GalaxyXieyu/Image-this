@@ -29,7 +29,7 @@ export interface UserConfig {
 /**
  * 获取用户配置
  * @param userId 用户ID
- * @returns 用户配置
+ * @returns 用户配置（用户不存在时返回空配置）
  */
 export async function getUserConfig(userId: string): Promise<UserConfig> {
   const user = await prisma.user.findUnique({
@@ -46,8 +46,10 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
     }
   });
 
+  // 用户不存在时返回空配置，避免报错
   if (!user) {
-    throw new Error('用户不存在');
+    console.warn(`[用户配置] 用户不存在: ${userId}`);
+    return {};
   }
 
   const config: UserConfig = {};
@@ -97,8 +99,20 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
  * 保存用户配置
  * @param userId 用户ID
  * @param config 配置对象
+ * @returns 是否保存成功
  */
-export async function saveUserConfig(userId: string, config: UserConfig): Promise<void> {
+export async function saveUserConfig(userId: string, config: UserConfig): Promise<boolean> {
+  // 先检查用户是否存在
+  const userExists = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true }
+  });
+
+  if (!userExists) {
+    console.warn(`[用户配置] 无法保存配置，用户不存在: ${userId}`);
+    return false;
+  }
+
   await prisma.user.update({
     where: { id: userId },
     data: {
@@ -112,4 +126,6 @@ export async function saveUserConfig(userId: string, config: UserConfig): Promis
       localStoragePath: config.localStorage?.savePath || null,
     }
   });
+  
+  return true;
 }

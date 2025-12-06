@@ -185,3 +185,74 @@ export async function generateAndUploadThumbnail(
   const thumbnailName = `thumbnail-${filename}`;
   return await uploadImageToLocal(originalImageBuffer, thumbnailName, 'image/jpeg', customPath);
 }
+
+/**
+ * 检查本地图片文件是否存在
+ * @param urlPath 图片URL路径或完整文件路径
+ * @param customPath 用户自定义路径（可选）
+ * @returns 文件是否存在
+ */
+export async function checkImageExists(
+  urlPath: string,
+  customPath?: string | null
+): Promise<boolean> {
+  if (!urlPath) return false;
+  
+  // 清理路径中可能的空白字符
+  const cleanUrl = urlPath.trim();
+  
+  // 跳过非本地路径（如 http:// 或 https://）
+  if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
+    return true; // 假设远程URL存在，不做验证
+  }
+  
+  try {
+    let filePath: string;
+    
+    // 检查是否在 Electron 环境
+    const cwd = process.cwd();
+    const isElectronPackaged = cwd.includes('app.asar') || 
+                                cwd.includes('AppData') || 
+                                cwd.includes('Temp') ||
+                                process.env.ELECTRON_RUN_AS_NODE;
+    
+    // 如果是绝对路径，直接使用
+    if (path.isAbsolute(cleanUrl)) {
+      filePath = cleanUrl;
+    } else if (cleanUrl.startsWith('/api/files/')) {
+      // API 路径格式：/api/files/uploads/xxx.jpg
+      const relativePath = cleanUrl.replace('/api/files/', '');
+      
+      if (isElectronPackaged) {
+        if (customPath) {
+          const uploadDir = getUploadDir(customPath);
+          const filename = path.basename(relativePath);
+          filePath = path.join(uploadDir, filename);
+        } else {
+          // 默认 Electron 路径
+          filePath = path.join(os.homedir(), 'ImagineThis', relativePath);
+        }
+      } else {
+        // Web 环境：/api/files/uploads/xxx.jpg -> public/uploads/xxx.jpg
+        filePath = path.join(process.cwd(), 'public', relativePath);
+      }
+    } else if (cleanUrl.startsWith('/uploads/')) {
+      // Web 环境路径格式：/uploads/xxx.jpg -> public/uploads/xxx.jpg
+      filePath = path.join(process.cwd(), 'public', cleanUrl.substring(1)); // 移除开头的 /
+    } else if (cleanUrl.startsWith('uploads/')) {
+      // 相对路径格式：uploads/xxx.jpg -> public/uploads/xxx.jpg
+      filePath = path.join(process.cwd(), 'public', cleanUrl);
+    } else {
+      // 其他路径，尝试从自定义目录或默认目录查找
+      const filename = path.basename(cleanUrl);
+      const uploadDir = getUploadDir(customPath);
+      filePath = path.join(uploadDir, filename);
+    }
+    
+    await fs.access(filePath);
+    return true;
+  } catch (error) {
+    // 文件不存在或无法访问
+    return false;
+  }
+}

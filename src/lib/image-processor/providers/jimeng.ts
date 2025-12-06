@@ -7,6 +7,7 @@ import { IImageProcessor, ProcessResult, VolcengineConfig } from '../types';
 import { generateVolcengineSignature } from '../utils/volcengine-signature';
 import { postJson } from '../utils/api-client';
 import { uploadBase64ToSuperbed } from '@/lib/superbed-upload';
+import { jimengApiLock } from '../utils/jimeng-lock';
 
 const HOST = 'visual.volcengineapi.com';
 const REGION = 'cn-north-1';
@@ -37,16 +38,18 @@ export class JimengProcessor implements IImageProcessor {
       if (originalImageUrl) {
         const url = await uploadBase64ToSuperbed(
           originalImageUrl,
-          `jimeng-original-${Date.now()}.jpg`
+          `jimeng-original-${Date.now()}.png`
         );
+        console.log('[Jimeng Processor] 产品图上传完成:', url);
         imageUrls.push(url);
       }
 
       if (referenceImageUrl) {
         const url = await uploadBase64ToSuperbed(
           referenceImageUrl,
-          `jimeng-reference-${Date.now()}.jpg`
+          `jimeng-reference-${Date.now()}.png`
         );
+        console.log('[Jimeng Processor] 参考图上传完成:', url);
         imageUrls.push(url);
       }
 
@@ -86,9 +89,25 @@ export class JimengProcessor implements IImageProcessor {
   }
 
   /**
-   * 调用即梦 API
+   * 调用即梦 API（通过全局锁确保串行执行）
    */
   private async callJimengAPI(
+    prompt: string,
+    imageUrls?: string[],
+    width = 2048,
+    height = 2048,
+    maxRetries = 3
+  ): Promise<any> {
+    // 使用全局锁确保即梦 API 串行调用
+    return jimengApiLock.enqueue(async () => {
+      return this.executeJimengAPI(prompt, imageUrls, width, height, maxRetries);
+    });
+  }
+
+  /**
+   * 实际执行即梦 API 调用
+   */
+  private async executeJimengAPI(
     prompt: string,
     imageUrls?: string[],
     width = 2048,
@@ -100,7 +119,8 @@ export class JimengProcessor implements IImageProcessor {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         if (attempt > 0) {
-          const delay = Math.min(2000 * Math.pow(2, attempt - 1), 10000);
+          // 429 错误时等待更长时间
+          const delay = Math.min(5000 * Math.pow(2, attempt - 1), 60000);
           console.log(`[Jimeng API] 重试 ${attempt}/${maxRetries}，等待 ${delay}ms...`);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
@@ -120,6 +140,7 @@ export class JimengProcessor implements IImageProcessor {
         }
 
         const bodyStr = JSON.stringify(requestBody);
+        console.log('[Jimeng API] POST 参数:', JSON.stringify(requestBody, null, 2));
         const query = `Action=CVProcess&Version=${VERSION}`;
         
         // 生成签名和请求头
@@ -158,6 +179,8 @@ export class JimengProcessor implements IImageProcessor {
 
         if (result.code !== 10000) {
           if (result.code === 50430) {
+            // 设置冷却时间
+            jimengApiLock.setCooldown(60);
             throw new Error(`CONCURRENT_LIMIT:${result.message || 'API并发限制'}`);
           }
           throw new Error(`即梦API调用失败: code=${result.code}, msg=${result.message || 'Unknown'}`);
@@ -169,11 +192,19 @@ export class JimengProcessor implements IImageProcessor {
         lastError = error instanceof Error ? error : new Error('Unknown error');
 
         const errorMessage = lastError.message;
+        
+        // 检查是否是 429 并发限制
+        if (errorMessage.includes('429') || errorMessage.includes('CONCURRENT_LIMIT') || errorMessage.includes('Concurrent Limit')) {
+          jimengApiLock.setCooldown(60);
+        }
+        
         const isRetryable =
           errorMessage.includes('CONCURRENT_LIMIT') ||
+          errorMessage.includes('429') ||
           errorMessage.includes('timeout') ||
           errorMessage.includes('ECONNRESET') ||
           errorMessage.includes('ETIMEDOUT') ||
+          errorMessage.includes('500') ||
           errorMessage.includes('503') ||
           errorMessage.includes('504');
 
@@ -181,6 +212,8 @@ export class JimengProcessor implements IImageProcessor {
           console.error(`[Jimeng API] 失败: ${lastError.message}`);
           break;
         }
+        
+        console.log(`[Jimeng API] 可重试错误，将进行重试: ${errorMessage.substring(0, 100)}`);
       }
     }
 

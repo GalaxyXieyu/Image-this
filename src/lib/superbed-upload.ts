@@ -1,5 +1,6 @@
 import axios from 'axios';
 import FormData from 'form-data';
+import sharp from 'sharp';
 
 const DEFAULT_SUPERBED_TOKEN = process.env.SUPERBED_TOKEN || '00fbe01340604063b1f59aedc0481ddc';
 
@@ -35,10 +36,15 @@ export async function uploadImageToSuperbed(
       
       console.log(`[Superbed] 使用 Token: ${token.substring(0, 10)}...`);
       
+      // 根据文件扩展名确定 Content-Type
+      const ext = filename.toLowerCase().split('.').pop();
+      const contentType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+      console.log(`[Superbed] 使用 Content-Type: ${contentType}`);
+      
       const formData = new FormData();
       formData.append('file', imageBuffer, {
         filename: filename,
-        contentType: 'image/jpeg'
+        contentType: contentType
       });
       
       const response = await axios.post(
@@ -108,8 +114,16 @@ export async function uploadBase64ToSuperbed(
     throw new Error(`无效的 base64 数据: 长度=${base64String.length}`);
   }
   
-  const imageBuffer = Buffer.from(base64String, 'base64');
-  console.log(`[Superbed] 准备上传: ${filename}, 大小: ${(imageBuffer.length / 1024).toFixed(0)}KB`);
+  // 强制使用 .png 格式
+  const pngFilename = filename.replace(/\.(jpg|jpeg|webp)$/i, '.png');
   
-  return await uploadImageToSuperbed(imageBuffer, filename, 3, superbedToken);
+  // 使用 Sharp 真正转换为 PNG 格式
+  const originalBuffer = Buffer.from(base64String, 'base64');
+  const pngBuffer = await sharp(originalBuffer)
+    .png()
+    .toBuffer();
+  
+  console.log(`[Superbed] 准备上传: ${pngFilename}, 原始: ${(originalBuffer.length / 1024).toFixed(0)}KB -> PNG: ${(pngBuffer.length / 1024).toFixed(0)}KB`);
+  
+  return await uploadImageToSuperbed(pngBuffer, pngFilename, 3, superbedToken);
 }

@@ -26,7 +26,9 @@ import {
   AlertCircle,
   Loader,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  RotateCcw,
+  ImagePlus
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
@@ -103,8 +105,15 @@ interface Task {
   processedImage?: {
     id: string;
     filename: string;
+    originalUrl: string;
     processedUrl: string;
   };
+}
+
+interface ImagePreviewState {
+  isOpen: boolean;
+  imageUrl: string;
+  title: string;
 }
 
 export default function TaskCenterPage() {
@@ -130,6 +139,12 @@ export default function TaskCenterPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [pageSize] = useState(20);
+  const [imagePreview, setImagePreview] = useState<ImagePreviewState>({
+    isOpen: false,
+    imageUrl: '',
+    title: ''
+  });
+  const [isRetrying, setIsRetrying] = useState(false);
 
   // 重定向未登录用户
   useEffect(() => {
@@ -138,7 +153,7 @@ export default function TaskCenterPage() {
     }
   }, [status, router]);
 
-  // 获取任务列表
+  // 获取任务列表（包含统计数据，一次请求器全部数据）
   const fetchTasks = useCallback(async (page = currentPage) => {
     if (!session) return;
 
@@ -154,6 +169,10 @@ export default function TaskCenterPage() {
         if (data.pagination) {
           setTotalPages(Math.ceil(data.pagination.total / pageSize));
         }
+        // 从同一个 API 响应中获取统计数据，减少一次网络请求
+        if (data.stats) {
+          setQueueStats(data.stats);
+        }
       } else {
         throw new Error(data.error || '获取任务列表失败');
       }
@@ -163,31 +182,16 @@ export default function TaskCenterPage() {
     }
   }, [session, currentPage, pageSize]);
 
-  // 获取队列统计
-  const fetchQueueStats = useCallback(async () => {
-    try {
-      const response = await fetch('/api/tasks/worker');
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.status) {
-          setQueueStats(data.status);
-        }
-      }
-    } catch (err) {
-      console.error('获取队列统计失败:', err);
-    }
-  }, []);
-
-  // 初始化数据
+  // 初始化数据 - 现在只需要一次请求
   const initializeData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      await Promise.all([fetchTasks(), fetchQueueStats()]);
+      await fetchTasks();
     } finally {
       setLoading(false);
     }
-  }, [fetchTasks, fetchQueueStats]);
+  }, [fetchTasks]);
 
   useEffect(() => {
     if (session) {
@@ -195,7 +199,7 @@ export default function TaskCenterPage() {
     }
   }, [session, initializeData]);
 
-  // 轮询任务状态（仅在有进行中任务时）
+  // 轮询任务状态（仅在有进行中任务时）- 优化为 5 秒，减少数据库压力
   useEffect(() => {
     const hasActiveTasks = tasks.some(task => 
       task.status === 'PENDING' || task.status === 'PROCESSING'
@@ -204,8 +208,7 @@ export default function TaskCenterPage() {
     if (hasActiveTasks && !pollingInterval) {
       const interval = setInterval(async () => {
         await fetchTasks();
-        await fetchQueueStats();
-      }, 3000); // 每3秒更新一次
+      }, 5000); // 每5秒更新一次，减少数据库压力
       setPollingInterval(interval);
     } else if (!hasActiveTasks && pollingInterval) {
       clearInterval(pollingInterval);
@@ -217,7 +220,7 @@ export default function TaskCenterPage() {
         clearInterval(pollingInterval);
       }
     };
-  }, [tasks, pollingInterval, fetchTasks, fetchQueueStats]);
+  }, [tasks, pollingInterval, fetchTasks]);
 
   // 确保组件卸载时清理定时器
   useEffect(() => {
@@ -241,7 +244,6 @@ export default function TaskCenterPage() {
 
       if (response.ok) {
         await fetchTasks();
-        await fetchQueueStats();
       }
     } catch (err) {
       console.error('触发任务处理器失败:', err);
@@ -392,6 +394,145 @@ export default function TaskCenterPage() {
     }
   };
 
+  // 重试单个任务
+  const retryTask = async (taskId: string) => {
+    try {
+      const response = await fetch('/api/tasks/retry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskIds: [taskId] })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        toast({
+          title: "重新运行成功",
+          description: data.message,
+        });
+        // 切换到第一页显示新创建的任务
+        setCurrentPage(1);
+        await fetchTasks(1);
+      } else {
+        const errorData = await response.json();
+        toast({
+          title: "重新运行失败",
+          description: errorData.error || "重新运行任务失败",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "重试失败",
+        description: "重试任务时出现错误，请重试",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // 批量重试选中的任务
+  const retrySelectedTasks = async () => {
+    const retryableSelectedTasks = Array.from(selectedTasks).filter(taskId => {
+      const task = tasks.find(t => t.id === taskId);
+      return task && (task.status === 'FAILED' || task.status === 'CANCELLED' || task.status === 'COMPLETED');
+    });
+
+    if (retryableSelectedTasks.length === 0) {
+      toast({
+        title: "提示",
+        description: "选中的任务中没有可重新运行的任务",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsRetrying(true);
+    try {
+      const response = await fetch('/api/tasks/retry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskIds: retryableSelectedTasks })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        toast({
+          title: "重新运行成功",
+          description: data.message,
+        });
+        setSelectedTasks(new Set());
+        // 切换到第一页显示新创建的任务
+        setCurrentPage(1);
+        await fetchTasks(1);
+      } else {
+        const errorData = await response.json();
+        toast({
+          title: "重新运行失败",
+          description: errorData.error || "批量重新运行任务失败",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "重试失败",
+        description: "批量重试任务时出现错误，请重试",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
+  // 打开图片预览
+  const openImagePreview = (imageUrl: string, title: string) => {
+    setImagePreview({ isOpen: true, imageUrl, title });
+  };
+
+  // 关闭图片预览
+  const closeImagePreview = () => {
+    setImagePreview({ isOpen: false, imageUrl: '', title: '' });
+  };
+
+  // 解析任务输入数据获取原图 URL
+  const getOriginalImageUrl = (task: Task): string | null => {
+    try {
+      const inputData = JSON.parse(task.inputData);
+      return inputData.imageUrl || null;
+    } catch {
+      return null;
+    }
+  };
+
+  // 获取任务结果图 URL
+  const getResultImageUrl = (task: Task): string | null => {
+    // 1. 优先从关联的 processedImage 获取
+    if (task.processedImage?.processedUrl) {
+      return task.processedImage.processedUrl;
+    }
+    // 2. 从 outputData 中解析获取
+    if (task.outputData) {
+      try {
+        const outputData = JSON.parse(task.outputData);
+        // 尝试多种可能的字段名
+        const url = outputData.processedImageUrl 
+          || outputData.processedUrl 
+          || outputData.imageUrl 
+          || outputData.result?.processedUrl
+          || outputData.result?.processedImageUrl
+          || null;
+        if (url) return url;
+      } catch {
+        // 解析失败，继续尝试其他方式
+      }
+    }
+    return null;
+  };
+
+  // 检查选中任务中是否有可重新运行的（包括已完成的）
+  const hasRetryableTasks = Array.from(selectedTasks).some(taskId => {
+    const task = tasks.find(t => t.id === taskId);
+    return task && (task.status === 'FAILED' || task.status === 'CANCELLED' || task.status === 'COMPLETED');
+  });
+
   // 删除所有任务
   const deleteAllTasks = async () => {
     if (tasks.length === 0) {
@@ -527,6 +668,25 @@ export default function TaskCenterPage() {
                 <RefreshCw className="w-4 h-4 mr-1.5" />
                 刷新
               </Button>
+              {selectedTasks.size > 0 && hasRetryableTasks && (
+                <Button
+                  onClick={retrySelectedTasks}
+                  variant="outline"
+                  size="sm"
+                  className="h-9 text-orange-600 border-orange-300 hover:bg-orange-50"
+                  disabled={isRetrying}
+                >
+                  {isRetrying ? (
+                    <Loader className="w-4 h-4 mr-1.5 animate-spin" />
+                  ) : (
+                    <RotateCcw className="w-4 h-4 mr-1.5" />
+                  )}
+                  重跑 ({Array.from(selectedTasks).filter(id => {
+                    const t = tasks.find(task => task.id === id);
+                    return t && (t.status === 'FAILED' || t.status === 'CANCELLED' || t.status === 'COMPLETED');
+                  }).length})
+                </Button>
+              )}
               {selectedTasks.size > 0 && (
                 <Button
                   onClick={deleteSelectedTasks}
@@ -587,13 +747,14 @@ export default function TaskCenterPage() {
                       className="w-4 h-4 text-orange-600 rounded border-gray-300"
                     />
                   </div>
-                  <div className="flex-1 min-w-0 flex items-center gap-8">
-                    <div className="w-48">任务类型</div>
+                  <div className="flex-1 min-w-0 flex items-center gap-4">
+                    <div className="w-36">预览</div>
+                    <div className="w-36">任务类型</div>
                     <div className="flex-1 min-w-0">当前步骤</div>
-                    <div className="w-32">状态</div>
-                    <div className="w-24 text-center">进度</div>
-                    <div className="w-32">创建时间</div>
-                    <div className="w-20 text-right">操作</div>
+                    <div className="w-24">状态</div>
+                    <div className="w-20 text-center">进度</div>
+                    <div className="w-28">创建时间</div>
+                    <div className="w-28 text-right">操作</div>
                   </div>
                 </div>
               </div>
@@ -603,11 +764,14 @@ export default function TaskCenterPage() {
                 const TaskIcon = taskTypeIcons[task.type as keyof typeof taskTypeIcons] || ListTodo;
                 const statusInfo = statusConfig[task.status as keyof typeof statusConfig];
                 const isExpanded = expandedTasks.has(task.id);
+                const originalImageUrl = getOriginalImageUrl(task);
+                const resultImageUrl = getResultImageUrl(task);
+                const canRetry = task.status === 'FAILED' || task.status === 'CANCELLED' || task.status === 'COMPLETED';
 
                 return (
                   <div key={task.id}>
                     {/* 任务行 */}
-                    <div className="flex items-center px-4 py-3 border-b hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center px-4 py-4 border-b hover:bg-gray-50 transition-colors">
                       <div className="w-10 flex-shrink-0">
                         <input
                           type="checkbox"
@@ -617,11 +781,59 @@ export default function TaskCenterPage() {
                         />
                       </div>
                       
-                      <div className="flex-1 min-w-0 flex items-center gap-8">
+                      <div className="flex-1 min-w-0 flex items-center gap-4">
+                        {/* 预览图 */}
+                        <div className="w-36 flex items-center gap-2">
+                          {/* 原图缩略图 */}
+                          {originalImageUrl ? (
+                            <div
+                              className="w-16 h-16 rounded-lg border border-gray-200 overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all flex-shrink-0 shadow-sm"
+                              onClick={() => openImagePreview(originalImageUrl, '原图')}
+                              title="点击查看原图"
+                            >
+                              <img
+                                src={originalImageUrl}
+                                alt="原图"
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-16 h-16 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center flex-shrink-0">
+                              <ImageIcon className="w-6 h-6 text-gray-300" />
+                            </div>
+                          )}
+                          {/* 结果图缩略图 */}
+                          {task.status === 'COMPLETED' && resultImageUrl ? (
+                            <div
+                              className="w-16 h-16 rounded-lg border-2 border-green-400 overflow-hidden cursor-pointer hover:ring-2 hover:ring-green-500 transition-all flex-shrink-0 shadow-sm"
+                              onClick={() => openImagePreview(resultImageUrl, '结果图')}
+                              title="点击查看结果图"
+                            >
+                              <img
+                                src={resultImageUrl}
+                                alt="结果"
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ) : task.status === 'PROCESSING' ? (
+                            <div className="w-16 h-16 rounded-lg border border-blue-300 bg-blue-50 flex items-center justify-center flex-shrink-0">
+                              <Loader className="w-6 h-6 text-blue-500 animate-spin" />
+                            </div>
+                          ) : task.status === 'FAILED' ? (
+                            <div className="w-16 h-16 rounded-lg border border-red-300 bg-red-50 flex items-center justify-center flex-shrink-0" title={task.errorMessage}>
+                              <XCircle className="w-6 h-6 text-red-500" />
+                            </div>
+                          ) : (
+                            <div className="w-16 h-16 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center flex-shrink-0">
+                              <ImagePlus className="w-6 h-6 text-gray-300" />
+                            </div>
+                          )}
+                        </div>
+
                         {/* 任务类型 */}
-                        <div className="w-48 flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0">
-                            <TaskIcon className="w-4 h-4 text-orange-600" />
+                        <div className="w-36 flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center flex-shrink-0">
+                            <TaskIcon className="w-3.5 h-3.5 text-orange-600" />
                           </div>
                           <span className="text-sm font-medium text-gray-900 truncate">
                             {getTaskTypeName(task.type)}
@@ -636,23 +848,23 @@ export default function TaskCenterPage() {
                         </div>
 
                         {/* 状态 */}
-                        <div className="w-32">
+                        <div className="w-24">
                           <Badge className={`${statusInfo?.color || 'bg-gray-100 text-gray-800'} text-xs`}>
                             {statusInfo?.label || task.status}
                           </Badge>
                         </div>
 
                         {/* 进度 */}
-                        <div className="w-24 text-center">
+                        <div className="w-20 text-center">
                           {task.status === 'PROCESSING' ? (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1">
                               <div className="flex-1 bg-gray-200 rounded-full h-1.5">
                                 <div
                                   className="bg-orange-500 h-1.5 rounded-full transition-all duration-300"
                                   style={{ width: `${Math.max(task.progress, 5)}%` }}
                                 ></div>
                               </div>
-                              <span className="text-xs text-gray-600 w-10 text-right">
+                              <span className="text-xs text-gray-600 w-8 text-right">
                                 {Math.round(task.progress)}%
                               </span>
                             </div>
@@ -662,7 +874,7 @@ export default function TaskCenterPage() {
                         </div>
 
                         {/* 创建时间 */}
-                        <div className="w-32">
+                        <div className="w-28">
                           <span className="text-xs text-gray-600">
                             {new Date(task.createdAt).toLocaleDateString('zh-CN', { 
                               month: '2-digit', 
@@ -674,12 +886,24 @@ export default function TaskCenterPage() {
                         </div>
 
                         {/* 操作 */}
-                        <div className="w-20 flex items-center justify-end gap-1">
+                        <div className="w-28 flex items-center justify-end gap-1">
+                          {canRetry && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => retryTask(task.id)}
+                              className="h-7 w-7 p-0 hover:bg-orange-50 text-orange-600"
+                              title="重新运行任务"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => toggleTaskExpansion(task.id)}
                             className="h-7 w-7 p-0 hover:bg-gray-100"
+                            title="查看详情"
                           >
                             <Eye className="w-3.5 h-3.5 text-gray-600" />
                           </Button>
@@ -688,6 +912,7 @@ export default function TaskCenterPage() {
                             size="sm"
                             onClick={() => deleteTask(task.id)}
                             className="h-7 w-7 p-0 hover:bg-red-50 text-gray-600 hover:text-red-600"
+                            title="删除任务"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>
@@ -799,6 +1024,36 @@ export default function TaskCenterPage() {
           </div>
         )}
       </div>
+
+      {/* 图片预览模态框 */}
+      {imagePreview.isOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+          onClick={closeImagePreview}
+        >
+          <div className="relative max-w-4xl max-h-full" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={closeImagePreview}
+              className="absolute -top-10 right-0 w-8 h-8 bg-white bg-opacity-20 text-white rounded-full flex items-center justify-center hover:bg-opacity-40 transition-all"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            <div className="bg-white rounded-lg overflow-hidden shadow-2xl">
+              <div className="p-3 border-b bg-gray-50">
+                <span className="text-sm font-medium text-gray-700">{imagePreview.title}</span>
+              </div>
+              <div className="p-2 bg-gray-100">
+                <img
+                  src={imagePreview.imageUrl}
+                  alt={imagePreview.title}
+                  className="max-w-full max-h-[70vh] object-contain mx-auto rounded"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

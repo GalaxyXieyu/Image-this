@@ -1,11 +1,9 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
 
 export async function GET() {
   try {
-    // 检查数据库连接
+    // 检查数据库连接 - 使用共享的 prisma 实例
     await prisma.$queryRaw`SELECT 1`;
     
     // 检查应用状态
@@ -35,7 +33,6 @@ export async function GET() {
     };
 
     return NextResponse.json(status, { status: 503 });
-  } finally {
-    await prisma.$disconnect();
   }
+  // 不要断开连接 - 保持连接池活跃
 }

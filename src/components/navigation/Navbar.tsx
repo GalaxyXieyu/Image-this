@@ -43,16 +43,16 @@ export default function Navbar() {
       active: pathname === '/workspace'
     },
     {
-      name: '图片库',
-      href: '/gallery',
-      icon: Image,
-      active: pathname === '/gallery'
-    },
-    {
       name: '任务中心',
       href: '/history',
       icon: ListTodo,
       active: pathname === '/history'
+    },
+    {
+      name: '图片库',
+      href: '/gallery',
+      icon: Image,
+      active: pathname === '/gallery'
     },
     {
       name: '设置',

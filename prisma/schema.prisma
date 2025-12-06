@@ -177,6 +177,7 @@ model TaskQueue {
   @@index([userId, status])
   @@index([status, priority])
   @@index([userId, createdAt])
+  @@index([status])  // 单独 status 索引，优化 groupBy 统计查询
   @@map("task_queue")
 }
 

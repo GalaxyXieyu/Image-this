@@ -19,19 +19,18 @@ if (!fs.existsSync(buildDir)) {
   process.exit(1);
 }
 
-// 检查关键文件和目录
+// 检查关键文件和目录 (asar 禁用后，文件在 resources/app 目录)
 const requiredPaths = [
   { path: 'ImagineThis.exe', desc: 'Electron 可执行文件' },
-  { path: 'resources/app.asar', desc: 'Electron 应用包' },
-  { path: 'resources/app.asar.unpacked', desc: '解包目录' },
-  { path: 'resources/app.asar.unpacked/.next/standalone', desc: 'Standalone 目录' },
-  { path: 'resources/app.asar.unpacked/.next/standalone/server.js', desc: 'Next.js 服务器' },
-  { path: 'resources/app.asar.unpacked/.next/standalone/node_modules', desc: 'Standalone 依赖' },
-  { path: 'resources/app.asar.unpacked/.next/standalone/.next/static', desc: '静态资源 (CSS/JS)', critical: true },
-  { path: 'resources/app.asar.unpacked/.next/standalone/public', desc: '公共资源', critical: true },
-  { path: 'resources/app.asar.unpacked/.next/standalone/node_modules/.prisma/client/query_engine-windows.dll.node', desc: 'Prisma Windows 引擎', critical: true },
-  { path: 'resources/app.asar.unpacked/prisma', desc: 'Prisma Schema' },
-  { path: 'resources/app.asar.unpacked/.env.production', desc: '生产环境配置' },
+  { path: 'resources/app', desc: '应用目录' },
+  { path: 'resources/app/.next/standalone', desc: 'Standalone 目录' },
+  { path: 'resources/app/.next/standalone/server.js', desc: 'Next.js 服务器' },
+  { path: 'resources/app/.next/standalone/node_modules', desc: 'Standalone 依赖' },
+  { path: 'resources/app/.next/standalone/.next/static', desc: '静态资源 (CSS/JS)', critical: true },
+  { path: 'resources/app/.next/standalone/public', desc: '公共资源', critical: true },
+  { path: 'resources/app/.next/standalone/node_modules/.prisma/client/query_engine-windows.dll.node', desc: 'Prisma Windows 引擎', critical: true },
+  { path: 'resources/app/.next/standalone/prisma', desc: 'Prisma Schema' },
+  { path: 'resources/app/.next/standalone/.env.production', desc: '生产环境配置' },
 ];
 
 let allExists = true;
@@ -67,8 +66,8 @@ requiredPaths.forEach(item => {
 console.log('\n📦 检查 Windows 原生模块:\n');
 
 const nativeModules = [
-  { path: 'resources/app.asar.unpacked/.next/standalone/node_modules/.prisma/client/query_engine-windows.dll.node', desc: 'Prisma Windows 引擎' },
-  { path: 'resources/app.asar.unpacked/node_modules/canvas/build/Release/canvas.node', desc: 'Canvas 模块' },
+  { path: 'resources/app/.next/standalone/node_modules/.prisma/client/query_engine-windows.dll.node', desc: 'Prisma Windows 引擎' },
+  { path: 'resources/app/node_modules/canvas/build/Release/canvas.node', desc: 'Canvas 模块' },
 ];
 
 nativeModules.forEach(item => {
@@ -85,7 +84,7 @@ nativeModules.forEach(item => {
 // 检查静态资源内容
 console.log('\n📄 检查静态资源内容:\n');
 
-const staticDir = path.join(buildDir, 'resources/app.asar.unpacked/.next/standalone/.next/static');
+const staticDir = path.join(buildDir, 'resources/app/.next/standalone/.next/static');
 if (fs.existsSync(staticDir)) {
   const staticContents = fs.readdirSync(staticDir);
   console.log(`✅ static 目录包含: ${staticContents.join(', ')}`);

@@ -69,7 +69,7 @@ class TaskProcessor {
           throw new Error(`不支持的任务类型: ${task.type}`);
       }
 
-      // 更新任务为完成状态
+      // 更新任务为完成状态，并关联处理结果
       await prisma.taskQueue.update({
         where: { id: task.id },
         data: {
@@ -78,7 +78,8 @@ class TaskProcessor {
           currentStep: '处理完成',
           completedAt: new Date(),
           outputData: JSON.stringify(result),
-          completedSteps: task.totalSteps
+          completedSteps: task.totalSteps,
+          processedImageId: (result as { processedImageId?: string })?.processedImageId || null
         }
       });
 
@@ -261,7 +262,7 @@ class TaskProcessor {
       
       clearTimeout(timeoutHandle!);
       
-      // 更新任务为完成状态
+      // 更新任务为完成状态，并关联处理结果
       await prisma.taskQueue.update({
         where: { id: task.id },
         data: {
@@ -270,7 +271,8 @@ class TaskProcessor {
           currentStep: '处理完成',
           completedAt: new Date(),
           outputData: JSON.stringify(result),
-          completedSteps: task.totalSteps
+          completedSteps: task.totalSteps,
+          processedImageId: (result as { processedImageId?: string })?.processedImageId || null
         }
       });
 
@@ -856,26 +858,47 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// 获取任务处理器状态
-export async function GET() {
+// 获取任务处理器状态（按用户过滤）
+export async function GET(request: NextRequest) {
   try {
-    // 获取队列统计信息
-    const [pendingCount, processingCount, completedCount, failedCount] = await Promise.all([
-      prisma.taskQueue.count({ where: { status: 'PENDING' } }),
-      prisma.taskQueue.count({ where: { status: 'PROCESSING' } }),
-      prisma.taskQueue.count({ where: { status: 'COMPLETED' } }),
-      prisma.taskQueue.count({ where: { status: 'FAILED' } })
-    ]);
+    const { getServerSession } = await import('next-auth/next');
+    const { authOptions } = await import('@/lib/auth');
+    
+    const session = await getServerSession(authOptions);
+    
+    // 构建查询条件 - 如果有用户登录则只统计该用户的任务
+    const userFilter = session?.user?.id ? { userId: session.user.id } : {};
+    
+    // 使用 groupBy 替代 4 次独立查询，大幅提升性能
+    const statusCounts = await prisma.taskQueue.groupBy({
+      by: ['status'],
+      where: userFilter,
+      _count: { status: true }
+    });
+    
+    // 转换为统计对象
+    const stats = {
+      pending: 0,
+      processing: 0,
+      completed: 0,
+      failed: 0,
+      total: 0
+    };
+    
+    for (const item of statusCounts) {
+      const count = item._count.status;
+      stats.total += count;
+      switch (item.status) {
+        case 'PENDING': stats.pending = count; break;
+        case 'PROCESSING': stats.processing = count; break;
+        case 'COMPLETED': stats.completed = count; break;
+        case 'FAILED': stats.failed = count; break;
+      }
+    }
 
     return NextResponse.json({
       success: true,
-      status: {
-        pending: pendingCount,
-        processing: processingCount,
-        completed: completedCount,
-        failed: failedCount,
-        total: pendingCount + processingCount + completedCount + failedCount
-      }
+      status: stats
     });
   } catch (error) {
     console.error('Get worker status error:', error);

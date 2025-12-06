@@ -83,6 +83,7 @@ export default function GalleryPage() {
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [showImageModal, setShowImageModal] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [showOriginalInModal, setShowOriginalInModal] = useState(false); // 模态框中是否显示原图
   
   // 分页状态
   const [page, setPage] = useState(1);
@@ -580,6 +581,7 @@ export default function GalleryPage() {
   // 打开图片查看器
   const openImageViewer = (imageIndex: number) => {
     setSelectedImageIndex(imageIndex);
+    setShowOriginalInModal(false); // 默认显示结果图
     setShowImageModal(true);
   };
 
@@ -1093,8 +1095,8 @@ export default function GalleryPage() {
 
       {/* 图片查看模态框 */}
       {showImageModal && filteredImages.length > 0 && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="relative max-w-6xl max-h-full">
+        <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4">
+          <div className="relative max-w-6xl max-h-full w-full">
             <button
               onClick={() => setShowImageModal(false)}
               className="absolute top-4 right-4 w-10 h-10 bg-black bg-opacity-50 text-white rounded-full flex items-center justify-center hover:bg-opacity-75 z-10"
@@ -1105,33 +1107,76 @@ export default function GalleryPage() {
             {filteredImages.length > 1 && (
               <>
                 <button
-                  onClick={() => navigateImage('prev')}
+                  onClick={() => {
+                    navigateImage('prev');
+                    setShowOriginalInModal(false);
+                  }}
                   className="absolute left-4 top-1/2 transform -translate-y-1/2 w-10 h-10 bg-black bg-opacity-50 text-white rounded-full flex items-center justify-center hover:bg-opacity-75 z-10"
                 >
                   ←
                 </button>
                 <button
-                  onClick={() => navigateImage('next')}
+                  onClick={() => {
+                    navigateImage('next');
+                    setShowOriginalInModal(false);
+                  }}
                   className="absolute right-4 top-1/2 transform -translate-y-1/2 w-10 h-10 bg-black bg-opacity-50 text-white rounded-full flex items-center justify-center hover:bg-opacity-75 z-10"
                 >
                   →
                 </button>
               </>
             )}
+
+            {/* 原图/结果图切换按钮 */}
+            {filteredImages[selectedImageIndex]?.originalUrl && filteredImages[selectedImageIndex]?.processedUrl && (
+              <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex bg-black bg-opacity-60 rounded-lg overflow-hidden z-10">
+                <button
+                  onClick={() => setShowOriginalInModal(true)}
+                  className={`px-4 py-2 text-sm font-medium transition-colors ${
+                    showOriginalInModal
+                      ? 'bg-white text-black'
+                      : 'text-white hover:bg-white hover:bg-opacity-20'
+                  }`}
+                >
+                  原图
+                </button>
+                <button
+                  onClick={() => setShowOriginalInModal(false)}
+                  className={`px-4 py-2 text-sm font-medium transition-colors ${
+                    !showOriginalInModal
+                      ? 'bg-white text-black'
+                      : 'text-white hover:bg-white hover:bg-opacity-20'
+                  }`}
+                >
+                  结果图
+                </button>
+              </div>
+            )}
             
             <img
-              src={filteredImages[selectedImageIndex]?.processedUrl || filteredImages[selectedImageIndex]?.originalUrl}
+              src={
+                showOriginalInModal
+                  ? filteredImages[selectedImageIndex]?.originalUrl
+                  : (filteredImages[selectedImageIndex]?.processedUrl || filteredImages[selectedImageIndex]?.originalUrl)
+              }
               alt={filteredImages[selectedImageIndex]?.filename}
-              className="max-w-full max-h-full object-contain rounded-lg"
+              className="max-w-full max-h-[85vh] object-contain rounded-lg mx-auto"
             />
             
             <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-75 text-white px-4 py-2 rounded-lg">
               <p className="text-center font-medium">
                 {filteredImages[selectedImageIndex]?.filename}
               </p>
-              <p className="text-center text-sm opacity-75">
-                {getTypeLabel(filteredImages[selectedImageIndex]?.processType)}
-              </p>
+              <div className="flex items-center justify-center gap-2 text-sm">
+                <span className="opacity-75">
+                  {getTypeLabel(filteredImages[selectedImageIndex]?.processType)}
+                </span>
+                <span className={`px-2 py-0.5 rounded text-xs ${
+                  showOriginalInModal ? 'bg-gray-600' : 'bg-green-600'
+                }`}>
+                  {showOriginalInModal ? '原图' : '结果图'}
+                </span>
+              </div>
               {filteredImages.length > 1 && (
                 <p className="text-center text-sm opacity-75">
                   {selectedImageIndex + 1} / {filteredImages.length}

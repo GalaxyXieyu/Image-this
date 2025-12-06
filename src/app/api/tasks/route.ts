@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { deleteImage } from '@/lib/storage';
 
 // 创建新任务
 export async function POST(request: NextRequest) {
@@ -143,7 +144,7 @@ export async function GET(request: NextRequest) {
       where.id = { in: taskIds };
     }
 
-    // 查询任务
+    // 查询任务 - 排除大型 JSON 字段以提升性能
     const tasks = await prisma.taskQueue.findMany({
       where,
       orderBy: [
@@ -152,18 +153,56 @@ export async function GET(request: NextRequest) {
       ],
       take: limit,
       skip: offset,
-      include: {
+      select: {
+        id: true,
+        type: true,
+        status: true,
+        priority: true,
+        progress: true,
+        currentStep: true,
+        totalSteps: true,
+        completedSteps: true,
+        errorMessage: true,
+        createdAt: true,
+        updatedAt: true,
+        startedAt: true,
+        completedAt: true,
+        userId: true,
+        projectId: true,
+        processedImageId: true,
+        // 注意：不包含 inputData 和 outputData 以提升性能
         project: {
           select: { id: true, name: true }
         },
         processedImage: {
-          select: { id: true, filename: true, processedUrl: true }
+          select: { id: true, filename: true, originalUrl: true, processedUrl: true }
         }
       }
     });
 
-    // 获取总数
-    const total = await prisma.taskQueue.count({ where });
+    // 并行获取总数和状态统计（一次数据库往返）
+    const [total, statusCounts] = await Promise.all([
+      prisma.taskQueue.count({ where }),
+      // 使用 groupBy 一次查询获取所有状态统计
+      prisma.taskQueue.groupBy({
+        by: ['status'],
+        where: { userId: session.user.id },
+        _count: { status: true }
+      })
+    ]);
+
+    // 转换状态统计
+    const stats = { pending: 0, processing: 0, completed: 0, failed: 0, total: 0 };
+    for (const item of statusCounts) {
+      const count = item._count.status;
+      stats.total += count;
+      switch (item.status) {
+        case 'PENDING': stats.pending = count; break;
+        case 'PROCESSING': stats.processing = count; break;
+        case 'COMPLETED': stats.completed = count; break;
+        case 'FAILED': stats.failed = count; break;
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -173,7 +212,9 @@ export async function GET(request: NextRequest) {
         limit,
         offset,
         hasMore: offset + limit < total
-      }
+      },
+      // 直接返回统计，前端不需要额外请求
+      stats
     });
 
   } catch (error) {
@@ -196,9 +237,71 @@ export async function DELETE(request: NextRequest) {
     const body = await request.json();
     const { taskIds, deleteAll = false } = body;
 
+    // 辅助函数：删除图片文件和数据库记录
+    const deleteAssociatedImages = async (tasks: { processedImageId: string | null }[]) => {
+      const imageIds = tasks
+        .filter(t => t.processedImageId)
+        .map(t => t.processedImageId as string);
+      
+      if (imageIds.length === 0) return;
+
+      // 获取图片详情
+      const images = await prisma.processedImage.findMany({
+        where: { id: { in: imageIds } },
+        select: {
+          id: true,
+          originalUrl: true,
+          processedUrl: true,
+          thumbnailUrl: true
+        }
+      });
+
+      // 删除本地文件
+      const extractFilename = (url: string): string | null => {
+        try {
+          return url.startsWith('/') ? url.substring(1) : url;
+        } catch {
+          return url;
+        }
+      };
+
+      for (const image of images) {
+        try {
+          if (image.originalUrl) {
+            const filename = extractFilename(image.originalUrl);
+            if (filename) await deleteImage(filename, session.user.id);
+          }
+          if (image.processedUrl) {
+            const filename = extractFilename(image.processedUrl);
+            if (filename) await deleteImage(filename, session.user.id);
+          }
+          if (image.thumbnailUrl) {
+            const filename = extractFilename(image.thumbnailUrl);
+            if (filename) await deleteImage(filename, session.user.id);
+          }
+        } catch (deleteError) {
+          console.error('删除本地文件失败:', deleteError);
+        }
+      }
+
+      // 删除图片数据库记录
+      await prisma.processedImage.deleteMany({
+        where: { id: { in: imageIds } }
+      });
+    };
+
     let deleteResult;
 
     if (deleteAll) {
+      // 获取所有任务及其关联的图片
+      const allTasks = await prisma.taskQueue.findMany({
+        where: { userId: session.user.id },
+        select: { processedImageId: true }
+      });
+
+      // 删除关联的图片
+      await deleteAssociatedImages(allTasks);
+
       // 删除用户的所有任务
       deleteResult = await prisma.taskQueue.deleteMany({
         where: {
@@ -207,13 +310,13 @@ export async function DELETE(request: NextRequest) {
       });
     } else if (taskIds && Array.isArray(taskIds) && taskIds.length > 0) {
       // 批量删除指定的任务
-      // 首先验证所有任务都属于当前用户
+      // 首先验证所有任务都属于当前用户，并获取关联的图片
       const tasks = await prisma.taskQueue.findMany({
         where: {
           id: { in: taskIds },
           userId: session.user.id
         },
-        select: { id: true }
+        select: { id: true, processedImageId: true }
       });
 
       if (tasks.length !== taskIds.length) {
@@ -222,6 +325,9 @@ export async function DELETE(request: NextRequest) {
           { status: 403 }
         );
       }
+
+      // 删除关联的图片
+      await deleteAssociatedImages(tasks);
 
       // 删除任务
       deleteResult = await prisma.taskQueue.deleteMany({
@@ -239,7 +345,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `已删除 ${deleteResult.count} 个任务`,
+      message: `已删除 ${deleteResult.count} 个任务及关联图片`,
       deletedCount: deleteResult.count
     });
 

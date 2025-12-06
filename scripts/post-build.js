@@ -2,7 +2,14 @@
 
 /**
  * Post-build script for Next.js standalone mode
- * Copies necessary files to standalone directory
+ * 自动复制 standalone 模式缺失的必要文件
+ * 
+ * Next.js standalone 不会自动包含：
+ * - .next/static (CSS/JS)
+ * - public (静态资源)
+ * - prisma (数据库 schema)
+ * - 原生模块 (sharp, @img, .prisma, @prisma)
+ * - .env.production
  */
 
 const fs = require('fs');
@@ -10,68 +17,59 @@ const path = require('path');
 
 const projectRoot = path.join(__dirname, '..');
 const standaloneDir = path.join(projectRoot, '.next', 'standalone');
-const staticDir = path.join(projectRoot, '.next', 'static');
-const publicDir = path.join(projectRoot, 'public');
-const prismaDir = path.join(projectRoot, 'prisma');
 
-console.log('🔧 Running post-build tasks...');
+if (!fs.existsSync(standaloneDir)) {
+  console.log('⚠️ Standalone directory not found, skipping post-build');
+  process.exit(0);
+}
 
-// Copy .next/static to standalone
-if (fs.existsSync(staticDir)) {
-  const targetStaticDir = path.join(standaloneDir, '.next', 'static');
-  console.log(`📁 Copying static files to: ${targetStaticDir}`);
+console.log('🔧 Running post-build tasks...\n');
+
+// 需要复制的目录/文件列表
+const copyTasks = [
+  // 静态资源（必须）
+  { from: '.next/static', to: '.next/standalone/.next/static', required: true },
+  { from: 'public', to: '.next/standalone/public', required: true },
   
-  if (!fs.existsSync(targetStaticDir)) {
-    fs.mkdirSync(path.dirname(targetStaticDir), { recursive: true });
-  }
+  // 数据库
+  { from: 'prisma', to: '.next/standalone/prisma', required: true },
   
-  copyRecursiveSync(staticDir, targetStaticDir);
-  console.log('✅ Static files copied');
-}
-
-// Copy public directory to standalone
-if (fs.existsSync(publicDir)) {
-  const targetPublicDir = path.join(standaloneDir, 'public');
-  console.log(`📁 Copying public files to: ${targetPublicDir}`);
-  copyRecursiveSync(publicDir, targetPublicDir);
-  console.log('✅ Public files copied');
-}
-
-// Copy prisma directory to standalone
-if (fs.existsSync(prismaDir)) {
-  const targetPrismaDir = path.join(standaloneDir, 'prisma');
-  console.log(`📁 Copying prisma files to: ${targetPrismaDir}`);
-  copyRecursiveSync(prismaDir, targetPrismaDir);
-  console.log('✅ Prisma files copied');
-}
-
-// Copy .env.production if exists
-const envProdPath = path.join(projectRoot, '.env.production');
-if (fs.existsSync(envProdPath)) {
-  const targetEnvPath = path.join(standaloneDir, '.env.production');
-  console.log(`📁 Copying .env.production to: ${targetEnvPath}`);
-  fs.copyFileSync(envProdPath, targetEnvPath);
-  console.log('✅ Environment file copied');
-}
-
-console.log('✨ Post-build tasks completed!');
-
-function copyRecursiveSync(src, dest) {
-  const exists = fs.existsSync(src);
-  const stats = exists && fs.statSync(src);
-  const isDirectory = exists && stats.isDirectory();
+  // 原生模块
+  { from: 'node_modules/sharp', to: '.next/standalone/node_modules/sharp', required: false },
+  { from: 'node_modules/@img', to: '.next/standalone/node_modules/@img', required: false },
+  { from: 'node_modules/.prisma', to: '.next/standalone/node_modules/.prisma', required: true },
+  { from: 'node_modules/@prisma', to: '.next/standalone/node_modules/@prisma', required: true },
   
-  if (isDirectory) {
-    if (!fs.existsSync(dest)) {
-      fs.mkdirSync(dest, { recursive: true });
+  // 环境配置
+  { from: '.env.production', to: '.next/standalone/.env.production', required: false },
+];
+
+let hasError = false;
+
+copyTasks.forEach(task => {
+  const srcPath = path.join(projectRoot, task.from);
+  const destPath = path.join(projectRoot, task.to);
+  
+  if (fs.existsSync(srcPath)) {
+    try {
+      const stat = fs.statSync(srcPath);
+      if (stat.isDirectory()) {
+        fs.cpSync(srcPath, destPath, { recursive: true });
+      } else {
+        fs.mkdirSync(path.dirname(destPath), { recursive: true });
+        fs.copyFileSync(srcPath, destPath);
+      }
+      console.log(`✅ ${task.from}`);
+    } catch (e) {
+      console.log(`❌ ${task.from}: ${e.message}`);
+      if (task.required) hasError = true;
     }
-    fs.readdirSync(src).forEach(childItemName => {
-      copyRecursiveSync(
-        path.join(src, childItemName),
-        path.join(dest, childItemName)
-      );
-    });
+  } else if (task.required) {
+    console.log(`❌ ${task.from} (not found)`);
+    hasError = true;
   } else {
-    fs.copyFileSync(src, dest);
+    console.log(`⏭️  ${task.from} (skipped)`);
   }
-}
+});
+
+console.log('\n' + (hasError ? '❌ Post-build completed with errors' : '✨ Post-build completed!'));

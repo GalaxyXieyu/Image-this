@@ -57,7 +57,14 @@ export async function POST(request: NextRequest) {
       };
     }
     
-    await saveUserConfig(session.user.id, userConfig);
+    const saved = await saveUserConfig(session.user.id, userConfig);
+    
+    if (!saved) {
+      return NextResponse.json({ 
+        success: false,
+        error: '用户不存在，请重新登录'
+      }, { status: 404 });
+    }
     
     return NextResponse.json({ 
       success: true,

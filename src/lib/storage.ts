@@ -9,7 +9,8 @@ import {
   uploadBase64ImageToLocal,
   deleteImageFromLocal,
   generateAndUploadThumbnail as generateLocalThumbnail,
-  ensureUploadDirExists
+  ensureUploadDirExists,
+  checkImageExists as checkLocalImageExists
 } from './local-storage';
 import { getUserConfig } from './user-config';
 
@@ -103,4 +104,23 @@ export async function generateAndUploadThumbnail(
   }
   
   return generateLocalThumbnail(originalImageBuffer, filename, customPath);
+}
+
+// 检查图片文件是否存在
+export async function checkImageExists(
+  urlPath: string,
+  userId?: string
+): Promise<boolean> {
+  let customPath: string | undefined;
+  
+  if (userId) {
+    try {
+      const userConfig = await getUserConfig(userId);
+      customPath = userConfig.localStorage?.savePath;
+    } catch (error) {
+      console.error('获取用户配置失败，使用默认路径:', error);
+    }
+  }
+  
+  return checkLocalImageExists(urlPath, customPath);
 }

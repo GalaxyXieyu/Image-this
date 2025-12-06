@@ -2,6 +2,27 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { checkImageExists } from '@/lib/storage';
+
+// 图片查询结果类型
+interface ImageQueryResult {
+  id: string;
+  filename: string;
+  thumbnailUrl: string | null;
+  originalUrl: string | null;
+  processedUrl: string | null;
+  processType: string;
+  status: string;
+  fileSize: number | null;
+  width: number | null;
+  height: number | null;
+  createdAt: Date;
+  metadata?: string | null;
+  project: {
+    id: string;
+    name: string;
+  } | null;
+}
 
 // 获取用户的图片列表
 export async function GET(request: NextRequest) {
@@ -22,6 +43,9 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0');
     // 图片尺寸优化参数
     const includeFullSize = searchParams.get('includeFullSize') === 'true'; // 是否包含完整尺寸图片
+    // 文件存在性验证（默认关闭，可通过参数开启）
+    // 注意：开启后会验证本地文件是否存在，不存在的记录会被自动清理
+    const checkFiles = searchParams.get('checkFiles') === 'true';
 
     // 构建查询条件
     const where: any = {
@@ -60,51 +84,107 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 查询图片 - 优化字段选择，减少数据传输
-    const selectFields: any = {
-      id: true,
-      filename: true,
-      thumbnailUrl: true, // 始终返回缩略图
-      processType: true,
-      status: true,
-      fileSize: true,
-      width: true,
-      height: true,
-      createdAt: true,
-      project: {
-        select: {
-          id: true,
-          name: true
-        }
-      }
-    };
-
-    // 只在需要时返回完整尺寸图片 URL
-    if (includeFullSize) {
-      selectFields.originalUrl = true;
-      selectFields.processedUrl = true;
-      selectFields.metadata = true;
-    }
-
-    const images = await prisma.processedImage.findMany({
+    // 为了正确过滤不存在的文件，我们需要多查询一些数据
+    // 因为可能有些图片文件不存在，需要过滤掉
+    const queryLimit = checkFiles ? limit * 2 : limit; // 查询更多以弥补可能被过滤的数量
+    
+    // 查询图片 - 使用固定的 select 避免类型推断问题
+    const rawImages = await prisma.processedImage.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      take: limit,
+      take: queryLimit,
       skip: offset,
-      select: selectFields
+      select: {
+        id: true,
+        filename: true,
+        thumbnailUrl: true,
+        originalUrl: true,
+        processedUrl: true,
+        processType: true,
+        status: true,
+        fileSize: true,
+        width: true,
+        height: true,
+        createdAt: true,
+        metadata: true,
+        project: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      }
     });
+    
+    let images: ImageQueryResult[] = rawImages as ImageQueryResult[];
 
-    // 获取总数
+    // 验证本地文件是否存在，过滤掉不存在的图片
+    if (checkFiles && images.length > 0) {
+      const validImages: ImageQueryResult[] = [];
+      const invalidImageIds: string[] = [];
+      
+      for (const image of images) {
+        // 检查处理后的图片或原图是否存在
+        const urlToCheck = image.processedUrl || image.originalUrl;
+        
+        // 如果没有 URL，视为无效
+        if (!urlToCheck) {
+          invalidImageIds.push(image.id);
+          continue;
+        }
+        
+        const exists = await checkImageExists(urlToCheck, session.user.id);
+        
+        if (exists) {
+          validImages.push(image);
+        } else {
+          invalidImageIds.push(image.id);
+        }
+        
+        // 如果已经收集够了有效图片，就停止
+        if (validImages.length >= limit) {
+          break;
+        }
+      }
+      
+      // 异步清理不存在文件的数据库记录（不阻塞响应）
+      if (invalidImageIds.length > 0) {
+        // 使用 setImmediate 或 Promise 异步删除，不阻塞响应
+        prisma.processedImage.deleteMany({
+          where: { id: { in: invalidImageIds } }
+        }).catch(err => {
+          console.error('清理无效图片记录失败:', err);
+        });
+      }
+      
+      images = validImages;
+    }
+
+    // 限制返回数量
+    images = images.slice(0, limit);
+    
+    // 根据 includeFullSize 参数决定返回的字段
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let finalImages: any[] = images;
+    if (!includeFullSize) {
+      // 移除完整尺寸图片 URL 和 metadata 字段
+      finalImages = images.map(img => {
+        const { originalUrl, processedUrl, metadata, ...rest } = img;
+        return rest;
+      });
+    }
+
+    // 获取总数（这个总数可能包含文件不存在的记录，但作为近似值使用）
     const total = await prisma.processedImage.count({ where });
 
     return NextResponse.json({
       success: true,
-      images,
+      images: finalImages,
       pagination: {
         total,
         limit,
         offset,
-        hasMore: offset + limit < total
+        hasMore: finalImages.length === limit // 基于实际返回的数量判断
       }
     });
 

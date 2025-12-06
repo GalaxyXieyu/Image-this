@@ -65,6 +65,15 @@ log(`User Data: ${app.getPath('userData')}`);
 log(`Log file: ${LOG_FILE}`);
 log(`Error log file: ${ERROR_LOG_FILE}`);
 
+// Windows 性能优化：禁用可能导致启动慢的 GPU 功能
+if (process.platform === 'win32') {
+  app.commandLine.appendSwitch('disable-gpu-sandbox');
+  app.commandLine.appendSwitch('disable-software-rasterizer');
+  // 减少 V8 内存占用，加快启动
+  app.commandLine.appendSwitch('js-flags', '--max-old-space-size=256');
+  log('Windows GPU optimizations applied');
+}
+
 function createWindow() {
   try {
     log('Creating main window...');
@@ -102,9 +111,10 @@ function createWindow() {
     });
 
     // 显示加载页面，提升用户体验
-    mainWindow.loadURL(`data:text/html,
+    mainWindow.loadURL(`data:text/html;charset=utf-8,
       <html>
         <head>
+          <meta charset="UTF-8">
           <style>
             body {
               margin: 0;
@@ -204,10 +214,10 @@ function startNextServer() {
     let standaloneDir;
     
     if (app.isPackaged) {
-      // 打包后的路径 - .next 目录被解包到 app.asar.unpacked
-      const unpackedPath = path.join(process.resourcesPath, 'app.asar.unpacked');
-      standaloneDir = path.join(unpackedPath, '.next', 'standalone');
-      log(`Packaged mode, unpacked path: ${unpackedPath}`);
+      // 打包后的路径 - asar 禁用后，文件直接在 resources/app 目录
+      const appPath = path.join(process.resourcesPath, 'app');
+      standaloneDir = path.join(appPath, '.next', 'standalone');
+      log(`Packaged mode, app path: ${appPath}`);
     } else {
       // 开发模式路径
       const appRoot = path.join(__dirname, '..');
@@ -295,14 +305,14 @@ function startNextServer() {
       log(`Next.js server exited with code ${code}, signal: ${signal}`, code === 0 ? 'INFO' : 'ERROR');
     });
 
-    // 等待服务器启动 - 优化：减少检查间隔，更快响应
+    // 等待服务器启动 - 优化：更快的检查间隔
     const checkServer = async () => {
       const http = require('http');
-      const maxAttempts = 30; // 最多等待 15 秒
+      const maxAttempts = 60; // 最多等待 18 秒
       let attempts = 0;
       
-      // 等待 1 秒让服务器有时间启动
-      await new Promise(r => setTimeout(r, 1000));
+      // 等待 300ms 让服务器有时间启动（减少初始等待）
+      await new Promise(r => setTimeout(r, 300));
       
       while (attempts < maxAttempts) {
         try {
@@ -312,7 +322,7 @@ function startNextServer() {
               res();
             });
             req.on('error', rej);
-            req.setTimeout(1000, () => {
+            req.setTimeout(500, () => {
               req.destroy();
               rej(new Error('Timeout'));
             });
@@ -322,10 +332,11 @@ function startNextServer() {
           return;
         } catch (e) {
           attempts++;
-          if (attempts % 5 === 0) {
+          if (attempts % 10 === 0) {
             log(`Waiting for server... attempt ${attempts}/${maxAttempts}`);
           }
-          await new Promise(r => setTimeout(r, 500));
+          // 更短的检查间隔
+          await new Promise(r => setTimeout(r, 300));
         }
       }
       
@@ -359,8 +370,9 @@ async function initDatabase() {
     // 查找模板数据库
     let templateDbPath;
     if (app.isPackaged) {
-      const unpackedPath = path.join(process.resourcesPath, 'app.asar.unpacked');
-      templateDbPath = path.join(unpackedPath, 'prisma', 'app.db');
+      // asar 禁用后，文件直接在 resources/app 目录
+      const appPath = path.join(process.resourcesPath, 'app');
+      templateDbPath = path.join(appPath, 'prisma', 'app.db');
     } else {
       templateDbPath = path.join(__dirname, '..', 'prisma', 'app.db');
     }
@@ -379,6 +391,53 @@ async function initDatabase() {
   return dbPath;
 }
 
+// 预热单个 API
+function warmupAPI(endpoint, description) {
+  const http = require('http');
+  return new Promise((resolve) => {
+    const startTime = Date.now();
+    
+    const req = http.get(`http://localhost:${PORT}${endpoint}`, (response) => {
+      let data = '';
+      response.on('data', chunk => data += chunk);
+      response.on('end', () => {
+        const duration = Date.now() - startTime;
+        log(`[Warmup] ${description} completed in ${duration}ms`);
+        resolve(true);
+      });
+    });
+    
+    req.on('error', (e) => {
+      log(`[Warmup] ${description} failed: ${e.message}`, 'WARN');
+      resolve(false);
+    });
+    
+    req.setTimeout(3000, () => {
+      log(`[Warmup] ${description} timeout`, 'WARN');
+      req.destroy();
+      resolve(false);
+    });
+  });
+}
+
+// 并行预热所有常用 API - 大幅提升首次加载速度
+async function warmupDatabase() {
+  log('Starting parallel API warmup...');
+  const startTime = Date.now();
+  
+  // 并行预热多个 API，触发 Prisma 连接和查询缓存
+  const warmupPromises = [
+    warmupAPI('/api/health', 'Database connection'),
+    warmupAPI('/api/tasks?limit=1', 'Task list query'),
+    warmupAPI('/api/auth/session', 'Auth session'),
+  ];
+  
+  await Promise.all(warmupPromises);
+  
+  const totalDuration = Date.now() - startTime;
+  log(`All warmup completed in ${totalDuration}ms`);
+}
+
 app.whenReady().then(async () => {
   log('App ready, starting initialization...');
   
@@ -393,6 +452,9 @@ app.whenReady().then(async () => {
     await startNextServer();
     log('Next.js server started, loading app...');
     
+    // 预热数据库连接（调用 health API 触发 Prisma 连接）
+    await warmupDatabase();
+    
     // 加载实际应用
     const url = `http://localhost:${PORT}`;
     mainWindow.loadURL(url);
@@ -402,9 +464,10 @@ app.whenReady().then(async () => {
     log(`Error stack: ${error.stack}`, 'ERROR');
     
     // 在窗口中显示错误
-    mainWindow.loadURL(`data:text/html,
+    mainWindow.loadURL(`data:text/html;charset=utf-8,
       <html>
         <head>
+          <meta charset="UTF-8">
           <style>
             body {
               margin: 0;
