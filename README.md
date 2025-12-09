@@ -25,8 +25,27 @@
 ### 首页
 ![首页](docs/screenshots/01-homepage.png)
 
-### 工作区 - 一键增强
-![工作区](docs/screenshots/03-workspace.png)
+### 工作区功能
+
+<details>
+<summary>📸 点击展开查看所有功能截图</summary>
+
+#### 一键增强
+![一键增强](docs/screenshots/workspace-01-oneclick.png)
+
+#### 背景替换
+![背景替换](docs/screenshots/workspace-02-background-replace.png)
+
+#### 智能扩图
+![智能扩图](docs/screenshots/workspace-03-outpaint.png)
+
+#### 图像高清化
+![图像高清化](docs/screenshots/workspace-04-enhance.png)
+
+#### 叠加水印
+![叠加水印](docs/screenshots/workspace-05-watermark.png)
+
+</details>
 
 ### 任务中心
 ![任务中心](docs/screenshots/04-task-center.png)
