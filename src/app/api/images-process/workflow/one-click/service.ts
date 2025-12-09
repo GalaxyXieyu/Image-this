@@ -1,7 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { uploadBase64Image } from '@/lib/storage';
-import { ImageProcessorFactory, ImageProvider } from '@/lib/image-processor';
-import { processWithGemini, processWithGPT, processWithJimeng } from '@/lib/image-processor/service';
+import { processWithGemini, processWithGPT, processWithJimeng, outpaintWithVolcengine, enhanceWithVolcengine } from '@/lib/image-processor/service';
 
 export interface OneClickWorkflowParams {
   imageUrl: string;
@@ -178,29 +177,21 @@ export async function executeOneClickWorkflow(
         const left = expandRatio;
         const right = expandRatio;
         
-        // 初始化火山引擎 Provider
-        ImageProcessorFactory.initialize({
-          volcengine: {
-            enabled: true,
-            accessKey: volcengineConfig?.accessKey || '',
-            secretKey: volcengineConfig?.secretKey || ''
-          },
-          gpt: { enabled: false, apiUrl: '', apiKey: '' },
-          gemini: { enabled: false, apiKey: '', baseUrl: '' },
-          qwen: { enabled: false, apiKey: '' },
-          jimeng: { enabled: false, accessKey: '', secretKey: '' }
-        });
-        const processor = ImageProcessorFactory.getProcessor(ImageProvider.VOLCENGINE);
-        
-        const result = await processor.outpaint!(userId, processedImageUrl, {
-          prompt: '扩展图像，保持产品主体和风格完全一致，自然延伸背景',
+        // 使用统一的服务函数，自动从数据库读取配置
+        // 如果传入了 volcengineConfig 则使用传入的配置，否则从数据库读取
+        const result = await outpaintWithVolcengine(
+          userId,
+          processedImageUrl,
+          '扩展图像，保持产品主体和风格完全一致，自然延伸背景',
           top,
           bottom,
           left,
           right,
-          maxHeight: 2048,
-          maxWidth: 2048
-        });
+          2048,
+          2048,
+          volcengineConfig, // 如果为空，函数内部会从数据库读取
+          imagehostingConfig // 图床配置
+        );
         processedImageUrl = result.imageData;
         hasOutpaint = true;
         const outpaintDuration = ((Date.now() - outpaintStartTime) / 1000).toFixed(2);
@@ -218,35 +209,20 @@ export async function executeOneClickWorkflow(
       console.log(`=== 步骤3/4：开始智能画质增强 (使用 ${aiModel}) ===`);
       const enhanceStartTime = Date.now();
       try {
-        // 根据选择的 AI 模型调用不同的服务
-        // 注意：目前所有模型都使用火山引擎的画质增强，未来可以扩展
-        if (aiModel === 'jimeng' || aiModel === 'gpt' || aiModel === 'gemini') {
-          // 初始化火山引擎 Provider
-          ImageProcessorFactory.initialize({
-            volcengine: {
-              enabled: true,
-              accessKey: volcengineConfig?.accessKey || '',
-              secretKey: volcengineConfig?.secretKey || ''
-            },
-            gpt: { enabled: false, apiUrl: '', apiKey: '' },
-            gemini: { enabled: false, apiKey: '', baseUrl: '' },
-            qwen: { enabled: false, apiKey: '' },
-            jimeng: { enabled: false, accessKey: '', secretKey: '' }
-          });
-          const processor = ImageProcessorFactory.getProcessor(ImageProvider.VOLCENGINE);
-          
-          const result = await processor.enhance!(userId, processedImageUrl, {
-            resolutionBoundary: '720p',
-            enableHdr: false,
-            enableWb: false,
-            resultFormat: 1,
-            jpgQuality: 95,
-            skipDbSave: true // 跳过数据库保存，这是工作流中间步骤
-          });
-          processedImageUrl = result.imageData;
-        } else {
-          throw new Error(`不支持的 AI 模型: ${aiModel}`);
-        }
+        // 使用统一的服务函数，自动从数据库读取配置
+        const result = await enhanceWithVolcengine(
+          userId,
+          processedImageUrl,
+          '720p',
+          false, // enableHdr
+          false, // enableWb
+          1,     // resultFormat
+          95,    // jpgQuality
+          true,  // skipDbSave
+          volcengineConfig, // 如果为空，函数内部会从数据库读取
+          imagehostingConfig // 图床配置
+        );
+        processedImageUrl = result.imageData;
         
         const enhanceDuration = ((Date.now() - enhanceStartTime) / 1000).toFixed(2);
         console.log(`智能画质增强完成 (${aiModel})，耗时: ${enhanceDuration}秒`);

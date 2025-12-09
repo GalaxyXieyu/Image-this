@@ -214,8 +214,22 @@ function startNextServer() {
     let standaloneDir;
     
     if (app.isPackaged) {
-      // 打包后的路径 - asar 禁用后，文件直接在 resources/app 目录
-      const appPath = path.join(process.resourcesPath, 'app');
+      // 打包后的路径
+      // 优先检查 asar 禁用的情况（resources/app）
+      let appPath = path.join(process.resourcesPath, 'app');
+      
+      // 如果 asar 禁用的路径不存在，尝试 asar.unpacked 路径
+      if (!fs.existsSync(appPath)) {
+        appPath = path.join(process.resourcesPath, 'app.asar.unpacked');
+        log(`Using asar.unpacked path: ${appPath}`);
+      }
+      
+      // 如果两者都不存在，尝试 app.asar 解压路径（备用）
+      if (!fs.existsSync(appPath)) {
+        appPath = app.getAppPath();
+        log(`Using app.getAppPath(): ${appPath}`);
+      }
+      
       standaloneDir = path.join(appPath, '.next', 'standalone');
       log(`Packaged mode, app path: ${appPath}`);
     } else {
@@ -349,6 +363,59 @@ function startNextServer() {
   });
 }
 
+// 检查数据库是否损坏
+function isDatabaseCorrupted(dbPath) {
+  if (!fs.existsSync(dbPath)) {
+    return false; // 数据库不存在，不算损坏
+  }
+  
+  try {
+    // 尝试读取数据库文件头（SQLite 文件头是 "SQLite format 3"）
+    const fd = fs.openSync(dbPath, 'r');
+    const buffer = Buffer.alloc(16);
+    fs.readSync(fd, buffer, 0, 16, 0);
+    fs.closeSync(fd);
+    
+    const header = buffer.toString('utf8', 0, 15);
+    if (!header.startsWith('SQLite format')) {
+      log('Database header is invalid', 'WARN');
+      return true;
+    }
+    
+    // 检查文件大小（太小可能损坏）
+    const stats = fs.statSync(dbPath);
+    if (stats.size < 1024) {
+      log('Database file is too small', 'WARN');
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    log(`Error checking database: ${error.message}`, 'WARN');
+    return true; // 无法读取，可能损坏
+  }
+}
+
+// 备份损坏的数据库
+function backupCorruptedDatabase(dbPath) {
+  try {
+    const backupDir = path.join(path.dirname(dbPath), 'corrupted-backups');
+    if (!fs.existsSync(backupDir)) {
+      fs.mkdirSync(backupDir, { recursive: true });
+    }
+    
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupPath = path.join(backupDir, `app-corrupted-${timestamp}.db`);
+    
+    fs.copyFileSync(dbPath, backupPath);
+    log(`Corrupted database backed up to: ${backupPath}`);
+    return backupPath;
+  } catch (error) {
+    log(`Failed to backup corrupted database: ${error.message}`, 'ERROR');
+    return null;
+  }
+}
+
 // 初始化数据库
 async function initDatabase() {
   const userDataPath = app.getPath('userData');
@@ -363,6 +430,35 @@ async function initDatabase() {
     log(`Created database directory: ${dbDir}`);
   }
   
+  // 检查数据库是否损坏
+  if (fs.existsSync(dbPath) && isDatabaseCorrupted(dbPath)) {
+    log('Database is corrupted, attempting to repair...', 'WARN');
+    
+    // 备份损坏的数据库
+    backupCorruptedDatabase(dbPath);
+    
+    // 删除损坏的数据库文件
+    try {
+      fs.unlinkSync(dbPath);
+      log('Corrupted database deleted');
+      
+      // 删除相关的 WAL 和 SHM 文件
+      const walPath = `${dbPath}-wal`;
+      const shmPath = `${dbPath}-shm`;
+      if (fs.existsSync(walPath)) {
+        fs.unlinkSync(walPath);
+        log('Deleted WAL file');
+      }
+      if (fs.existsSync(shmPath)) {
+        fs.unlinkSync(shmPath);
+        log('Deleted SHM file');
+      }
+    } catch (error) {
+      log(`Failed to delete corrupted database: ${error.message}`, 'ERROR');
+      throw new Error('无法删除损坏的数据库文件，请手动删除后重试');
+    }
+  }
+  
   // 如果数据库不存在，从模板复制或创建
   if (!fs.existsSync(dbPath)) {
     log('Database does not exist, checking for template...');
@@ -370,9 +466,16 @@ async function initDatabase() {
     // 查找模板数据库
     let templateDbPath;
     if (app.isPackaged) {
-      // asar 禁用后，文件直接在 resources/app 目录
-      const appPath = path.join(process.resourcesPath, 'app');
+      // 优先检查 asar 禁用的情况
+      let appPath = path.join(process.resourcesPath, 'app');
+      if (!fs.existsSync(appPath)) {
+        appPath = path.join(process.resourcesPath, 'app.asar.unpacked');
+      }
+      if (!fs.existsSync(appPath)) {
+        appPath = app.getAppPath();
+      }
       templateDbPath = path.join(appPath, 'prisma', 'app.db');
+      log(`Template database path: ${templateDbPath}`);
     } else {
       templateDbPath = path.join(__dirname, '..', 'prisma', 'app.db');
     }
@@ -385,7 +488,7 @@ async function initDatabase() {
       log('No template database found, will be created on first API call');
     }
   } else {
-    log('Database exists');
+    log('Database exists and is valid');
   }
   
   return dbPath;

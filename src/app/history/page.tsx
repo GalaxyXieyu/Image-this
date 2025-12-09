@@ -494,12 +494,20 @@ export default function TaskCenterPage() {
 
   // 解析任务输入数据获取原图 URL
   const getOriginalImageUrl = (task: Task): string | null => {
-    try {
-      const inputData = JSON.parse(task.inputData);
-      return inputData.imageUrl || null;
-    } catch {
-      return null;
+    // 1. 优先从 processedImage 获取原图 URL（API 已返回此字段）
+    if (task.processedImage?.originalUrl) {
+      return task.processedImage.originalUrl;
     }
+    // 2. 回退到从 inputData 解析
+    if (task.inputData) {
+      try {
+        const inputData = JSON.parse(task.inputData);
+        return inputData.imageUrl || inputData.originalUrl || inputData.sourceUrl || null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
   };
 
   // 获取任务结果图 URL
@@ -795,6 +803,15 @@ export default function TaskCenterPage() {
                                 src={originalImageUrl}
                                 alt="原图"
                                 className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                  target.parentElement?.classList.add('bg-gray-100', 'flex', 'items-center', 'justify-center');
+                                  const placeholder = document.createElement('span');
+                                  placeholder.className = 'text-gray-400 text-xs text-center px-1';
+                                  placeholder.textContent = '加载失败';
+                                  target.parentElement?.appendChild(placeholder);
+                                }}
                               />
                             </div>
                           ) : (
@@ -813,6 +830,15 @@ export default function TaskCenterPage() {
                                 src={resultImageUrl}
                                 alt="结果"
                                 className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                  target.parentElement?.classList.add('bg-green-50', 'flex', 'items-center', 'justify-center');
+                                  const placeholder = document.createElement('span');
+                                  placeholder.className = 'text-green-500 text-xs text-center px-1';
+                                  placeholder.textContent = '加载失败';
+                                  target.parentElement?.appendChild(placeholder);
+                                }}
                               />
                             </div>
                           ) : task.status === 'PROCESSING' ? (

@@ -13,6 +13,8 @@ import { getUserConfig } from '@/lib/user-config';
 async function initializeProvider(userId: string, provider: ImageProvider) {
   const userConfig = await getUserConfig(userId);
   
+  console.log(`[initializeProvider] 初始化 ${provider}，图床配置:`, userConfig.imagehosting ? '已配置' : '未配置');
+  
   const providerConfig = {
     volcengine: {
       enabled: provider === ImageProvider.VOLCENGINE && !!userConfig.volcengine,
@@ -36,7 +38,9 @@ async function initializeProvider(userId: string, provider: ImageProvider) {
     jimeng: {
       enabled: provider === ImageProvider.JIMENG && !!userConfig.volcengine,
       accessKey: userConfig.volcengine?.accessKey || '',
-      secretKey: userConfig.volcengine?.secretKey || ''
+      secretKey: userConfig.volcengine?.secretKey || '',
+      // 添加图床配置（Jimeng 需要上传图片到图床）
+      imagehostingConfig: userConfig.imagehosting
     }
   };
   
@@ -97,12 +101,14 @@ export async function processWithJimeng(
   prompt: string,
   userId: string
 ): Promise<ProcessResult> {
+  const userConfig = await getUserConfig(userId);
   const processor = await initializeProvider(userId, ImageProvider.JIMENG);
   
   return await processor.backgroundReplace!(userId, {
     originalImageUrl,
     referenceImageUrl,
-    prompt
+    prompt,
+    superbedToken: userConfig.imagehosting?.superbedToken
   });
 }
 
@@ -171,7 +177,8 @@ export async function enhanceWithVolcengine(
     enableWb,
     resultFormat,
     jpgQuality,
-    skipDbSave
+    skipDbSave,
+    superbedToken: imagehostingConfig?.superbedToken
   });
 }
 
@@ -217,6 +224,7 @@ export async function outpaintWithVolcengine(
     left,
     right,
     maxHeight,
-    maxWidth
+    maxWidth,
+    superbedToken: imagehostingConfig?.superbedToken
   });
 }

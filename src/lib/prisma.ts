@@ -23,11 +23,12 @@ if (!globalForPrisma.prismaConnected) {
       console.log('[Prisma] Database connection established');
       
       // SQLite WAL 模式优化 - 显著提升 Windows 上的并发读写性能
+      // 使用 $queryRawUnsafe 因为 PRAGMA 语句会返回结果
       try {
-        await prisma.$executeRawUnsafe('PRAGMA journal_mode = WAL;');
-        await prisma.$executeRawUnsafe('PRAGMA synchronous = NORMAL;');
-        await prisma.$executeRawUnsafe('PRAGMA cache_size = 10000;');
-        await prisma.$executeRawUnsafe('PRAGMA temp_store = MEMORY;');
+        await prisma.$queryRawUnsafe('PRAGMA journal_mode = WAL;');
+        await prisma.$queryRawUnsafe('PRAGMA synchronous = NORMAL;');
+        await prisma.$queryRawUnsafe('PRAGMA cache_size = 10000;');
+        await prisma.$queryRawUnsafe('PRAGMA temp_store = MEMORY;');
         console.log('[Prisma] SQLite WAL mode enabled for better performance');
       } catch (e) {
         console.warn('[Prisma] Failed to enable WAL mode:', e);

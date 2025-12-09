@@ -154,6 +154,10 @@ model TaskQueue {
   totalSteps       Int           @default(1) // 总步骤数
   completedSteps   Int           @default(0) // 已完成步骤数
   
+  // 重试机制
+  retryCount       Int           @default(0) // 已重试次数
+  maxRetries       Int           @default(3) // 最大重试次数
+  
   // 任务数据
   inputData        String        // 输入数据（图片URL、参数等）JSON字符串
   outputData       String?       // 输出结果 JSON字符串

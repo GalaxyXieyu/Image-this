@@ -21,7 +21,7 @@ export class JimengProcessor implements IImageProcessor {
    * 背景替换（使用即梦 API）
    */
   async backgroundReplace(userId: string, params: any): Promise<ProcessResult> {
-    const { originalImageUrl, referenceImageUrl, prompt, customPrompt } = params;
+    const { originalImageUrl, referenceImageUrl, prompt, customPrompt, superbedToken } = params;
 
     if (!this.config.accessKey || !this.config.secretKey) {
       throw new Error('VOLCENGINE_NOT_CONFIGURED:请先配置火山引擎 Access Key 和 Secret Key');
@@ -30,6 +30,7 @@ export class JimengProcessor implements IImageProcessor {
     const finalPrompt = customPrompt || prompt || '保持第一张图的产品主体完全不变，仅替换第二张图的背景为类似参考场景的风格（要完全把第二张图的产品去掉），不要有同时出现的情况，保持第一张产品的形状、材质、特征比例、摆放角度及数量完全一致，专业摄影，高质量，4K分辨率';
 
     console.log('[Jimeng Processor] 开始背景替换');
+    console.log('[Jimeng Processor] 图床 Token:', superbedToken ? `${superbedToken.substring(0, 10)}...` : '未提供');
 
     try {
       // 上传参考图片到图床
@@ -38,7 +39,8 @@ export class JimengProcessor implements IImageProcessor {
       if (originalImageUrl) {
         const url = await uploadBase64ToSuperbed(
           originalImageUrl,
-          `jimeng-original-${Date.now()}.png`
+          `jimeng-original-${Date.now()}.png`,
+          superbedToken
         );
         console.log('[Jimeng Processor] 产品图上传完成:', url);
         imageUrls.push(url);
@@ -47,7 +49,8 @@ export class JimengProcessor implements IImageProcessor {
       if (referenceImageUrl) {
         const url = await uploadBase64ToSuperbed(
           referenceImageUrl,
-          `jimeng-reference-${Date.now()}.png`
+          `jimeng-reference-${Date.now()}.png`,
+          superbedToken
         );
         console.log('[Jimeng Processor] 参考图上传完成:', url);
         imageUrls.push(url);

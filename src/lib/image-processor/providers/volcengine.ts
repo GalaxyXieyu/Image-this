@@ -26,7 +26,8 @@ export class VolcengineProcessor implements IImageProcessor {
       enableWb = false,
       resultFormat = 1,
       jpgQuality = 95,
-      skipDbSave = false
+      skipDbSave = false,
+      superbedToken
     } = params || {};
 
     if (!this.config.accessKey || !this.config.secretKey) {
@@ -42,10 +43,10 @@ export class VolcengineProcessor implements IImageProcessor {
       if (isLocalPath(imageInput)) {
         // 本地路径：转换为 base64 再上传到图床
         const dataUrl = await localPathToDataUrl(imageInput);
-        imageUrl = await this.uploadToImageHost(dataUrl);
+        imageUrl = await this.uploadToImageHost(dataUrl, superbedToken);
       } else if (isBase64DataUrl(imageInput)) {
         // base64 Data URL：上传到图床
-        imageUrl = await this.uploadToImageHost(imageInput);
+        imageUrl = await this.uploadToImageHost(imageInput, superbedToken);
       } else {
         // 假设是 URL，直接使用
         imageUrl = imageInput;
@@ -107,7 +108,8 @@ export class VolcengineProcessor implements IImageProcessor {
       left = 0.1,
       right = 0.1,
       maxHeight = 1920,
-      maxWidth = 1920
+      maxWidth = 1920,
+      superbedToken
     } = params || {};
 
     if (!this.config.accessKey || !this.config.secretKey) {
@@ -123,7 +125,7 @@ export class VolcengineProcessor implements IImageProcessor {
       if (isLocalPath(imageInput)) {
         // 本地路径：转换为 base64 再上传
         const dataUrl = await localPathToDataUrl(imageInput);
-        const imageUrl = await this.uploadToImageHost(dataUrl);
+        const imageUrl = await this.uploadToImageHost(dataUrl, superbedToken);
         requestBody = this.buildOutpaintRequest(imageUrl, prompt, top, bottom, left, right, maxHeight, maxWidth, false);
       } else if (isBase64DataUrl(imageInput)) {
         // base64：可以直接使用或上传
@@ -135,6 +137,12 @@ export class VolcengineProcessor implements IImageProcessor {
       }
 
       const bodyStr = JSON.stringify(requestBody);
+      
+      // 调试日志：显示使用的鉴权信息
+      console.log(`[Volcengine Processor] 扩图鉴权信息:`);
+      console.log(`  - AccessKey: ${this.config.accessKey.substring(0, 10)}...${this.config.accessKey.substring(this.config.accessKey.length - 10)}`);
+      console.log(`  - SecretKey: ${this.config.secretKey.substring(0, 10)}...${this.config.secretKey.substring(this.config.secretKey.length - 10)}`);
+      
       const headers = generateVolcengineHeaders(bodyStr, this.config.accessKey, this.config.secretKey);
       const apiUrl = getVolcengineApiUrl();
 
@@ -212,11 +220,11 @@ export class VolcengineProcessor implements IImageProcessor {
   /**
    * 上传图片到图床
    */
-  private async uploadToImageHost(dataUrl: string): Promise<string> {
+  private async uploadToImageHost(dataUrl: string, superbedToken?: string): Promise<string> {
     try {
       const { uploadBase64ToSuperbed } = await import('@/lib/superbed-upload');
-      const filename = `volcengine-temp-${Date.now()}.jpg`;
-      const publicUrl = await uploadBase64ToSuperbed(dataUrl, filename);
+      const filename = `volcengine-temp-${Date.now()}.png`;
+      const publicUrl = await uploadBase64ToSuperbed(dataUrl, filename, superbedToken);
       console.log(`[Volcengine Processor] 图片已上传到图床: ${publicUrl.substring(0, 50)}...`);
       return publicUrl;
     } catch (error) {

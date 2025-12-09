@@ -170,7 +170,8 @@ export async function GET(request: NextRequest) {
         userId: true,
         projectId: true,
         processedImageId: true,
-        // 注意：不包含 inputData 和 outputData 以提升性能
+        inputData: true, // 需要 inputData 来获取原图 URL
+        // 注意：不包含 outputData 以提升性能（通常比 inputData 大）
         project: {
           select: { id: true, name: true }
         },

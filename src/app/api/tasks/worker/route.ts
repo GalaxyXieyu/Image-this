@@ -217,7 +217,7 @@ class TaskProcessor {
     }
   }
 
-  private async processSingleTask(task: { id: string; type: string; inputData: string; totalSteps: number; userId: string }) {
+  private async processSingleTask(task: { id: string; type: string; inputData: string; totalSteps: number; userId: string; retryCount?: number; maxRetries?: number }) {
     try {
       const userConfig = await getUserConfig(task.userId);
       
@@ -227,13 +227,16 @@ class TaskProcessor {
       inputData.imagehostingConfig = userConfig.imagehosting;
       task.inputData = JSON.stringify(inputData);
       
+      const retryCount = task.retryCount ?? 0;
+      const retryInfo = retryCount > 0 ? ` (重试 ${retryCount} 次)` : '';
+      
       // 更新任务状态为处理中
       await prisma.taskQueue.update({
         where: { id: task.id },
         data: {
           status: 'PROCESSING',
           startedAt: new Date(),
-          currentStep: '开始处理任务',
+          currentStep: `开始处理任务${retryInfo}`,
           progress: 0
         }
       });
@@ -282,16 +285,44 @@ class TaskProcessor {
       console.error(`=== 任务处理失败 ===`);
       console.error(`任务ID: ${task.id}, 类型: ${task.type}`);
       console.error(`错误信息:`, error);
-      // 更新任务为失败状态
-      await prisma.taskQueue.update({
+      
+      // 获取当前重试信息
+      const currentTask = await prisma.taskQueue.findUnique({
         where: { id: task.id },
-        data: {
-          status: 'FAILED',
-          completedAt: new Date(),
-          errorMessage: error instanceof Error ? error.message : '未知错误',
-          currentStep: '处理失败'
-        }
+        select: { retryCount: true, maxRetries: true }
       });
+      
+      const retryCount = currentTask?.retryCount ?? 0;
+      const maxRetries = currentTask?.maxRetries ?? 3;
+      
+      if (retryCount < maxRetries) {
+        // 还可以重试：增加重试次数，重置为 PENDING 状态
+        await prisma.taskQueue.update({
+          where: { id: task.id },
+          data: {
+            status: 'PENDING',
+            retryCount: retryCount + 1,
+            progress: 0,
+            currentStep: `等待重试 (${retryCount + 1}/${maxRetries})`,
+            startedAt: null,
+            errorMessage: `处理失败: ${error instanceof Error ? error.message : '未知错误'}，准备第 ${retryCount + 1} 次重试`
+          }
+        });
+        console.log(`[Task Worker] 任务 ${task.id} 处理失败，将进行第 ${retryCount + 1} 次重试`);
+      } else {
+        // 超过最大重试次数：标记为失败
+        await prisma.taskQueue.update({
+          where: { id: task.id },
+          data: {
+            status: 'FAILED',
+            completedAt: new Date(),
+            errorMessage: `重试 ${maxRetries} 次后仍然失败: ${error instanceof Error ? error.message : '未知错误'}`,
+            currentStep: '处理失败（已达最大重试次数）'
+          }
+        });
+        console.log(`[Task Worker] 任务 ${task.id} 已达最大重试次数 (${maxRetries})，标记为失败`);
+      }
+      
       throw error;
     }
   }

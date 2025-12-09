@@ -46,10 +46,28 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
     }
   });
 
-  // 用户不存在时返回空配置，避免报错
+  // 用户不存在时返回硬编码默认配置
   if (!user) {
-    console.warn(`[用户配置] 用户不存在: ${userId}`);
-    return {};
+    console.warn(`[用户配置] 用户不存在: ${userId}，使用硬编码默认配置`);
+    const defaultConfig = {
+      volcengine: {
+        accessKey: 'AKLTYzk3Y2U5YjUxMjM1NDk0YTg0NmRkN2U0ZTkxZDQzYWE',
+        secretKey: 'Tm1FNE1Ea3lNelJoT0RZM05EZGtNR0U0WlRBME5qZGxaamxoTlRjeE9ERQ=='
+      },
+      gpt: {
+        apiUrl: 'https://yunwu.ai',
+        apiKey: 'sk-3MUwbxYhQRjj9J9xIkD5RRS4oyxmlhqPXuVHHvsQXZTDDo4A'
+      },
+      gemini: {
+        apiKey: 'sk-GVb87LaFxklfvOz7aym0Ql2rreqrrGJvCGXK8cYIyY8foe9y',
+        baseUrl: 'https://yunwu.ai'
+      },
+      imagehosting: {
+        superbedToken: '00fbe01340604063b1f59aedc0481ddc'
+      }
+    };
+    console.log('[用户配置] 返回默认配置:', JSON.stringify(defaultConfig, null, 2));
+    return defaultConfig;
   }
 
   const config: UserConfig = {};
@@ -60,6 +78,16 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
       accessKey: user.volcengineAccessKey,
       secretKey: user.volcengineSecretKey,
     };
+    console.log('[用户配置] Volcengine: 从数据库读取');
+    console.log(`  - AccessKey: ${user.volcengineAccessKey.substring(0, 10)}...${user.volcengineAccessKey.substring(user.volcengineAccessKey.length - 10)}`);
+  } else {
+    // 硬编码兜底
+    config.volcengine = {
+      accessKey: 'AKLTYzk3Y2U5YjUxMjM1NDk0YTg0NmRkN2U0ZTkxZDQzYWE',
+      secretKey: 'Tm1FNE1Ea3lNelJoT0RZM05EZGtNR0U0WlRBME5qZGxaamxoTlRjeE9ERQ=='
+    };
+    console.log('[用户配置] Volcengine: 使用硬编码兜底');
+    console.log(`  - AccessKey: AKLTYzk3Y2...ZDQzYWE (硬编码)`);
   }
 
   // GPT 配置
@@ -68,6 +96,13 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
       apiUrl: user.gptApiUrl,
       apiKey: user.gptApiKey,
     };
+    console.log('[用户配置] GPT: 从数据库读取');
+  } else {
+    config.gpt = {
+      apiUrl: 'https://yunwu.ai',
+      apiKey: 'sk-3MUwbxYhQRjj9J9xIkD5RRS4oyxmlhqPXuVHHvsQXZTDDo4A'
+    };
+    console.log('[用户配置] GPT: 使用硬编码兜底');
   }
 
   // Gemini 配置
@@ -76,6 +111,13 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
       apiKey: user.geminiApiKey,
       baseUrl: user.geminiBaseUrl || 'https://yunwu.ai',
     };
+    console.log('[用户配置] Gemini: 从数据库读取');
+  } else {
+    config.gemini = {
+      apiKey: 'sk-GVb87LaFxklfvOz7aym0Ql2rreqrrGJvCGXK8cYIyY8foe9y',
+      baseUrl: 'https://yunwu.ai'
+    };
+    console.log('[用户配置] Gemini: 使用硬编码兜底');
   }
 
   // 图床配置
@@ -83,6 +125,13 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
     config.imagehosting = {
       superbedToken: user.superbedToken,
     };
+    console.log('[用户配置] 图床: 从数据库读取');
+  } else {
+    // 硬编码兜底
+    config.imagehosting = {
+      superbedToken: '00fbe01340604063b1f59aedc0481ddc'
+    };
+    console.log('[用户配置] 图床: 使用硬编码兜底');
   }
 
   // 本地存储配置
