@@ -185,6 +185,12 @@ postgres_data/
 prisma/migrations/*/migration.sql
 prisma/*.db
 prisma/*.db-journal
+prisma/*.db-shm
+prisma/*.db-wal
+prisma/**/*.db
+prisma/**/*.db-shm
+prisma/**/*.db-wal
+prisma/**/*.db-journal
 
 # Local development files
 .local
