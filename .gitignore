@@ -184,6 +184,7 @@ postgres_data/
 # Prisma
 prisma/migrations/*/migration.sql
 prisma/*.db
+!prisma/app.db
 prisma/*.db-journal
 prisma/*.db-shm
 prisma/*.db-wal

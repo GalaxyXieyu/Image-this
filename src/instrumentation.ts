@@ -111,6 +111,16 @@ async function recoverStuckTasks() {
     }
 
   } catch (error) {
+    // 数据库未初始化（缺少表）时不要让启动流程报错刷屏
+    // Prisma: P2021 = 表不存在
+    const maybePrismaError = error as { code?: string; message?: string };
+    if (maybePrismaError?.code === 'P2021') {
+      console.warn(
+        '[Task Recovery] 数据库表不存在，跳过任务恢复（请先初始化数据库，例如运行: npx prisma db push）'
+      );
+      return;
+    }
+
     console.error('[Task Recovery] 恢复任务时出错:', error);
   }
 }

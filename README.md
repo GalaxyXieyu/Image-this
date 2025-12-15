@@ -115,7 +115,7 @@
 
 ### 环境要求
 
-- Node.js 20.x 或更高版本
+- Node.js 20.x（推荐使用 LTS 版本）
 - npm 或 pnpm
 
 ### 安装步骤
@@ -133,8 +133,10 @@ cp .env.example .env
 # 编辑 .env 文件，配置必要的 API Key
 
 # 4. 初始化数据库
-npx prisma migrate dev --name init
-npx prisma generate
+# 默认配置会使用仓库内置的 SQLite 模板库：prisma/app.db（可直接启动）。
+# 如果你希望使用全新的空库，请把 DATABASE_URL 改为 file:./dev.db，然后执行：
+# npx prisma db push
+# npx prisma generate
 
 # 5. 启动开发服务器
 npm run dev
@@ -241,6 +243,24 @@ ai-images-generated/
 ```
 
 ## 开发指南
+
+### 重新生成 README 截图
+
+如果 `docs/screenshots/` 下截图缺失，可以用 Playwright 自动启动本地服务并重建这些图片文件（文件名与 README 引用保持一致）。
+
+```bash
+# 首次需要安装浏览器依赖（会下载 Chromium）
+npx playwright install chromium
+
+# 一键生成 README 截图（默认会自动启动 Next.js dev server）
+npm run screenshots:readme
+
+# 如果你想自己先启动服务（例如在受限环境中），可以这样运行：
+# 终端 A：npm run dev
+# 终端 B：SCREENSHOT_SKIP_SERVER=true npm run screenshots:readme
+```
+
+生成产物：`docs/screenshots/*.png`
 
 ### 常用命令
 

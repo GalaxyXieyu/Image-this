@@ -4,6 +4,9 @@
   "description": "专业的 AI 图像处理平台，支持背景替换、图像扩展、高清化等功能",
   "author": "Imagine This Team",
   "private": true,
+  "engines": {
+    "node": ">=20 <24"
+  },
   "main": "electron/main.js",
   "scripts": {
     "dev": "next dev -p 23000",
@@ -11,9 +14,11 @@
     "start": "next start -p 34000",
     "lint": "next lint",
     "clean": "bash scripts/clean-build.sh",
+    "screenshots:readme": "node scripts/generate-readme-screenshots.mjs",
     "electron:dev": "concurrently \"NODE_ENV=development npm run dev\" \"wait-on http://localhost:23000 && NODE_ENV=development electron .\"",
     "build:windows": "npm run clean && node scripts/build-windows.mjs --auto",
-    "build:mac": "npm run clean && node scripts/build-mac.mjs"
+    "build:mac": "npm run clean && node scripts/build-mac.mjs",
+    "electron:build:win": "electron-builder --win"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -90,6 +95,7 @@
   "build": {
     "appId": "com.imaginethis.app",
     "productName": "ImagineThis",
+    "npmRebuild": false,
     "directories": {
       "output": "dist-electron"
     },
@@ -108,7 +114,10 @@
         "to": "prisma"
       },
       "package.json",
-      ".env.production"
+      ".env.production",
+      "!node_modules/@img/sharp-darwin-*",
+      "!node_modules/@img/sharp-linux-*",
+      "!node_modules/canvas"
     ],
     "asar": false,
     "mac": {

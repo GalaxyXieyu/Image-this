@@ -6,7 +6,7 @@
  */
 
 import { spawn } from 'child_process';
-import { existsSync, copyFileSync, cpSync, mkdirSync } from 'fs';
+import { existsSync, copyFileSync, cpSync, mkdirSync, unlinkSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import readline from 'readline';
@@ -123,6 +123,18 @@ async function main() {
     // 3.1 安装 Windows 平台的 sharp
     log('📦 安装 Windows 平台 sharp 模块...', 'yellow');
     await runCommand('npm', ['install', '--os=win32', '--cpu=x64', 'sharp']);
+    
+    // 3.2 创建占位目录，避免 electron-builder 扫描时报错
+    const sharpDarwinX64 = join(projectRoot, 'node_modules', '@img', 'sharp-darwin-x64');
+    const sharpDarwinArm64 = join(projectRoot, 'node_modules', '@img', 'sharp-darwin-arm64');
+    if (!existsSync(sharpDarwinX64)) {
+      mkdirSync(sharpDarwinX64, { recursive: true });
+      log('📁 创建 sharp-darwin-x64 占位目录', 'yellow');
+    }
+    if (!existsSync(sharpDarwinArm64)) {
+      mkdirSync(sharpDarwinArm64, { recursive: true });
+      log('📁 创建 sharp-darwin-arm64 占位目录', 'yellow');
+    }
     log('✅ sharp 模块安装完成\n', 'green');
 
     // 4. 生成数据库
@@ -131,7 +143,19 @@ async function main() {
     // 设置环境变量以生成 Windows 平台的 Prisma 引擎
     process.env.PRISMA_CLI_BINARY_TARGETS = 'windows,darwin,darwin-arm64,linux-musl-openssl-3.0.x';
     await runCommand('npx', ['prisma', 'generate']);
-    log('✅ 数据库准备完成\n', 'green');
+    
+    // 4.1 创建最新结构的数据库模板（用于 Windows 端首次启动）
+    log('🔨 创建数据库模板（确保包含最新表结构）...', 'yellow');
+    const templateDbPath = join(projectRoot, 'prisma', 'app.db');
+    // 删除旧的模板数据库（如果存在）
+    if (existsSync(templateDbPath)) {
+      unlinkSync(templateDbPath);
+      log('🗑️  已删除旧的数据库模板', 'yellow');
+    }
+    // 使用 prisma db push 创建最新结构的数据库
+    process.env.DATABASE_URL = `file:${templateDbPath}`;
+    await runCommand('npx', ['prisma', 'db', 'push', '--skip-generate']);
+    log('✅ 数据库模板创建完成（包含最新表结构）\n', 'green');
 
     // 5. 构建 Next.js 应用
     log('📋 步骤 5/7: 构建 Next.js 应用', 'blue');
