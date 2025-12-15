@@ -158,6 +158,10 @@ reference.jpg
 volcengine-result-*.jpg
 IMG_*.JPG
 
+# README 文档截图（需要提交到仓库，供 GitHub/IDE 预览展示）
+!docs/screenshots/*.png
+!docs/screenshots/**/*.png
+
 # Backup files
 *.bak
 *.backup
