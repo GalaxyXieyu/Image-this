@@ -642,25 +642,25 @@ export default function TaskCenterPage() {
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-              className="px-3 py-2 text-sm border border-gray-300 rounded-md h-9 bg-white hover:bg-gray-50 transition-colors"
+              className="px-3 py-2 text-sm text-gray-900 border border-gray-300 rounded-md h-9 bg-white hover:bg-gray-50 transition-colors"
             >
-              <option value="all">所有类型</option>
-              <option value="ONE_CLICK_WORKFLOW">一键增强</option>
-              <option value="BACKGROUND_REMOVAL">背景替换</option>
-              <option value="IMAGE_EXPANSION">图像扩展</option>
-              <option value="IMAGE_UPSCALING">图像高清化</option>
+              <option value="all" className="text-gray-900">所有类型</option>
+              <option value="ONE_CLICK_WORKFLOW" className="text-gray-900">一键增强</option>
+              <option value="BACKGROUND_REMOVAL" className="text-gray-900">背景替换</option>
+              <option value="IMAGE_EXPANSION" className="text-gray-900">图像扩展</option>
+              <option value="IMAGE_UPSCALING" className="text-gray-900">图像高清化</option>
             </select>
 
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-3 py-2 text-sm border border-gray-300 rounded-md h-9 bg-white hover:bg-gray-50 transition-colors"
+              className="px-3 py-2 text-sm text-gray-900 border border-gray-300 rounded-md h-9 bg-white hover:bg-gray-50 transition-colors"
             >
-              <option value="all">所有状态</option>
-              <option value="PENDING">等待中</option>
-              <option value="PROCESSING">处理中</option>
-              <option value="COMPLETED">已完成</option>
-              <option value="FAILED">失败</option>
+              <option value="all" className="text-gray-900">所有状态</option>
+              <option value="PENDING" className="text-gray-900">等待中</option>
+              <option value="PROCESSING" className="text-gray-900">处理中</option>
+              <option value="COMPLETED" className="text-gray-900">已完成</option>
+              <option value="FAILED" className="text-gray-900">失败</option>
             </select>
 
             <div className="flex-1"></div>

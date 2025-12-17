@@ -2,8 +2,6 @@ import axios from 'axios';
 import FormData from 'form-data';
 import sharp from 'sharp';
 
-const DEFAULT_SUPERBED_TOKEN = process.env.SUPERBED_TOKEN || '00fbe01340604063b1f59aedc0481ddc';
-
 /**
  * 上传图片到superbed图床并返回公网URL（带重试机制）
  * @param imageBuffer 图片Buffer
@@ -18,10 +16,10 @@ export async function uploadImageToSuperbed(
   retries = 3,
   superbedToken?: string
 ): Promise<string> {
-  const token = superbedToken || DEFAULT_SUPERBED_TOKEN;
+  const token = superbedToken || process.env.SUPERBED_TOKEN;
   
   if (!token) {
-    throw new Error('SUPERBED_NOT_CONFIGURED: 请先在设置页面配置 Superbed Token');
+    throw new Error('SUPERBED_NOT_CONFIGURED: 请先在设置页面配置 Superbed Token，或在环境变量中设置 SUPERBED_TOKEN');
   }
   
   let lastError: Error | null = null;

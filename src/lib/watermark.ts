@@ -16,6 +16,8 @@ interface WatermarkOptions {
   watermarkOpacity?: number;
   watermarkText?: string;
   outputResolution?: string;
+  xScale?: number;
+  yScale?: number;
 }
 
 /**
@@ -39,26 +41,40 @@ export async function addWatermarkToImage(options: WatermarkOptions): Promise<st
     watermarkPosition,
     watermarkOpacity = 1.0,
     watermarkText = 'Watermark',
-    outputResolution
+    outputResolution,
+    xScale = 1,
+    yScale = 1
   } = options;
 
   console.log('[addWatermarkToImage] 开始处理水印:', {
     watermarkType,
     hasLogoUrl: !!watermarkLogoUrl,
     position: typeof watermarkPosition === 'string' ? watermarkPosition : 'custom',
-    outputResolution
+    outputResolution,
+    xScale,
+    yScale
   });
 
   // 解析原始图片
   const base64Data = extractBase64FromDataUrl(imageUrl);
   const imageBuffer = Buffer.from(base64Data, 'base64');
   
-  // 获取原始图片信息
+  // === 获取原始图片信息
   const metadata = await sharp(imageBuffer).metadata();
   const originalWidth = metadata.width || 800;
   const originalHeight = metadata.height || 600;
 
-  // 计算输出尺寸
+  console.log('[addWatermarkToImage] 图片信息:', {
+    originalSize: { width: originalWidth, height: originalHeight },
+    xScale,
+    yScale,
+    expectedExpandedSize: {
+      width: originalWidth * xScale,
+      height: originalHeight * yScale
+    }
+  });
+
+  // === 计算输出尺寸
   let outputWidth = originalWidth;
   let outputHeight = originalHeight;
   
@@ -76,6 +92,11 @@ export async function addWatermarkToImage(options: WatermarkOptions): Promise<st
     }
   }
 
+  console.log('[addWatermarkToImage] 输出尺寸:', {
+    outputSize: { width: outputWidth, height: outputHeight },
+    outputResolution
+  });
+
   // 调整图片尺寸
   let processedImage = sharp(imageBuffer).resize(outputWidth, outputHeight);
 
@@ -87,7 +108,9 @@ export async function addWatermarkToImage(options: WatermarkOptions): Promise<st
       watermarkOpacity,
       watermarkPosition,
       outputWidth,
-      outputHeight
+      outputHeight,
+      xScale,
+      yScale
     );
   } else {
     processedImage = await addTextWatermark(
@@ -96,7 +119,9 @@ export async function addWatermarkToImage(options: WatermarkOptions): Promise<st
       watermarkOpacity,
       watermarkPosition,
       outputWidth,
-      outputHeight
+      outputHeight,
+      xScale,
+      yScale
     );
   }
 
@@ -125,7 +150,9 @@ async function addLogoWatermark(
     editorHeight?: number 
   },
   width: number,
-  height: number
+  height: number,
+  xScale: number = 1,
+  yScale: number = 1
 ): Promise<sharp.Sharp> {
   // 解析 Logo 图片
   const logoBase64 = extractBase64FromDataUrl(logoUrl);
@@ -139,36 +166,60 @@ async function addLogoWatermark(
   let logoWidth: number, logoHeight: number, x: number, y: number;
 
   if (typeof position === 'object' && 'x' in position) {
-    // 使用交互式设置的位置和尺寸
+    // === 使用交互式设置的位置和尺寸
     const editorWidth = position.editorWidth || 600;
     const editorHeight = position.editorHeight || 400;
     
-    // 计算实际图片和编辑器的比例
+    // === 调试日志
+    console.log('[addLogoWatermark] 位置计算参数:', {
+      editorPosition: { x: position.x, y: position.y },
+      editorSize: { width: editorWidth, height: editorHeight },
+      actualImageSize: { width, height },
+      xScale,
+      yScale
+    });
+    
+    // === 计算实际图片和编辑器的比例
+    // 编辑器中的位置是相对于扩图后的预览画布的
+    // 实际图片经过扩图后，尺寸是原图尺寸 * xScale/yScale
+    // 使用相对位置（百分比）来确保位置一致
     const widthRatio = width / editorWidth;
     const heightRatio = height / editorHeight;
     
     if (position.width && position.height) {
-      // 直接按比例缩放编辑器中的 Logo 尺寸
+      // === 直接按比例缩放编辑器中的 Logo 尺寸
       logoWidth = Math.round(position.width * widthRatio);
       logoHeight = Math.round(position.height * heightRatio);
     } else if (position.scale) {
-      // 向后兼容：如果只有 scale
+      // === 向后兼容：如果只有 scale
       const avgRatio = (widthRatio + heightRatio) / 2;
       const actualScale = position.scale * avgRatio;
       logoWidth = Math.round(logoOriginalWidth * actualScale);
       logoHeight = Math.round(logoOriginalHeight * actualScale);
     } else {
-      // 默认值
+      // === 默认值
       logoWidth = Math.round(logoOriginalWidth * 0.2);
       logoHeight = Math.round(logoOriginalHeight * 0.2);
     }
     
-    // 使用相对位置（百分比）来确保位置一致
+    // === 使用相对位置（百分比）来确保位置一致
+    // 编辑器中的位置是相对于扩图后的预览画布的，直接按比例转换即可
+    // 允许logo在画布外（负数坐标），最终生成时只显示画布内的部分
     const relativeX = position.x / editorWidth;
     const relativeY = position.y / editorHeight;
     
     x = Math.round(relativeX * width);
     y = Math.round(relativeY * height);
+    
+    // === 调试日志
+    console.log('[addLogoWatermark] 计算后的位置:', {
+      originalPosition: { x: position.x, y: position.y },
+      relativePosition: { x: relativeX, y: relativeY },
+      finalPosition: { x, y },
+      logoSize: { width: logoWidth, height: logoHeight },
+      ratios: { widthRatio, heightRatio },
+      isOutsideCanvas: x < 0 || y < 0 || x + logoWidth > width || y + logoHeight > height
+    });
   } else {
     // 使用预设位置
     const maxLogoWidth = width * 0.2;
@@ -236,18 +287,64 @@ async function addLogoWatermark(
     });
   }
 
-  const logoCompositeBuffer = await logoImage.png().toBuffer();
+  // === 处理logo在画布外的情况
+  // 如果logo的一部分在画布外，需要裁剪logo只显示画布内的部分
+  let finalX = x;
+  let finalY = y;
+  let cropLeft = 0;
+  let cropTop = 0;
+  let cropWidth = logoWidth;
+  let cropHeight = logoHeight;
 
-  // 确保坐标不为负
-  x = Math.max(0, x);
-  y = Math.max(0, y);
+  // === 如果logo在画布左边，需要从左边裁剪
+  if (x < 0) {
+    cropLeft = -x;
+    cropWidth = logoWidth - cropLeft;
+    finalX = 0;
+  }
 
-  // 合成图片
+  // === 如果logo在画布上边，需要从上边裁剪
+  if (y < 0) {
+    cropTop = -y;
+    cropHeight = logoHeight - cropTop;
+    finalY = 0;
+  }
+
+  // === 如果logo在画布右边，需要裁剪右边超出的部分
+  if (x + logoWidth > width) {
+    cropWidth = Math.min(cropWidth, width - finalX);
+  }
+
+  // === 如果logo在画布下边，需要裁剪下边超出的部分
+  if (y + logoHeight > height) {
+    cropHeight = Math.min(cropHeight, height - finalY);
+  }
+
+  // === 如果裁剪后的尺寸无效，说明logo完全在画布外
+  if (cropWidth <= 0 || cropHeight <= 0 || finalX >= width || finalY >= height) {
+    console.log('[addLogoWatermark] Logo完全在画布外，不显示');
+    return image;
+  }
+
+  // === 裁剪logo只显示画布内的部分
+  let logoToComposite = logoImage;
+  if (cropLeft > 0 || cropTop > 0 || cropWidth < logoWidth || cropHeight < logoHeight) {
+    logoToComposite = logoImage.extract({
+      left: cropLeft,
+      top: cropTop,
+      width: cropWidth,
+      height: cropHeight
+    });
+  }
+
+  const logoCompositeBuffer = await logoToComposite.png().toBuffer();
+
+  // === 合成图片
   const baseBuffer = await image.toBuffer();
   return sharp(baseBuffer).composite([{
     input: logoCompositeBuffer,
-    left: x,
-    top: y,
+    left: finalX,
+    top: finalY,
     blend: 'over'
   }]);
 }
@@ -269,7 +366,9 @@ async function addTextWatermark(
     editorHeight?: number 
   },
   width: number,
-  height: number
+  height: number,
+  xScale: number = 1,
+  yScale: number = 1
 ): Promise<sharp.Sharp> {
   // 计算字体大小
   const fontSize = Math.max(20, Math.floor(width / 30));

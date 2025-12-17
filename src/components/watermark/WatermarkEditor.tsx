@@ -53,8 +53,6 @@ export default function WatermarkEditor({
 
   // 加载背景图片并计算画布尺寸（考虑扩图比例）
   useEffect(() => {
-    console.log('[WatermarkEditor] useEffect 触发, xScale:', xScale, 'yScale:', yScale);
-    
     if (!imageUrl) {
       setBackgroundImage(null);
       setCanvasSize({ width: containerWidth, height: containerHeight });
@@ -64,15 +62,12 @@ export default function WatermarkEditor({
     const img = new window.Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
+      // === 背景图片加载完成
       setBackgroundImage(img);
       
-      console.log('[WatermarkEditor] 图片加载完成, 原图尺寸:', img.width, 'x', img.height);
-      console.log('[WatermarkEditor] 扩图比例 xScale:', xScale, 'yScale:', yScale);
-      
-      // 计算扩图后的画布比例
+      // === 计算画布尺寸
       const expandedWidth = img.width * xScale;
       const expandedHeight = img.height * yScale;
-      console.log('[WatermarkEditor] 扩图后尺寸:', expandedWidth, 'x', expandedHeight);
       const expandedAspect = expandedWidth / expandedHeight;
       const containerAspect = containerWidth / containerHeight;
       
@@ -86,8 +81,7 @@ export default function WatermarkEditor({
       }
       setCanvasSize({ width: canvasW, height: canvasH });
       
-      // 计算原图在扩图后画布中的位置和尺寸
-      // 原图应该居中放置
+      // === 计算原图在扩图后画布中的位置和尺寸（居中放置）
       const imgW = canvasW / xScale;
       const imgH = canvasH / yScale;
       const imgX = (canvasW - imgW) / 2;
@@ -99,27 +93,43 @@ export default function WatermarkEditor({
 
   // 加载 Logo 图片（可选）并检查透明度
   useEffect(() => {
+    // === 清除旧的 Logo 图片
+    setLogoImage(null);
+    
     if (!logoUrl) {
-      setLogoImage(null);
       return;
     }
+    
     const img = new window.Image();
     img.crossOrigin = 'anonymous';
+    img.onerror = () => {
+      console.error('[WatermarkEditor] Logo 图片加载失败');
+      setLogoImage(null);
+    };
     img.onload = () => {
       setLogoImage(img);
-      // 初始 Logo 尺寸（保持宽高比）
+      // === 初始 Logo 尺寸（保持宽高比）
       const aspectRatio = img.width / img.height;
       const initialWidth = Math.min(200, img.width);
       const initialHeight = initialWidth / aspectRatio;
-      setLogoProps(prev => ({
-        ...prev,
+      setLogoProps({
         x: (canvasSize.width - initialWidth) / 2,
         y: (canvasSize.height - initialHeight) / 2,
         width: initialWidth,
-        height: initialHeight
-      }));
+        height: initialHeight,
+        rotation: 0,
+        scaleX: 1,
+        scaleY: 1
+      });
     };
     img.src = logoUrl;
+    
+    // === 清理函数：如果组件卸载或 logoUrl 改变，取消图片加载
+    return () => {
+      img.onload = null;
+      img.onerror = null;
+      img.src = '';
+    };
   }, [logoUrl, canvasSize.width, canvasSize.height]);
 
   // 更新 Transformer - 确保在 Logo 加载后绑定
@@ -135,15 +145,24 @@ export default function WatermarkEditor({
     if (!logoImage) return;
     const actualWidth = logoProps.width * logoProps.scaleX;
     const actualHeight = logoProps.height * logoProps.scaleY;
-    onPositionChange({
+    const position = {
       x: logoProps.x,
       y: logoProps.y,
       width: actualWidth,
       height: actualHeight,
       editorWidth: canvasSize.width,
       editorHeight: canvasSize.height
+    };
+    // === 调试日志
+    console.log('[WatermarkEditor] 位置变化:', {
+      logoPosition: { x: logoProps.x, y: logoProps.y },
+      logoSize: { width: actualWidth, height: actualHeight },
+      editorSize: { width: canvasSize.width, height: canvasSize.height },
+      xScale,
+      yScale
     });
-  }, [logoImage, logoProps, canvasSize.width, canvasSize.height, onPositionChange]);
+    onPositionChange(position);
+  }, [logoImage, logoProps, canvasSize.width, canvasSize.height, onPositionChange, xScale, yScale]);
 
   const handleLogoTransform = () => {
     const node = logoRef.current;
@@ -152,6 +171,7 @@ export default function WatermarkEditor({
     const scaleX = node.scaleX();
     const scaleY = node.scaleY();
 
+    // === 允许logo在画布外，不限制位置
     setLogoProps({
       x: node.x(),
       y: node.y(),
@@ -165,14 +185,14 @@ export default function WatermarkEditor({
 
 
   return (
-    <div className="space-y-4 max-w-5xl mx-auto">
+    <div className="w-full flex items-center justify-center p-2">
       {/* Konva 画布 */}
       <div 
-        className="relative border-2 border-gray-300 rounded-lg overflow-hidden shadow-lg bg-gray-100 flex items-center justify-center"
+        className="relative border border-gray-200 rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center shadow-inner"
         style={{ 
           width: canvasSize.width, 
           height: canvasSize.height,
-          margin: '0 auto'
+          boxShadow: 'inset 0 2px 4px 0 rgb(0 0 0 / 0.06)'
         }}
       >
         <Stage
@@ -267,10 +287,10 @@ export default function WatermarkEditor({
           </Layer>
         </Stage>
         {!backgroundImage && (
-          <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm select-none">
-            <div className="text-center">
-              <p className="text-base mb-2">请先上传背景图片</p>
-              <p className="text-xs">点击右上角"上传图片"或"上传文件夹"按钮</p>
+          <div className="absolute inset-0 flex items-center justify-center text-gray-400 select-none">
+            <div className="text-center px-4">
+              <p className="text-sm font-medium text-gray-500 mb-1.5">请先上传背景图片</p>
+              <p className="text-xs text-gray-400">点击右上角"上传图片"或"上传文件夹"按钮</p>
             </div>
           </div>
         )}

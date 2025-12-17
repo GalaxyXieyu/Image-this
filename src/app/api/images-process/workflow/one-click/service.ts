@@ -246,7 +246,9 @@ export async function executeOneClickWorkflow(
           watermarkPosition,
           watermarkType,
           watermarkLogoUrl,
-          outputResolution
+          outputResolution,
+          xScale,
+          yScale
         });
         console.log('水印添加完成');
       } catch (error) {

@@ -15,6 +15,29 @@ async function initializeProvider(userId: string, provider: ImageProvider) {
   
   console.log(`[initializeProvider] 初始化 ${provider}，图床配置:`, userConfig.imagehosting ? '已配置' : '未配置');
   
+  // 检查配置是否存在
+  if (provider === ImageProvider.VOLCENGINE || provider === ImageProvider.JIMENG) {
+    if (!userConfig.volcengine?.accessKey || !userConfig.volcengine?.secretKey) {
+      throw new Error('火山引擎配置未设置，请在设置页面配置火山引擎 AccessKey 和 SecretKey');
+    }
+  }
+  
+  if (provider === ImageProvider.GPT || provider === ImageProvider.QWEN) {
+    if (!userConfig.gpt?.apiKey) {
+      throw new Error('GPT 配置未设置，请在设置页面配置 GPT API Key');
+    }
+  }
+  
+  if (provider === ImageProvider.GEMINI) {
+    if (!userConfig.gemini?.apiKey) {
+      throw new Error('Gemini 配置未设置，请在设置页面配置 Gemini API Key');
+    }
+  }
+  
+  if (provider === ImageProvider.JIMENG && !userConfig.imagehosting?.superbedToken) {
+    throw new Error('图床配置未设置，请在设置页面配置 Superbed Token');
+  }
+  
   const providerConfig = {
     volcengine: {
       enabled: provider === ImageProvider.VOLCENGINE && !!userConfig.volcengine,
