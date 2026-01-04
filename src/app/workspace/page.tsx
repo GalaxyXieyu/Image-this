@@ -27,6 +27,7 @@ import {
   Play,
   Loader2,
   Settings as SettingsIcon,
+  Video,
 } from "lucide-react";
 import WatermarkEditor from '@/components/watermark/WatermarkEditor';
 
@@ -42,11 +43,20 @@ import ImagePreviewModal from '@/components/workspace/ImagePreviewModal';
 import ResultModal from '@/components/workspace/ResultModal';
 import WatermarkEditorView from '@/components/workspace/WatermarkEditorView';
 import OneClickWatermarkSettings from '@/components/workspace/OneClickWatermarkSettings';
+import QualityReviewResultModal from '@/components/workspace/QualityReviewResult';
+import BatchWarningDialog from '@/components/workspace/BatchWarningDialog';
+import { VideoStyleSelector } from '@/components/workspace/VideoStyleSelector';
+import { VideoResultModal } from '@/components/workspace/VideoResultModal';
+import { VIDEO_STYLE_TEMPLATES } from '@/lib/video-style-templates';
 
 // Custom Hooks
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { useImageProcessing } from '@/hooks/useImageProcessing';
 import { useTaskPolling } from '@/hooks/useTaskPolling';
+import { useUserPreferences } from '@/hooks/useUserPreferences';
+
+// Types
+import type { QualityReviewResult } from '@/types/quality-review';
 
 // Zustand Store
 import { useWorkspaceTabStore, UploadedImage as StoreUploadedImage } from '@/stores/useWorkspaceTabStore';
@@ -79,6 +89,7 @@ interface Task {
   originalName?: string;
   outputData?: string;
   errorMessage?: string;
+  processedImageId?: string;
 }
 
 export default function WorkspacePage() {
@@ -110,6 +121,9 @@ export default function WorkspacePage() {
     setXScale,
     setYScale,
     getCurrentTabState,
+    setEnableQualityReview,
+    setCurrentReviewResult,
+    setIsReviewing,
   } = useWorkspaceTabStore();
   
   // 从当前 tab 状态中获取值
@@ -126,6 +140,9 @@ export default function WorkspacePage() {
   const watermarkSettings = currentTabState.watermarkSettings;
   const xScale = parseFloat(currentTabState.xScale) || 2.0;
   const yScale = parseFloat(currentTabState.yScale) || 2.0;
+  const enableQualityReview = currentTabState.enableQualityReview;
+  const currentReviewResult = currentTabState.currentReviewResult;
+  const isReviewing = currentTabState.isReviewing;
   
   // 提示词根据 tab 类型获取
   const backgroundPrompt = activeTab === 'background' ? currentTabState.prompt : '';
@@ -145,10 +162,31 @@ export default function WorkspacePage() {
   const [showWatermarkPreview, setShowWatermarkPreview] = useState(false);
   const [availableProviders, setAvailableProviders] = useState<string[]>([]);
 
+  // 用户偏好
+  const { preferences, updatePreference } = useUserPreferences();
+
+  // 审核相关状态
+  const [showReviewResult, setShowReviewResult] = useState(false);
+  const [showBatchWarning, setShowBatchWarning] = useState(false);
+  const [pendingBatchAction, setPendingBatchAction] = useState<(() => void) | null>(null);
+  const [reviewImages, setReviewImages] = useState<{
+    product: string;
+    reference: string;
+    result: string;
+  } | null>(null);
+
   // 历史记录侧边栏状态
   const [isHistorySidebarOpen, setIsHistorySidebarOpen] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const historyLoadingRef = useRef(false);
+
+  // 视频生成相关状态
+  const [videoStyle, setVideoStyle] = useState('product-showcase');
+  const [videoCustomPrompt, setVideoCustomPrompt] = useState('');
+  const [videoDuration, setVideoDuration] = useState<121 | 241>(121);
+  const [videoAspectRatio, setVideoAspectRatio] = useState('16:9');
+  const [showVideoResult, setShowVideoResult] = useState(false);
+  const [generatedVideoUrl, setGeneratedVideoUrl] = useState('');
 
   const watermarkLogoInputRef = useRef<HTMLInputElement>(null);
 
@@ -232,7 +270,8 @@ export default function WorkspacePage() {
         'background': ['BACKGROUND_REMOVAL'],
         'expansion': ['IMAGE_OUTPAINTING'],
         'upscaling': ['IMAGE_UPSCALING'],
-        'watermark': ['WATERMARK']
+        'watermark': ['WATERMARK'],
+        'video': ['VIDEO_GENERATION']
       };
 
       const allowedTypes = processTypeMap[activeTab] || [];
@@ -323,6 +362,155 @@ export default function WorkspacePage() {
     }
   };
 
+  // 智能审核函数
+  const performQualityReview = useCallback(async (
+    productImageUrl: string,
+    referenceImageUrl: string,
+    resultImageUrl: string,
+    processedImageId?: string
+  ) => {
+    setIsReviewing(true);
+    try {
+      const response = await fetch('/api/quality-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productImageBase64: productImageUrl,
+          referenceImageBase64: referenceImageUrl,
+          resultImageBase64: resultImageUrl,
+          prompt: backgroundPrompt,
+          processedImageId,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success && data.data) {
+        setCurrentReviewResult(data.data);
+        setReviewImages({
+          product: productImageUrl,
+          reference: referenceImageUrl,
+          result: resultImageUrl,
+        });
+        setShowReviewResult(true);
+      } else {
+        toast({
+          title: '审核失败',
+          description: data.error || '未知错误',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Quality review error:', error);
+      toast({
+        title: '审核失败',
+        description: '请检查网络连接',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsReviewing(false);
+    }
+  }, [backgroundPrompt, setCurrentReviewResult, setIsReviewing, toast]);
+
+  // 将图片 URL 转换为 base64
+  const urlToBase64 = useCallback(async (url: string): Promise<string> => {
+    // 如果已经是 base64，直接返回
+    if (url.startsWith('data:')) return url;
+
+    // 如果是 blob URL，需要 fetch 并转换
+    if (url.startsWith('blob:')) {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    // 如果是相对路径或绝对 URL，需要 fetch
+    const fullUrl = url.startsWith('/') ? `${window.location.origin}${url}` : url;
+    const response = await fetch(fullUrl);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }, []);
+
+  // 使用 ref 保持 enableQualityReview 的最新值
+  const enableQualityReviewRef = useRef(enableQualityReview);
+  useEffect(() => {
+    enableQualityReviewRef.current = enableQualityReview;
+  }, [enableQualityReview]);
+
+  // 任务完成后触发审核的回调
+  const handleTaskCompleteWithData = useCallback(async (task: Task) => {
+    console.log('[TaskComplete] Task completed:', {
+      taskId: task.id,
+      type: task.type,
+      hasOutputData: !!task.outputData,
+    });
+
+    // 视频生成任务完成
+    if (task.type === 'VIDEO_GENERATION' && task.outputData) {
+      try {
+        const outputData = JSON.parse(task.outputData);
+        if (outputData.videoUrl) {
+          setGeneratedVideoUrl(outputData.videoUrl);
+          setShowVideoResult(true);
+        }
+      } catch (error) {
+        console.error('[VideoGeneration] Error parsing output:', error);
+      }
+      return;
+    }
+
+    // 只对背景替换任务且开启了审核的情况触发
+    if (task.type !== 'BACKGROUND_REMOVAL') {
+      console.log('[QualityReview] Skipped: not BACKGROUND_REMOVAL task');
+      return;
+    }
+    if (!enableQualityReviewRef.current) {
+      console.log('[QualityReview] Skipped: quality review disabled');
+      return;
+    }
+    if (!task.outputData) {
+      console.log('[QualityReview] Skipped: no outputData');
+      return;
+    }
+
+    try {
+      const outputData = JSON.parse(task.outputData);
+      const resultImageUrl = outputData.processedImageUrl || outputData.processedUrl || outputData.imageUrl;
+      console.log('[QualityReview] Parsed outputData:', { outputData, resultImageUrl, processedImageId: task.processedImageId });
+
+      // 获取产品图和参考图
+      const productImg = uploadedImagesRef.current[0]?.preview;
+      const refImg = referenceImageRef.current?.preview;
+      console.log('[QualityReview] Images:', { hasProduct: !!productImg, hasRef: !!refImg, hasResult: !!resultImageUrl });
+
+      if (productImg && refImg && resultImageUrl) {
+        console.log('[QualityReview] Starting quality review...');
+        // 转换为 base64
+        const [productBase64, refBase64, resultBase64] = await Promise.all([
+          urlToBase64(productImg),
+          urlToBase64(refImg),
+          urlToBase64(resultImageUrl),
+        ]);
+        // 使用 outputData 中的 processedImageId 或 task 上的 processedImageId
+        const imageId = outputData.processedImageId || task.processedImageId;
+        await performQualityReview(productBase64, refBase64, resultBase64, imageId);
+      } else {
+        console.log('[QualityReview] Skipped: missing images');
+      }
+    } catch (error) {
+      console.error('[QualityReview] Error:', error);
+    }
+  }, [performQualityReview, urlToBase64]);
+
   // 使用任务轮询 Hook
   useTaskPolling({
     isProcessing,
@@ -330,6 +518,7 @@ export default function WorkspacePage() {
     setActiveTasks,
     setIsProcessing,
     onTaskComplete: loadProcessingHistory,
+    onTaskCompleteWithData: handleTaskCompleteWithData,
     getProcessTypeName
   });
 
@@ -389,6 +578,13 @@ export default function WorkspacePage() {
         icon: FileImage,
         description: "添加文字水印",
         color: "blue"
+      },
+      {
+        id: "video",
+        title: "视频生成",
+        icon: Video,
+        description: "图生视频",
+        color: "purple"
       }
     ];
 
@@ -541,6 +737,93 @@ export default function WorkspacePage() {
     }
   };
 
+  // 视频生成处理
+  const handleVideoGenerate = async () => {
+    if (uploadedImages.length === 0) {
+      toast({
+        title: "请先上传图片",
+        description: "请选择要作为首帧的图片",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const selectedImage = uploadedImages[selectedPreviewIndex];
+    if (!selectedImage) return;
+
+    toast({
+      title: "正在启动",
+      description: "视频生成任务正在准备中...",
+    });
+
+    try {
+      setIsProcessing(true);
+
+      // 获取提示词
+      let prompt = videoCustomPrompt;
+      if (!prompt && videoStyle !== 'custom') {
+        const template = VIDEO_STYLE_TEMPLATES.find(t => t.id === videoStyle);
+        prompt = template?.prompt || '';
+      }
+
+      // 转换图片为 base64
+      const imageBase64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(selectedImage.file);
+      });
+
+      // 创建任务
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'VIDEO_GENERATION',
+          inputData: JSON.stringify({
+            imageUrl: imageBase64,
+            prompt,
+            frames: videoDuration,
+            aspectRatio: videoAspectRatio,
+          }),
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || '创建任务失败');
+      }
+
+      const { task } = await response.json();
+
+      setActiveTasks(prev => [...prev, {
+        ...task,
+        originalImageId: selectedImage.id,
+        originalName: selectedImage.name,
+      }]);
+
+      toast({
+        title: "任务创建成功",
+        description: "视频生成任务已创建，正在处理中...",
+      });
+
+      // 触发 worker
+      fetch('/api/tasks/worker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batch: true }),
+      });
+
+    } catch (error) {
+      console.error('视频生成失败:', error);
+      toast({
+        title: "视频生成失败",
+        description: error instanceof Error ? error.message : '未知错误',
+        variant: "destructive",
+      });
+      setIsProcessing(false);
+    }
+  };
+
   const renderTabContent = () => {
     // 水印模式：始终显示编辑器视图
     if (activeTab === "watermark") {
@@ -571,6 +854,117 @@ export default function WorkspacePage() {
             }
           }}
         />
+      );
+    }
+
+    // 视频生成模式
+    if (activeTab === "video") {
+      return (
+        <div className="flex flex-col h-full overflow-hidden">
+          {/* 左右布局：宽屏左右，窄屏上下 */}
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 overflow-y-auto min-h-0 pb-4">
+            {/* 左侧：图片上传区域 */}
+            <div className="min-h-[400px]">
+              <ImageUploadArea
+                uploadedImages={uploadedImages}
+                onUpload={handleFileUpload}
+                onFolderUpload={handleFolderUpload}
+                onClear={clearAllImages}
+                onRemove={(id) => removeImage(id)}
+                onPreview={() => setShowImageModal(true)}
+                fileInputRef={fileInputRef}
+                folderInputRef={folderInputRef}
+                selectedIndex={selectedPreviewIndex}
+                onSelectIndex={setSelectedPreviewIndex}
+                isFullWidth={true}
+              />
+            </div>
+
+            {/* 右侧：视频设置 */}
+            <div className="space-y-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">视频风格</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <VideoStyleSelector
+                    selectedStyle={videoStyle}
+                    onStyleChange={setVideoStyle}
+                    customPrompt={videoCustomPrompt}
+                    onCustomPromptChange={setVideoCustomPrompt}
+                  />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">视频参数</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm">视频时长</Label>
+                      <select
+                        value={videoDuration}
+                        onChange={(e) => setVideoDuration(Number(e.target.value) as 121 | 241)}
+                        className="w-full mt-1 px-3 py-2 border rounded-md text-sm"
+                      >
+                        <option value={121}>5秒</option>
+                        <option value={241}>10秒</option>
+                      </select>
+                    </div>
+                    <div>
+                      <Label className="text-sm">宽高比</Label>
+                      <select
+                        value={videoAspectRatio}
+                        onChange={(e) => setVideoAspectRatio(e.target.value)}
+                        className="w-full mt-1 px-3 py-2 border rounded-md text-sm"
+                      >
+                        <option value="16:9">16:9 横屏</option>
+                        <option value="9:16">9:16 竖屏</option>
+                        <option value="1:1">1:1 方形</option>
+                        <option value="4:3">4:3</option>
+                        <option value="3:4">3:4</option>
+                      </select>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* 底部操作区域 */}
+          <div className="flex-shrink-0 bg-gradient-to-t from-gray-50 via-gray-50 to-transparent pt-4 pb-2 space-y-4 border-t border-gray-200 mt-4">
+            {(activeTasks.length > 0 || isReviewing) && (
+              <TaskProgress tasks={activeTasks} isProcessing={isProcessing} getProcessTypeName={getProcessTypeName} isReviewing={isReviewing} />
+            )}
+            <ActionButtons
+              isProcessing={isProcessing}
+              disabled={uploadedImages.length === 0}
+              onProcess={handleVideoGenerate}
+              activeTab={activeTab}
+              tabs={tabs}
+            />
+          </div>
+
+          {/* 隐藏的文件输入 */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileUpload}
+          />
+          <input
+            ref={folderInputRef}
+            type="file"
+            multiple
+            {...({ webkitdirectory: "" } as React.InputHTMLAttributes<HTMLInputElement>)}
+            className="hidden"
+            onChange={handleFolderUpload}
+          />
+        </div>
       );
     }
 
@@ -614,12 +1008,13 @@ export default function WorkspacePage() {
 
         {/* 底部固定区域 - 参数设置和操作按钮 */}
         <div className="flex-shrink-0 bg-gradient-to-t from-gray-50 via-gray-50 to-transparent pt-4 pb-2 space-y-4 border-t border-gray-200 mt-4">
-          {/* 任务进度显示 - 如果有任务则显示 */}
-          {activeTasks.length > 0 && (
+          {/* 任务进度显示 - 如果有任务或正在审核则显示 */}
+          {(activeTasks.length > 0 || isReviewing) && (
             <TaskProgress
               tasks={activeTasks}
               isProcessing={isProcessing}
               getProcessTypeName={getProcessTypeName}
+              isReviewing={isReviewing}
             />
           )}
           {/* 参数设置区域 */}
@@ -642,6 +1037,8 @@ export default function WorkspacePage() {
             setXScale={setXScale}
             yScale={currentTabState.yScale}
             setYScale={setYScale}
+            enableQualityReview={enableQualityReview}
+            setEnableQualityReview={setEnableQualityReview}
           />
 
           {/* One-click 水印设置 */}
@@ -763,7 +1160,8 @@ export default function WorkspacePage() {
                 'background': '背景替换历史',
                 'expansion': '图像扩展历史',
                 'upscaling': '图像放大历史',
-                'watermark': '水印处理历史'
+                'watermark': '水印处理历史',
+                'video': '视频生成历史'
               };
               return titleMap[activeTab];
             })()}
@@ -827,6 +1225,66 @@ export default function WorkspacePage() {
         isOpen={showResultModal && selectedResultIndex !== null}
         onClose={() => setShowResultModal(false)}
         result={selectedResultIndex !== null ? processedResults[selectedResultIndex] : null}
+      />
+
+      {/* 智能审核结果弹窗 */}
+      {currentReviewResult && reviewImages && (
+        <QualityReviewResultModal
+          isOpen={showReviewResult}
+          onClose={() => {
+            setShowReviewResult(false);
+            setCurrentReviewResult(null);
+          }}
+          result={currentReviewResult}
+          productImage={reviewImages.product}
+          referenceImage={reviewImages.reference}
+          resultImage={reviewImages.result}
+          prompt={backgroundPrompt}
+          onSaveAsTemplate={() => {
+            toast({ title: '保存模板功能开发中' });
+          }}
+          onApplySuggestion={(suggestion) => {
+            const newPrompt = backgroundPrompt + '\n' + suggestion;
+            handleSetBackgroundPrompt(newPrompt);
+            toast({ title: '已追加到提示词' });
+          }}
+          onRetryWithSuggestions={(newPrompt) => {
+            handleSetBackgroundPrompt(newPrompt);
+            toast({ title: '已更新提示词，正在重新处理...' });
+            // 自动触发重新处理
+            setTimeout(() => handleProcess(), 100);
+          }}
+        />
+      )}
+
+      {/* 批量处理警告对话框 */}
+      <BatchWarningDialog
+        isOpen={showBatchWarning}
+        imageCount={uploadedImages.length}
+        onConfirm={() => {
+          setShowBatchWarning(false);
+          pendingBatchAction?.();
+          setPendingBatchAction(null);
+        }}
+        onCancel={() => {
+          setShowBatchWarning(false);
+          setPendingBatchAction(null);
+        }}
+        onDontShowAgain={(dontShow) => {
+          updatePreference('hideBatchWarning', dontShow);
+        }}
+      />
+
+      {/* 视频结果弹窗 */}
+      <VideoResultModal
+        isOpen={showVideoResult}
+        onClose={() => {
+          setShowVideoResult(false);
+          setGeneratedVideoUrl('');
+        }}
+        videoUrl={generatedVideoUrl}
+        originalImage={uploadedImages[selectedPreviewIndex]?.preview}
+        prompt={videoCustomPrompt || VIDEO_STYLE_TEMPLATES.find(t => t.id === videoStyle)?.prompt}
       />
     </div>
   );

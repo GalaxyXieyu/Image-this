@@ -31,6 +31,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import Navbar from '@/components/navigation/Navbar';
+import ScoreBadge from '@/components/ui/score-badge';
 
 interface Project {
   id: string;
@@ -54,6 +55,8 @@ interface ProcessedImage {
   fileSize?: number;
   width?: number;
   height?: number;
+  qualityScore?: number;
+  metadata?: string;
   createdAt: string;
   project?: {
     id: string;
@@ -83,7 +86,7 @@ export default function GalleryPage() {
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [showImageModal, setShowImageModal] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
-  const [showOriginalInModal, setShowOriginalInModal] = useState(false); // 模态框中是否显示原图
+  const [modalViewMode, setModalViewMode] = useState<'product' | 'reference' | 'result'>('result'); // 三图对比模式
   
   // 分页状态
   const [page, setPage] = useState(1);
@@ -581,7 +584,7 @@ export default function GalleryPage() {
   // 打开图片查看器
   const openImageViewer = (imageIndex: number) => {
     setSelectedImageIndex(imageIndex);
-    setShowOriginalInModal(false); // 默认显示结果图
+    setModalViewMode('result'); // 默认显示结果图
     setShowImageModal(true);
   };
 
@@ -891,7 +894,12 @@ export default function GalleryPage() {
                       )}
                     </div>
                     <div className="space-y-1">
-                      <p className="text-sm font-medium truncate">{image.filename}</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium truncate flex-1">{image.filename}</p>
+                        {image.qualityScore && (
+                          <ScoreBadge score={image.qualityScore} size="sm" />
+                        )}
+                      </div>
                       <p className="text-xs text-gray-500">{getTypeLabel(image.processType)}</p>
                       {image.project && (
                         <p className="text-xs text-blue-600">{image.project.name}</p>
@@ -924,6 +932,7 @@ export default function GalleryPage() {
                     )}
                     <th className="text-left p-4">名称</th>
                     <th className="text-left p-4">类型</th>
+                    <th className="text-left p-4">评分</th>
                     <th className="text-left p-4">状态</th>
                     <th className="text-left p-4">文件夹</th>
                     <th className="text-left p-4">大小</th>
@@ -973,6 +982,13 @@ export default function GalleryPage() {
                       </td>
                       <td className="p-4 text-sm text-gray-600">
                         {getTypeLabel(image.processType)}
+                      </td>
+                      <td className="p-4">
+                        {image.qualityScore ? (
+                          <ScoreBadge score={image.qualityScore} size="sm" />
+                        ) : (
+                          <span className="text-xs text-gray-400">-</span>
+                        )}
                       </td>
                       <td className="p-4">
                         <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(image.status)}`}>
@@ -1094,7 +1110,20 @@ export default function GalleryPage() {
       )}
 
       {/* 图片查看模态框 */}
-      {showImageModal && filteredImages.length > 0 && (
+      {showImageModal && filteredImages.length > 0 && (() => {
+        const currentImage = filteredImages[selectedImageIndex];
+        const metadata = currentImage?.metadata ? JSON.parse(currentImage.metadata) : null;
+        const referenceImageUrl = metadata?.referenceImageUrl;
+        const hasReferenceImage = currentImage?.processType === 'BACKGROUND_REMOVAL' && referenceImageUrl;
+
+        // 根据模式获取当前显示的图片URL
+        const getCurrentImageUrl = () => {
+          if (modalViewMode === 'product') return currentImage?.originalUrl;
+          if (modalViewMode === 'reference' && hasReferenceImage) return referenceImageUrl;
+          return currentImage?.processedUrl || currentImage?.originalUrl;
+        };
+
+        return (
         <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4">
           <div className="relative max-w-6xl max-h-full w-full">
             <button
@@ -1103,13 +1132,13 @@ export default function GalleryPage() {
             >
               <X className="w-6 h-6" />
             </button>
-            
+
             {filteredImages.length > 1 && (
               <>
                 <button
                   onClick={() => {
                     navigateImage('prev');
-                    setShowOriginalInModal(false);
+                    setModalViewMode('result');
                   }}
                   className="absolute left-4 top-1/2 transform -translate-y-1/2 w-10 h-10 bg-black bg-opacity-50 text-white rounded-full flex items-center justify-center hover:bg-opacity-75 z-10"
                 >
@@ -1118,7 +1147,7 @@ export default function GalleryPage() {
                 <button
                   onClick={() => {
                     navigateImage('next');
-                    setShowOriginalInModal(false);
+                    setModalViewMode('result');
                   }}
                   className="absolute right-4 top-1/2 transform -translate-y-1/2 w-10 h-10 bg-black bg-opacity-50 text-white rounded-full flex items-center justify-center hover:bg-opacity-75 z-10"
                 >
@@ -1127,23 +1156,35 @@ export default function GalleryPage() {
               </>
             )}
 
-            {/* 原图/结果图切换按钮 */}
-            {filteredImages[selectedImageIndex]?.originalUrl && filteredImages[selectedImageIndex]?.processedUrl && (
+            {/* 三图对比切换按钮 */}
+            {currentImage?.originalUrl && currentImage?.processedUrl && (
               <div className="absolute top-4 left-1/2 transform -translate-x-1/2 flex bg-black bg-opacity-60 rounded-lg overflow-hidden z-10">
                 <button
-                  onClick={() => setShowOriginalInModal(true)}
+                  onClick={() => setModalViewMode('product')}
                   className={`px-4 py-2 text-sm font-medium transition-colors ${
-                    showOriginalInModal
+                    modalViewMode === 'product'
                       ? 'bg-white text-black'
                       : 'text-white hover:bg-white hover:bg-opacity-20'
                   }`}
                 >
-                  原图
+                  产品图
                 </button>
+                {hasReferenceImage && (
+                  <button
+                    onClick={() => setModalViewMode('reference')}
+                    className={`px-4 py-2 text-sm font-medium transition-colors ${
+                      modalViewMode === 'reference'
+                        ? 'bg-white text-black'
+                        : 'text-white hover:bg-white hover:bg-opacity-20'
+                    }`}
+                  >
+                    参考图
+                  </button>
+                )}
                 <button
-                  onClick={() => setShowOriginalInModal(false)}
+                  onClick={() => setModalViewMode('result')}
                   className={`px-4 py-2 text-sm font-medium transition-colors ${
-                    !showOriginalInModal
+                    modalViewMode === 'result'
                       ? 'bg-white text-black'
                       : 'text-white hover:bg-white hover:bg-opacity-20'
                   }`}
@@ -1152,30 +1193,29 @@ export default function GalleryPage() {
                 </button>
               </div>
             )}
-            
+
             <img
-              src={
-                showOriginalInModal
-                  ? filteredImages[selectedImageIndex]?.originalUrl
-                  : (filteredImages[selectedImageIndex]?.processedUrl || filteredImages[selectedImageIndex]?.originalUrl)
-              }
-              alt={filteredImages[selectedImageIndex]?.filename}
+              src={getCurrentImageUrl()}
+              alt={currentImage?.filename}
               className="max-w-full max-h-[85vh] object-contain rounded-lg mx-auto"
             />
-            
+
             <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-75 text-white px-4 py-2 rounded-lg">
               <p className="text-center font-medium">
-                {filteredImages[selectedImageIndex]?.filename}
+                {currentImage?.filename}
               </p>
               <div className="flex items-center justify-center gap-2 text-sm">
                 <span className="opacity-75">
-                  {getTypeLabel(filteredImages[selectedImageIndex]?.processType)}
+                  {getTypeLabel(currentImage?.processType)}
                 </span>
                 <span className={`px-2 py-0.5 rounded text-xs ${
-                  showOriginalInModal ? 'bg-gray-600' : 'bg-green-600'
+                  modalViewMode === 'result' ? 'bg-green-600' : modalViewMode === 'reference' ? 'bg-blue-600' : 'bg-gray-600'
                 }`}>
-                  {showOriginalInModal ? '原图' : '结果图'}
+                  {modalViewMode === 'product' ? '产品图' : modalViewMode === 'reference' ? '参考图' : '结果图'}
                 </span>
+                {currentImage?.qualityScore && (
+                  <ScoreBadge score={currentImage.qualityScore} size="sm" />
+                )}
               </div>
               {filteredImages.length > 1 && (
                 <p className="text-center text-sm opacity-75">
@@ -1185,7 +1225,8 @@ export default function GalleryPage() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

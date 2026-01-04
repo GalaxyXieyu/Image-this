@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ListTodo, Clock, Loader, CheckCircle, XCircle, Wand2, Image as ImageIcon, Expand, Zap, ImagePlus } from 'lucide-react';
+import { ListTodo, Clock, Loader, CheckCircle, XCircle, Wand2, Image as ImageIcon, Expand, Zap, ImagePlus, Video } from 'lucide-react';
 
 interface QueueStats {
   pending: number;
@@ -32,10 +32,11 @@ interface Task {
 // 任务类型映射
 const taskTypeMap: Record<string, string> = {
   'ONE_CLICK_WORKFLOW': '一键增强',
-  'BACKGROUND_REMOVAL': '背景替换', 
+  'BACKGROUND_REMOVAL': '背景替换',
   'IMAGE_EXPANSION': '图像扩展',
   'IMAGE_UPSCALING': '图像高清化',
-  'GPT_GENERATION': '图像生成'
+  'GPT_GENERATION': '图像生成',
+  'VIDEO_GENERATION': '视频生成'
 };
 
 // 任务类型图标
@@ -44,7 +45,8 @@ const taskTypeIcons: Record<string, React.ElementType> = {
   'BACKGROUND_REMOVAL': ImageIcon,
   'IMAGE_EXPANSION': Expand,
   'IMAGE_UPSCALING': Zap,
-  'GPT_GENERATION': ImageIcon
+  'GPT_GENERATION': ImageIcon,
+  'VIDEO_GENERATION': Video
 };
 
 export default function FloatingTaskButton() {
@@ -128,6 +130,20 @@ export default function FloatingTaskButton() {
     return null;
   };
 
+  // 获取视频URL
+  const getVideoUrl = (task: Task): string | null => {
+    if (task.type !== 'VIDEO_GENERATION') return null;
+    if (task.outputData) {
+      try {
+        const outputData = JSON.parse(task.outputData);
+        return outputData.videoUrl || null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  };
+
   // 只在登录状态下显示
   if (!session) {
     return null;
@@ -185,16 +201,20 @@ export default function FloatingTaskButton() {
                   const TaskIcon = taskTypeIcons[task.type] || ListTodo;
                   const originalUrl = getOriginalImageUrl(task);
                   const resultUrl = getResultImageUrl(task);
-                  const displayUrl = resultUrl || originalUrl;
-                  
+                  const videoUrl = getVideoUrl(task);
+                  const isVideoTask = task.type === 'VIDEO_GENERATION';
+                  const displayUrl = isVideoTask ? (videoUrl || originalUrl) : (resultUrl || originalUrl);
+
                   return (
-                    <div 
-                      key={task.id} 
+                    <div
+                      key={task.id}
                       className="flex items-center gap-3 p-2 rounded-lg border bg-white hover:bg-gray-50 transition-colors"
                     >
                       {/* 缩略图 */}
                       <div className="relative w-12 h-12 rounded-md overflow-hidden bg-gray-100 flex-shrink-0 border">
-                        {displayUrl ? (
+                        {isVideoTask && videoUrl ? (
+                          <video src={videoUrl} className="w-full h-full object-cover" muted />
+                        ) : displayUrl ? (
                           <img src={displayUrl} alt="" className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">

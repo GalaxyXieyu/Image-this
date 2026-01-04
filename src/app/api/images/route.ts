@@ -16,6 +16,7 @@ interface ImageQueryResult {
   fileSize: number | null;
   width: number | null;
   height: number | null;
+  qualityScore: number | null;
   createdAt: Date;
   metadata?: string | null;
   project: {
@@ -105,6 +106,7 @@ export async function GET(request: NextRequest) {
         fileSize: true,
         width: true,
         height: true,
+        qualityScore: true,
         createdAt: true,
         metadata: true,
         project: {

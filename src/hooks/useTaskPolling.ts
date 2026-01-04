@@ -12,6 +12,7 @@ interface Task {
   originalName?: string;
   outputData?: string;
   errorMessage?: string;
+  processedImageId?: string;
 }
 
 interface UseTaskPollingProps {
@@ -20,6 +21,7 @@ interface UseTaskPollingProps {
   setActiveTasks: (tasks: Task[] | ((prev: Task[]) => Task[])) => void;
   setIsProcessing: (processing: boolean) => void;
   onTaskComplete?: () => void;
+  onTaskCompleteWithData?: (task: Task) => void;
   getProcessTypeName: (type: string) => string;
 }
 
@@ -29,12 +31,19 @@ export function useTaskPolling({
   setActiveTasks,
   setIsProcessing,
   onTaskComplete,
+  onTaskCompleteWithData,
   getProcessTypeName
 }: UseTaskPollingProps) {
   const { toast } = useToast();
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const activeTasksRef = useRef<Task[]>([]);
   const processedResultIdsRef = useRef<Set<string>>(new Set());
+
+  // 使用 ref 保持回调的最新引用
+  const onTaskCompleteWithDataRef = useRef(onTaskCompleteWithData);
+  useEffect(() => {
+    onTaskCompleteWithDataRef.current = onTaskCompleteWithData;
+  }, [onTaskCompleteWithData]);
 
   useEffect(() => {
     activeTasksRef.current = activeTasks;
@@ -71,12 +80,32 @@ export function useTaskPolling({
       let hasNewCompletedTasks = false;
 
       for (const task of completedTasks) {
-        if (!task.outputData || processedResultIdsRef.current.has(task.id)) continue;
+        console.log('[TaskPolling] Completed task:', {
+          id: task.id,
+          type: task.type,
+          hasOutputData: !!task.outputData,
+          alreadyProcessed: processedResultIdsRef.current.has(task.id),
+        });
+
+        if (!task.outputData || processedResultIdsRef.current.has(task.id)) {
+          console.log('[TaskPolling] Skipping task:', task.id, 'reason:', !task.outputData ? 'no outputData' : 'already processed');
+          continue;
+        }
 
         try {
           const originalTask = originalTaskMap.get(task.id);
           processedResultIdsRef.current.add(task.id);
           hasNewCompletedTasks = true;
+
+          // 调用带数据的回调（使用 ref 获取最新引用）
+          console.log('[TaskPolling] Calling onTaskCompleteWithData callback, hasCallback:', !!onTaskCompleteWithDataRef.current);
+          if (onTaskCompleteWithDataRef.current) {
+            onTaskCompleteWithDataRef.current({
+              ...task,
+              originalImageId: originalTask?.originalImageId,
+              originalName: originalTask?.originalName,
+            });
+          }
 
           toast({
             title: "任务完成",

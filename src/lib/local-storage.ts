@@ -124,22 +124,26 @@ export async function uploadImageToLocal(
 }
 
 /**
- * 从base64上传图片
- * @param base64Data Base64图片数据
+ * 从base64上传图片或视频
+ * @param base64Data Base64数据
  * @param filename 文件名
  * @param customPath 用户自定义路径（可选）
- * @returns 图片URL路径
+ * @returns 文件URL路径
  */
 export async function uploadBase64ImageToLocal(
   base64Data: string,
   filename: string,
   customPath?: string | null
 ): Promise<string> {
-  // 移除data:image/jpeg;base64,前缀
-  const base64String = base64Data.replace(/^data:image\/[a-z]+;base64,/, '');
-  const imageBuffer = Buffer.from(base64String, 'base64');
-  
-  return await uploadImageToLocal(imageBuffer, filename, 'image/jpeg', customPath);
+  // 移除data:image/xxx;base64, 或 data:video/xxx;base64, 前缀
+  const base64String = base64Data.replace(/^data:(image|video)\/[a-z0-9]+;base64,/i, '');
+  const buffer = Buffer.from(base64String, 'base64');
+
+  // 根据文件名判断内容类型
+  const ext = filename.split('.').pop()?.toLowerCase();
+  const contentType = ext === 'mp4' ? 'video/mp4' : 'image/jpeg';
+
+  return await uploadImageToLocal(buffer, filename, contentType, customPath);
 }
 
 /**

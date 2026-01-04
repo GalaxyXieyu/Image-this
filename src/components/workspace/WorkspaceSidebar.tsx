@@ -1,7 +1,7 @@
 import React from 'react';
 import { LucideIcon } from 'lucide-react';
 
-export type ActiveTab = "one-click" | "background" | "expansion" | "upscaling" | "watermark";
+export type ActiveTab = "one-click" | "background" | "expansion" | "upscaling" | "watermark" | "video";
 
 interface Tab {
     id: ActiveTab;

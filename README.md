@@ -144,6 +144,42 @@ npm run dev
 
 访问 [http://localhost:23000](http://localhost:23000) 查看应用。
 
+## API 申请指南
+
+本项目需要申请以下 API 服务才能正常使用所有功能。请按照以下步骤进行申请和配置。
+
+### 1. GPT 和 Gemini API
+
+用于图像理解、背景替换等 AI 图像处理功能。
+
+**注册地址：** [https://yunwu.zeabur.app/register?aff=lulv](https://yunwu.zeabur.app/register?aff=lulv)
+
+**需要配置的渠道：**
+- **Gemini**：用于图像理解和背景替换
+- **Azure OpenAI (GPT-4)**：作为 Gemini 的备选方案，提供更强的图像理解能力
+
+注册后在该平台创建 API Key，然后在应用的设置页面中配置对应渠道的 API Key 即可。
+
+### 2. 火山引擎即梦 API
+
+用于智能扩图、画质增强、视频生成等功能。
+
+**功能页面地址：**
+- **视频生成**：[https://console.volcengine.com/ai/ability/detail/2](https://console.volcengine.com/ai/ability/detail/2)
+- **智能扩图**：[https://console.volcengine.com/ai/ability/detail/10](https://console.volcengine.com/ai/ability/detail/10)
+- **背景替换**：[https://console.volcengine.com/ai/ability/detail/1](https://console.volcengine.com/ai/ability/detail/1)
+
+**新建密钥地址：** [https://console.volcengine.com/iam/keymanage](https://console.volcengine.com/iam/keymanage)
+
+> ⚠️ **注意：** 火山引擎的控制台页面比较分散，建议收藏以上链接方便后续查找。
+
+```bash
+# 火山引擎 API 密钥
+VOLCENGINE_ACCESS_KEY="你的AccessKey"
+VOLCENGINE_SECRET_KEY="你的SecretKey"
+```
+---
+
 ## 部署
 
 ### 桌面应用打包（推荐）

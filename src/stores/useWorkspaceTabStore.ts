@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { ActiveTab } from '@/components/workspace/WorkspaceSidebar';
+import type { QualityReviewResult } from '@/types/quality-review';
 
 // 上传的图片类型
 export interface UploadedImage {
@@ -47,6 +48,10 @@ export interface TabState {
   xScale: string;
   yScale: string;
   upscaleFactor: string;
+  // 智能审核相关
+  enableQualityReview: boolean;
+  currentReviewResult: QualityReviewResult | null;
+  isReviewing: boolean;
 }
 
 // 默认的 Tab 状态
@@ -74,6 +79,10 @@ const createDefaultTabState = (): TabState => ({
   xScale: '2.0',
   yScale: '2.0',
   upscaleFactor: '2',
+  // 智能审核相关
+  enableQualityReview: false,
+  currentReviewResult: null,
+  isReviewing: false,
 });
 
 // Store 状态类型
@@ -111,7 +120,12 @@ interface WorkspaceTabStore {
   setXScale: (scale: string) => void;
   setYScale: (scale: string) => void;
   setUpscaleFactor: (factor: string) => void;
-  
+
+  // 智能审核相关
+  setEnableQualityReview: (enable: boolean) => void;
+  setCurrentReviewResult: (result: QualityReviewResult | null) => void;
+  setIsReviewing: (reviewing: boolean) => void;
+
   // 获取当前 tab 的状态
   getCurrentTabState: () => TabState;
   
@@ -126,6 +140,7 @@ const initialTabStates: Record<ActiveTab, TabState> = {
   'expansion': createDefaultTabState(),
   'upscaling': createDefaultTabState(),
   'watermark': createDefaultTabState(),
+  'video': createDefaultTabState(),
 };
 
 export const useWorkspaceTabStore = create<WorkspaceTabStore>((set, get) => ({
@@ -364,7 +379,38 @@ export const useWorkspaceTabStore = create<WorkspaceTabStore>((set, get) => ({
       },
     },
   })),
-  
+
+  // 智能审核相关
+  setEnableQualityReview: (enable) => set((state) => ({
+    tabStates: {
+      ...state.tabStates,
+      [state.activeTab]: {
+        ...state.tabStates[state.activeTab],
+        enableQualityReview: enable,
+      },
+    },
+  })),
+
+  setCurrentReviewResult: (result) => set((state) => ({
+    tabStates: {
+      ...state.tabStates,
+      [state.activeTab]: {
+        ...state.tabStates[state.activeTab],
+        currentReviewResult: result,
+      },
+    },
+  })),
+
+  setIsReviewing: (reviewing) => set((state) => ({
+    tabStates: {
+      ...state.tabStates,
+      [state.activeTab]: {
+        ...state.tabStates[state.activeTab],
+        isReviewing: reviewing,
+      },
+    },
+  })),
+
   getCurrentTabState: () => {
     const state = get();
     return state.tabStates[state.activeTab];

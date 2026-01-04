@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Settings as SettingsIcon } from "lucide-react";
 import { ActiveTab } from './WorkspaceSidebar';
 import PromptTemplateSelector from './PromptTemplateSelector';
+import QualityReviewToggle from './QualityReviewToggle';
 
 interface ParameterSettingsProps {
     activeTab: ActiveTab;
@@ -28,6 +29,9 @@ interface ParameterSettingsProps {
     setXScale?: (value: string) => void;
     yScale?: string;
     setYScale?: (value: string) => void;
+    // 智能审核相关
+    enableQualityReview?: boolean;
+    setEnableQualityReview?: (value: boolean) => void;
 }
 
 export default function ParameterSettings({
@@ -49,6 +53,8 @@ export default function ParameterSettings({
     setXScale,
     yScale = '2.0',
     setYScale,
+    enableQualityReview = false,
+    setEnableQualityReview,
 }: ParameterSettingsProps) {
     
     // 根据功能类型获取可用的提供商
@@ -178,6 +184,14 @@ export default function ParameterSettings({
 
                 {activeTab === "background" && (
                     <div className="space-y-4">
+                        {/* 智能审核开关 */}
+                        {setEnableQualityReview && (
+                            <QualityReviewToggle
+                                enabled={enableQualityReview}
+                                onChange={setEnableQualityReview}
+                            />
+                        )}
+
                         {/* 提示词选择器 */}
                         {setBackgroundPrompt && (
                             <PromptTemplateSelector

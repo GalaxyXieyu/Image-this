@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle, X } from "lucide-react";
+import { CheckCircle, X, Sparkles, Loader2 } from "lucide-react";
 
 interface Task {
     id: string;
@@ -19,9 +19,30 @@ interface TaskProgressProps {
     tasks: Task[];
     isProcessing: boolean;
     getProcessTypeName: (type: string) => string;
+    isReviewing?: boolean;
 }
 
-export default function TaskProgress({ tasks, isProcessing, getProcessTypeName }: TaskProgressProps) {
+export default function TaskProgress({ tasks, isProcessing, getProcessTypeName, isReviewing }: TaskProgressProps) {
+    // 显示审核状态
+    if (isReviewing) {
+        return (
+            <Card className="border-purple-200 bg-purple-50">
+                <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                        <Loader2 className="w-5 h-5 text-purple-500 animate-spin" />
+                        <div>
+                            <h3 className="font-semibold text-purple-900 flex items-center gap-2">
+                                <Sparkles className="w-4 h-4" />
+                                正在进行智能审核...
+                            </h3>
+                            <p className="text-sm text-purple-700">AI 正在评估生成质量</p>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
     if (!isProcessing || tasks.length === 0) {
         return null;
     }

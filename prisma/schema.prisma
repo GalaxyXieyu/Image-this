@@ -112,6 +112,8 @@ model ProcessedImage {
   fileSize         Int?
   width            Int?
   height           Int?
+  qualityScore     Int?             // 质量评分 1-10
+  qualityReview    String?          // 质量审核详情（JSON字符串）
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   

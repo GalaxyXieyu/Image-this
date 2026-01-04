@@ -7,6 +7,7 @@ import Navbar from '@/components/navigation/Navbar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import ScoreBadge from '@/components/ui/score-badge';
 import {
   CheckCircle,
   XCircle,
@@ -28,7 +29,8 @@ import {
   ChevronLeft,
   ChevronRight,
   RotateCcw,
-  ImagePlus
+  ImagePlus,
+  Video
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
@@ -36,10 +38,11 @@ import { useToast } from '@/components/ui/use-toast';
 // 任务类型映射
 const taskTypeMap = {
   'ONE_CLICK_WORKFLOW': '一键增强',
-  'BACKGROUND_REMOVAL': '背景替换', 
+  'BACKGROUND_REMOVAL': '背景替换',
   'IMAGE_EXPANSION': '图像扩展',
   'IMAGE_UPSCALING': '图像高清化',
-  'GPT_GENERATION': '图像生成'
+  'GPT_GENERATION': '图像生成',
+  'VIDEO_GENERATION': '视频生成'
 };
 
 // 任务类型图标
@@ -48,7 +51,8 @@ const taskTypeIcons = {
   'BACKGROUND_REMOVAL': ImageIcon,
   'IMAGE_EXPANSION': Expand,
   'IMAGE_UPSCALING': Zap,
-  'GPT_GENERATION': ImageIcon
+  'GPT_GENERATION': ImageIcon,
+  'VIDEO_GENERATION': Video
 };
 
 // 状态配置
@@ -107,6 +111,7 @@ interface Task {
     filename: string;
     originalUrl: string;
     processedUrl: string;
+    qualityScore?: number;
   };
 }
 
@@ -114,6 +119,7 @@ interface ImagePreviewState {
   isOpen: boolean;
   imageUrl: string;
   title: string;
+  isVideo?: boolean;
 }
 
 export default function TaskCenterPage() {
@@ -126,6 +132,7 @@ export default function TaskCenterPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterScore, setFilterScore] = useState('all');
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
@@ -253,14 +260,22 @@ export default function TaskCenterPage() {
   // 过滤任务
   const filteredTasks = tasks.filter(task => {
     const taskTypeName = taskTypeMap[task.type as keyof typeof taskTypeMap] || task.type;
-    
+
     const matchesSearch = taskTypeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          task.currentStep.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const matchesType = filterType === 'all' || task.type === filterType;
     const matchesStatus = filterStatus === 'all' || task.status === filterStatus;
-    
-    return matchesSearch && matchesType && matchesStatus;
+
+    // 评分筛选
+    const score = task.processedImage?.qualityScore;
+    let matchesScore = true;
+    if (filterScore === 'high') matchesScore = score !== undefined && score >= 8;
+    else if (filterScore === 'medium') matchesScore = score !== undefined && score >= 5 && score < 8;
+    else if (filterScore === 'low') matchesScore = score !== undefined && score < 5;
+    else if (filterScore === 'none') matchesScore = score === undefined;
+
+    return matchesSearch && matchesType && matchesStatus && matchesScore;
   });
 
   // 切换任务展开状态
@@ -482,14 +497,14 @@ export default function TaskCenterPage() {
     }
   };
 
-  // 打开图片预览
-  const openImagePreview = (imageUrl: string, title: string) => {
-    setImagePreview({ isOpen: true, imageUrl, title });
+  // 打开图片/视频预览
+  const openImagePreview = (imageUrl: string, title: string, isVideo = false) => {
+    setImagePreview({ isOpen: true, imageUrl, title, isVideo });
   };
 
   // 关闭图片预览
   const closeImagePreview = () => {
-    setImagePreview({ isOpen: false, imageUrl: '', title: '' });
+    setImagePreview({ isOpen: false, imageUrl: '', title: '', isVideo: false });
   };
 
   // 解析任务输入数据获取原图 URL
@@ -521,15 +536,29 @@ export default function TaskCenterPage() {
       try {
         const outputData = JSON.parse(task.outputData);
         // 尝试多种可能的字段名
-        const url = outputData.processedImageUrl 
-          || outputData.processedUrl 
-          || outputData.imageUrl 
+        const url = outputData.processedImageUrl
+          || outputData.processedUrl
+          || outputData.imageUrl
           || outputData.result?.processedUrl
           || outputData.result?.processedImageUrl
           || null;
         if (url) return url;
       } catch {
         // 解析失败，继续尝试其他方式
+      }
+    }
+    return null;
+  };
+
+  // 获取视频任务的视频 URL
+  const getVideoUrl = (task: Task): string | null => {
+    if (task.type !== 'VIDEO_GENERATION') return null;
+    if (task.outputData) {
+      try {
+        const outputData = JSON.parse(task.outputData);
+        return outputData.videoUrl || null;
+      } catch {
+        return null;
       }
     }
     return null;
@@ -649,6 +678,7 @@ export default function TaskCenterPage() {
               <option value="BACKGROUND_REMOVAL" className="text-gray-900">背景替换</option>
               <option value="IMAGE_EXPANSION" className="text-gray-900">图像扩展</option>
               <option value="IMAGE_UPSCALING" className="text-gray-900">图像高清化</option>
+              <option value="VIDEO_GENERATION" className="text-gray-900">视频生成</option>
             </select>
 
             <select
@@ -661,6 +691,18 @@ export default function TaskCenterPage() {
               <option value="PROCESSING" className="text-gray-900">处理中</option>
               <option value="COMPLETED" className="text-gray-900">已完成</option>
               <option value="FAILED" className="text-gray-900">失败</option>
+            </select>
+
+            <select
+              value={filterScore}
+              onChange={(e) => setFilterScore(e.target.value)}
+              className="px-3 py-2 text-sm text-gray-900 border border-gray-300 rounded-md h-9 bg-white hover:bg-gray-50 transition-colors"
+            >
+              <option value="all">所有评分</option>
+              <option value="high">高分 (8-10)</option>
+              <option value="medium">中等 (5-7)</option>
+              <option value="low">低分 (1-4)</option>
+              <option value="none">未评分</option>
             </select>
 
             <div className="flex-1"></div>
@@ -760,6 +802,7 @@ export default function TaskCenterPage() {
                     <div className="w-36">任务类型</div>
                     <div className="flex-1 min-w-0">当前步骤</div>
                     <div className="w-24">状态</div>
+                    <div className="w-16 text-center">评分</div>
                     <div className="w-20 text-center">进度</div>
                     <div className="w-28">创建时间</div>
                     <div className="w-28 text-right">操作</div>
@@ -774,6 +817,8 @@ export default function TaskCenterPage() {
                 const isExpanded = expandedTasks.has(task.id);
                 const originalImageUrl = getOriginalImageUrl(task);
                 const resultImageUrl = getResultImageUrl(task);
+                const videoUrl = getVideoUrl(task);
+                const isVideoTask = task.type === 'VIDEO_GENERATION';
                 const canRetry = task.status === 'FAILED' || task.status === 'CANCELLED' || task.status === 'COMPLETED';
 
                 return (
@@ -819,28 +864,45 @@ export default function TaskCenterPage() {
                               <ImageIcon className="w-6 h-6 text-gray-300" />
                             </div>
                           )}
-                          {/* 结果图缩略图 */}
-                          {task.status === 'COMPLETED' && resultImageUrl ? (
-                            <div
-                              className="w-16 h-16 rounded-lg border-2 border-green-400 overflow-hidden cursor-pointer hover:ring-2 hover:ring-green-500 transition-all flex-shrink-0 shadow-sm"
-                              onClick={() => openImagePreview(resultImageUrl, '结果图')}
-                              title="点击查看结果图"
-                            >
-                              <img
-                                src={resultImageUrl}
-                                alt="结果"
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  target.style.display = 'none';
-                                  target.parentElement?.classList.add('bg-green-50', 'flex', 'items-center', 'justify-center');
-                                  const placeholder = document.createElement('span');
-                                  placeholder.className = 'text-green-500 text-xs text-center px-1';
-                                  placeholder.textContent = '加载失败';
-                                  target.parentElement?.appendChild(placeholder);
-                                }}
-                              />
-                            </div>
+                          {/* 结果图/视频缩略图 */}
+                          {task.status === 'COMPLETED' && (isVideoTask ? videoUrl : resultImageUrl) ? (
+                            isVideoTask && videoUrl ? (
+                              <div
+                                className="w-16 h-16 rounded-lg border-2 border-purple-400 overflow-hidden cursor-pointer hover:ring-2 hover:ring-purple-500 transition-all flex-shrink-0 shadow-sm relative bg-gray-900"
+                                onClick={() => openImagePreview(videoUrl, '生成视频', true)}
+                                title="点击查看视频"
+                              >
+                                <video
+                                  src={videoUrl}
+                                  className="w-full h-full object-cover"
+                                  muted
+                                />
+                                <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                                  <Play className="w-6 h-6 text-white fill-white" />
+                                </div>
+                              </div>
+                            ) : (
+                              <div
+                                className="w-16 h-16 rounded-lg border-2 border-green-400 overflow-hidden cursor-pointer hover:ring-2 hover:ring-green-500 transition-all flex-shrink-0 shadow-sm"
+                                onClick={() => openImagePreview(resultImageUrl!, '结果图')}
+                                title="点击查看结果图"
+                              >
+                                <img
+                                  src={resultImageUrl!}
+                                  alt="结果"
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    target.parentElement?.classList.add('bg-green-50', 'flex', 'items-center', 'justify-center');
+                                    const placeholder = document.createElement('span');
+                                    placeholder.className = 'text-green-500 text-xs text-center px-1';
+                                    placeholder.textContent = '加载失败';
+                                    target.parentElement?.appendChild(placeholder);
+                                  }}
+                                />
+                              </div>
+                            )
                           ) : task.status === 'PROCESSING' ? (
                             <div className="w-16 h-16 rounded-lg border border-blue-300 bg-blue-50 flex items-center justify-center flex-shrink-0">
                               <Loader className="w-6 h-6 text-blue-500 animate-spin" />
@@ -878,6 +940,15 @@ export default function TaskCenterPage() {
                           <Badge className={`${statusInfo?.color || 'bg-gray-100 text-gray-800'} text-xs`}>
                             {statusInfo?.label || task.status}
                           </Badge>
+                        </div>
+
+                        {/* 评分 */}
+                        <div className="w-16 text-center">
+                          {task.processedImage?.qualityScore ? (
+                            <ScoreBadge score={task.processedImage.qualityScore} size="sm" />
+                          ) : (
+                            <span className="text-xs text-gray-400">-</span>
+                          )}
                         </div>
 
                         {/* 进度 */}
@@ -1051,9 +1122,9 @@ export default function TaskCenterPage() {
         )}
       </div>
 
-      {/* 图片预览模态框 */}
+      {/* 图片/视频预览模态框 */}
       {imagePreview.isOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
           onClick={closeImagePreview}
         >
@@ -1064,17 +1135,26 @@ export default function TaskCenterPage() {
             >
               <X className="w-5 h-5" />
             </button>
-            
+
             <div className="bg-white rounded-lg overflow-hidden shadow-2xl">
               <div className="p-3 border-b bg-gray-50">
                 <span className="text-sm font-medium text-gray-700">{imagePreview.title}</span>
               </div>
               <div className="p-2 bg-gray-100">
-                <img
-                  src={imagePreview.imageUrl}
-                  alt={imagePreview.title}
-                  className="max-w-full max-h-[70vh] object-contain mx-auto rounded"
-                />
+                {imagePreview.isVideo ? (
+                  <video
+                    src={imagePreview.imageUrl}
+                    controls
+                    autoPlay
+                    className="max-w-full max-h-[70vh] object-contain mx-auto rounded"
+                  />
+                ) : (
+                  <img
+                    src={imagePreview.imageUrl}
+                    alt={imagePreview.title}
+                    className="max-w-full max-h-[70vh] object-contain mx-auto rounded"
+                  />
+                )}
               </div>
             </div>
           </div>

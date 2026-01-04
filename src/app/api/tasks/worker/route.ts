@@ -65,6 +65,9 @@ class TaskProcessor {
         case 'WATERMARK':
           result = await this.processWatermark(task);
           break;
+        case 'VIDEO_GENERATION':
+          result = await this.processVideoGeneration(task);
+          break;
         default:
           throw new Error(`不支持的任务类型: ${task.type}`);
       }
@@ -345,6 +348,9 @@ class TaskProcessor {
       case 'WATERMARK':
         result = await this.processWatermark(task);
         break;
+      case 'VIDEO_GENERATION':
+        result = await this.processVideoGeneration(task);
+        break;
       default:
         throw new Error(`不支持的任务类型: ${task.type}`);
     }
@@ -468,6 +474,7 @@ class TaskProcessor {
             metadata: JSON.stringify({
               provider: 'gpt',
               prompt,
+              referenceImageUrl,
               processingCompletedAt: new Date().toISOString()
             }),
             userId: task.userId
@@ -512,6 +519,7 @@ class TaskProcessor {
             metadata: JSON.stringify({
               provider: 'gemini',
               prompt,
+              referenceImageUrl,
               processingCompletedAt: new Date().toISOString()
             }),
             userId: task.userId
@@ -556,6 +564,7 @@ class TaskProcessor {
             metadata: JSON.stringify({
               provider: 'jimeng',
               prompt,
+              referenceImageUrl,
               processingCompletedAt: new Date().toISOString()
             }),
             userId: task.userId
@@ -820,6 +829,60 @@ class TaskProcessor {
 
     } catch (error) {
       await this.updateTaskProgress(task.id, '水印添加失败', 0, 0);
+      throw error;
+    }
+  }
+
+  private async processVideoGeneration(task: { id: string; inputData: string; userId: string }) {
+    const inputData = JSON.parse(task.inputData);
+    const { imageUrl, prompt, frames = 121, aspectRatio = '16:9' } = inputData;
+
+    await this.updateTaskProgress(task.id, '提交视频生成任务...', 10, 1);
+
+    try {
+      const { submitVideoTask, queryVideoTask, downloadAndSaveVideo } = await import('@/app/api/jimeng-video/service');
+
+      // 提交任务 - imageUrl 实际是 base64 数据
+      const { taskId: jimengTaskId } = await submitVideoTask(task.userId, {
+        imageBase64: imageUrl,
+        prompt,
+        frames,
+        aspectRatio,
+      });
+
+      // 轮询查询结果（最多5分钟）
+      await this.updateTaskProgress(task.id, '视频生成中...', 30, 1);
+      const maxAttempts = 60;
+      for (let i = 0; i < maxAttempts; i++) {
+        const result = await queryVideoTask(task.userId, jimengTaskId);
+
+        if (result.status === 'done' && result.videoUrl) {
+          await this.updateTaskProgress(task.id, '保存视频...', 90, 1);
+          const localVideoUrl = await downloadAndSaveVideo(result.videoUrl, task.userId);
+
+          await this.updateTaskProgress(task.id, '视频生成完成', 100, 1);
+          return {
+            videoUrl: localVideoUrl,
+            jimengTaskId,
+            prompt,
+            frames,
+            aspectRatio
+          };
+        }
+
+        if (result.status === 'not_found' || result.status === 'expired') {
+          throw new Error(result.error || '视频生成任务失败或已过期');
+        }
+
+        const progress = 30 + (i / maxAttempts) * 50;
+        await this.updateTaskProgress(task.id, `视频生成中 (${i + 1}/${maxAttempts})...`, progress, 1);
+        await this.delay(5000);
+      }
+
+      throw new Error('视频生成超时');
+    } catch (error) {
+      console.error('[视频生成] 处理失败:', error);
+      await this.updateTaskProgress(task.id, '视频生成失败', 0, 0);
       throw error;
     }
   }
