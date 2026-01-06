@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Wand2, ImageIcon, Star, Clock, ArrowRight, Sparkles, Zap, Expand } from "lucide-react";
 import Navbar from "@/components/navigation/Navbar";
-import Footer from "./Footer";
 
 export default function AuthenticatedHomePage() {
   return (
@@ -172,7 +171,6 @@ export default function AuthenticatedHomePage() {
           </div>
         </div>
       </div>
-      <Footer />
     </div>
   );
 }

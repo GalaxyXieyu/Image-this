@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sparkles, Wand2, ImageIcon, Expand, Zap, ArrowRight } from "lucide-react";
-import Footer from "@/components/home/Footer";
 import AuthenticatedHomePage from "@/components/home/AuthenticatedHomePage";
 
 
@@ -189,7 +188,6 @@ export default function Home() {
         </div>
       </section>
 
-      <Footer />
     </div>
   );
 }
