@@ -6,6 +6,11 @@ on:
       - main
   workflow_dispatch:  # 支持手动触发
 
+# 添加权限配置
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
