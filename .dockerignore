@@ -1,0 +1,108 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# CI/CD
+.github
+.gitlab-ci.yml
+
+# Documentation
+README.md
+CHANGELOG.md
+docs/
+*.md
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Testing
+coverage
+.nyc_output
+test
+tests
+__tests__
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+
+# Build artifacts
+.next/cache
+dist
+dist-electron
+build
+out
+
+# Environment variables (use example files)
+.env
+.env.local
+.env.development
+.env.test
+
+# Database
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+prisma/migrations
+prisma/*.db
+
+# Temp files
+tmp
+temp
+.cache
+.temp
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Backups
+backups/
+*.backup
+*.bak
+
+# Uploads (don't include in image)
+public/uploads/*
+
+# PM2
+.pm2
+ecosystem.config.js
+
+# Electron
+electron/
+*.exe
+*.dmg
+*.pkg
+*.deb
+*.AppImage
+
+# Playwright
+playwright-report
+test-results
+
+# Misc
+.npmrc
+.yarnrc
+.editorconfig
+.eslintcache
+.prettierrc
