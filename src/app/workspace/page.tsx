@@ -124,6 +124,11 @@ export default function WorkspacePage() {
     setEnableQualityReview,
     setCurrentReviewResult,
     setIsReviewing,
+    // 视频生成相关
+    setEnableVideo,
+    setVideoPrompt,
+    setVideoFrames,
+    setVideoAspectRatio,
   } = useWorkspaceTabStore();
   
   // 从当前 tab 状态中获取值
@@ -143,6 +148,11 @@ export default function WorkspacePage() {
   const enableQualityReview = currentTabState.enableQualityReview;
   const currentReviewResult = currentTabState.currentReviewResult;
   const isReviewing = currentTabState.isReviewing;
+  // 视频生成相关
+  const enableVideo = currentTabState.enableVideo;
+  const videoPrompt = currentTabState.videoPrompt;
+  const videoFrames = currentTabState.videoFrames;
+  const videoAspectRatio_OneClick = currentTabState.videoAspectRatio;
   
   // 提示词根据 tab 类型获取
   const backgroundPrompt = activeTab === 'background' ? currentTabState.prompt : '';
@@ -180,11 +190,11 @@ export default function WorkspacePage() {
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const historyLoadingRef = useRef(false);
 
-  // 视频生成相关状态
+  // 视频生成相关状态（独立视频标签页专用）
   const [videoStyle, setVideoStyle] = useState('product-showcase');
   const [videoCustomPrompt, setVideoCustomPrompt] = useState('');
   const [videoDuration, setVideoDuration] = useState<121 | 241>(121);
-  const [videoAspectRatio, setVideoAspectRatio] = useState('16:9');
+  const [videoAspectRatio_VideoTab, setVideoAspectRatio_VideoTab] = useState('16:9');
   const [showVideoResult, setShowVideoResult] = useState(false);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState('');
 
@@ -210,7 +220,12 @@ export default function WorkspacePage() {
     watermarkLogo,
     watermarkSettings,
     outputResolution,
-    aiModel
+    aiModel,
+    // 视频生成相关
+    enableVideo,
+    videoPrompt,
+    videoFrames,
+    videoAspectRatio: videoAspectRatio_OneClick
   });
 
   useEffect(() => {
@@ -722,8 +737,8 @@ export default function WorkspacePage() {
         };
 
         toast({
-          title: "任务创建成功",
-          description: `已创建 ${mappedTasks.length} 个${getProcessTypeName(mappedTasks[0]?.type || '')}任务，正在处理中...`,
+          title: "✅ 任务已加入队列",
+          description: `${mappedTasks.length} 个${getProcessTypeName(mappedTasks[0]?.type || '')}任务已加入队列，请等待处理...`,
         });
       }
     } catch (error) {
@@ -783,7 +798,7 @@ export default function WorkspacePage() {
             imageUrl: imageBase64,
             prompt,
             frames: videoDuration,
-            aspectRatio: videoAspectRatio,
+            aspectRatio: videoAspectRatio_VideoTab,
           }),
         }),
       });
@@ -802,8 +817,8 @@ export default function WorkspacePage() {
       }]);
 
       toast({
-        title: "任务创建成功",
-        description: "视频生成任务已创建，正在处理中...",
+        title: "✅ 视频任务已加入队列",
+        description: "视频生成任务已加入队列，请等待处理...",
       });
 
       // 触发 worker
@@ -889,7 +904,16 @@ export default function WorkspacePage() {
                 <CardContent>
                   <VideoStyleSelector
                     selectedStyle={videoStyle}
-                    onStyleChange={setVideoStyle}
+                    onStyleChange={(styleId) => {
+                      setVideoStyle(styleId);
+                      // 当选择预设风格时，自动填充提示词
+                      if (styleId !== 'custom') {
+                        const template = VIDEO_STYLE_TEMPLATES.find(t => t.id === styleId);
+                        if (template) {
+                          setVideoCustomPrompt(template.prompt);
+                        }
+                      }
+                    }}
                     customPrompt={videoCustomPrompt}
                     onCustomPromptChange={setVideoCustomPrompt}
                   />
@@ -916,8 +940,8 @@ export default function WorkspacePage() {
                     <div>
                       <Label className="text-sm">宽高比</Label>
                       <select
-                        value={videoAspectRatio}
-                        onChange={(e) => setVideoAspectRatio(e.target.value)}
+                        value={videoAspectRatio_VideoTab}
+                        onChange={(e) => setVideoAspectRatio_VideoTab(e.target.value)}
                         className="w-full mt-1 px-3 py-2 border rounded-md text-sm"
                       >
                         <option value="16:9">16:9 横屏</option>
@@ -1039,6 +1063,15 @@ export default function WorkspacePage() {
             setYScale={setYScale}
             enableQualityReview={enableQualityReview}
             setEnableQualityReview={setEnableQualityReview}
+            // 视频生成相关
+            enableVideo={enableVideo}
+            setEnableVideo={setEnableVideo}
+            videoPrompt={videoPrompt}
+            setVideoPrompt={setVideoPrompt}
+            videoFrames={videoFrames}
+            setVideoFrames={setVideoFrames}
+            videoAspectRatio={videoAspectRatio_OneClick}
+            setVideoAspectRatio={setVideoAspectRatio}
           />
 
           {/* One-click 水印设置 */}

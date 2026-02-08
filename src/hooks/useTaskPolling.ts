@@ -75,6 +75,17 @@ export function useTaskPolling({
       const updatedTasks: Task[] = data.tasks || [];
       const originalTaskMap = new Map(tasksSnapshot.map(task => [task.id, task]));
 
+      // 检查状态变化 - PENDING -> PROCESSING
+      for (const task of updatedTasks) {
+        const originalTask = originalTaskMap.get(task.id);
+        if (originalTask && originalTask.status === 'PENDING' && task.status === 'PROCESSING') {
+          toast({
+            title: "任务开始处理",
+            description: `${originalTask?.originalName || '图片'} ${getProcessTypeName(task.type)}开始处理`,
+          });
+        }
+      }
+
       // 检查完成的任务
       const completedTasks = updatedTasks.filter(task => task.status === 'COMPLETED');
       let hasNewCompletedTasks = false;
@@ -108,7 +119,7 @@ export function useTaskPolling({
           }
 
           toast({
-            title: "任务完成",
+            title: "✅ 任务完成",
             description: `${originalTask?.originalName || '图片'} ${getProcessTypeName(task.type)}处理完成`,
           });
         } catch (error) {
@@ -125,8 +136,8 @@ export function useTaskPolling({
       for (const task of failedTasks) {
         const originalTask = originalTaskMap.get(task.id);
         toast({
-          title: "任务失败",
-          description: `${originalTask?.originalName || '图片'} ${getProcessTypeName(task.type)}处理失败`,
+          title: "❌ 任务失败",
+          description: `${originalTask?.originalName || '图片'} ${getProcessTypeName(task.type)}处理失败: ${task.errorMessage || '未知错误'}`,
           variant: "destructive",
         });
       }

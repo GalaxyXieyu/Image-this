@@ -9,9 +9,9 @@
   },
   "main": "electron/main.js",
   "scripts": {
-    "dev": "next dev -p 23000",
+    "dev": "next dev -p 34123",
     "build": "next build && node scripts/post-build.js",
-    "start": "next start -p 34000",
+    "start": "next start -p 34123",
     "lint": "next lint",
     "clean": "bash scripts/clean-build.sh",
     "screenshots:readme": "node scripts/generate-readme-screenshots.mjs",

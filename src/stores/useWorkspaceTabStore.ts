@@ -52,6 +52,11 @@ export interface TabState {
   enableQualityReview: boolean;
   currentReviewResult: QualityReviewResult | null;
   isReviewing: boolean;
+  // 视频生成相关
+  enableVideo: boolean;
+  videoPrompt: string;
+  videoFrames: number;
+  videoAspectRatio: string;
 }
 
 // 默认的 Tab 状态
@@ -83,6 +88,11 @@ const createDefaultTabState = (): TabState => ({
   enableQualityReview: false,
   currentReviewResult: null,
   isReviewing: false,
+  // 视频生成相关
+  enableVideo: false,
+  videoPrompt: '',
+  videoFrames: 121, // 默认5秒
+  videoAspectRatio: '16:9',
 });
 
 // Store 状态类型
@@ -91,16 +101,16 @@ interface WorkspaceTabStore {
   activeTab: ActiveTab;
   // 每个 tab 的状态缓存
   tabStates: Record<ActiveTab, TabState>;
-  
+
   // Actions
   setActiveTab: (tab: ActiveTab) => void;
-  
+
   // 更新当前 tab 的状态
   setUploadedImages: (images: UploadedImage[]) => void;
   addUploadedImages: (images: UploadedImage[]) => void;
   removeUploadedImage: (id: string) => void;
   clearUploadedImages: () => void;
-  
+
   setReferenceImage: (image: UploadedImage | null) => void;
   setSelectedPreviewIndex: (index: number) => void;
   setOutputResolution: (resolution: string) => void;
@@ -108,14 +118,14 @@ interface WorkspaceTabStore {
   setPrompt: (prompt: string) => void;
   setBackgroundPrompt: (prompt: string) => void;
   setOutpaintPrompt: (prompt: string) => void;
-  
+
   // 水印相关
   setEnableWatermark: (enable: boolean) => void;
   setWatermarkType: (type: 'text' | 'logo') => void;
   setWatermarkText: (text: string) => void;
   setWatermarkLogo: (logo: UploadedImage | null) => void;
   setWatermarkSettings: (settings: WatermarkSettings) => void;
-  
+
   // 扩展参数
   setXScale: (scale: string) => void;
   setYScale: (scale: string) => void;
@@ -126,9 +136,15 @@ interface WorkspaceTabStore {
   setCurrentReviewResult: (result: QualityReviewResult | null) => void;
   setIsReviewing: (reviewing: boolean) => void;
 
+  // 视频生成相关
+  setEnableVideo: (enable: boolean) => void;
+  setVideoPrompt: (prompt: string) => void;
+  setVideoFrames: (frames: number) => void;
+  setVideoAspectRatio: (ratio: string) => void;
+
   // 获取当前 tab 的状态
   getCurrentTabState: () => TabState;
-  
+
   // 清除指定 tab 的状态
   clearTabState: (tab: ActiveTab) => void;
 }
@@ -407,6 +423,47 @@ export const useWorkspaceTabStore = create<WorkspaceTabStore>((set, get) => ({
       [state.activeTab]: {
         ...state.tabStates[state.activeTab],
         isReviewing: reviewing,
+      },
+    },
+  })),
+
+  // 视频生成相关
+  setEnableVideo: (enable) => set((state) => ({
+    tabStates: {
+      ...state.tabStates,
+      [state.activeTab]: {
+        ...state.tabStates[state.activeTab],
+        enableVideo: enable,
+      },
+    },
+  })),
+
+  setVideoPrompt: (prompt) => set((state) => ({
+    tabStates: {
+      ...state.tabStates,
+      [state.activeTab]: {
+        ...state.tabStates[state.activeTab],
+        videoPrompt: prompt,
+      },
+    },
+  })),
+
+  setVideoFrames: (frames) => set((state) => ({
+    tabStates: {
+      ...state.tabStates,
+      [state.activeTab]: {
+        ...state.tabStates[state.activeTab],
+        videoFrames: frames,
+      },
+    },
+  })),
+
+  setVideoAspectRatio: (ratio) => set((state) => ({
+    tabStates: {
+      ...state.tabStates,
+      [state.activeTab]: {
+        ...state.tabStates[state.activeTab],
+        videoAspectRatio: ratio,
       },
     },
   })),

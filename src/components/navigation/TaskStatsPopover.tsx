@@ -44,12 +44,14 @@ export default function TaskStatsPopover() {
       }
     };
 
-    // 只在打开弹窗时才轮询
-    if (isOpen) {
-      fetchStats();
-      const interval = setInterval(fetchStats, 10000); // 10秒轮询一次
-      return () => clearInterval(interval);
-    }
+    // 始终在后台轮询更新统计数据
+    // 打开弹窗时: 5秒更新一次 (快速更新)
+    // 关闭弹窗时: 15秒更新一次 (减少服务器压力,但保持数据同步)
+    fetchStats(); // 立即获取一次
+    const pollingDelay = isOpen ? 5000 : 15000;
+    const interval = setInterval(fetchStats, pollingDelay);
+
+    return () => clearInterval(interval);
   }, [isOpen]);
 
   const hasActiveTasks = stats.pending > 0 || stats.processing > 0;
