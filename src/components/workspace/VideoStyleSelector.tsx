@@ -74,6 +74,9 @@ export function VideoStyleSelector({
 }: VideoStyleSelectorProps) {
   const selectedTemplate = VIDEO_STYLE_TEMPLATES.find(t => t.id === selectedStyle);
 
+  // 当前使用的提示词：如果是自定义则用 customPrompt，否则用模板的 prompt
+  const currentPrompt = selectedStyle === 'custom' ? customPrompt : (selectedTemplate?.prompt || '');
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
@@ -110,22 +113,25 @@ export function VideoStyleSelector({
         })}
       </div>
 
-      {/* 选中风格的提示词预览 */}
-      {selectedStyle !== 'custom' && selectedTemplate && (
-        <div className="p-3 bg-gray-50 rounded-lg border">
-          <div className="text-xs text-gray-500 mb-1">当前风格提示词：</div>
-          <div className="text-sm text-gray-700">{selectedTemplate.prompt}</div>
+      {/* 提示词编辑区 - 所有风格都可编辑 */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-gray-500">
+            {selectedStyle === 'custom' ? '自定义提示词' : '当前风格提示词（可编辑）'}
+          </div>
         </div>
-      )}
-
-      {selectedStyle === 'custom' && (
         <Textarea
-          placeholder="输入自定义视频提示词，描述你想要的视频效果..."
-          value={customPrompt}
+          placeholder={selectedStyle === 'custom' ? '输入自定义视频提示词，描述你想要的视频效果...' : '编辑提示词...'}
+          value={currentPrompt}
           onChange={(e) => onCustomPromptChange(e.target.value)}
-          className="min-h-[100px]"
+          className="min-h-[100px] text-sm"
         />
-      )}
+        {selectedStyle !== 'custom' && (
+          <div className="text-xs text-gray-400">
+            💡 提示：选择预设风格后，仍可以编辑提示词进行微调
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -15,6 +15,11 @@ interface UseImageProcessingProps {
   watermarkSettings: any;
   outputResolution: string;
   aiModel?: string;
+  // 视频生成相关
+  enableVideo?: boolean;
+  videoPrompt?: string;
+  videoFrames?: number;
+  videoAspectRatio?: string;
 }
 
 export function useImageProcessing({
@@ -23,7 +28,12 @@ export function useImageProcessing({
   watermarkLogo,
   watermarkSettings,
   outputResolution,
-  aiModel = 'jimeng'
+  aiModel = 'jimeng',
+  // 视频生成相关
+  enableVideo = false,
+  videoPrompt = '',
+  videoFrames = 121,
+  videoAspectRatio = '16:9'
 }: UseImageProcessingProps) {
   const { toast } = useToast();
 
@@ -243,6 +253,11 @@ export function useImageProcessing({
         watermarkLogoUrl: watermarkLogoData,
         outputResolution,
         aiModel,
+        // 视频生成相关
+        enableVideo,
+        videoPrompt,
+        videoFrames,
+        videoAspectRatio,
         originalImageId: image.id,
         originalImageName: image.name
       });
@@ -251,7 +266,7 @@ export function useImageProcessing({
     const tasks = await createBatchTasks('ONE_CLICK_WORKFLOW', taskData);
     await triggerWorker();
     return tasks;
-  }, [uploadedImages, referenceImage, watermarkLogo, watermarkSettings, outputResolution, aiModel, resizeImageForAPI, createBatchTasks, triggerWorker]);
+  }, [uploadedImages, referenceImage, watermarkLogo, watermarkSettings, outputResolution, aiModel, enableVideo, videoPrompt, videoFrames, videoAspectRatio, resizeImageForAPI, createBatchTasks, triggerWorker]);
 
   // 背景替换处理
   const handleBackgroundReplace = useCallback(async () => {

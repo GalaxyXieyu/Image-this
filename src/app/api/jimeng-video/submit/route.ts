@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { submitVideoTask, VIDEO_STYLE_TEMPLATES } from '../service';
+import { submitVideoTask } from '../service';
+import { VIDEO_STYLE_TEMPLATES } from '@/lib/video-style-templates';
 
 export async function POST(request: NextRequest) {
   try {

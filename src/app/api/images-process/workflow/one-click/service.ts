@@ -19,6 +19,12 @@ export interface OneClickWorkflowParams {
   watermarkLogoUrl?: string;
   outputResolution?: string;
   aiModel?: string;
+  // 视频生成相关参数
+  enableVideo?: boolean;
+  videoPrompt?: string;
+  videoFrames?: number;      // 121(5s) | 241(10s)
+  videoAspectRatio?: string; // "16:9" | "4:3" | "1:1" | "3:4" | "9:16" | "21:9"
+  videoSeed?: number;
   userId: string;
   volcengineConfig?: { accessKey: string; secretKey: string };
   imagehostingConfig?: { superbedToken: string };
@@ -34,12 +40,16 @@ export interface OneClickWorkflowResult {
     outpaint: boolean;
     upscale: boolean;
     watermark: boolean;
+    video: boolean;
   };
+  videoTaskId?: string;
+  videoUrl?: string;
   errors?: {
     backgroundReplace?: string;
     outpaint?: string;
     upscale?: string;
     watermark?: string;
+    video?: string;
   };
 }
 
@@ -67,6 +77,12 @@ export async function executeOneClickWorkflow(
     watermarkLogoUrl,
     outputResolution = 'original',
     aiModel = 'jimeng',
+    // 视频生成参数
+    enableVideo = false,
+    videoPrompt = '',
+    videoFrames = 121,
+    videoAspectRatio = '16:9',
+    videoSeed = -1,
     userId,
     volcengineConfig,
     imagehostingConfig
@@ -236,7 +252,7 @@ export async function executeOneClickWorkflow(
 
     // 步骤4：添加水印
     if (enableWatermark) {
-      console.log('=== 步骤4/4：开始添加水印 ===');
+      console.log('=== 步骤4/5：开始添加水印 ===');
       try {
         const { addWatermarkToImage } = await import('@/lib/watermark');
         processedImageUrl = await addWatermarkToImage({
@@ -257,6 +273,37 @@ export async function executeOneClickWorkflow(
       }
     } else {
       console.log('=== 跳过水印步骤 ===');
+    }
+
+    // 步骤5：视频生成
+    let videoTaskId: string | undefined;
+    let hasVideo = false;
+    if (enableVideo) {
+      console.log('=== 步骤5/5：开始视频生成 ===');
+      const videoStartTime = Date.now();
+      try {
+        const { submitVideoTask } = await import('@/app/api/jimeng-video/service');
+        const finalPrompt = videoPrompt || '高质量产品视频，流畅自然的动态效果';
+
+        // 使用处理后的图片作为视频首帧
+        const videoResult = await submitVideoTask(userId, {
+          imageBase64: processedImageUrl,
+          prompt: finalPrompt,
+          frames: videoFrames,
+          aspectRatio: videoAspectRatio,
+          seed: videoSeed
+        });
+
+        videoTaskId = videoResult.taskId;
+        hasVideo = true;
+        const videoDuration = ((Date.now() - videoStartTime) / 1000).toFixed(2);
+        console.log(`视频生成任务已提交，任务ID: ${videoTaskId}，耗时: ${videoDuration}秒`);
+      } catch (error) {
+        console.error('视频生成失败:', error);
+        stepErrors.video = error instanceof Error ? error.message : String(error);
+      }
+    } else {
+      console.log('=== 跳过视频生成步骤 ===');
     }
 
     // 获取最终结果
@@ -291,8 +338,10 @@ export async function executeOneClickWorkflow(
             backgroundReplace: hasBackgroundReplace,
             outpaint: hasOutpaint,
             upscale: enableUpscale,
-            watermark: enableWatermark
+            watermark: enableWatermark,
+            video: hasVideo
           },
+          videoTaskId, // 保存视频任务ID
           stepErrors // 记录每一步的错误
         })
       }
@@ -307,8 +356,10 @@ export async function executeOneClickWorkflow(
         backgroundReplace: hasBackgroundReplace,
         outpaint: hasOutpaint,
         upscale: enableUpscale,
-        watermark: enableWatermark
+        watermark: enableWatermark,
+        video: hasVideo
       },
+      videoTaskId,
       errors: stepErrors
     };
 

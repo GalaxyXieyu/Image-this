@@ -135,7 +135,6 @@ export default function TaskCenterPage() {
   const [filterScore, setFilterScore] = useState('all');
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
-  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
   const [queueStats, setQueueStats] = useState({
     pending: 0,
     processing: 0,
@@ -152,6 +151,7 @@ export default function TaskCenterPage() {
     title: ''
   });
   const [isRetrying, setIsRetrying] = useState(false);
+  const [hasActiveTasks, setHasActiveTasks] = useState(false);
 
   // 重定向未登录用户
   useEffect(() => {
@@ -180,6 +180,11 @@ export default function TaskCenterPage() {
         if (data.stats) {
           setQueueStats(data.stats);
         }
+        // 更新活跃任务状态
+        const hasActive = data.tasks.some((task: Task) =>
+          task.status === 'PENDING' || task.status === 'PROCESSING'
+        );
+        setHasActiveTasks(hasActive);
       } else {
         throw new Error(data.error || '获取任务列表失败');
       }
@@ -206,37 +211,24 @@ export default function TaskCenterPage() {
     }
   }, [session, initializeData]);
 
-  // 轮询任务状态（仅在有进行中任务时）- 优化为 5 秒，减少数据库压力
+  // 始终轮询任务状态 - 根据是否有活跃任务动态调整轮询间隔
   useEffect(() => {
-    const hasActiveTasks = tasks.some(task => 
-      task.status === 'PENDING' || task.status === 'PROCESSING'
-    );
+    if (!session) return;
 
-    if (hasActiveTasks && !pollingInterval) {
-      const interval = setInterval(async () => {
-        await fetchTasks();
-      }, 5000); // 每5秒更新一次，减少数据库压力
-      setPollingInterval(interval);
-    } else if (!hasActiveTasks && pollingInterval) {
-      clearInterval(pollingInterval);
-      setPollingInterval(null);
-    }
+    // 根据是否有活跃任务选择轮询间隔
+    // 有活跃任务: 3秒 (快速更新)
+    // 无活跃任务: 10秒 (减少服务器压力)
+    const pollingDelay = hasActiveTasks ? 3000 : 10000;
 
+    const interval = setInterval(async () => {
+      await fetchTasks();
+    }, pollingDelay);
+
+    // 组件卸载或 session 变化时清理定时器
     return () => {
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-      }
+      clearInterval(interval);
     };
-  }, [tasks, pollingInterval, fetchTasks]);
-
-  // 确保组件卸载时清理定时器
-  useEffect(() => {
-    return () => {
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-      }
-    };
-  }, [pollingInterval]);
+  }, [session, fetchTasks, hasActiveTasks]);
 
   // 触发任务处理器
   const triggerWorker = async () => {

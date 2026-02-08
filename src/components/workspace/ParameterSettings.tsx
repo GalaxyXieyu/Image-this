@@ -2,10 +2,12 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Settings as SettingsIcon } from "lucide-react";
 import { ActiveTab } from './WorkspaceSidebar';
 import PromptTemplateSelector from './PromptTemplateSelector';
 import QualityReviewToggle from './QualityReviewToggle';
+import VideoPromptSelector from './VideoPromptSelector';
 
 interface ParameterSettingsProps {
     activeTab: ActiveTab;
@@ -32,6 +34,15 @@ interface ParameterSettingsProps {
     // 智能审核相关
     enableQualityReview?: boolean;
     setEnableQualityReview?: (value: boolean) => void;
+    // 视频生成相关
+    enableVideo?: boolean;
+    setEnableVideo?: (value: boolean) => void;
+    videoPrompt?: string;
+    setVideoPrompt?: (value: string) => void;
+    videoFrames?: number;
+    setVideoFrames?: (value: number) => void;
+    videoAspectRatio?: string;
+    setVideoAspectRatio?: (value: string) => void;
 }
 
 export default function ParameterSettings({
@@ -55,6 +66,15 @@ export default function ParameterSettings({
     setYScale,
     enableQualityReview = false,
     setEnableQualityReview,
+    // 视频生成相关
+    enableVideo = false,
+    setEnableVideo,
+    videoPrompt = '',
+    setVideoPrompt,
+    videoFrames = 121,
+    setVideoFrames,
+    videoAspectRatio = '16:9',
+    setVideoAspectRatio,
 }: ParameterSettingsProps) {
     
     // 根据功能类型获取可用的提供商
@@ -312,6 +332,65 @@ export default function ParameterSettings({
                                         )}
                                     </select>
                                     <p className="text-xs text-gray-500 mt-1">用于背景替换和画质增强</p>
+                                </div>
+
+                                {/* 视频生成选项 */}
+                                <div className="border-t pt-4 mt-4 space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <Label className="text-base font-semibold">启用视频生成</Label>
+                                            <p className="text-xs text-gray-500 mt-1">处理完成后自动生成视频</p>
+                                        </div>
+                                        {setEnableVideo && (
+                                            <Switch
+                                                checked={enableVideo}
+                                                onCheckedChange={setEnableVideo}
+                                            />
+                                        )}
+                                    </div>
+
+                                    {enableVideo && (
+                                        <>
+                                            <VideoPromptSelector
+                                                value={videoPrompt}
+                                                onChange={(value) => setVideoPrompt?.(value)}
+                                                label="视频生成提示词"
+                                                description="选择预设风格或自定义提示词"
+                                            />
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <Label htmlFor="videoFrames">视频时长</Label>
+                                                    <select
+                                                        id="videoFrames"
+                                                        value={videoFrames}
+                                                        onChange={(e) => setVideoFrames?.(parseInt(e.target.value))}
+                                                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
+                                                    >
+                                                        <option value="121">5秒 (121帧)</option>
+                                                        <option value="241">10秒 (241帧)</option>
+                                                    </select>
+                                                </div>
+
+                                                <div>
+                                                    <Label htmlFor="videoAspectRatio">视频比例</Label>
+                                                    <select
+                                                        id="videoAspectRatio"
+                                                        value={videoAspectRatio}
+                                                        onChange={(e) => setVideoAspectRatio?.(e.target.value)}
+                                                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-white"
+                                                    >
+                                                        <option value="16:9">16:9 (横屏)</option>
+                                                        <option value="9:16">9:16 (竖屏)</option>
+                                                        <option value="1:1">1:1 (正方形)</option>
+                                                        <option value="4:3">4:3</option>
+                                                        <option value="3:4">3:4</option>
+                                                        <option value="21:9">21:9 (超宽)</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             </>
                         )}
