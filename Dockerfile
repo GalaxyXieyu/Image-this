@@ -26,6 +26,10 @@ RUN npm ci --only=production
 FROM base AS builder
 WORKDIR /app
 COPY . .
+
+# 设置构建时的环境变量（Prisma 需要）
+ENV DATABASE_URL="file:./app.db"
+
 RUN npm ci
 RUN npx prisma generate
 RUN npm run build
