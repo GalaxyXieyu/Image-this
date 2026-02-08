@@ -58,7 +58,7 @@ echo ""
 
 # 3. 停止旧容器
 echo -e "${YELLOW}[3/7] 🛑 停止旧容器...${NC}"
-docker-compose -f "$COMPOSE_FILE" down || true
+docker compose -f "$COMPOSE_FILE" down || true
 echo -e "${GREEN}✅ 旧容器已停止${NC}"
 echo ""
 
@@ -70,7 +70,7 @@ echo ""
 
 # 5. 启动新容器
 echo -e "${YELLOW}[5/7] 🚀 启动新容器...${NC}"
-docker-compose -f "$COMPOSE_FILE" up -d
+docker compose -f "$COMPOSE_FILE" up -d
 echo -e "${GREEN}✅ 容器启动成功${NC}"
 echo ""
 
@@ -125,7 +125,7 @@ echo ""
 
 # 停止失败的容器
 echo -e "${YELLOW}🛑 停止失败的容器...${NC}"
-docker-compose -f "$COMPOSE_FILE" down
+docker compose -f "$COMPOSE_FILE" down
 
 # 恢复备份
 if [ -f "$BACKUP_DIR/app.db.$TIMESTAMP" ]; then
