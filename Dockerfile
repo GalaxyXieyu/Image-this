@@ -1,8 +1,18 @@
-# 使用官方 Node.js 镜像
-FROM node:18-alpine AS base
+# 使用官方 Node.js 镜像 - 升级到 Node 20
+FROM node:20-alpine AS base
 
-# 安装必要的系统依赖
-RUN apk add --no-cache libc6-compat wget
+# 安装必要的系统依赖，包括 canvas 构建依赖
+RUN apk add --no-cache \
+    libc6-compat \
+    wget \
+    python3 \
+    make \
+    g++ \
+    cairo-dev \
+    jpeg-dev \
+    pango-dev \
+    giflib-dev \
+    pixman-dev
 
 # 设置工作目录
 WORKDIR /app
@@ -22,11 +32,19 @@ RUN npx prisma generate
 RUN npm run build
 
 # 生产阶段
-FROM node:18-alpine AS runner
+FROM node:20-alpine AS runner
 WORKDIR /app
 
-# 安装运行时依赖
-RUN apk add --no-cache libc6-compat wget curl
+# 安装运行时依赖（包括 canvas 运行时库）
+RUN apk add --no-cache \
+    libc6-compat \
+    wget \
+    curl \
+    cairo \
+    jpeg \
+    pango \
+    giflib \
+    pixman
 
 # 创建非 root 用户
 RUN addgroup --system --gid 1001 nodejs
@@ -49,9 +67,9 @@ USER nextjs
 EXPOSE 3000
 
 # 设置环境变量
-ENV PORT 3000
-ENV HOSTNAME "0.0.0.0"
-ENV NODE_ENV production
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+ENV NODE_ENV=production
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
