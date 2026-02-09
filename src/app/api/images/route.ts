@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { checkImageExists } from '@/lib/storage';
+import { normalizeImageUrlForClient } from '@/lib/image-url';
 
 // 图片查询结果类型
 interface ImageQueryResult {
@@ -164,6 +165,14 @@ export async function GET(request: NextRequest) {
 
     // 限制返回数量
     images = images.slice(0, limit);
+
+    // 统一 URL，避免 /uploads 在某些部署环境中无法直接访问
+    images = images.map((img) => ({
+      ...img,
+      originalUrl: normalizeImageUrlForClient(img.originalUrl),
+      processedUrl: normalizeImageUrlForClient(img.processedUrl),
+      thumbnailUrl: normalizeImageUrlForClient(img.thumbnailUrl),
+    }));
     
     // 根据 includeFullSize 参数决定返回的字段
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { deleteImage } from '@/lib/storage';
+import { normalizeImageUrlForClient } from '@/lib/image-url';
 
 // 创建新任务
 export async function POST(request: NextRequest) {
@@ -182,6 +183,17 @@ export async function GET(request: NextRequest) {
     });
 
     // 并行获取总数和状态统计（一次数据库往返）
+    const normalizedTasks = tasks.map((task) => ({
+      ...task,
+      processedImage: task.processedImage
+        ? {
+            ...task.processedImage,
+            originalUrl: normalizeImageUrlForClient(task.processedImage.originalUrl),
+            processedUrl: normalizeImageUrlForClient(task.processedImage.processedUrl),
+          }
+        : null,
+    }));
+
     const [total, statusCounts] = await Promise.all([
       prisma.taskQueue.count({ where }),
       // 使用 groupBy 一次查询获取所有状态统计
@@ -207,7 +219,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      tasks,
+      tasks: normalizedTasks,
       pagination: {
         total,
         limit,
