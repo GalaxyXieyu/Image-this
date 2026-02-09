@@ -427,8 +427,8 @@ class TaskProcessor {
 
   private async processBackgroundRemoval(task: { id: string; inputData: string; userId: string }) {
     const inputData = JSON.parse(task.inputData);
-    const { imageUrl, referenceImageUrl, customPrompt, aiModel = 'gemini', volcengineConfig, imagehostingConfig } = inputData;
-    
+    const { imageUrl, referenceImageUrl, customPrompt, aiModel = 'jimeng', volcengineConfig, imagehostingConfig } = inputData;
+
     await this.updateTaskProgress(task.id, `使用 ${aiModel} 生成图像中...`, 30, 1);
     
     try {

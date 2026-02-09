@@ -65,7 +65,7 @@ const createDefaultTabState = (): TabState => ({
   referenceImage: null,
   selectedPreviewIndex: 0,
   outputResolution: 'original',
-  aiModel: 'gemini',
+  aiModel: 'jimeng', // 默认使用即梦（火山引擎）
   prompt: '',
   backgroundPrompt: '',
   outpaintPrompt: '',

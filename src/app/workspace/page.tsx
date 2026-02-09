@@ -243,7 +243,7 @@ export default function WorkspacePage() {
           const data = await response.json();
           if (data.success && data.config) {
             const providers: string[] = [];
-            
+
             // 检查哪些提供商已配置
             if (data.config.gemini?.enabled) providers.push('gemini');
             if (data.config.gpt?.enabled) providers.push('gpt');
@@ -252,9 +252,9 @@ export default function WorkspacePage() {
               providers.push('volcengine');
             }
             if (data.config.qwen?.enabled) providers.push('qwen');
-            
+
             setAvailableProviders(providers);
-            
+
             // 自动选择第一个可用的提供商
             if (providers.length > 0 && !providers.includes(aiModel)) {
               setAiModel(providers[0]);
@@ -269,7 +269,7 @@ export default function WorkspacePage() {
     if (status === 'authenticated') {
       loadUserConfig();
     }
-  }, [status]);
+  }, [status, aiModel, setAiModel, setAvailableProviders]);
 
   // 加载处理历史 - 根据当前标签页筛选
   const loadProcessingHistory = useCallback(async () => {
