@@ -196,6 +196,18 @@ prisma/**/*.db-shm
 prisma/**/*.db-wal
 prisma/**/*.db-journal
 
+# SQLite database files (runtime data)
+data/*.db
+data/*.db-journal
+data/*.db-shm
+data/*.db-wal
+
+# Backup files
+backups/*.db
+backups/*.db.*
+backups/*.tar.gz
+backups/*.zip
+
 # Local development files
 .local
 .cache/
