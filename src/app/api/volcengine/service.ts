@@ -108,7 +108,10 @@ export async function enhanceWithVolcengine(
   enableHdr = false,
   enableWb = false,
   resultFormat = 1,
-  jpgQuality = 95
+  jpgQuality = 95,
+  skipDbSave = false,
+  volcengineConfig?: any,
+  imagehostingConfig?: any
 ) {
   const startTime = Date.now();
   console.log(`[火山增强] 开始 - 分辨率: ${resolutionBoundary}`);
@@ -141,7 +144,8 @@ export async function enhanceWithVolcengine(
   try {
     const imageUrl = await uploadBase64ToSuperbed(
       imageBase64,
-      `enhance-input-${processedImage.id}.jpg`
+      `enhance-input-${processedImage.id}.jpg`,
+      imagehostingConfig?.superbedToken
     );
     console.log(`[火山增强] 图片上传完成`);
     const requestBody = {
