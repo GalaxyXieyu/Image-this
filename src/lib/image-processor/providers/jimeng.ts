@@ -33,7 +33,8 @@ export class JimengProcessor implements IImageProcessor {
     console.log('[Jimeng Processor] 图床 Token:', superbedToken ? `${superbedToken.substring(0, 10)}...` : '未提供');
 
     try {
-      // 即梦 API 支持直接使用 base64 data URI，不需要上传到图床
+      // 即梦 API 只接受 HTTP URL，不支持 base64 data URI
+      // 需要先上传到图床获取 HTTP URL
       const imageUrls: string[] = [];
 
       if (originalImageUrl) {
@@ -41,8 +42,16 @@ export class JimengProcessor implements IImageProcessor {
         const dataUri = originalImageUrl.startsWith('data:')
           ? originalImageUrl
           : `data:image/png;base64,${originalImageUrl}`;
-        console.log('[Jimeng Processor] 产品图准备完成（使用 base64）');
-        imageUrls.push(dataUri);
+
+        // 上传到图床获取 HTTP URL
+        console.log('[Jimeng Processor] 正在上传产品图到图床...');
+        const httpUrl = await uploadBase64ToSuperbed(
+          dataUri,
+          `jimeng-original-${Date.now()}.png`,
+          superbedToken
+        );
+        console.log('[Jimeng Processor] 产品图上传完成:', httpUrl.substring(0, 60) + '...');
+        imageUrls.push(httpUrl);
       }
 
       if (referenceImageUrl) {
@@ -50,8 +59,16 @@ export class JimengProcessor implements IImageProcessor {
         const dataUri = referenceImageUrl.startsWith('data:')
           ? referenceImageUrl
           : `data:image/png;base64,${referenceImageUrl}`;
-        console.log('[Jimeng Processor] 参考图准备完成（使用 base64）');
-        imageUrls.push(dataUri);
+
+        // 上传到图床获取 HTTP URL
+        console.log('[Jimeng Processor] 正在上传参考图到图床...');
+        const httpUrl = await uploadBase64ToSuperbed(
+          dataUri,
+          `jimeng-reference-${Date.now()}.png`,
+          superbedToken
+        );
+        console.log('[Jimeng Processor] 参考图上传完成:', httpUrl.substring(0, 60) + '...');
+        imageUrls.push(httpUrl);
       }
 
       // 调用即梦 API
