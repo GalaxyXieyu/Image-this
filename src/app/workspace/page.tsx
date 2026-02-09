@@ -251,6 +251,7 @@ export default function WorkspacePage() {
               providers.push('jimeng'); // jimeng 使用火山引擎配置
               providers.push('volcengine');
             }
+            if (data.config.jimeng45?.enabled) providers.push('jimeng45');
             if (data.config.qwen?.enabled) providers.push('qwen');
 
             setAvailableProviders(providers);

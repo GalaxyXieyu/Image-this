@@ -102,6 +102,7 @@ export default function ParameterSettings({
         'gemini': 'Gemini',
         'gpt': 'GPT-4 Vision',
         'jimeng': '即梦 (火山引擎)',
+        'jimeng45': '即梦 4.5 (Seedream 4.5)',
         'volcengine': '火山引擎',
         'qwen': '通义千问'
     };

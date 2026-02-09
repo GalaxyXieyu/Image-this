@@ -80,6 +80,8 @@ export default function SettingsPage() {
     // Gemini 配置
     geminiApiKey: '',
     geminiBaseUrl: 'https://yunwu.ai',
+    // 即梦 4.5 配置
+    arkApiKey: '',
     // 图床配置
     superbedToken: '',
     // 本地存储配置
@@ -148,6 +150,7 @@ export default function SettingsPage() {
               gptApiKey: data.config.gpt?.apiKey || '',
               geminiApiKey: data.config.gemini?.apiKey || '',
               geminiBaseUrl: data.config.gemini?.baseUrl || 'https://yunwu.ai',
+              arkApiKey: data.config.jimeng45?.arkApiKey || '',
               superbedToken: data.config.imagehosting?.superbedToken || '',
               localStoragePath: data.config.localStorage?.savePath || ''
             });
@@ -194,6 +197,10 @@ export default function SettingsPage() {
           enabled: !!(apiSettings.geminiApiKey),
           apiKey: apiSettings.geminiApiKey,
           baseUrl: apiSettings.geminiBaseUrl
+        },
+        jimeng45: {
+          enabled: !!(apiSettings.arkApiKey),
+          arkApiKey: apiSettings.arkApiKey
         },
         imagehosting: {
           enabled: !!(apiSettings.superbedToken),
@@ -546,6 +553,34 @@ export default function SettingsPage() {
                     value={apiSettings.geminiApiKey}
                     onChange={(e) => handleInputChange('geminiApiKey', e.target.value)}
                   />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 即梦 4.5 配置 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Sparkles className="w-5 h-5 mr-2 text-blue-600" />
+                  即梦 4.5 (Seedream 4.5)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-gray-500 mb-4">
+                  支持：高质量图片生成、背景替换（使用 Ark API）
+                </div>
+                <div>
+                  <Label htmlFor="arkApiKey">ARK API Key</Label>
+                  <Input
+                    id="arkApiKey"
+                    type="password"
+                    placeholder="输入 ARK API Key"
+                    value={apiSettings.arkApiKey}
+                    onChange={(e) => handleInputChange('arkApiKey', e.target.value)}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    即梦 4.5 使用火山引擎 Ark API，需要单独的 API Key
+                  </p>
                 </div>
               </CardContent>
             </Card>
