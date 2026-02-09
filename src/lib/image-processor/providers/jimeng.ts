@@ -33,27 +33,25 @@ export class JimengProcessor implements IImageProcessor {
     console.log('[Jimeng Processor] 图床 Token:', superbedToken ? `${superbedToken.substring(0, 10)}...` : '未提供');
 
     try {
-      // 上传参考图片到图床
+      // 即梦 API 支持直接使用 base64 data URI，不需要上传到图床
       const imageUrls: string[] = [];
-      
+
       if (originalImageUrl) {
-        const url = await uploadBase64ToSuperbed(
-          originalImageUrl,
-          `jimeng-original-${Date.now()}.png`,
-          superbedToken
-        );
-        console.log('[Jimeng Processor] 产品图上传完成:', url);
-        imageUrls.push(url);
+        // 确保是 data URI 格式
+        const dataUri = originalImageUrl.startsWith('data:')
+          ? originalImageUrl
+          : `data:image/png;base64,${originalImageUrl}`;
+        console.log('[Jimeng Processor] 产品图准备完成（使用 base64）');
+        imageUrls.push(dataUri);
       }
 
       if (referenceImageUrl) {
-        const url = await uploadBase64ToSuperbed(
-          referenceImageUrl,
-          `jimeng-reference-${Date.now()}.png`,
-          superbedToken
-        );
-        console.log('[Jimeng Processor] 参考图上传完成:', url);
-        imageUrls.push(url);
+        // 确保是 data URI 格式
+        const dataUri = referenceImageUrl.startsWith('data:')
+          ? referenceImageUrl
+          : `data:image/png;base64,${referenceImageUrl}`;
+        console.log('[Jimeng Processor] 参考图准备完成（使用 base64）');
+        imageUrls.push(dataUri);
       }
 
       // 调用即梦 API
