@@ -44,7 +44,13 @@ export async function POST(request: NextRequest) {
         baseUrl: body.gemini.baseUrl || 'https://yunwu.ai',
       };
     }
-    
+
+    if (body.jimeng45?.enabled && body.jimeng45?.arkApiKey) {
+      userConfig.jimeng45 = {
+        arkApiKey: body.jimeng45.arkApiKey,
+      };
+    }
+
     if (body.imagehosting?.enabled && body.imagehosting?.superbedToken) {
       userConfig.imagehosting = {
         superbedToken: body.imagehosting.superbedToken,
@@ -109,6 +115,10 @@ export async function GET(request: NextRequest) {
         enabled: !!userConfig.gemini,
         apiKey: userConfig.gemini?.apiKey || '',
         baseUrl: userConfig.gemini?.baseUrl || 'https://yunwu.ai'
+      },
+      jimeng45: {
+        enabled: !!userConfig.jimeng45,
+        arkApiKey: userConfig.jimeng45?.arkApiKey || ''
       },
       imagehosting: {
         enabled: !!userConfig.imagehosting,

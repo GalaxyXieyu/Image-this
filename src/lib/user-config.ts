@@ -18,6 +18,9 @@ export interface UserConfig {
     apiKey: string;
     baseUrl: string;
   };
+  jimeng45?: {
+    arkApiKey: string;
+  };
   imagehosting?: {
     superbedToken: string;
   };
@@ -41,6 +44,7 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
       gptApiKey: true,
       geminiApiKey: true,
       geminiBaseUrl: true,
+      arkApiKey: true,
       superbedToken: true,
       localStoragePath: true,
     }
@@ -86,6 +90,16 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
     console.log('[用户配置] Gemini: 从数据库读取');
   } else {
     console.warn('[用户配置] Gemini: 未配置，请在设置页面配置 Gemini API Key');
+  }
+
+  // 即梦 4.5 配置
+  if (user.arkApiKey) {
+    config.jimeng45 = {
+      arkApiKey: user.arkApiKey,
+    };
+    console.log('[用户配置] Jimeng 4.5: 从数据库读取');
+  } else {
+    console.warn('[用户配置] Jimeng 4.5: 未配置，请在设置页面配置 ARK API Key');
   }
 
   // 图床配置
@@ -135,6 +149,7 @@ export async function saveUserConfig(userId: string, config: UserConfig): Promis
       gptApiKey: config.gpt?.apiKey || null,
       geminiApiKey: config.gemini?.apiKey || null,
       geminiBaseUrl: config.gemini?.baseUrl || null,
+      arkApiKey: config.jimeng45?.arkApiKey || null,
       superbedToken: config.imagehosting?.superbedToken || null,
       localStoragePath: config.localStorage?.savePath || null,
     }

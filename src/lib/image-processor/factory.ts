@@ -8,6 +8,7 @@ import { GPTProcessor } from './providers/gpt';
 import { GeminiProcessor } from './providers/gemini';
 import { QwenProcessor } from './providers/qwen';
 import { JimengProcessor } from './providers/jimeng';
+import { Jimeng45Provider } from './providers/jimeng45';
 
 export class ImageProcessorFactory {
   private static processors: Map<ImageProvider, IImageProcessor> = new Map();
@@ -15,25 +16,29 @@ export class ImageProcessorFactory {
 
   static initialize(config: ProvidersConfig) {
     this.config = config;
-    
+
     if (config.volcengine.enabled) {
       this.processors.set(ImageProvider.VOLCENGINE, new VolcengineProcessor(config.volcengine));
     }
-    
+
     if (config.gpt.enabled) {
       this.processors.set(ImageProvider.GPT, new GPTProcessor(config.gpt));
     }
-    
+
     if (config.gemini.enabled) {
       this.processors.set(ImageProvider.GEMINI, new GeminiProcessor(config.gemini));
     }
-    
+
     if (config.qwen.enabled) {
       this.processors.set(ImageProvider.QWEN, new QwenProcessor(config.qwen));
     }
-    
+
     if (config.jimeng.enabled) {
       this.processors.set(ImageProvider.JIMENG, new JimengProcessor(config.jimeng));
+    }
+
+    if (config.jimeng45?.enabled) {
+      this.processors.set(ImageProvider.JIMENG45, new Jimeng45Provider(config.jimeng45));
     }
   }
 
