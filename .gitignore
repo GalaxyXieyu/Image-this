@@ -222,3 +222,10 @@ dist-electron/
 *.AppImage
 *.deb
 *.rpm
+
+# Local build and smoke-test artifacts
+.build-home/
+.npm-cache/
+.tmp-smoke/
+.tmp-smoke-login/
+.tools/

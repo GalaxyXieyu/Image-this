@@ -14,6 +14,20 @@ import readline from 'readline';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const projectRoot = join(__dirname, '..');
+const prismaCli = process.platform === 'win32'
+  ? join(projectRoot, 'node_modules', '.bin', 'prisma.cmd')
+  : join(projectRoot, 'node_modules', '.bin', 'prisma');
+const isolatedBuildHome = join(projectRoot, '.build-home');
+const originalUserHomeEnv = {
+  HOME: process.env.HOME,
+  USERPROFILE: process.env.USERPROFILE,
+  HOMEDRIVE: process.env.HOMEDRIVE,
+  HOMEPATH: process.env.HOMEPATH,
+  APPDATA: process.env.APPDATA,
+  LOCALAPPDATA: process.env.LOCALAPPDATA,
+  TEMP: process.env.TEMP,
+  TMP: process.env.TMP,
+};
 
 // 颜色输出
 const colors = {
@@ -46,6 +60,41 @@ function runCommand(command, args = [], cwd = projectRoot) {
     });
 
     child.on('error', reject);
+  });
+}
+
+function removeIfExists(filePath) {
+  if (existsSync(filePath)) {
+    unlinkSync(filePath);
+  }
+}
+
+function prepareIsolatedBuildHome() {
+  const roamingDir = join(isolatedBuildHome, 'AppData', 'Roaming');
+  const localDir = join(isolatedBuildHome, 'AppData', 'Local');
+  const tempDir = join(isolatedBuildHome, 'Temp');
+
+  [isolatedBuildHome, roamingDir, localDir, tempDir].forEach((dirPath) => {
+    mkdirSync(dirPath, { recursive: true });
+  });
+
+  process.env.HOME = isolatedBuildHome;
+  process.env.USERPROFILE = isolatedBuildHome;
+  process.env.HOMEDRIVE = 'D:';
+  process.env.HOMEPATH = '\\code\\Image-this\\.build-home';
+  process.env.APPDATA = roamingDir;
+  process.env.LOCALAPPDATA = localDir;
+  process.env.TEMP = tempDir;
+  process.env.TMP = tempDir;
+}
+
+function restoreOriginalBuildHome() {
+  Object.entries(originalUserHomeEnv).forEach(([key, value]) => {
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
   });
 }
 
@@ -142,25 +191,41 @@ async function main() {
     log('🔨 生成 Prisma Client（包含 Windows 引擎）...', 'yellow');
     // 设置环境变量以生成 Windows 平台的 Prisma 引擎
     process.env.PRISMA_CLI_BINARY_TARGETS = 'windows,darwin,darwin-arm64,linux-musl-openssl-3.0.x';
-    await runCommand('npx', ['prisma', 'generate']);
+    await runCommand(prismaCli, ['generate']);
     
     // 4.1 创建最新结构的数据库模板（用于 Windows 端首次启动）
     log('🔨 创建数据库模板（确保包含最新表结构）...', 'yellow');
     const templateDbPath = join(projectRoot, 'prisma', 'app.db');
-    // 删除旧的模板数据库（如果存在）
+    const nestedTemplateDbPath = join(projectRoot, 'prisma', 'prisma', 'app.db');
     if (existsSync(templateDbPath)) {
-      unlinkSync(templateDbPath);
-      log('🗑️  已删除旧的数据库模板', 'yellow');
+      log('✅ 复用现有数据库模板 prisma/app.db\n', 'green');
+    } else {
+      // 使用 prisma db push 创建最新结构的数据库
+      [
+        `${templateDbPath}-shm`,
+        `${templateDbPath}-wal`,
+        nestedTemplateDbPath,
+        `${nestedTemplateDbPath}-shm`,
+        `${nestedTemplateDbPath}-wal`,
+      ].forEach(removeIfExists);
+      process.env.DATABASE_URL = 'file:./app.db';
+      await runCommand(prismaCli, ['db', 'push', '--skip-generate']);
+      if (!existsSync(templateDbPath) && existsSync(nestedTemplateDbPath)) {
+        copyFileSync(nestedTemplateDbPath, templateDbPath);
+        log('Template database was created in prisma/prisma/app.db, copied back to prisma/app.db', 'yellow');
+      }
+      if (!existsSync(templateDbPath)) {
+        throw new Error(`未生成数据库模板: ${templateDbPath}`);
+      }
+      log('✅ 数据库模板创建完成（包含最新表结构）\n', 'green');
     }
-    // 使用 prisma db push 创建最新结构的数据库
-    process.env.DATABASE_URL = 'file:./prisma/app.db';
-    await runCommand('npx', ['prisma', 'db', 'push', '--skip-generate']);
-    log('✅ 数据库模板创建完成（包含最新表结构）\n', 'green');
 
     // 5. 构建 Next.js 应用
     log('📋 步骤 5/7: 构建 Next.js 应用', 'blue');
     log('🔨 开始构建...', 'yellow');
+    prepareIsolatedBuildHome();
     await runCommand('npm', ['run', 'build']);
+    restoreOriginalBuildHome();
     log('✅ Next.js 应用构建完成\n', 'green');
 
     // 6. 复制静态资源到 standalone 目录

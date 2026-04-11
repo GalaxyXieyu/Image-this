@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, session } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
@@ -421,6 +421,8 @@ async function initDatabase() {
   const userDataPath = app.getPath('userData');
   const dbPath = path.join(userDataPath, 'data', 'app.db');
   const dbDir = path.dirname(dbPath);
+  let templateDbPath = getTemplateDatabasePath();
+  let databaseReset = false;
   
   log(`Initializing database at: ${dbPath}`);
   
@@ -439,8 +441,9 @@ async function initDatabase() {
     
     // 删除损坏的数据库文件
     try {
-      fs.unlinkSync(dbPath);
+      removeDatabaseFiles(dbPath);
       log('Corrupted database deleted');
+      databaseReset = true;
       
       // 删除相关的 WAL 和 SHM 文件
       const walPath = `${dbPath}-wal`;
@@ -460,12 +463,20 @@ async function initDatabase() {
   }
   
   // 如果数据库不存在，从模板复制或创建
+  const schemaReady = await hasRequiredDatabaseSchema(dbPath);
+  if (fs.existsSync(dbPath) && !schemaReady) {
+    log('Database exists but schema is incomplete, rebuilding from template...', 'WARN');
+    backupCorruptedDatabase(dbPath);
+    removeDatabaseFiles(dbPath);
+    databaseReset = true;
+  }
+
   if (!fs.existsSync(dbPath)) {
-    log('Database does not exist, checking for template...');
+    log('Database does not exist, restoring from template...');
+    databaseReset = true;
     
     // 查找模板数据库
-    let templateDbPath;
-    if (app.isPackaged) {
+    if (!templateDbPath && app.isPackaged) {
       // 优先检查 asar 禁用的情况
       let appPath = path.join(process.resourcesPath, 'app');
       if (!fs.existsSync(appPath)) {
@@ -476,25 +487,163 @@ async function initDatabase() {
       }
       templateDbPath = path.join(appPath, 'prisma', 'app.db');
       log(`Template database path: ${templateDbPath}`);
-    } else {
+    } else if (!templateDbPath) {
       templateDbPath = path.join(__dirname, '..', 'prisma', 'app.db');
     }
     
-    if (fs.existsSync(templateDbPath)) {
-      log(`Copying template database from: ${templateDbPath}`);
-      fs.copyFileSync(templateDbPath, dbPath);
-      log('Database template copied successfully');
-    } else {
-      log('No template database found, will be created on first API call');
+    if (!templateDbPath) {
+      throw new Error('Database template is missing. Please rebuild the installer package.');
     }
-  } else {
+
+    if (fs.existsSync(templateDbPath)) {
+      restoreDatabaseFromTemplate(dbPath, templateDbPath);
+    } else {
+      throw new Error(`Template database path does not exist: ${templateDbPath}`);
+    }
+  } else if (schemaReady) {
     log('Database exists and is valid');
+  }
+
+  if (databaseReset) {
+    await clearAppSessionData();
   }
   
   return dbPath;
 }
 
 // 预热单个 API
+const REQUIRED_TABLES = [
+  'users',
+  'accounts',
+  'sessions',
+  'verificationtokens',
+  'task_queue',
+];
+
+function removeDatabaseFiles(dbPath) {
+  const relatedFiles = [
+    dbPath,
+    `${dbPath}-wal`,
+    `${dbPath}-shm`,
+    `${dbPath}-journal`,
+  ];
+
+  for (const filePath of relatedFiles) {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      log(`Deleted database file: ${filePath}`);
+    }
+  }
+}
+
+function getTemplateDatabaseCandidates() {
+  const candidates = [];
+
+  if (app.isPackaged) {
+    let appPath = path.join(process.resourcesPath, 'app');
+    if (!fs.existsSync(appPath)) {
+      appPath = path.join(process.resourcesPath, 'app.asar.unpacked');
+    }
+    if (!fs.existsSync(appPath)) {
+      appPath = app.getAppPath();
+    }
+
+    candidates.push(
+      path.join(appPath, 'prisma', 'app.db'),
+      path.join(appPath, 'prisma', 'prisma', 'app.db')
+    );
+  } else {
+    const appRoot = path.join(__dirname, '..');
+    candidates.push(
+      path.join(appRoot, 'prisma', 'app.db'),
+      path.join(appRoot, 'prisma', 'prisma', 'app.db')
+    );
+  }
+
+  return [...new Set(candidates)];
+}
+
+function getTemplateDatabasePath() {
+  const candidates = getTemplateDatabaseCandidates();
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      log(`Using template database: ${candidate}`);
+      return candidate;
+    }
+  }
+
+  log(`No template database found. Checked: ${candidates.join(', ')}`, 'WARN');
+  return null;
+}
+
+async function hasRequiredDatabaseSchema(dbPath) {
+  if (!fs.existsSync(dbPath)) {
+    return false;
+  }
+
+  let database;
+
+  try {
+    const { DatabaseSync } = require('node:sqlite');
+    database = new DatabaseSync(dbPath);
+    const statement = database.prepare("SELECT name FROM sqlite_master WHERE type='table'");
+    const tables = statement.all();
+
+    const existingTables = new Set(
+      tables
+        .map((row) => row && row.name)
+        .filter(Boolean)
+    );
+
+    const missingTables = REQUIRED_TABLES.filter(
+      (tableName) => !existingTables.has(tableName)
+    );
+
+    if (missingTables.length > 0) {
+      log(`Database schema is incomplete, missing tables: ${missingTables.join(', ')}`, 'WARN');
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    log(`Error validating database schema: ${error.message}`, 'WARN');
+    return false;
+  } finally {
+    if (database) {
+      try {
+        database.close();
+      } catch (disconnectError) {
+        log(`Failed to close schema check database: ${disconnectError.message}`, 'WARN');
+      }
+    }
+  }
+}
+
+function restoreDatabaseFromTemplate(dbPath, templateDbPath) {
+  if (!templateDbPath || !fs.existsSync(templateDbPath)) {
+    throw new Error('Valid template database not found');
+  }
+
+  fs.copyFileSync(templateDbPath, dbPath);
+  log(`Database restored from template: ${templateDbPath}`);
+}
+
+async function clearAppSessionData() {
+  try {
+    if (!session || !session.defaultSession) {
+      return;
+    }
+
+    await session.defaultSession.clearStorageData({
+      storages: ['cookies', 'localstorage', 'indexdb', 'serviceworkers'],
+    });
+    await session.defaultSession.clearCache();
+    log('Cleared app session data after database reset');
+  } catch (error) {
+    log(`Failed to clear app session data: ${error.message}`, 'WARN');
+  }
+}
+
 function warmupAPI(endpoint, description) {
   const http = require('http');
   return new Promise((resolve) => {

@@ -1,6 +1,6 @@
 /**
- * Gemini 图片处理器
- * 同时兼容 Gemini 原生 API 与 toapis 图片生成协议
+ * Gemini image processor.
+ * Supports both native Gemini API and the toapis-compatible image workflow.
  */
 
 import { IImageProcessor, ProcessResult, GeminiConfig } from '../types';
@@ -22,21 +22,34 @@ interface GeminiNativeResponse {
 }
 
 interface ToApisUploadResponse {
-  data?: Array<{
+  success?: boolean;
+  message?: string;
+  data?: {
+    id?: string;
+    url?: string;
+    mime_type?: string;
+    size?: number;
+  } | Array<{
     url?: string;
   }>;
 }
 
 interface ToApisGenerationTaskResponse {
   id?: string;
+  task_id?: string;
   status?: string;
   progress?: number;
+  url?: string;
   error?: {
+    code?: string;
     message?: string;
   };
   result?: {
     type?: string;
-    data?: Array<{
+    url?: string;
+    data?: {
+      url?: string;
+    } | Array<{
       url?: string;
     }>;
   };
@@ -46,30 +59,43 @@ const DEFAULT_GEMINI_BASE_URL = 'https://toapis.com';
 const DEFAULT_GEMINI_MODEL = 'gemini-3.1-flash-image-preview';
 const DEFAULT_GEMINI_NATIVE_MODEL = 'gemini-3-pro-image-preview';
 const TOAPIS_POLL_INTERVAL_MS = 3000;
-const TOAPIS_MAX_POLL_ATTEMPTS = 30;
+const TOAPIS_MAX_POLL_ATTEMPTS = 120;
+const TOAPIS_PROGRESS_LOG_INTERVAL = 5;
 
 export class GeminiProcessor implements IImageProcessor {
   constructor(private config: GeminiConfig) {}
 
-  /**
-   * 背景替换 - 使用 Gemini 图像生成能力
-   */
   async backgroundReplace(userId: string, params: any): Promise<ProcessResult> {
     const { originalImageUrl, referenceImageUrl, prompt, customPrompt } = params;
 
     if (!this.config.apiKey) {
-      throw new Error('GEMINI_NOT_CONFIGURED:请先在设置页面配置 Gemini API Key');
+      throw new Error('GEMINI_NOT_CONFIGURED:璇峰厛鍦ㄨ缃〉闈㈤厤缃?Gemini API Key');
     }
 
-    const finalPrompt = customPrompt || prompt || '保持第一张图的产品主体完全不变，仅替换第二张图的背景为类似参考场景的风格（要完全把第二张图的产品去掉），不要有同时出现的情况，保持第一张产品的形状、材质、特征比例、摆放角度及数量完全一致，专业摄影，高质量，4K分辨率';
+    const finalPrompt =
+      customPrompt ||
+      prompt ||
+      '淇濇寔绗竴寮犲浘鐨勪骇鍝佷富浣撳畬鍏ㄤ笉鍙橈紝浠呮浛鎹㈢浜屽紶鍥剧殑鑳屾櫙涓虹被浼煎弬鑰冨満鏅殑椋庢牸锛堣瀹屽叏鎶婄浜屽紶鍥剧殑浜у搧鍘绘帀锛夛紝涓嶈鏈夊悓鏃跺嚭鐜扮殑鎯呭喌锛屼繚鎸佺涓€寮犱骇鍝佺殑褰㈢姸銆佹潗璐ㄣ€佺壒寰佹瘮渚嬨€佹憜鏀捐搴﹀強鏁伴噺瀹屽叏涓€鑷达紝涓撲笟鎽勫奖锛岄珮璐ㄩ噺锛?K鍒嗚鲸鐜?';
     const baseUrl = this.normalizeBaseUrl(this.config.baseUrl || DEFAULT_GEMINI_BASE_URL);
     const modelName = this.config.modelName || DEFAULT_GEMINI_MODEL;
 
     if (this.isToApisBaseUrl(baseUrl)) {
-      return this.backgroundReplaceWithToApis(originalImageUrl, referenceImageUrl, finalPrompt, baseUrl, modelName);
+      return this.backgroundReplaceWithToApis(
+        originalImageUrl,
+        referenceImageUrl,
+        finalPrompt,
+        baseUrl,
+        modelName
+      );
     }
 
-    return this.backgroundReplaceWithGeminiNative(originalImageUrl, referenceImageUrl, finalPrompt, baseUrl, modelName);
+    return this.backgroundReplaceWithGeminiNative(
+      originalImageUrl,
+      referenceImageUrl,
+      finalPrompt,
+      baseUrl,
+      modelName
+    );
   }
 
   private async backgroundReplaceWithGeminiNative(
@@ -85,15 +111,15 @@ export class GeminiProcessor implements IImageProcessor {
         parts: [
           { text: finalPrompt },
           convertToGeminiInlineData(originalImageUrl),
-          convertToGeminiInlineData(referenceImageUrl)
-        ]
+          convertToGeminiInlineData(referenceImageUrl),
+        ],
       }],
       generationConfig: {
         responseModalities: ['IMAGE'],
         imageConfig: {
-          aspectRatio: '1:1'
-        }
-      }
+          aspectRatio: '1:1',
+        },
+      },
     };
 
     const apiUrl = `${baseUrl}/v1beta/models/${nativeModelName}:generateContent`;
@@ -107,7 +133,7 @@ export class GeminiProcessor implements IImageProcessor {
       );
 
       const imageBase64 = data.candidates?.[0]?.content?.parts?.find(
-        part => part.inlineData
+        (part) => part.inlineData
       )?.inlineData?.data;
 
       if (imageBase64) {
@@ -117,12 +143,12 @@ export class GeminiProcessor implements IImageProcessor {
         return {
           id: `gemini-${Date.now()}`,
           imageData: dataUrl,
-          imageSize
+          imageSize,
         };
       }
 
       const textContent = data.candidates?.[0]?.content?.parts?.find(
-        part => part.text
+        (part) => part.text
       )?.text;
 
       if (textContent) {
@@ -132,15 +158,15 @@ export class GeminiProcessor implements IImageProcessor {
           return {
             id: `gemini-${Date.now()}`,
             imageData: dataUrl,
-            imageSize
+            imageSize,
           };
         }
       }
 
-      throw new Error('未能从 Gemini 响应中提取图片数据');
+      throw new Error('鏈兘浠?Gemini 鍝嶅簲涓彁鍙栧浘鐗囨暟鎹?');
     } catch (error) {
-      console.error('[Gemini Processor] 处理失败:', error instanceof Error ? error.message : 'Unknown error');
-      throw new Error(`Gemini API 请求失败: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('[Gemini Processor] 澶勭悊澶辫触:', error instanceof Error ? error.message : 'Unknown error');
+      throw new Error(`Gemini API 璇锋眰澶辫触: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -153,7 +179,7 @@ export class GeminiProcessor implements IImageProcessor {
   ): Promise<ProcessResult> {
     const imageUrls = await Promise.all([
       this.uploadImageToToApis(baseUrl, this.config.apiKey, originalImageUrl, 1),
-      this.uploadImageToToApis(baseUrl, this.config.apiKey, referenceImageUrl, 2)
+      this.uploadImageToToApis(baseUrl, this.config.apiKey, referenceImageUrl, 2),
     ]);
 
     const task = await postJson<ToApisGenerationTaskResponse>(
@@ -165,26 +191,30 @@ export class GeminiProcessor implements IImageProcessor {
         n: 1,
         image_urls: imageUrls,
         metadata: {
-          resolution: '2K'
-        }
+          resolution: '2K',
+        },
       },
       {
-        Authorization: `Bearer ${this.config.apiKey}`
+        Authorization: `Bearer ${this.config.apiKey}`,
       },
       { timeout: 120000 }
     );
 
-    if (!task.id) {
-      throw new Error('toapis 未返回任务 ID');
+    const taskId = task.id || task.task_id;
+    if (!taskId) {
+      console.error('[Gemini Processor] toapis generation response missing task id:', JSON.stringify(task));
+      throw new Error('toapis 鏈繑鍥炰换鍔?ID');
     }
 
-    const resultUrl = await this.pollToApisResult(baseUrl, this.config.apiKey, task.id);
+    console.info(`[Gemini Processor] toapis task created: ${taskId}, model=${modelName}`);
+
+    const resultUrl = await this.pollToApisResult(baseUrl, this.config.apiKey, taskId);
     const { dataUrl, imageSize } = await this.downloadImageAsDataUrl(resultUrl);
 
     return {
-      id: task.id,
+      id: taskId,
       imageData: dataUrl,
-      imageSize
+      imageSize,
     };
   }
 
@@ -202,53 +232,78 @@ export class GeminiProcessor implements IImageProcessor {
     const response = await fetchWithRetry(`${baseUrl}/v1/uploads/images`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${apiKey}`
+        Authorization: `Bearer ${apiKey}`,
       },
       body: formData,
-      timeout: 120000
+      timeout: 120000,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`toapis 图片上传失败: HTTP ${response.status}: ${errorText}`);
+      throw new Error(`toapis 鍥剧墖涓婁紶澶辫触: HTTP ${response.status}: ${errorText}`);
     }
 
     const data = await response.json() as ToApisUploadResponse;
-    const uploadedUrl = data.data?.[0]?.url;
+    const uploadedUrl = this.extractToApisUploadUrl(data);
 
     if (!uploadedUrl) {
-      throw new Error('toapis 图片上传成功，但未返回 URL');
+      console.error('[Gemini Processor] toapis upload response missing url:', JSON.stringify(data));
+      throw new Error('toapis 鍥剧墖涓婁紶鎴愬姛锛屼絾鏈繑鍥?URL');
     }
 
     return uploadedUrl;
   }
 
   private async pollToApisResult(baseUrl: string, apiKey: string, taskId: string): Promise<string> {
+    let lastStatus = 'unknown';
+    let lastProgress: number | undefined;
+
     for (let attempt = 0; attempt < TOAPIS_MAX_POLL_ATTEMPTS; attempt++) {
       const task = await getJson<ToApisGenerationTaskResponse>(
         `${baseUrl}/v1/images/generations/${taskId}`,
         {
-          Authorization: `Bearer ${apiKey}`
+          Authorization: `Bearer ${apiKey}`,
         },
         { timeout: 30000 }
       );
 
+      const status = task.status || 'unknown';
+      const progress = typeof task.progress === 'number' ? task.progress : undefined;
+      const shouldLogProgress =
+        attempt === 0 ||
+        status !== lastStatus ||
+        progress !== lastProgress ||
+        (attempt + 1) % TOAPIS_PROGRESS_LOG_INTERVAL === 0;
+
+      if (shouldLogProgress) {
+        console.info(
+          `[Gemini Processor] toapis task ${taskId} poll ${attempt + 1}/${TOAPIS_MAX_POLL_ATTEMPTS}: status=${status}, progress=${progress ?? 'n/a'}`
+        );
+      }
+
+      lastStatus = status;
+      lastProgress = progress;
+
       if (task.status === 'completed') {
-        const resultUrl = task.result?.data?.[0]?.url;
+        const resultUrl = this.extractToApisResultUrl(task);
         if (!resultUrl) {
-          throw new Error('toapis 任务已完成，但未返回结果图片 URL');
+          console.error('[Gemini Processor] toapis completed task missing result url:', JSON.stringify(task));
+          throw new Error('toapis 浠诲姟宸插畬鎴愶紝浣嗘湭杩斿洖缁撴灉鍥剧墖 URL');
         }
         return resultUrl;
       }
 
       if (task.status === 'failed') {
-        throw new Error(task.error?.message || 'toapis 图像生成失败');
+        throw new Error(task.error?.message || 'toapis 鍥惧儚鐢熸垚澶辫触');
       }
 
-      await new Promise(resolve => setTimeout(resolve, TOAPIS_POLL_INTERVAL_MS));
+      await new Promise((resolve) => setTimeout(resolve, TOAPIS_POLL_INTERVAL_MS));
     }
 
-    throw new Error('toapis 图像生成超时，请稍后重试');
+    const waitedSeconds = Math.round((TOAPIS_MAX_POLL_ATTEMPTS * TOAPIS_POLL_INTERVAL_MS) / 1000);
+    throw new Error(
+      `toapis 鍥惧儚鐢熸垚瓒呮椂锛岃绋嶅悗閲嶈瘯 (taskId: ${taskId}, lastStatus: ${lastStatus}, lastProgress: ${lastProgress ?? 'n/a'}, waited: ${waitedSeconds}s)`
+    );
   }
 
   private async loadSourceAsBlob(source: string): Promise<Blob> {
@@ -270,7 +325,7 @@ export class GeminiProcessor implements IImageProcessor {
 
     return {
       dataUrl: `data:${mimeType};base64,${buffer.toString('base64')}`,
-      imageSize: buffer.length
+      imageSize: buffer.length,
     };
   }
 
@@ -295,13 +350,39 @@ export class GeminiProcessor implements IImageProcessor {
     return baseUrl.includes('toapis.com');
   }
 
+  private extractToApisUploadUrl(response: ToApisUploadResponse): string | undefined {
+    if (!response?.data) {
+      return undefined;
+    }
+
+    if (Array.isArray(response.data)) {
+      return response.data[0]?.url;
+    }
+
+    return response.data.url;
+  }
+
+  private extractToApisResultUrl(task: ToApisGenerationTaskResponse): string | undefined {
+    if (task.url) {
+      return task.url;
+    }
+
+    if (Array.isArray(task.result?.data)) {
+      return task.result.data[0]?.url;
+    }
+
+    if (task.result?.data && !Array.isArray(task.result.data)) {
+      return task.result.data.url;
+    }
+
+    return task.result?.url;
+  }
+
   async enhance(userId: string, imageBase64: string, params?: any): Promise<ProcessResult> {
-    // TODO: 实现 Gemini 画质增强逻辑
     throw new Error('Gemini enhance not implemented yet');
   }
 
   async generate(userId: string, params: any): Promise<ProcessResult> {
-    // TODO: 实现 Gemini 图片生成逻辑
     throw new Error('Gemini generate not implemented yet');
   }
 }
