@@ -79,7 +79,8 @@ export default function SettingsPage() {
     gptApiKey: '',
     // Gemini 配置
     geminiApiKey: '',
-    geminiBaseUrl: 'https://yunwu.ai',
+    geminiBaseUrl: 'https://toapis.com',
+    geminiModelName: 'gemini-3.1-flash-image-preview',
     // 即梦 4.5 配置
     arkApiKey: '',
     // 图床配置
@@ -149,7 +150,8 @@ export default function SettingsPage() {
               gptApiUrl: data.config.gpt?.apiUrl || 'https://yunwu.ai',
               gptApiKey: data.config.gpt?.apiKey || '',
               geminiApiKey: data.config.gemini?.apiKey || '',
-              geminiBaseUrl: data.config.gemini?.baseUrl || 'https://yunwu.ai',
+              geminiBaseUrl: data.config.gemini?.baseUrl || 'https://toapis.com',
+              geminiModelName: data.config.gemini?.modelName || 'gemini-3.1-flash-image-preview',
               arkApiKey: data.config.jimeng45?.arkApiKey || '',
               superbedToken: data.config.imagehosting?.superbedToken || '',
               localStoragePath: data.config.localStorage?.savePath || ''
@@ -196,7 +198,8 @@ export default function SettingsPage() {
         gemini: {
           enabled: !!(apiSettings.geminiApiKey),
           apiKey: apiSettings.geminiApiKey,
-          baseUrl: apiSettings.geminiBaseUrl
+          baseUrl: apiSettings.geminiBaseUrl,
+          modelName: apiSettings.geminiModelName
         },
         jimeng45: {
           enabled: !!(apiSettings.arkApiKey),
@@ -535,14 +538,24 @@ export default function SettingsPage() {
                   支持：图片生成、图片理解（即将推出）
                 </div>
                 <div>
+                  <Label htmlFor="geminiModelName">模型名称</Label>
+                  <Input
+                    id="geminiModelName"
+                    placeholder="gemini-3.1-flash-image-preview"
+                    value={apiSettings.geminiModelName}
+                    onChange={(e) => handleInputChange('geminiModelName', e.target.value)}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">用于 Gemini 图片生成请求的模型名</p>
+                </div>
+                <div>
                   <Label htmlFor="geminiBaseUrl">API 地址</Label>
                   <Input
                     id="geminiBaseUrl"
-                    placeholder="https://yunwu.ai"
+                    placeholder="https://toapis.com"
                     value={apiSettings.geminiBaseUrl}
                     onChange={(e) => handleInputChange('geminiBaseUrl', e.target.value)}
                   />
-                  <p className="text-xs text-gray-500 mt-1">Gemini API 的基础 URL</p>
+                  <p className="text-xs text-gray-500 mt-1">例如 toapis 的基础地址 https://toapis.com</p>
                 </div>
                 <div>
                   <Label htmlFor="geminiApiKey">API 密钥</Label>

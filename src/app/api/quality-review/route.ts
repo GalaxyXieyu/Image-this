@@ -94,6 +94,7 @@ export async function POST(request: NextRequest) {
         id: true,
         geminiApiKey: true,
         geminiBaseUrl: true,
+        geminiModelName: true,
       },
     });
 
@@ -123,7 +124,19 @@ export async function POST(request: NextRequest) {
     }
 
     // 构建 Gemini 请求
-    const baseUrl = user.geminiBaseUrl || 'https://yunwu.ai';
+    const baseUrl = user.geminiBaseUrl || 'https://toapis.com';
+    const isToApisBaseUrl = baseUrl.includes('toapis.com');
+
+    if (isToApisBaseUrl) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '当前 toapis 图片模型暂不支持智能审核，请先关闭智能审核，或切换到兼容 Gemini 原生审核接口的 API 地址。'
+        } as QualityReviewResponse,
+        { status: 400 }
+      );
+    }
+
     const modelName = 'gemini-2.0-flash';
 
     const requestBody = {

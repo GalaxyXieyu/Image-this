@@ -17,6 +17,7 @@ export interface UserConfig {
   gemini?: {
     apiKey: string;
     baseUrl: string;
+    modelName?: string;
   };
   jimeng45?: {
     arkApiKey: string;
@@ -44,6 +45,7 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
       gptApiKey: true,
       geminiApiKey: true,
       geminiBaseUrl: true,
+      geminiModelName: true,
       arkApiKey: true,
       superbedToken: true,
       localStoragePath: true,
@@ -85,7 +87,8 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
   if (user.geminiApiKey) {
     config.gemini = {
       apiKey: user.geminiApiKey,
-      baseUrl: user.geminiBaseUrl || 'https://yunwu.ai',
+      baseUrl: user.geminiBaseUrl || 'https://toapis.com',
+      modelName: user.geminiModelName || 'gemini-3.1-flash-image-preview',
     };
     console.log('[用户配置] Gemini: 从数据库读取');
   } else {
@@ -149,6 +152,7 @@ export async function saveUserConfig(userId: string, config: UserConfig): Promis
       gptApiKey: config.gpt?.apiKey || null,
       geminiApiKey: config.gemini?.apiKey || null,
       geminiBaseUrl: config.gemini?.baseUrl || null,
+      geminiModelName: config.gemini?.modelName || null,
       arkApiKey: config.jimeng45?.arkApiKey || null,
       superbedToken: config.imagehosting?.superbedToken || null,
       localStoragePath: config.localStorage?.savePath || null,

@@ -153,7 +153,7 @@ async function main() {
       log('🗑️  已删除旧的数据库模板', 'yellow');
     }
     // 使用 prisma db push 创建最新结构的数据库
-    process.env.DATABASE_URL = `file:${templateDbPath}`;
+    process.env.DATABASE_URL = 'file:./prisma/app.db';
     await runCommand('npx', ['prisma', 'db', 'push', '--skip-generate']);
     log('✅ 数据库模板创建完成（包含最新表结构）\n', 'green');
 

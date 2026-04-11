@@ -23,6 +23,7 @@ export interface UserConfig {
     enabled: boolean;
     apiKey: string;
     baseUrl: string;
+    modelName?: string;
   };
 }
 

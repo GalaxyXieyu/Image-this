@@ -41,7 +41,8 @@ export async function POST(request: NextRequest) {
     if (body.gemini?.enabled && body.gemini?.apiKey) {
       userConfig.gemini = {
         apiKey: body.gemini.apiKey,
-        baseUrl: body.gemini.baseUrl || 'https://yunwu.ai',
+        baseUrl: body.gemini.baseUrl || 'https://toapis.com',
+        modelName: body.gemini.modelName || 'gemini-3.1-flash-image-preview',
       };
     }
 
@@ -114,7 +115,8 @@ export async function GET(request: NextRequest) {
       gemini: {
         enabled: !!userConfig.gemini,
         apiKey: userConfig.gemini?.apiKey || '',
-        baseUrl: userConfig.gemini?.baseUrl || 'https://yunwu.ai'
+        baseUrl: userConfig.gemini?.baseUrl || 'https://toapis.com',
+        modelName: userConfig.gemini?.modelName || 'gemini-3.1-flash-image-preview'
       },
       jimeng45: {
         enabled: !!userConfig.jimeng45,

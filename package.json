@@ -15,7 +15,7 @@
     "lint": "next lint",
     "clean": "bash scripts/clean-build.sh",
     "screenshots:readme": "node scripts/generate-readme-screenshots.mjs",
-    "electron:dev": "concurrently \"NODE_ENV=development npm run dev\" \"wait-on http://localhost:23000 && NODE_ENV=development electron .\"",
+    "electron:dev": "concurrently \"NODE_ENV=development npm run dev\" \"wait-on http://localhost:34123 && PORT=34123 NODE_ENV=development electron .\"",
     "build:windows": "npm run clean && node scripts/build-windows.mjs --auto",
     "build:mac": "npm run clean && node scripts/build-mac.mjs",
     "electron:build:win": "electron-builder --win"
@@ -173,8 +173,10 @@
       "category": "Graphics"
     },
     "nsis": {
+      "include": "build/installer.nsh",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "artifactName": "${productName}-${version}-${arch}-Setup.${ext}"

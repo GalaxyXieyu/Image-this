@@ -34,6 +34,7 @@ export interface GeminiConfig {
   enabled: boolean;
   apiKey: string;
   baseUrl?: string;
+  modelName?: string;
 }
 
 export interface QwenConfig {

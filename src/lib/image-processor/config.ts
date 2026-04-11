@@ -21,7 +21,8 @@ export const defaultConfig: ProvidersConfig = {
   gemini: {
     enabled: false,
     apiKey: '',
-    baseUrl: 'https://yunwu.ai',
+    baseUrl: 'https://toapis.com',
+    modelName: 'gemini-3.1-flash-image-preview',
   },
   qwen: {
     enabled: false,
@@ -50,7 +51,8 @@ export function loadConfigFromEnv(): ProvidersConfig {
     gemini: {
       enabled: !!process.env.GEMINI_API_KEY,
       apiKey: process.env.GEMINI_API_KEY || '',
-      baseUrl: process.env.GEMINI_BASE_URL || 'https://yunwu.ai',
+      baseUrl: process.env.GEMINI_BASE_URL || 'https://toapis.com',
+      modelName: process.env.GEMINI_MODEL_NAME || 'gemini-3.1-flash-image-preview',
     },
     qwen: {
       enabled: !!process.env.QWEN_API_KEY,
@@ -115,6 +117,7 @@ export function loadMergedConfig(): ProvidersConfig {
       enabled: envConfig.gemini.enabled || storageConfig.gemini.enabled,
       apiKey: storageConfig.gemini.apiKey || envConfig.gemini.apiKey,
       baseUrl: storageConfig.gemini.baseUrl || envConfig.gemini.baseUrl,
+      modelName: storageConfig.gemini.modelName || envConfig.gemini.modelName,
     },
     qwen: {
       enabled: envConfig.qwen.enabled || storageConfig.qwen.enabled,

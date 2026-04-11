@@ -52,7 +52,8 @@ async function initializeProvider(userId: string, provider: ImageProvider) {
     gemini: {
       enabled: provider === ImageProvider.GEMINI && !!userConfig.gemini,
       apiKey: userConfig.gemini?.apiKey || '',
-      baseUrl: userConfig.gemini?.baseUrl || 'https://yunwu.ai'
+      baseUrl: userConfig.gemini?.baseUrl || 'https://toapis.com',
+      modelName: userConfig.gemini?.modelName || 'gemini-3.1-flash-image-preview'
     },
     qwen: {
       enabled: provider === ImageProvider.QWEN && !!userConfig.gpt, // Qwen 使用 GPT 配置
@@ -184,7 +185,7 @@ export async function enhanceWithVolcengine(
         secretKey: volcengineConfig.secretKey
       },
       gpt: { enabled: false, apiUrl: '', apiKey: '' },
-      gemini: { enabled: false, apiKey: '', baseUrl: '' },
+      gemini: { enabled: false, apiKey: '', baseUrl: '', modelName: '' },
       qwen: { enabled: false, apiKey: '' },
       jimeng: { enabled: false, accessKey: '', secretKey: '' }
     });
@@ -230,7 +231,7 @@ export async function outpaintWithVolcengine(
         secretKey: volcengineConfig.secretKey
       },
       gpt: { enabled: false, apiUrl: '', apiKey: '' },
-      gemini: { enabled: false, apiKey: '', baseUrl: '' },
+      gemini: { enabled: false, apiKey: '', baseUrl: '', modelName: '' },
       qwen: { enabled: false, apiKey: '' },
       jimeng: { enabled: false, accessKey: '', secretKey: '' }
     });
