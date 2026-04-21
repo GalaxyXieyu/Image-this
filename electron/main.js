@@ -8,6 +8,8 @@ let mainWindow;
 let nextServer;
 const isDev = process.env.NODE_ENV === 'development';
 const PORT = process.env.PORT || 23000;
+const WINDOWS_RENDERER_MAX_OLD_SPACE_MB = 1024;
+let renderRecoveryInProgress = false;
 
 // 日志文件路径 - 使用更明显的位置
 const LOG_DIR = path.join(os.homedir(), 'ImagineThis', 'logs');
@@ -70,8 +72,82 @@ if (process.platform === 'win32') {
   app.commandLine.appendSwitch('disable-gpu-sandbox');
   app.commandLine.appendSwitch('disable-software-rasterizer');
   // 减少 V8 内存占用，加快启动
-  app.commandLine.appendSwitch('js-flags', '--max-old-space-size=256');
+  app.commandLine.appendSwitch('js-flags', `--max-old-space-size=${WINDOWS_RENDERER_MAX_OLD_SPACE_MB}`);
   log('Windows GPU optimizations applied');
+}
+
+function showWindowStatusPage(title, message) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  mainWindow.loadURL(`data:text/html;charset=utf-8,
+    <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: #f8fafc;
+            color: #0f172a;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          }
+          .panel {
+            width: min(520px, calc(100vw - 48px));
+            padding: 24px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            box-shadow: 0 12px 40px rgba(15, 23, 42, 0.08);
+          }
+          h2 {
+            margin: 0 0 12px;
+            font-size: 20px;
+          }
+          p {
+            margin: 0;
+            line-height: 1.6;
+            color: #475569;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="panel">
+          <h2>${title}</h2>
+          <p>${message}</p>
+        </div>
+      </body>
+    </html>
+  `);
+}
+
+function recoverMainWindow(reason) {
+  if (!mainWindow || mainWindow.isDestroyed() || renderRecoveryInProgress) {
+    return;
+  }
+
+  renderRecoveryInProgress = true;
+  log(`Attempting renderer recovery after: ${reason}`, 'WARN');
+  showWindowStatusPage('界面正在恢复', '检测到界面进程异常，正在自动重新加载...');
+
+  setTimeout(() => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      renderRecoveryInProgress = false;
+      return;
+    }
+
+    mainWindow.loadURL(`http://localhost:${PORT}`)
+      .catch((error) => {
+        log(`Renderer recovery failed: ${error.message}`, 'ERROR');
+      })
+      .finally(() => {
+        renderRecoveryInProgress = false;
+      });
+  }, 1200);
 }
 
 function createWindow() {
@@ -778,6 +854,9 @@ app.on('before-quit', () => {
 // 添加额外的错误处理
 app.on('render-process-gone', (event, webContents, details) => {
   log(`Render process gone: ${JSON.stringify(details)}`, 'ERROR');
+  if (mainWindow && !mainWindow.isDestroyed() && webContents.id === mainWindow.webContents.id) {
+    recoverMainWindow(details.reason || 'unknown');
+  }
 });
 
 app.on('child-process-gone', (event, details) => {

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Play, Wand2, Loader2, CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Loader2, Play, RefreshCw, Wand2 } from "lucide-react";
 import { ActiveTab } from './WorkspaceSidebar';
 
 interface ActionButtonsProps {
@@ -9,6 +9,7 @@ interface ActionButtonsProps {
     disabled: boolean;
     activeTab: ActiveTab;
     tabs: { id: ActiveTab; title: string }[];
+    resetKey?: string;
 }
 
 export default function ActionButtons({
@@ -16,24 +17,45 @@ export default function ActionButtons({
     onProcess,
     disabled,
     activeTab,
-    tabs
+    tabs,
+    resetKey
 }: ActionButtonsProps) {
     const [isClicked, setIsClicked] = useState(false);
+    const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const currentTabTitle = tabs.find(tab => tab.id === activeTab)?.title;
 
-    // 当标签页切换时，重置点击状态
+    const clearResetTimer = () => {
+        if (resetTimerRef.current) {
+            clearTimeout(resetTimerRef.current);
+            resetTimerRef.current = null;
+        }
+    };
+
+    // 切换标签或修改参数时，立即恢复按钮状态
     useEffect(() => {
+        clearResetTimer();
         setIsClicked(false);
-    }, [activeTab]);
+    }, [activeTab, resetKey]);
+
+    useEffect(() => {
+        return () => {
+            clearResetTimer();
+        };
+    }, []);
 
     const handleClick = async () => {
+        clearResetTimer();
         setIsClicked(true);
+
         try {
             await onProcess();
         } finally {
-            // 延迟重置点击状态，确保用户看到反馈
-            setTimeout(() => setIsClicked(false), 1000);
+            // 保留短暂的“已接收请求”反馈，但允许外部变更立即重置
+            resetTimerRef.current = setTimeout(() => {
+                setIsClicked(false);
+                resetTimerRef.current = null;
+            }, 1000);
         }
     };
 
@@ -62,7 +84,7 @@ export default function ActionButtons({
                     </>
                 )}
             </Button>
-        )
+        );
     }
 
     return (

@@ -15,6 +15,11 @@ interface UseImageProcessingProps {
   watermarkSettings: any;
   outputResolution: string;
   aiModel?: string;
+  backgroundPrompt?: string;
+  outpaintPrompt?: string;
+  oneClickBackgroundPrompt?: string;
+  oneClickOutpaintPrompt?: string;
+  enableOneClickOutpaint?: boolean;
   // 视频生成相关
   enableVideo?: boolean;
   videoPrompt?: string;
@@ -28,7 +33,12 @@ export function useImageProcessing({
   watermarkLogo,
   watermarkSettings,
   outputResolution,
-  aiModel = 'jimeng',
+  aiModel = 'gemini',
+  backgroundPrompt = '',
+  outpaintPrompt = '',
+  oneClickBackgroundPrompt = '',
+  oneClickOutpaintPrompt = '',
+  enableOneClickOutpaint = true,
   // 视频生成相关
   enableVideo = false,
   videoPrompt = '',
@@ -171,6 +181,7 @@ export function useImageProcessing({
         imageUrl: resizedImageUrl,
         xScale,
         yScale,
+        prompt: outpaintPrompt,
         originalImageId: image.id,
         originalImageName: image.name
       });
@@ -179,7 +190,7 @@ export function useImageProcessing({
     const tasks = await createBatchTasks('IMAGE_EXPANSION', taskData);
     await triggerWorker();
     return tasks;
-  }, [uploadedImages, resizeImageForAPI, createBatchTasks, triggerWorker]);
+  }, [uploadedImages, outpaintPrompt, resizeImageForAPI, createBatchTasks, triggerWorker]);
 
   // 图像高清化处理
   const handleUpscaling = useCallback(async () => {
@@ -243,7 +254,7 @@ export function useImageProcessing({
         yScale,
         upscaleFactor,
         enableBackgroundReplace: !!referenceImage,
-        enableOutpaint: true,
+        enableOutpaint: enableOneClickOutpaint,
         enableUpscale: true,
         enableWatermark,
         watermarkText,
@@ -253,6 +264,8 @@ export function useImageProcessing({
         watermarkLogoUrl: watermarkLogoData,
         outputResolution,
         aiModel,
+        backgroundPrompt: oneClickBackgroundPrompt,
+        outpaintPrompt: oneClickOutpaintPrompt,
         // 视频生成相关
         enableVideo,
         videoPrompt,
@@ -266,7 +279,7 @@ export function useImageProcessing({
     const tasks = await createBatchTasks('ONE_CLICK_WORKFLOW', taskData);
     await triggerWorker();
     return tasks;
-  }, [uploadedImages, referenceImage, watermarkLogo, watermarkSettings, outputResolution, aiModel, enableVideo, videoPrompt, videoFrames, videoAspectRatio, resizeImageForAPI, createBatchTasks, triggerWorker]);
+  }, [uploadedImages, referenceImage, watermarkLogo, watermarkSettings, outputResolution, aiModel, oneClickBackgroundPrompt, oneClickOutpaintPrompt, enableOneClickOutpaint, enableVideo, videoPrompt, videoFrames, videoAspectRatio, resizeImageForAPI, createBatchTasks, triggerWorker]);
 
   // 背景替换处理
   const handleBackgroundReplace = useCallback(async () => {
@@ -274,7 +287,7 @@ export function useImageProcessing({
       throw new Error('背景替换需要参考图片');
     }
 
-    const customPrompt = (document.getElementById('customPrompt') as HTMLTextAreaElement)?.value || '';
+    const customPrompt = backgroundPrompt;
 
     // 先处理参考图（只处理一次）
     const resizedReferenceUrl = await resizeImageForAPI(referenceImage.preview, referenceImage.file.type);
@@ -297,7 +310,7 @@ export function useImageProcessing({
     const tasks = await createBatchTasks('BACKGROUND_REMOVAL', taskData);
     await triggerWorker();
     return tasks;
-  }, [uploadedImages, referenceImage, aiModel, resizeImageForAPI, createBatchTasks, triggerWorker]);
+  }, [uploadedImages, referenceImage, aiModel, backgroundPrompt, resizeImageForAPI, createBatchTasks, triggerWorker]);
 
   // 水印处理
   const handleWatermark = useCallback(async () => {

@@ -376,6 +376,8 @@ class TaskProcessor {
       watermarkLogoUrl,
       outputResolution = 'original',
       aiModel = 'gemini',
+      backgroundPrompt = '',
+      outpaintPrompt = '',
       volcengineConfig
     } = inputData;
     
@@ -401,6 +403,8 @@ class TaskProcessor {
         watermarkLogoUrl,
         outputResolution,
         aiModel,
+        backgroundPrompt,
+        outpaintPrompt,
         userId: task.userId,
         volcengineConfig
       });
@@ -427,7 +431,7 @@ class TaskProcessor {
 
   private async processBackgroundRemoval(task: { id: string; inputData: string; userId: string }) {
     const inputData = JSON.parse(task.inputData);
-    const { imageUrl, referenceImageUrl, customPrompt, aiModel = 'jimeng', volcengineConfig, imagehostingConfig } = inputData;
+    const { imageUrl, referenceImageUrl, customPrompt, aiModel = 'gemini', volcengineConfig, imagehostingConfig } = inputData;
 
     await this.updateTaskProgress(task.id, `使用 ${aiModel} 生成图像中...`, 30, 1);
     
@@ -600,7 +604,7 @@ class TaskProcessor {
 
   private async processImageExpansion(task: { id: string; inputData: string; userId: string }) {
     const inputData = JSON.parse(task.inputData);
-    const { imageUrl, xScale = 2.0, yScale = 2.0, volcengineConfig, imagehostingConfig } = inputData;
+    const { imageUrl, xScale = 2.0, yScale = 2.0, prompt = '扩展图像，保持产品主体和风格完全一致，自然延伸背景', volcengineConfig, imagehostingConfig } = inputData;
     
     await this.updateTaskProgress(task.id, '图像扩展处理中...', 50, 1);
     
@@ -619,7 +623,7 @@ class TaskProcessor {
       const result = await outpaintWithVolcengine(
         task.userId,
         imageUrl,
-        '扩展图像，保持风格一致',
+        prompt,
         top,
         bottom,
         left,

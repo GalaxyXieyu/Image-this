@@ -6,7 +6,7 @@
  */
 
 import { spawn } from 'child_process';
-import { existsSync, copyFileSync, cpSync, mkdirSync, unlinkSync } from 'fs';
+import { existsSync, copyFileSync, cpSync, mkdirSync, readdirSync, rmSync, statSync, unlinkSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import readline from 'readline';
@@ -67,6 +67,75 @@ function removeIfExists(filePath) {
   if (existsSync(filePath)) {
     unlinkSync(filePath);
   }
+}
+
+function removeDirectoryIfExists(dirPath) {
+  if (existsSync(dirPath)) {
+    rmSync(dirPath, { recursive: true, force: true });
+  }
+}
+
+function removeFilesByPredicate(dirPath, predicate) {
+  if (!existsSync(dirPath)) {
+    return 0;
+  }
+
+  let removedCount = 0;
+
+  for (const entry of readdirSync(dirPath)) {
+    const fullPath = join(dirPath, entry);
+    const stats = statSync(fullPath);
+
+    if (stats.isDirectory()) {
+      removedCount += removeFilesByPredicate(fullPath, predicate);
+      continue;
+    }
+
+    if (predicate(entry, fullPath)) {
+      unlinkSync(fullPath);
+      removedCount += 1;
+    }
+  }
+
+  return removedCount;
+}
+
+function pruneStandaloneForWindows(standaloneDir) {
+  log('🧹 精简 Windows 运行时文件...', 'yellow');
+
+  removeDirectoryIfExists(join(standaloneDir, '.build-home'));
+  removeDirectoryIfExists(join(standaloneDir, 'src'));
+
+  const prismaClientDir = join(standaloneDir, 'node_modules', '.prisma', 'client');
+  const prismaEnginesDir = join(standaloneDir, 'node_modules', '@prisma', 'engines');
+
+  const removedClientEngines = removeFilesByPredicate(
+    prismaClientDir,
+    (fileName) =>
+      (
+        fileName.startsWith('libquery_engine-') ||
+        fileName.startsWith('query_engine-') ||
+        fileName.startsWith('schema-engine-')
+      ) &&
+      fileName !== 'query_engine-windows.dll.node'
+  );
+
+  const removedPackageEngines = removeFilesByPredicate(
+    prismaEnginesDir,
+    (fileName) =>
+      (
+        fileName.startsWith('libquery_engine-') ||
+        fileName.startsWith('query_engine-') ||
+        fileName.startsWith('schema-engine-')
+      ) &&
+      fileName !== 'query_engine-windows.dll.node' &&
+      fileName !== 'schema-engine-windows.exe'
+  );
+
+  log(
+    `✅ 已移除 ${removedClientEngines + removedPackageEngines} 个非 Windows Prisma 引擎文件\n`,
+    'green'
+  );
 }
 
 function prepareIsolatedBuildHome() {
@@ -168,6 +237,10 @@ async function main() {
     } else {
       log('✅ 依赖已安装', 'green');
     }
+
+    log('🪄 生成 Windows 图标...', 'yellow');
+    await runCommand('node', ['scripts/generate-windows-icon.mjs']);
+    log('✅ Windows 图标已更新\n', 'green');
     
     // 3.1 安装 Windows 平台的 sharp
     log('📦 安装 Windows 平台 sharp 模块...', 'yellow');
@@ -302,6 +375,8 @@ async function main() {
       copyFileSync(envProdSrc, envProdDest);
       log('✅ .env.production 复制完成', 'green');
     }
+
+    pruneStandaloneForWindows(standaloneDir);
     
     log('✅ 静态资源复制完成\n', 'green');
 

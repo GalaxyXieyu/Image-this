@@ -38,6 +38,7 @@ export interface TabState {
   backgroundPrompt: string;
   // 一键增强专用：扩图提示词
   outpaintPrompt: string;
+  enableOneClickOutpaint: boolean;
   // 水印相关（一键增强、水印 tab 用）
   enableWatermark: boolean;
   watermarkType: 'text' | 'logo';
@@ -65,10 +66,11 @@ const createDefaultTabState = (): TabState => ({
   referenceImage: null,
   selectedPreviewIndex: 0,
   outputResolution: 'original',
-  aiModel: 'jimeng', // 默认使用即梦（火山引擎）
+  aiModel: 'gemini', // 默认使用 Gemini
   prompt: '',
   backgroundPrompt: '',
   outpaintPrompt: '',
+  enableOneClickOutpaint: true,
   enableWatermark: false,
   watermarkType: 'logo',
   watermarkText: 'Sample Watermark',
@@ -118,6 +120,7 @@ interface WorkspaceTabStore {
   setPrompt: (prompt: string) => void;
   setBackgroundPrompt: (prompt: string) => void;
   setOutpaintPrompt: (prompt: string) => void;
+  setEnableOneClickOutpaint: (enable: boolean) => void;
 
   // 水印相关
   setEnableWatermark: (enable: boolean) => void;
@@ -310,6 +313,16 @@ export const useWorkspaceTabStore = create<WorkspaceTabStore>((set, get) => ({
       [state.activeTab]: {
         ...state.tabStates[state.activeTab],
         outpaintPrompt: prompt,
+      },
+    },
+  })),
+
+  setEnableOneClickOutpaint: (enable) => set((state) => ({
+    tabStates: {
+      ...state.tabStates,
+      [state.activeTab]: {
+        ...state.tabStates[state.activeTab],
+        enableOneClickOutpaint: enable,
       },
     },
   })),

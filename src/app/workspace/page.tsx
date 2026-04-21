@@ -113,6 +113,7 @@ export default function WorkspacePage() {
     setPrompt,
     setBackgroundPrompt,
     setOutpaintPrompt,
+    setEnableOneClickOutpaint,
     setEnableWatermark,
     setWatermarkType,
     setWatermarkText,
@@ -153,6 +154,7 @@ export default function WorkspacePage() {
   const videoPrompt = currentTabState.videoPrompt;
   const videoFrames = currentTabState.videoFrames;
   const videoAspectRatio_OneClick = currentTabState.videoAspectRatio;
+  const uploadedImageIds = uploadedImages.map(image => image.id).join(',');
   
   // 提示词根据 tab 类型获取
   const backgroundPrompt = activeTab === 'background' ? currentTabState.prompt : '';
@@ -160,6 +162,7 @@ export default function WorkspacePage() {
   // 一键增强专用：独立的背景替换和扩图提示词
   const oneClickBackgroundPrompt = currentTabState.backgroundPrompt;
   const oneClickOutpaintPrompt = currentTabState.outpaintPrompt;
+  const enableOneClickOutpaint = currentTabState.enableOneClickOutpaint;
   
   // 本地状态（不需要跨 tab 保持）
   const [isProcessing, setIsProcessing] = useState(false);
@@ -198,6 +201,41 @@ export default function WorkspacePage() {
   const [showVideoResult, setShowVideoResult] = useState(false);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState('');
 
+  const actionButtonResetKey = activeTab === 'video'
+    ? JSON.stringify({
+        activeTab,
+        uploadedImageIds,
+        selectedPreviewIndex,
+        videoStyle,
+        videoCustomPrompt,
+        videoDuration,
+        videoAspectRatio_VideoTab,
+      })
+    : JSON.stringify({
+        activeTab,
+        uploadedImageIds,
+        referenceImageId: referenceImage?.id ?? null,
+        watermarkLogoId: watermarkLogo?.id ?? null,
+        selectedPreviewIndex,
+        outputResolution,
+        aiModel,
+        prompt: currentTabState.prompt,
+        backgroundPrompt: currentTabState.backgroundPrompt,
+        outpaintPrompt: currentTabState.outpaintPrompt,
+        enableOneClickOutpaint,
+        enableWatermark,
+        watermarkType,
+        watermarkText,
+        watermarkSettings,
+        xScale: currentTabState.xScale,
+        yScale: currentTabState.yScale,
+        enableQualityReview,
+        enableVideo,
+        videoPrompt,
+        videoFrames,
+        videoAspectRatio: videoAspectRatio_OneClick,
+      });
+
   const watermarkLogoInputRef = useRef<HTMLInputElement>(null);
 
   // 新增：任务管理状态
@@ -221,6 +259,11 @@ export default function WorkspacePage() {
     watermarkSettings,
     outputResolution,
     aiModel,
+    backgroundPrompt,
+    outpaintPrompt,
+    oneClickBackgroundPrompt,
+    oneClickOutpaintPrompt,
+    enableOneClickOutpaint,
     // 视频生成相关
     enableVideo,
     videoPrompt,
@@ -969,6 +1012,7 @@ export default function WorkspacePage() {
               onProcess={handleVideoGenerate}
               activeTab={activeTab}
               tabs={tabs}
+              resetKey={actionButtonResetKey}
             />
           </div>
 
@@ -1058,6 +1102,8 @@ export default function WorkspacePage() {
             setOneClickBackgroundPrompt={handleSetOneClickBackgroundPrompt}
             oneClickOutpaintPrompt={oneClickOutpaintPrompt}
             setOneClickOutpaintPrompt={handleSetOneClickOutpaintPrompt}
+            enableOneClickOutpaint={enableOneClickOutpaint}
+            setEnableOneClickOutpaint={setEnableOneClickOutpaint}
             xScale={currentTabState.xScale}
             setXScale={setXScale}
             yScale={currentTabState.yScale}
@@ -1105,6 +1151,7 @@ export default function WorkspacePage() {
             }
             activeTab={activeTab}
             tabs={tabs}
+            resetKey={actionButtonResetKey}
           />
         </div>
 

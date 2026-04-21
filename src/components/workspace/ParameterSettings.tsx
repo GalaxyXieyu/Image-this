@@ -26,6 +26,8 @@ interface ParameterSettingsProps {
     setOneClickBackgroundPrompt?: (value: string) => void;
     oneClickOutpaintPrompt?: string;
     setOneClickOutpaintPrompt?: (value: string) => void;
+    enableOneClickOutpaint?: boolean;
+    setEnableOneClickOutpaint?: (value: boolean) => void;
     // 扩图比例参数
     xScale?: string;
     setXScale?: (value: string) => void;
@@ -60,6 +62,8 @@ export default function ParameterSettings({
     setOneClickBackgroundPrompt,
     oneClickOutpaintPrompt = '',
     setOneClickOutpaintPrompt,
+    enableOneClickOutpaint = true,
+    setEnableOneClickOutpaint,
     xScale = '2.0',
     setXScale,
     yScale = '2.0',
@@ -265,13 +269,29 @@ export default function ParameterSettings({
                                 
                                 {/* 扩图提示词 */}
                                 {setOneClickOutpaintPrompt && (
-                                    <PromptTemplateSelector
-                                        category="OUTPAINT"
-                                        value={oneClickOutpaintPrompt}
-                                        onChange={setOneClickOutpaintPrompt}
-                                        label="扩图提示词"
-                                        description="描述如何扩展图像边界，自然延伸背景"
-                                    />
+                                    <>
+                                        <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                                            <div>
+                                                <Label className="text-sm font-medium">启用扩图</Label>
+                                                <p className="text-xs text-gray-500 mt-1">关闭后，一键增强只执行背景替换、高清化和水印</p>
+                                            </div>
+                                            {setEnableOneClickOutpaint && (
+                                                <Switch
+                                                    checked={enableOneClickOutpaint}
+                                                    onCheckedChange={setEnableOneClickOutpaint}
+                                                />
+                                            )}
+                                        </div>
+                                        <div className={!enableOneClickOutpaint ? 'pointer-events-none opacity-60' : ''}>
+                                            <PromptTemplateSelector
+                                                category="OUTPAINT"
+                                                value={oneClickOutpaintPrompt}
+                                                onChange={setOneClickOutpaintPrompt}
+                                                label="扩图提示词"
+                                                description="描述如何扩展图像边界，自然延伸背景"
+                                            />
+                                        </div>
+                                    </>
                                 )}
                                 
                                 <div className="grid grid-cols-3 gap-4">
@@ -286,6 +306,7 @@ export default function ParameterSettings({
                                             value={xScale}
                                             onChange={(e) => setXScale?.(e.target.value)}
                                             className="mt-1"
+                                            disabled={!enableOneClickOutpaint}
                                         />
                                     </div>
                                     <div>
@@ -299,6 +320,7 @@ export default function ParameterSettings({
                                             value={yScale}
                                             onChange={(e) => setYScale?.(e.target.value)}
                                             className="mt-1"
+                                            disabled={!enableOneClickOutpaint}
                                         />
                                     </div>
                                     <div>

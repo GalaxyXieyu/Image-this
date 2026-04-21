@@ -2,6 +2,9 @@ import { prisma } from '@/lib/prisma';
 import { uploadBase64Image } from '@/lib/storage';
 import { processWithGemini, processWithGPT, processWithJimeng, outpaintWithVolcengine, enhanceWithVolcengine } from '@/lib/image-processor/service';
 
+const DEFAULT_BACKGROUND_PROMPT = '保持第一张图的产品主体完全不变，仅替换第二张图的背景为类似参考场景的风格（要完全把第二张图的产品去掉），不要有同时出现的情况，保持第一张产品的形状、材质、特征比例、摆放角度及数量完全一致，专业摄影，高质量，4K分辨率';
+const DEFAULT_OUTPAINT_PROMPT = '扩展图像，保持产品主体和风格完全一致，自然延伸背景';
+
 export interface OneClickWorkflowParams {
   imageUrl: string;
   referenceImageUrl?: string;
@@ -11,6 +14,8 @@ export interface OneClickWorkflowParams {
   enableBackgroundReplace?: boolean;
   enableOutpaint?: boolean;
   enableUpscale?: boolean;
+  backgroundPrompt?: string;
+  outpaintPrompt?: string;
   enableWatermark?: boolean;
   watermarkText?: string;
   watermarkOpacity?: number;
@@ -69,6 +74,8 @@ export async function executeOneClickWorkflow(
     enableBackgroundReplace = true,
     enableOutpaint = true,
     enableUpscale = true,
+    backgroundPrompt = '',
+    outpaintPrompt = '',
     enableWatermark = false,
     watermarkText = 'Sample Watermark',
     watermarkOpacity = 0.3,
@@ -76,7 +83,7 @@ export async function executeOneClickWorkflow(
     watermarkType = 'text',
     watermarkLogoUrl,
     outputResolution = 'original',
-    aiModel = 'jimeng',
+    aiModel = 'gemini',
     // 视频生成参数
     enableVideo = false,
     videoPrompt = '',
@@ -114,6 +121,8 @@ export async function executeOneClickWorkflow(
         enableBackgroundReplace,
         enableOutpaint,
         enableUpscale,
+        backgroundPrompt,
+        outpaintPrompt,
         enableWatermark,
         watermarkText,
         watermarkOpacity,
@@ -145,7 +154,7 @@ export async function executeOneClickWorkflow(
       console.log(`=== 步骤1/4：开始背景替换 (使用 ${aiModel}) ===`);
       const bgStartTime = Date.now();
       try {
-        const prompt = '保持第一张图的产品主体完全不变，仅替换第二张图的背景为类似参考场景的风格（要完全把第二张图的产品去掉），不要有同时出现的情况，保持第一张产品的形状、材质、特征比例、摆放角度及数量完全一致，专业摄影，高质量，4K分辨率';
+        const prompt = backgroundPrompt || DEFAULT_BACKGROUND_PROMPT;
         
         let bgResultImageData: string | undefined;
 
@@ -198,7 +207,7 @@ export async function executeOneClickWorkflow(
         const result = await outpaintWithVolcengine(
           userId,
           processedImageUrl,
-          '扩展图像，保持产品主体和风格完全一致，自然延伸背景',
+          outpaintPrompt || DEFAULT_OUTPAINT_PROMPT,
           top,
           bottom,
           left,

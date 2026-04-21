@@ -13,7 +13,7 @@
     "build": "next build && node scripts/post-build.js",
     "start": "next start -p 34123",
     "lint": "next lint",
-    "clean": "bash scripts/clean-build.sh",
+    "clean": "node scripts/clean-build.mjs",
     "screenshots:readme": "node scripts/generate-readme-screenshots.mjs",
     "electron:dev": "concurrently \"NODE_ENV=development npm run dev\" \"wait-on http://localhost:34123 && PORT=34123 NODE_ENV=development electron .\"",
     "build:windows": "npm run clean && node scripts/build-windows.mjs --auto",
@@ -86,6 +86,7 @@
     "eslint": "^9",
     "eslint-config-next": "15.3.4",
     "playwright": "^1.53.1",
+    "png-to-ico": "^3.0.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.10",
     "typescript": "^5",
@@ -101,8 +102,15 @@
     "files": [
       "electron/**/*",
       {
-        "from": ".next",
-        "to": ".next"
+        "from": ".next/standalone",
+        "to": ".next/standalone",
+        "filter": [
+          "**/*",
+          "!.build-home",
+          "!.build-home/**/*",
+          "!src",
+          "!src/**/*"
+        ]
       },
       {
         "from": "public",
@@ -114,6 +122,12 @@
       },
       "package.json",
       ".env.production",
+      "!node_modules/**/*",
+      "!.next/cache/**",
+      "!.next/diagnostics/**",
+      "!.next/types/**",
+      "!.next/trace",
+      ".next/standalone/node_modules/**/*",
       "!node_modules/@img/sharp-darwin-*",
       "!node_modules/@img/sharp-linux-*"
     ],
@@ -145,7 +159,7 @@
       "entitlementsInherit": "electron/entitlements.mac.plist"
     },
     "win": {
-      "icon": "public/icon.png",
+      "icon": "build/icon.ico",
       "signAndEditExecutable": false,
       "target": [
         {
