@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { NextAuthProvider } from "@/providers/auth-provider";
+import { DesktopUpdateProvider } from "@/components/providers/DesktopUpdateProvider";
 import { Toaster } from "@/components/ui/toaster";
 import FloatingTaskButton from "@/components/navigation/FloatingTaskButton";
 import "./globals.css";
@@ -21,9 +22,11 @@ export default function RootLayout({
     <html lang="zh-CN">
       <body className={inter.className}>
         <NextAuthProvider>
-          {children}
-          <FloatingTaskButton />
-          <Toaster />
+          <DesktopUpdateProvider>
+            {children}
+            <FloatingTaskButton />
+            <Toaster />
+          </DesktopUpdateProvider>
         </NextAuthProvider>
       </body>
     </html>

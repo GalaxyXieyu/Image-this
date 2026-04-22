@@ -4,6 +4,7 @@
  */
 
 import { prisma } from '@/lib/prisma';
+import { getStoredSecrets, isDesktopSecretStoreEnabled, setStoredSecrets } from '@/lib/desktop-secret-store';
 
 export interface UserConfig {
   volcengine?: {
@@ -41,13 +42,18 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
     select: {
       volcengineAccessKey: true,
       volcengineSecretKey: true,
+      hasVolcengineCredentials: true,
       gptApiUrl: true,
       gptApiKey: true,
+      hasGptApiKey: true,
       geminiApiKey: true,
       geminiBaseUrl: true,
       geminiModelName: true,
+      hasGeminiApiKey: true,
       arkApiKey: true,
+      hasArkApiKey: true,
       superbedToken: true,
+      hasSuperbedToken: true,
       localStoragePath: true,
     }
   });
@@ -59,24 +65,31 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
   }
 
   const config: UserConfig = {};
+  const desktopSecrets = isDesktopSecretStoreEnabled() ? await getStoredSecrets(userId) : {};
+  const volcengineAccessKey = desktopSecrets.volcengineAccessKey || user.volcengineAccessKey || '';
+  const volcengineSecretKey = desktopSecrets.volcengineSecretKey || user.volcengineSecretKey || '';
+  const gptApiKey = desktopSecrets.gptApiKey || user.gptApiKey || '';
+  const geminiApiKey = desktopSecrets.geminiApiKey || user.geminiApiKey || '';
+  const arkApiKey = desktopSecrets.arkApiKey || user.arkApiKey || '';
+  const superbedToken = desktopSecrets.superbedToken || user.superbedToken || '';
 
   // 火山引擎配置
-  if (user.volcengineAccessKey && user.volcengineSecretKey) {
+  if (volcengineAccessKey && volcengineSecretKey) {
     config.volcengine = {
-      accessKey: user.volcengineAccessKey,
-      secretKey: user.volcengineSecretKey,
+      accessKey: volcengineAccessKey,
+      secretKey: volcengineSecretKey,
     };
     console.log('[用户配置] Volcengine: 从数据库读取');
-    console.log(`  - AccessKey: ${user.volcengineAccessKey.substring(0, 10)}...${user.volcengineAccessKey.substring(user.volcengineAccessKey.length - 10)}`);
+    console.log(`  - AccessKey: ${volcengineAccessKey.substring(0, 10)}...${volcengineAccessKey.substring(volcengineAccessKey.length - 10)}`);
   } else {
     console.warn('[用户配置] Volcengine: 未配置，请在设置页面配置火山引擎 AccessKey 和 SecretKey');
   }
 
   // GPT 配置
-  if (user.gptApiUrl && user.gptApiKey) {
+  if (user.gptApiUrl && gptApiKey) {
     config.gpt = {
       apiUrl: user.gptApiUrl,
-      apiKey: user.gptApiKey,
+      apiKey: gptApiKey,
     };
     console.log('[用户配置] GPT: 从数据库读取');
   } else {
@@ -84,9 +97,9 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
   }
 
   // Gemini 配置
-  if (user.geminiApiKey) {
+  if (geminiApiKey) {
     config.gemini = {
-      apiKey: user.geminiApiKey,
+      apiKey: geminiApiKey,
       baseUrl: user.geminiBaseUrl || 'https://toapis.com',
       modelName: user.geminiModelName || 'gemini-3.1-flash-image-preview',
     };
@@ -96,9 +109,9 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
   }
 
   // 即梦 4.5 配置
-  if (user.arkApiKey) {
+  if (arkApiKey) {
     config.jimeng45 = {
-      arkApiKey: user.arkApiKey,
+      arkApiKey,
     };
     console.log('[用户配置] Jimeng 4.5: 从数据库读取');
   } else {
@@ -106,9 +119,9 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
   }
 
   // 图床配置
-  if (user.superbedToken) {
+  if (superbedToken) {
     config.imagehosting = {
-      superbedToken: user.superbedToken,
+      superbedToken,
     };
     console.log('[用户配置] 图床: 从数据库读取');
   } else {
@@ -143,18 +156,34 @@ export async function saveUserConfig(userId: string, config: UserConfig): Promis
     return false;
   }
 
+  if (isDesktopSecretStoreEnabled()) {
+    await setStoredSecrets(userId, {
+      volcengineAccessKey: config.volcengine?.accessKey,
+      volcengineSecretKey: config.volcengine?.secretKey,
+      gptApiKey: config.gpt?.apiKey,
+      geminiApiKey: config.gemini?.apiKey,
+      arkApiKey: config.jimeng45?.arkApiKey,
+      superbedToken: config.imagehosting?.superbedToken,
+    });
+  }
+
   await prisma.user.update({
     where: { id: userId },
     data: {
-      volcengineAccessKey: config.volcengine?.accessKey || null,
-      volcengineSecretKey: config.volcengine?.secretKey || null,
+      volcengineAccessKey: isDesktopSecretStoreEnabled() ? null : config.volcengine?.accessKey || null,
+      volcengineSecretKey: isDesktopSecretStoreEnabled() ? null : config.volcengine?.secretKey || null,
+      hasVolcengineCredentials: !!(config.volcengine?.accessKey && config.volcengine?.secretKey),
       gptApiUrl: config.gpt?.apiUrl || null,
-      gptApiKey: config.gpt?.apiKey || null,
-      geminiApiKey: config.gemini?.apiKey || null,
+      gptApiKey: isDesktopSecretStoreEnabled() ? null : config.gpt?.apiKey || null,
+      hasGptApiKey: !!config.gpt?.apiKey,
+      geminiApiKey: isDesktopSecretStoreEnabled() ? null : config.gemini?.apiKey || null,
       geminiBaseUrl: config.gemini?.baseUrl || null,
       geminiModelName: config.gemini?.modelName || null,
-      arkApiKey: config.jimeng45?.arkApiKey || null,
-      superbedToken: config.imagehosting?.superbedToken || null,
+      hasGeminiApiKey: !!config.gemini?.apiKey,
+      arkApiKey: isDesktopSecretStoreEnabled() ? null : config.jimeng45?.arkApiKey || null,
+      hasArkApiKey: !!config.jimeng45?.arkApiKey,
+      superbedToken: isDesktopSecretStoreEnabled() ? null : config.imagehosting?.superbedToken || null,
+      hasSuperbedToken: !!config.imagehosting?.superbedToken,
       localStoragePath: config.localStorage?.savePath || null,
     }
   });

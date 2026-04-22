@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import Navbar from '@/components/navigation/Navbar';
+import { DesktopUpdateCard } from '@/components/settings/DesktopUpdateCard';
 import { Save, Key, Zap, Sparkles, User, Image, FileText, Plus, Edit, Trash2, Star, StarOff, Cpu, HardDrive, FolderOpen, Folder } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -829,28 +830,32 @@ export default function SettingsPage() {
 
       case 'profile':
         return (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <User className="w-5 h-5 mr-2 text-gray-600" />
-                用户信息
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label>邮箱</Label>
-                <div className="text-gray-700 bg-gray-50 px-3 py-2 rounded border">
-                  {session.user?.email}
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <User className="w-5 h-5 mr-2 text-gray-600" />
+                  用户信息
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label>邮箱</Label>
+                  <div className="text-gray-700 bg-gray-50 px-3 py-2 rounded border">
+                    {session.user?.email}
+                  </div>
                 </div>
-              </div>
-              <div>
-                <Label>用户ID</Label>
-                <div className="text-gray-700 bg-gray-50 px-3 py-2 rounded border font-mono text-sm">
-                  {session.user?.id}
+                <div>
+                  <Label>用户ID</Label>
+                  <div className="text-gray-700 bg-gray-50 px-3 py-2 rounded border font-mono text-sm">
+                    {session.user?.id}
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            <DesktopUpdateCard />
+          </div>
         );
 
       default:

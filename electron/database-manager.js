@@ -1,0 +1,363 @@
+const fs = require('fs');
+const path = require('path');
+const { spawnSync } = require('child_process');
+const { DatabaseSync } = require('node:sqlite');
+const { getPrismaDir, getUserDataPaths } = require('./app-runtime');
+
+const REQUIRED_TABLES = [
+  'users',
+  'accounts',
+  'sessions',
+  'verificationtokens',
+  'task_queue',
+];
+
+const SECRET_STORE_FILE = 'desktop-secrets.json';
+const SECRET_KEYS = [
+  'volcengineAccessKey',
+  'volcengineSecretKey',
+  'gptApiKey',
+  'geminiApiKey',
+  'arkApiKey',
+  'superbedToken',
+];
+
+function ensureDirectory(dirPath) {
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
+}
+
+function getSecretStorePath(app) {
+  const { configDir } = getUserDataPaths(app);
+  ensureDirectory(configDir);
+  return path.join(configDir, SECRET_STORE_FILE);
+}
+
+function readSecretStore(app) {
+  const secretStorePath = getSecretStorePath(app);
+  if (!fs.existsSync(secretStorePath)) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(fs.readFileSync(secretStorePath, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+function writeSecretStore(app, store) {
+  const secretStorePath = getSecretStorePath(app);
+  fs.writeFileSync(secretStorePath, JSON.stringify(store, null, 2), 'utf8');
+}
+
+function encryptSecret(secret) {
+  if (process.platform !== 'win32') {
+    return Buffer.from(secret, 'utf8').toString('base64');
+  }
+
+  const result = spawnSync(
+    'powershell.exe',
+    [
+      '-NoProfile',
+      '-NonInteractive',
+      '-Command',
+      '$secure = ConvertTo-SecureString -String $env:IMAGINE_THIS_SECRET -AsPlainText -Force; ' +
+        '$encrypted = ConvertFrom-SecureString -SecureString $secure; ' +
+        '[Console]::Out.Write($encrypted)'
+    ],
+    {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        IMAGINE_THIS_SECRET: secret,
+      },
+    }
+  );
+
+  if (result.status !== 0) {
+    throw new Error(result.stderr || 'Failed to encrypt secret');
+  }
+
+  return result.stdout.trim();
+}
+
+function getMigrationFiles(app) {
+  const migrationRoot = path.join(getPrismaDir(app), 'migrations');
+  if (!fs.existsSync(migrationRoot)) {
+    return [];
+  }
+
+  return fs
+    .readdirSync(migrationRoot)
+    .map((name) => ({
+      name,
+      filePath: path.join(migrationRoot, name, 'migration.sql'),
+    }))
+    .filter((item) => fs.existsSync(item.filePath))
+    .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function ensureMigrationTable(database) {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS desktop_migrations (
+      name TEXT NOT NULL PRIMARY KEY,
+      checksum TEXT,
+      appliedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+}
+
+function hasRequiredDatabaseSchema(database) {
+  const statement = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table'");
+  const rows = statement.all();
+  const existingTables = new Set(rows.map((row) => row.name));
+  return REQUIRED_TABLES.every((tableName) => existingTables.has(tableName));
+}
+
+function checksum(text) {
+  return require('crypto').createHash('sha256').update(text).digest('hex');
+}
+
+function markMigrationApplied(database, migrationName, migrationSql) {
+  const insert = database.prepare(`
+    INSERT OR REPLACE INTO desktop_migrations (name, checksum, appliedAt)
+    VALUES (?, ?, CURRENT_TIMESTAMP)
+  `);
+  insert.run(migrationName, checksum(migrationSql));
+}
+
+function backupDatabase(dbPath, backupDir, prefix) {
+  ensureDirectory(backupDir);
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const backupPath = path.join(backupDir, `${prefix}-${timestamp}.db`);
+  fs.copyFileSync(dbPath, backupPath);
+  return backupPath;
+}
+
+function isDatabaseCorrupted(dbPath) {
+  if (!fs.existsSync(dbPath)) {
+    return false;
+  }
+
+  try {
+    const fd = fs.openSync(dbPath, 'r');
+    const buffer = Buffer.alloc(16);
+    fs.readSync(fd, buffer, 0, 16, 0);
+    fs.closeSync(fd);
+    const header = buffer.toString('utf8', 0, 15);
+    return !header.startsWith('SQLite format');
+  } catch {
+    return true;
+  }
+}
+
+function removeDatabaseSidecars(dbPath) {
+  for (const filePath of [`${dbPath}-wal`, `${dbPath}-shm`, `${dbPath}-journal`]) {
+    if (fs.existsSync(filePath)) {
+      fs.rmSync(filePath, { force: true });
+    }
+  }
+}
+
+function restoreDatabaseFromTemplate(app, dbPath, log) {
+  const templateDbPath = path.join(getPrismaDir(app), 'app.db');
+  if (!fs.existsSync(templateDbPath)) {
+    throw new Error(`Template database path does not exist: ${templateDbPath}`);
+  }
+
+  fs.copyFileSync(templateDbPath, dbPath);
+  log(`Database restored from template: ${templateDbPath}`);
+}
+
+function runSqlMigrations(app, dbPath, log) {
+  const database = new DatabaseSync(dbPath);
+
+  try {
+    ensureMigrationTable(database);
+    const migrationFiles = getMigrationFiles(app);
+    if (migrationFiles.length === 0) {
+      log('No SQL migrations found, skipping desktop migration step');
+      return;
+    }
+
+    const appliedRows = database.prepare('SELECT name FROM desktop_migrations').all();
+    const appliedNames = new Set(appliedRows.map((row) => row.name));
+
+    if (appliedNames.size === 0 && hasRequiredDatabaseSchema(database)) {
+      const baseline = migrationFiles[0];
+      const baselineSql = fs.readFileSync(baseline.filePath, 'utf8');
+      markMigrationApplied(database, baseline.name, baselineSql);
+      appliedNames.add(baseline.name);
+      log(`Marked existing database baseline as applied: ${baseline.name}`);
+    }
+
+    for (const migration of migrationFiles) {
+      if (appliedNames.has(migration.name)) {
+        continue;
+      }
+
+      const migrationSql = fs.readFileSync(migration.filePath, 'utf8');
+      log(`Applying desktop migration: ${migration.name}`);
+      database.exec('BEGIN');
+      try {
+        database.exec(migrationSql);
+        markMigrationApplied(database, migration.name, migrationSql);
+        database.exec('COMMIT');
+      } catch (error) {
+        database.exec('ROLLBACK');
+        throw error;
+      }
+    }
+  } finally {
+    database.close();
+  }
+}
+
+function migrateLegacySecrets(app, dbPath, log) {
+  const database = new DatabaseSync(dbPath);
+
+  try {
+    const columns = new Set(
+      database
+        .prepare("PRAGMA table_info('users')")
+        .all()
+        .map((column) => column.name)
+    );
+
+    const hasLegacyColumns = SECRET_KEYS.every((key) => columns.has(key))
+      && columns.has('hasVolcengineCredentials')
+      && columns.has('hasGptApiKey')
+      && columns.has('hasGeminiApiKey')
+      && columns.has('hasArkApiKey')
+      && columns.has('hasSuperbedToken');
+
+    if (!hasLegacyColumns) {
+      return;
+    }
+
+    const users = database.prepare(`
+      SELECT
+        id,
+        volcengineAccessKey,
+        volcengineSecretKey,
+        gptApiKey,
+        geminiApiKey,
+        arkApiKey,
+        superbedToken,
+        hasVolcengineCredentials,
+        hasGptApiKey,
+        hasGeminiApiKey,
+        hasArkApiKey,
+        hasSuperbedToken
+      FROM users
+    `).all();
+
+    if (users.length === 0) {
+      return;
+    }
+
+    const store = readSecretStore(app);
+    let migratedCount = 0;
+
+    for (const user of users) {
+      const encryptedSecrets = {};
+
+      if (user.volcengineAccessKey) {
+        encryptedSecrets.volcengineAccessKey = encryptSecret(user.volcengineAccessKey);
+      }
+      if (user.volcengineSecretKey) {
+        encryptedSecrets.volcengineSecretKey = encryptSecret(user.volcengineSecretKey);
+      }
+      if (user.gptApiKey) {
+        encryptedSecrets.gptApiKey = encryptSecret(user.gptApiKey);
+      }
+      if (user.geminiApiKey) {
+        encryptedSecrets.geminiApiKey = encryptSecret(user.geminiApiKey);
+      }
+      if (user.arkApiKey) {
+        encryptedSecrets.arkApiKey = encryptSecret(user.arkApiKey);
+      }
+      if (user.superbedToken) {
+        encryptedSecrets.superbedToken = encryptSecret(user.superbedToken);
+      }
+
+      if (Object.keys(encryptedSecrets).length === 0) {
+        continue;
+      }
+
+      store[user.id] = {
+        ...(store[user.id] || {}),
+        ...encryptedSecrets,
+      };
+
+      database.prepare(`
+        UPDATE users
+        SET
+          volcengineAccessKey = NULL,
+          volcengineSecretKey = NULL,
+          gptApiKey = NULL,
+          geminiApiKey = NULL,
+          arkApiKey = NULL,
+          superbedToken = NULL,
+          hasVolcengineCredentials = ?,
+          hasGptApiKey = ?,
+          hasGeminiApiKey = ?,
+          hasArkApiKey = ?,
+          hasSuperbedToken = ?
+        WHERE id = ?
+      `).run(
+        !!(user.volcengineAccessKey && user.volcengineSecretKey),
+        !!user.gptApiKey,
+        !!user.geminiApiKey,
+        !!user.arkApiKey,
+        !!user.superbedToken,
+        user.id
+      );
+
+      migratedCount += 1;
+    }
+
+    if (migratedCount > 0) {
+      writeSecretStore(app, store);
+      log(`Migrated ${migratedCount} legacy user secret record(s) to desktop secret store`);
+    }
+  } finally {
+    database.close();
+  }
+}
+
+async function ensureDesktopDatabaseReady(app, log) {
+  const { dataDir, configDir, dbPath, backupDir } = getUserDataPaths(app);
+  ensureDirectory(dataDir);
+  ensureDirectory(configDir);
+  ensureDirectory(backupDir);
+
+  log(`Initializing database at: ${dbPath}`);
+
+  if (fs.existsSync(dbPath) && isDatabaseCorrupted(dbPath)) {
+    const corruptedBackup = backupDatabase(dbPath, backupDir, 'corrupted');
+    log(`Database was corrupted, backup created at: ${corruptedBackup}`, 'WARN');
+    fs.rmSync(dbPath, { force: true });
+    removeDatabaseSidecars(dbPath);
+  }
+
+  if (!fs.existsSync(dbPath)) {
+    log('Database does not exist, restoring from template...');
+    restoreDatabaseFromTemplate(app, dbPath, log);
+  } else {
+    const migrationBackup = backupDatabase(dbPath, backupDir, 'pre-migration');
+    log(`Created pre-migration backup: ${migrationBackup}`);
+  }
+
+  runSqlMigrations(app, dbPath, log);
+  migrateLegacySecrets(app, dbPath, log);
+
+  return dbPath;
+}
+
+module.exports = {
+  ensureDesktopDatabaseReady,
+  getUserDataPaths,
+};

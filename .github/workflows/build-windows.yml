@@ -1,15 +1,17 @@
 name: Build Windows App
 
 on:
-  workflow_dispatch:  # 手动触发
+  workflow_dispatch:
   push:
     tags:
-      - 'v*'  # 当推送 tag 时触发
+      - 'v*'
 
 jobs:
   build-windows:
     runs-on: windows-latest
-    
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -23,12 +25,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Setup environment
+      - name: Validate tag version matches package.json
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
         run: |
-          # 创建 .env.production 文件
-          echo "DATABASE_URL=file:./data/app.db" > .env.production
-          echo "NEXTAUTH_URL=http://localhost:23000" >> .env.production
-          echo "NEXTAUTH_SECRET=your-production-secret-key-min-32-chars" >> .env.production
+          $packageJson = Get-Content package.json -Raw | ConvertFrom-Json
+          $expectedTag = "v$($packageJson.version)"
+          if ("${{ github.ref_name }}" -ne $expectedTag) {
+            throw "Git tag ${{ github.ref_name }} does not match package.json version $($packageJson.version)"
+          }
+
+      - name: Setup environment
+        shell: pwsh
+        run: |
+          @"
+          DATABASE_URL=file:./data/app.db
+          NEXTAUTH_URL=http://localhost:23000
+          NEXTAUTH_SECRET=your-production-secret-key-min-32-chars
+          DESKTOP_UPDATE_BASE_URL=https://your-domain.example.com
+          "@ | Set-Content .env.production
 
       - name: Generate Prisma Client
         run: npx prisma generate
@@ -41,20 +56,26 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Windows Installer
+      - name: Upload Windows build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-installer
           path: |
             dist-electron/*.exe
-            dist-electron/*.exe.blockmap
+            dist-electron/*.blockmap
+            dist-electron/latest*.yml
           retention-days: 30
 
-      - name: Upload to Release (if tag)
+      - name: Publish private GitHub Release assets
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
+          draft: false
+          prerelease: false
+          generate_release_notes: true
           files: |
             dist-electron/*.exe
+            dist-electron/*.blockmap
+            dist-electron/latest*.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

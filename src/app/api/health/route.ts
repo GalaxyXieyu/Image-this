@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import packageJson from '../../../../package.json';
 
 export async function GET() {
   try {
@@ -14,7 +15,7 @@ export async function GET() {
         database: 'connected',
         application: 'running'
       },
-      version: process.env.npm_package_version || '1.0.0',
+      version: packageJson.version,
       environment: process.env.NODE_ENV || 'development'
     };
 
