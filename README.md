@@ -2,7 +2,7 @@
 
 # Imagine This
 
-**专业的 AI 图像处理平台**
+**专业的 AI 图像与视频处理平台**
 
 [![Next.js](https://img.shields.io/badge/Next.js-15.3-black?style=flat-square&logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
@@ -10,7 +10,9 @@
 [![Prisma](https://img.shields.io/badge/Prisma-5.22-2D3748?style=flat-square&logo=prisma)](https://www.prisma.io/)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 
-[功能特性](#功能特性) • [界面预览](#界面预览) • [技术栈](#技术栈) • [快速开始](#快速开始) • [部署](#部署)
+[功能特性](#功能特性) · [界面预览](#界面预览) · [技术栈](#技术栈) · [快速开始](#快速开始) · [API 文档](#api-文档)
+
+[English](README.en.md)
 
 </div>
 
@@ -18,7 +20,7 @@
 
 ## 项目简介
 
-**Imagine This** 是一个基于 Next.js 15 构建的现代化全栈 AI 图像处理平台，支持 **Web 端** 和 **桌面端（Windows/macOS）** 双平台运行。集成了多种先进的 AI 模型（Gemini、GPT-4 Vision、即梦），为用户提供专业级的图像处理能力。
+**Imagine This** 是一个基于 Next.js 15 构建的现代化全栈 AI 图像处理平台，支持 **Web 端** 和 **桌面端（Windows / macOS / Linux）** 多平台运行。集成多种先进的 AI 模型（Gemini、GPT-4o、通义千问、即梦、火山引擎），为用户提供专业级的图像处理与视频生成能力。
 
 ## 界面预览
 
@@ -59,21 +61,31 @@
 
 | 功能 | 描述 | 支持的 AI 模型 |
 |------|------|---------------|
-| **一键增强** | 背景替换 + 智能扩图 + 高清化 + 水印，一键完成 | Gemini / GPT-4 / 即梦 |
-| **智能换背景** | AI 自动识别主体，精准更换背景 | Gemini / GPT-4 / 即梦 |
+| **一键增强** | 背景替换 + 智能扩图 + 高清化 + 水印，一键完成 | Gemini / GPT-4o / 即梦 / 通义千问 |
+| **智能换背景** | AI 自动识别主体，精准更换背景，保持产品细节 | Gemini / GPT-4o / 即梦 / 通义千问 |
 | **智能扩图** | AI 智能扩展图片边界，保持内容自然连贯 | 火山引擎 |
-| **AI 高清化** | 使用先进算法提升分辨率和细节 | 火山引擎 |
-| **叠加水印** | 支持文字水印，可自定义位置和样式 | 本地处理 |
+| **AI 高清化** | 使用先进算法提升分辨率和细节，支持 HDR / 白平衡 | 火山引擎 |
+| **叠加水印** | 支持文字水印和 Logo 水印，可拖拽定位、自由缩放 | 本地处理 |
+| **图生视频** | 基于首帧图片生成 5s / 10s AI 视频 | 即梦 (火山引擎) |
+
+### 🤖 智能质量审核
+
+- 基于 Gemini 的自动质量评估，从 **产品细节保持**、**纹理一致性**、**背景融合度** 三个维度打分（1-10 分）
+- 自动识别问题并给出提示词优化建议
+- 支持一键保存高质量提示词为模板
 
 ### 📋 核心功能
 
-- **用户认证系统** - 基于 NextAuth.js 的安全认证
-- **任务队列系统** - 异步处理，支持批量任务，实时进度反馈
+- **用户认证系统** - 基于 NextAuth.js 的安全认证，支持注册登录
+- **多提供商密钥管理** - 每个用户独立配置 Gemini、GPT、即梦、火山引擎、通义千问 API 密钥
+- **任务队列系统** - 异步处理，支持批量任务，实时进度反馈，自动重试（最多 3 次）
+- **项目管理** - 按项目分组管理图片和任务
 - **图片库管理** - 按类型分类，支持文件夹管理
-- **提示词模板** - 可自定义的提示词模板系统
-- **任务历史** - 完整的处理历史记录，支持重试和查看详情
-- **图床集成** - 支持 Superbed 图床服务
-- **桌面应用** - 支持 Windows 和 macOS 桌面端
+- **提示词模板** - 可自定义的提示词模板系统，支持系统预设 + 用户自定义
+- **任务历史** - 完整的处理历史记录，支持重试、取消和查看详情
+- **图床集成** - 支持 Superbed 图床服务，本地存储，可选 MinIO
+- **桌面应用** - 支持 Windows、macOS、Linux 桌面端，内置自动更新
+- **模型动态切换** - 工作区内可实时切换不同 AI 提供商和模型
 
 ## 技术栈
 
@@ -85,24 +97,27 @@
 | TypeScript | 5.x | 类型安全 |
 | Tailwind CSS | 3.x | 原子化 CSS |
 | shadcn/ui | - | 高质量 UI 组件库 |
-| Framer Motion | - | 动画库 |
+| Motion | - | 动画库 |
 | React Hook Form + Zod | - | 表单处理和验证 |
+| React Konva | - | Canvas 水印编辑器 |
 
 ### 后端
 | 技术 | 版本 | 用途 |
 |------|------|------|
 | Next.js API Routes | 15.3 | RESTful API |
 | Prisma ORM | 5.22 | 类型安全的数据库访问 |
-| SQLite | - | 数据库（开发/桌面端） |
+| SQLite | - | 数据库（开发 / 桌面端） |
 | NextAuth.js | 4.x | 身份认证 |
 | Sharp | - | 图像处理 |
 
 ### AI 服务
 | 服务 | 用途 |
 |------|------|
-| Google Gemini | 背景替换、图像理解 |
-| GPT-4 Vision | 背景替换、图像理解 |
-| 火山引擎即梦 | 背景替换、智能扩图、高清化 |
+| Google Gemini | 背景替换、图像理解、质量审核 |
+| GPT-4o (yunwu.ai) | 背景替换、图像理解 |
+| 通义千问 (Qwen) | 背景替换 |
+| 火山引擎即梦 | 背景替换、图生视频 |
+| 火山引擎视觉 API | 智能扩图、画质增强 |
 | Superbed | 图床服务 |
 
 ### 桌面端
@@ -110,12 +125,13 @@
 |------|------|------|
 | Electron | 39.x | 桌面应用框架 |
 | electron-builder | 26.x | 应用打包 |
+| electron-updater | - | 自动更新 |
 
 ## 快速开始
 
 ### 环境要求
 
-- Node.js 20.x（推荐使用 LTS 版本）
+- Node.js 20.x - 23.x（推荐使用 LTS 版本）
 - npm 或 pnpm
 
 ### 安装步骤
@@ -130,7 +146,7 @@ npm install
 
 # 3. 配置环境变量
 cp .env.example .env
-# 编辑 .env 文件，配置必要的 API Key
+# 编辑 .env 文件，配置 DATABASE_URL 和 NEXTAUTH_SECRET
 
 # 4. 初始化数据库
 # 默认配置会使用仓库内置的 SQLite 模板库：prisma/app.db（可直接启动）。
@@ -142,21 +158,28 @@ cp .env.example .env
 npm run dev
 ```
 
-访问 [http://localhost:23000](http://localhost:23000) 查看应用。
+访问 [http://localhost:34123](http://localhost:34123) 查看应用。
+
+### 桌面端开发
+
+```bash
+# 同时启动 Web 服务和 Electron 桌面端
+npm run electron:dev
+```
 
 ## API 申请指南
 
-本项目需要申请以下 API 服务才能正常使用所有功能。请按照以下步骤进行申请和配置。
+本项目需要申请以下 API 服务才能正常使用所有功能。
 
 ### 1. GPT 和 Gemini API
 
-用于图像理解、背景替换等 AI 图像处理功能。
+用于图像理解、背景替换、质量审核等 AI 图像处理功能。
 
 **注册地址：** [https://yunwu.zeabur.app/register?aff=lulv](https://yunwu.zeabur.app/register?aff=lulv)
 
 **需要配置的渠道：**
-- **Gemini**：用于图像理解和背景替换
-- **Azure OpenAI (GPT-4)**：作为 Gemini 的备选方案，提供更强的图像理解能力
+- **Gemini**：用于图像理解、背景替换、质量审核
+- **Azure OpenAI (GPT-4o)**：作为备选方案，提供图像理解能力
 
 注册后在该平台创建 API Key，然后在应用的设置页面中配置对应渠道的 API Key 即可。
 
@@ -173,12 +196,9 @@ npm run dev
 
 > ⚠️ **注意：** 火山引擎的控制台页面比较分散，建议收藏以上链接方便后续查找。
 
-```bash
-# 火山引擎 API 密钥
-VOLCENGINE_ACCESS_KEY="你的AccessKey"
-VOLCENGINE_SECRET_KEY="你的SecretKey"
-```
----
+### 3. 通义千问 API (可选)
+
+用于背景替换功能备选方案。
 
 ## 部署
 
@@ -194,7 +214,7 @@ npm run build:mac
 
 打包产物位于 `dist-electron/` 目录：
 - **Windows**: `ImagineThis-x.x.x-x64-Setup.exe`（安装版）、`ImagineThis-x.x.x-x64-Portable.exe`（便携版）
-- **macOS**: `ImagineThis-x.x.x.dmg`
+- **macOS**: `ImagineThis-x.x.x.dmg`（支持 Intel / Apple Silicon）
 
 ### Web 服务部署
 
@@ -202,15 +222,8 @@ npm run build:mac
 # 构建
 npm run build
 
-# 使用 PM2 启动
-npm run pm2:start
-```
-
-### Docker 部署
-
-```bash
-docker build -t imagine-this .
-docker run -d -p 34000:3000 --env-file .env --name imagine-this imagine-this
+# 启动生产服务
+npm start
 ```
 
 ## API 文档
@@ -224,26 +237,49 @@ docker run -d -p 34000:3000 --env-file .env --name imagine-this imagine-this
 | `/api/images-process/enhance` | POST | 画质增强 |
 | `/api/images-process/watermark` | POST | 叠加水印 |
 
+### 视频生成
+| 端点 | 方法 | 描述 |
+|------|------|------|
+| `/api/jimeng-video/submit` | POST | 提交图生视频任务 |
+| `/api/jimeng-video/query` | POST | 查询视频生成结果 |
+
+### 质量审核
+| 端点 | 方法 | 描述 |
+|------|------|------|
+| `/api/quality-review` | POST | AI 智能质量审核 |
+
 ### 任务管理
 | 端点 | 方法 | 描述 |
 |------|------|------|
-| `/api/tasks` | GET | 获取任务列表 |
-| `/api/tasks/:id` | GET | 获取任务详情 |
-| `/api/tasks/:id` | DELETE | 删除任务 |
+| `/api/tasks` | GET / POST | 获取 / 创建任务 |
+| `/api/tasks/:id` | GET / DELETE | 获取详情 / 删除 |
 | `/api/tasks/retry` | POST | 重试失败任务 |
+| `/api/tasks/recover` | POST | 恢复卡住的任务 |
+| `/api/tasks/cron` | POST | 定时任务轮询 |
 | `/api/tasks/worker` | POST | 任务处理器 |
 
-### 图片管理
+### 图片与文件
 | 端点 | 方法 | 描述 |
 |------|------|------|
-| `/api/images` | GET | 获取图片列表 |
-| `/api/images/:id` | DELETE | 删除图片 |
+| `/api/images` | GET / POST | 获取 / 创建图片记录 |
+| `/api/images/:id` | GET / DELETE | 获取 / 删除图片 |
+| `/api/files/:path*` | GET | 本地文件访问 |
 
 ### 提示词模板
 | 端点 | 方法 | 描述 |
 |------|------|------|
-| `/api/prompt-templates` | GET/POST | 获取/创建模板 |
-| `/api/prompt-templates/:id` | PUT/DELETE | 更新/删除模板 |
+| `/api/prompt-templates` | GET / POST | 获取 / 创建模板 |
+| `/api/prompt-templates/:id` | PUT / DELETE | 更新 / 删除模板 |
+
+### 项目与设置
+| 端点 | 方法 | 描述 |
+|------|------|------|
+| `/api/projects` | GET / POST | 获取 / 创建项目 |
+| `/api/projects/:id` | GET / PUT / DELETE | 项目详情 / 更新 / 删除 |
+| `/api/settings` | GET / PUT | 用户设置（含 API 密钥） |
+| `/api/models` | GET | 获取可用 AI 模型列表 |
+
+## 项目结构
 
 ```
 ai-images-generated/
@@ -251,8 +287,10 @@ ai-images-generated/
 │   ├── app/                    # Next.js App Router
 │   │   ├── api/               # API 路由
 │   │   │   ├── images-process/  # 图像处理 API
+│   │   │   ├── jimeng-video/    # 视频生成 API
+│   │   │   ├── quality-review/  # 质量审核 API
 │   │   │   ├── tasks/           # 任务管理 API
-│   │   │   └── ...              # 其他 API
+│   │   │   └── ...
 │   │   ├── auth/              # 认证页面
 │   │   ├── gallery/           # 图片库页面
 │   │   ├── history/           # 任务中心页面
@@ -262,19 +300,14 @@ ai-images-generated/
 │   │   ├── ui/               # shadcn/ui 组件
 │   │   └── workspace/        # 工作区组件
 │   ├── lib/                  # 工具库
-│   │   ├── image-processor/  # 图像处理核心
-│   │   └── ...               # 其他工具
-│   └── hooks/                # 自定义 Hooks
+│   │   ├── image-processor/  # 图像处理核心（工厂模式）
+│   │   └── ...
+│   └── stores/               # Zustand 状态管理
 ├── prisma/                   # Prisma 数据库
 │   └── schema.prisma        # 数据库模型
 ├── electron/                 # Electron 桌面端
-│   ├── main.js              # 主进程
-│   └── preload.js           # 预加载脚本
 ├── scripts/                  # 构建脚本
-│   ├── build-windows.mjs    # Windows 打包
-│   └── build-mac.mjs        # macOS 打包
-├── docs/                     # 文档
-│   └── screenshots/         # 界面截图
+├── docs/                     # 文档与截图
 └── public/                   # 静态资源
 ```
 
@@ -282,18 +315,15 @@ ai-images-generated/
 
 ### 重新生成 README 截图
 
-如果 `docs/screenshots/` 下截图缺失，可以用 Playwright 自动启动本地服务并重建这些图片文件（文件名与 README 引用保持一致）。
-
 ```bash
-# 首次需要安装浏览器依赖（会下载 Chromium）
+# 首次需要安装浏览器依赖
 npx playwright install chromium
 
-# 一键生成 README 截图（默认会自动启动 Next.js dev server）
+# 一键生成 README 截图
 npm run screenshots:readme
 
-# 如果你想自己先启动服务（例如在受限环境中），可以这样运行：
-# 终端 A：npm run dev
-# 终端 B：SCREENSHOT_SKIP_SERVER=true npm run screenshots:readme
+# 如果你已经启动了服务
+SCREENSHOT_SKIP_SERVER=true npm run screenshots:readme
 ```
 
 生成产物：`docs/screenshots/*.png`
@@ -302,7 +332,7 @@ npm run screenshots:readme
 
 ```bash
 # 开发
-npm run dev              # 启动开发服务器 (端口 23000)
+npm run dev              # 启动开发服务器 (端口 34123)
 npm run electron:dev     # 启动 Electron 开发模式
 
 # 构建
@@ -315,7 +345,7 @@ npm run clean            # 清理构建缓存
 
 # 数据库
 npx prisma studio        # 打开 Prisma Studio
-npx prisma migrate dev   # 创建并应用迁移
+npx prisma db push       # 推送 schema 变更
 npx prisma generate      # 生成 Prisma Client
 ```
 
@@ -338,7 +368,7 @@ npx prisma generate      # 生成 Prisma Client
 - [Next.js](https://nextjs.org/) - React 全栈框架
 - [shadcn/ui](https://ui.shadcn.com/) - 精美的 UI 组件库
 - [Prisma](https://www.prisma.io/) - 现代化 ORM
-- [火山引擎即梦](https://www.volcengine.com/) - AI 图像处理服务
+- [火山引擎即梦](https://www.volcengine.com/) - AI 图像与视频处理服务
 
 ## 联系方式
 

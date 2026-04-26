@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Imagine This** is a full-stack AI image processing platform built with Next.js 15 (App Router), supporting both web and desktop (Electron) deployments. It integrates multiple AI providers (Gemini, GPT-4 Vision, Volcengine/Jimeng) for image processing tasks.
+**Imagine This** is a full-stack AI image processing platform built with Next.js 15 (App Router), supporting both web and desktop (Electron) deployments. It integrates multiple AI providers (Gemini, GPT-4o, Volcengine, Jimeng, Qwen) for image processing tasks including background replacement, outpainting, upscaling, watermarking, and video generation.
 
 ## Common Commands
 
 ```bash
 # Development
-npm run dev              # Start dev server on port 23000
+npm run dev              # Start dev server on port 34123
 npm run electron:dev     # Start Electron dev mode (web + desktop)
 
 # Build
@@ -45,15 +45,20 @@ src/
 ├── app/                    # Next.js App Router pages and API routes
 │   ├── api/
 │   │   ├── images-process/ # Core image processing endpoints
-│   │   ├── tasks/          # Task queue management
+│   │   ├── tasks/          # Task queue management (cron, recover, retry, worker)
 │   │   ├── volcengine/     # Volcengine AI service
-│   │   └── jimeng/         # Jimeng AI service
+│   │   ├── jimeng/         # Jimeng AI image generation
+│   │   ├── jimeng-video/   # Jimeng video generation (ti2v)
+│   │   ├── quality-review/ # AI quality review (Gemini-based)
+│   │   ├── models/         # Available AI models listing
+│   │   └── files/          # File serving (local uploads)
 │   └── workspace/          # Main workspace UI
 ├── lib/
 │   └── image-processor/    # AI provider abstraction layer
-│       ├── providers/      # Gemini, GPT, Qwen, Jimeng implementations
+│       ├── providers/      # Gemini, GPT, Qwen, Jimeng, Volcengine
 │       ├── factory.ts      # Provider factory pattern
-│       └── types.ts        # Shared types and interfaces
+│       ├── types.ts        # Shared types and interfaces
+│       └── utils/          # API client, image converter, signatures
 ├── stores/                 # Zustand stores
 │   └── useWorkspaceTabStore.ts  # Workspace tab state management
 └── components/
@@ -82,20 +87,22 @@ Async processing via `TaskQueue` model:
 
 ### Workspace Tabs
 
-Five processing modes managed by `useWorkspaceTabStore`:
+Six processing modes managed by `useWorkspaceTabStore`:
 - `one-click`: Combined workflow (background + outpaint + enhance + watermark)
 - `background`: Background replacement
 - `expansion`: Image outpainting
 - `upscaling`: Image enhancement/upscaling
-- `watermark`: Watermark overlay
+- `watermark`: Watermark overlay (text or logo, draggable/resizeable)
+- `video`: Image-to-video generation (Jimeng ti2v)
 
 ## Database
 
 SQLite with Prisma ORM. Key models:
-- `User`: Auth + API credentials storage (Volcengine, GPT, Gemini keys)
-- `TaskQueue`: Async task management
-- `ProcessedImage`: Processing results
-- `PromptTemplate`: User-defined prompt templates
+- `User`: Auth + API credentials storage (Volcengine, GPT, Gemini, Jimeng/Qwen keys, Superbed token, local storage path)
+- `TaskQueue`: Async task management with priority, progress, retry
+- `ProcessedImage`: Processing results with quality score and review
+- `PromptTemplate`: User-defined + system prompt templates by category
+- `Project`: Image/task grouping per user
 
 Default database: `prisma/app.db` (template included in repo)
 
@@ -108,5 +115,5 @@ Required in `.env`:
 
 ## Ports
 
-- Development: `23000`
-- Production: `34000`
+- Development: `34123`
+- Production: `34123`
