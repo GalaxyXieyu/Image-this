@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Loader2, Play, RefreshCw, Wand2 } from "lucide-react";
+import { CheckCircle2, Loader2, Play, RefreshCw, RotateCcw, Wand2 } from "lucide-react";
 import { ActiveTab } from './WorkspaceSidebar';
 
 interface ActionButtonsProps {
@@ -32,10 +32,14 @@ export default function ActionButtons({
         }
     };
 
-    // 切换标签或修改参数时，立即恢复按钮状态
-    useEffect(() => {
+    const resetRequestState = () => {
         clearResetTimer();
         setIsClicked(false);
+    };
+
+    // 切换标签或修改参数时，立即恢复按钮状态
+    useEffect(() => {
+        resetRequestState();
     }, [activeTab, resetKey]);
 
     useEffect(() => {
@@ -59,57 +63,75 @@ export default function ActionButtons({
         }
     };
 
-    if (activeTab === "watermark") {
-        return (
-            <Button
-                size="lg"
-                onClick={handleClick}
-                disabled={disabled || isProcessing || isClicked}
-                className="w-full py-6 text-xl font-semibold bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white disabled:opacity-50 shadow-xl hover:shadow-2xl transition-all duration-300"
-            >
-                {isClicked && !isProcessing ? (
-                    <>
-                        <CheckCircle2 className="w-6 h-6 mr-3 text-green-400" />
-                        已接收请求
-                    </>
-                ) : isProcessing ? (
-                    <>
-                        <Loader2 className="w-6 h-6 mr-3 animate-spin" />
-                        处理中...
-                    </>
-                ) : (
-                    <>
-                        <Wand2 className="w-6 h-6 mr-3" />
-                        开始处理
-                    </>
-                )}
-            </Button>
-        );
-    }
-
-    return (
-        <Button
-            size="lg"
-            onClick={handleClick}
-            disabled={disabled || isClicked}
-            className="w-full py-6 text-xl font-semibold bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white disabled:opacity-50 shadow-xl hover:shadow-2xl transition-all duration-300"
-        >
-            {isClicked && !isProcessing ? (
+    const renderButtonContent = () => {
+        if (isClicked && !isProcessing) {
+            return (
                 <>
                     <CheckCircle2 className="w-6 h-6 mr-3 text-green-400" />
                     已接收请求
                 </>
-            ) : isProcessing ? (
+            );
+        }
+
+        if (isProcessing) {
+            if (activeTab === "watermark") {
+                return (
+                    <>
+                        <Loader2 className="w-6 h-6 mr-3 animate-spin" />
+                        处理中...
+                    </>
+                );
+            }
+
+            return (
                 <>
                     <RefreshCw className="w-6 h-6 mr-3 animate-spin" />
                     处理中...
                 </>
-            ) : (
+            );
+        }
+
+        if (activeTab === "watermark") {
+            return (
                 <>
-                    <Play className="w-6 h-6 mr-3" />
-                    开始{currentTabTitle}
+                    <Wand2 className="w-6 h-6 mr-3" />
+                    开始处理
                 </>
+            );
+        }
+
+        return (
+            <>
+                <Play className="w-6 h-6 mr-3" />
+                开始{currentTabTitle}
+            </>
+        );
+    };
+
+    return (
+        <div className="space-y-3">
+            {isClicked && !isProcessing && (
+                <div className="flex justify-end">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={resetRequestState}
+                        className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                    >
+                        <RotateCcw className="w-4 h-4 mr-2" />
+                        重置请求
+                    </Button>
+                </div>
             )}
-        </Button>
+
+            <Button
+                size="lg"
+                onClick={handleClick}
+                disabled={disabled || isClicked || (activeTab === "watermark" && isProcessing)}
+                className="w-full py-6 text-xl font-semibold bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white disabled:opacity-50 shadow-xl hover:shadow-2xl transition-all duration-300"
+            >
+                {renderButtonContent()}
+            </Button>
+        </div>
     );
 }

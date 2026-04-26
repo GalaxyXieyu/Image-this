@@ -21,6 +21,24 @@ const SECRET_KEYS = [
   'arkApiKey',
   'superbedToken',
 ];
+const USER_COLUMN_PATCHES = [
+  {
+    name: 'gptModelName',
+    sql: `ALTER TABLE "users" ADD COLUMN "gptModelName" TEXT`,
+  },
+  {
+    name: 'jimengBaseUrl',
+    sql: `ALTER TABLE "users" ADD COLUMN "jimengBaseUrl" TEXT`,
+  },
+  {
+    name: 'jimengModelName',
+    sql: `ALTER TABLE "users" ADD COLUMN "jimengModelName" TEXT`,
+  },
+  {
+    name: 'hasJimengCredentials',
+    sql: `ALTER TABLE "users" ADD COLUMN "hasJimengCredentials" BOOLEAN NOT NULL DEFAULT false`,
+  },
+];
 
 function ensureDirectory(dirPath) {
   if (!fs.existsSync(dirPath)) {
@@ -134,6 +152,10 @@ function backupDatabase(dbPath, backupDir, prefix) {
   const backupPath = path.join(backupDir, `${prefix}-${timestamp}.db`);
   fs.copyFileSync(dbPath, backupPath);
   return backupPath;
+}
+
+function toSqliteBoolean(value) {
+  return value ? 1 : 0;
 }
 
 function isDatabaseCorrupted(dbPath) {
@@ -308,11 +330,11 @@ function migrateLegacySecrets(app, dbPath, log) {
           hasSuperbedToken = ?
         WHERE id = ?
       `).run(
-        !!(user.volcengineAccessKey && user.volcengineSecretKey),
-        !!user.gptApiKey,
-        !!user.geminiApiKey,
-        !!user.arkApiKey,
-        !!user.superbedToken,
+        toSqliteBoolean(user.volcengineAccessKey && user.volcengineSecretKey),
+        toSqliteBoolean(user.gptApiKey),
+        toSqliteBoolean(user.geminiApiKey),
+        toSqliteBoolean(user.arkApiKey),
+        toSqliteBoolean(user.superbedToken),
         user.id
       );
 
@@ -322,6 +344,30 @@ function migrateLegacySecrets(app, dbPath, log) {
     if (migratedCount > 0) {
       writeSecretStore(app, store);
       log(`Migrated ${migratedCount} legacy user secret record(s) to desktop secret store`);
+    }
+  } finally {
+    database.close();
+  }
+}
+
+function patchUserSchemaColumns(dbPath, log) {
+  const database = new DatabaseSync(dbPath);
+
+  try {
+    const existingColumns = new Set(
+      database
+        .prepare("PRAGMA table_info('users')")
+        .all()
+        .map((column) => column.name)
+    );
+
+    for (const patch of USER_COLUMN_PATCHES) {
+      if (existingColumns.has(patch.name)) {
+        continue;
+      }
+
+      database.exec(patch.sql);
+      log(`Patched users table with missing column: ${patch.name}`);
     }
   } finally {
     database.close();
@@ -352,6 +398,7 @@ async function ensureDesktopDatabaseReady(app, log) {
   }
 
   runSqlMigrations(app, dbPath, log);
+  patchUserSchemaColumns(dbPath, log);
   migrateLegacySecrets(app, dbPath, log);
 
   return dbPath;

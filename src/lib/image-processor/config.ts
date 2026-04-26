@@ -17,6 +17,7 @@ export const defaultConfig: ProvidersConfig = {
     enabled: false,
     apiUrl: 'https://yunwu.ai',
     apiKey: '',
+    modelName: 'gpt-4o-image-vip',
   },
   gemini: {
     enabled: false,
@@ -32,6 +33,9 @@ export const defaultConfig: ProvidersConfig = {
     enabled: false,
     accessKey: '',
     secretKey: '',
+    arkApiKey: '',
+    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
+    modelName: 'seedream-4.5',
   },
 };
 
@@ -47,6 +51,7 @@ export function loadConfigFromEnv(): ProvidersConfig {
       enabled: !!process.env.GPT_API_KEY,
       apiUrl: process.env.GPT_API_URL || 'https://yunwu.ai',
       apiKey: process.env.GPT_API_KEY || '',
+      modelName: process.env.GPT_MODEL_NAME || 'gpt-4o-image-vip',
     },
     gemini: {
       enabled: !!process.env.GEMINI_API_KEY,
@@ -59,9 +64,12 @@ export function loadConfigFromEnv(): ProvidersConfig {
       apiKey: process.env.QWEN_API_KEY || '',
     },
     jimeng: {
-      enabled: !!(process.env.VOLCENGINE_ACCESS_KEY && process.env.VOLCENGINE_SECRET_KEY),
+      enabled: !!(process.env.VOLCENGINE_ACCESS_KEY && process.env.VOLCENGINE_SECRET_KEY) || !!process.env.ARK_API_KEY,
       accessKey: process.env.VOLCENGINE_ACCESS_KEY || '',
       secretKey: process.env.VOLCENGINE_SECRET_KEY || '',
+      arkApiKey: process.env.ARK_API_KEY || '',
+      baseUrl: process.env.JIMENG_BASE_URL || 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
+      modelName: process.env.JIMENG_MODEL || 'seedream-4.5',
     },
   };
 }
@@ -112,6 +120,7 @@ export function loadMergedConfig(): ProvidersConfig {
       enabled: envConfig.gpt.enabled || storageConfig.gpt.enabled,
       apiUrl: storageConfig.gpt.apiUrl || envConfig.gpt.apiUrl,
       apiKey: storageConfig.gpt.apiKey || envConfig.gpt.apiKey,
+      modelName: storageConfig.gpt.modelName || envConfig.gpt.modelName,
     },
     gemini: {
       enabled: envConfig.gemini.enabled || storageConfig.gemini.enabled,
@@ -124,9 +133,12 @@ export function loadMergedConfig(): ProvidersConfig {
       apiKey: storageConfig.qwen.apiKey || envConfig.qwen.apiKey,
     },
     jimeng: {
-      enabled: envConfig.jimeng.enabled || storageConfig.jimeng.enabled,
-      accessKey: storageConfig.jimeng.accessKey || envConfig.jimeng.accessKey,
-      secretKey: storageConfig.jimeng.secretKey || envConfig.jimeng.secretKey,
+      enabled: !!(envConfig.jimeng.enabled || storageConfig.jimeng.enabled),
+      accessKey: storageConfig.jimeng.accessKey || envConfig.jimeng.accessKey || '',
+      secretKey: storageConfig.jimeng.secretKey || envConfig.jimeng.secretKey || '',
+      arkApiKey: storageConfig.jimeng.arkApiKey || envConfig.jimeng.arkApiKey || '',
+      baseUrl: storageConfig.jimeng.baseUrl || envConfig.jimeng.baseUrl || 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
+      modelName: storageConfig.jimeng.modelName || envConfig.jimeng.modelName || 'seedream-4.5',
     },
   };
 }

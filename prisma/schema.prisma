@@ -58,13 +58,16 @@ model User {
   hasVolcengineCredentials Boolean @default(false)
   gptApiUrl           String? // GPT API 地址
   gptApiKey           String? // GPT API Key
+  gptModelName        String? // GPT Model Name
   hasGptApiKey        Boolean @default(false)
   geminiApiKey        String? // Gemini API Key
   geminiBaseUrl       String? // Gemini Base URL
   geminiModelName     String? // Gemini Model Name
   hasGeminiApiKey     Boolean @default(false)
-  arkApiKey           String? // 即梦 4.5 (Ark API) Key
-  hasArkApiKey        Boolean @default(false)
+  arkApiKey           String? // 即梦 Ark API Key
+  jimengBaseUrl       String? // 即梦 Base URL
+  jimengModelName     String? // 即梦 Model Name
+  hasJimengCredentials Boolean @default(false)
   superbedToken       String? // Superbed 图床 Token
   hasSuperbedToken    Boolean @default(false)
   localStoragePath    String? // 本地文件保存路径（默认为 public/uploads）

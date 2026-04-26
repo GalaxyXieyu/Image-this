@@ -8,7 +8,6 @@ export enum ImageProvider {
   GEMINI = 'gemini',
   QWEN = 'qwen',
   JIMENG = 'jimeng',
-  JIMENG45 = 'jimeng45',
 }
 
 export enum ProcessType {
@@ -28,6 +27,7 @@ export interface GPTConfig {
   enabled: boolean;
   apiUrl: string;
   apiKey: string;
+  modelName?: string;
 }
 
 export interface GeminiConfig {
@@ -42,9 +42,15 @@ export interface QwenConfig {
   apiKey: string;
 }
 
-export interface Jimeng45Config {
+export interface JimengConfig {
   enabled: boolean;
-  arkApiKey: string;
+  // Ark API 模式
+  arkApiKey?: string;
+  baseUrl?: string;
+  modelName?: string;
+  // Legacy 视觉 API 模式
+  accessKey?: string;
+  secretKey?: string;
 }
 
 export interface ProvidersConfig {
@@ -52,8 +58,7 @@ export interface ProvidersConfig {
   gpt: GPTConfig;
   gemini: GeminiConfig;
   qwen: QwenConfig;
-  jimeng: VolcengineConfig; // Jimeng 使用火山引擎配置
-  jimeng45?: Jimeng45Config; // Jimeng 4.5 使用 Ark API
+  jimeng: JimengConfig;
 }
 
 export interface ProcessResult {

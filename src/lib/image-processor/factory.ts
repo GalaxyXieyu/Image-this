@@ -8,7 +8,6 @@ import { GPTProcessor } from './providers/gpt';
 import { GeminiProcessor } from './providers/gemini';
 import { QwenProcessor } from './providers/qwen';
 import { JimengProcessor } from './providers/jimeng';
-import { Jimeng45Provider } from './providers/jimeng45';
 
 export class ImageProcessorFactory {
   private static processors: Map<ImageProvider, IImageProcessor> = new Map();
@@ -35,10 +34,6 @@ export class ImageProcessorFactory {
 
     if (config.jimeng.enabled) {
       this.processors.set(ImageProvider.JIMENG, new JimengProcessor(config.jimeng));
-    }
-
-    if (config.jimeng45?.enabled) {
-      this.processors.set(ImageProvider.JIMENG45, new Jimeng45Provider(config.jimeng45));
     }
   }
 

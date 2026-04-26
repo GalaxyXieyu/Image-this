@@ -14,14 +14,19 @@ export interface UserConfig {
   gpt?: {
     apiUrl: string;
     apiKey: string;
+    modelName?: string;
   };
   gemini?: {
     apiKey: string;
     baseUrl: string;
     modelName?: string;
   };
-  jimeng45?: {
-    arkApiKey: string;
+  jimeng?: {
+    arkApiKey?: string;
+    baseUrl?: string;
+    modelName?: string;
+    accessKey?: string;
+    secretKey?: string;
   };
   imagehosting?: {
     superbedToken: string;
@@ -45,13 +50,16 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
       hasVolcengineCredentials: true,
       gptApiUrl: true,
       gptApiKey: true,
+      gptModelName: true,
       hasGptApiKey: true,
       geminiApiKey: true,
       geminiBaseUrl: true,
       geminiModelName: true,
       hasGeminiApiKey: true,
       arkApiKey: true,
-      hasArkApiKey: true,
+      jimengBaseUrl: true,
+      jimengModelName: true,
+      hasJimengCredentials: true,
       superbedToken: true,
       hasSuperbedToken: true,
       localStoragePath: true,
@@ -90,6 +98,7 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
     config.gpt = {
       apiUrl: user.gptApiUrl,
       apiKey: gptApiKey,
+      modelName: user.gptModelName || undefined,
     };
     console.log('[用户配置] GPT: 从数据库读取');
   } else {
@@ -108,14 +117,18 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
     console.warn('[用户配置] Gemini: 未配置，请在设置页面配置 Gemini API Key');
   }
 
-  // 即梦 4.5 配置
-  if (arkApiKey) {
-    config.jimeng45 = {
-      arkApiKey,
+  // 即梦配置（统一：Ark API 或 Legacy 视觉 API）
+  if (arkApiKey || (volcengineAccessKey && volcengineSecretKey)) {
+    config.jimeng = {
+      arkApiKey: arkApiKey || undefined,
+      baseUrl: user.jimengBaseUrl || undefined,
+      modelName: user.jimengModelName || undefined,
+      accessKey: volcengineAccessKey || undefined,
+      secretKey: volcengineSecretKey || undefined,
     };
-    console.log('[用户配置] Jimeng 4.5: 从数据库读取');
+    console.log('[用户配置] 即梦: 从数据库读取');
   } else {
-    console.warn('[用户配置] Jimeng 4.5: 未配置，请在设置页面配置 ARK API Key');
+    console.warn('[用户配置] 即梦: 未配置，请在设置页面配置 ARK API Key 或火山引擎 AccessKey/SecretKey');
   }
 
   // 图床配置
@@ -162,7 +175,7 @@ export async function saveUserConfig(userId: string, config: UserConfig): Promis
       volcengineSecretKey: config.volcengine?.secretKey,
       gptApiKey: config.gpt?.apiKey,
       geminiApiKey: config.gemini?.apiKey,
-      arkApiKey: config.jimeng45?.arkApiKey,
+      arkApiKey: config.jimeng?.arkApiKey,
       superbedToken: config.imagehosting?.superbedToken,
     });
   }
@@ -175,13 +188,16 @@ export async function saveUserConfig(userId: string, config: UserConfig): Promis
       hasVolcengineCredentials: !!(config.volcengine?.accessKey && config.volcengine?.secretKey),
       gptApiUrl: config.gpt?.apiUrl || null,
       gptApiKey: isDesktopSecretStoreEnabled() ? null : config.gpt?.apiKey || null,
+      gptModelName: config.gpt?.modelName || null,
       hasGptApiKey: !!config.gpt?.apiKey,
       geminiApiKey: isDesktopSecretStoreEnabled() ? null : config.gemini?.apiKey || null,
       geminiBaseUrl: config.gemini?.baseUrl || null,
       geminiModelName: config.gemini?.modelName || null,
       hasGeminiApiKey: !!config.gemini?.apiKey,
-      arkApiKey: isDesktopSecretStoreEnabled() ? null : config.jimeng45?.arkApiKey || null,
-      hasArkApiKey: !!config.jimeng45?.arkApiKey,
+      arkApiKey: isDesktopSecretStoreEnabled() ? null : config.jimeng?.arkApiKey || null,
+      jimengBaseUrl: config.jimeng?.baseUrl || null,
+      jimengModelName: config.jimeng?.modelName || null,
+      hasJimengCredentials: !!(config.jimeng?.arkApiKey || (config.jimeng?.accessKey && config.jimeng?.secretKey)),
       superbedToken: isDesktopSecretStoreEnabled() ? null : config.imagehosting?.superbedToken || null,
       hasSuperbedToken: !!config.imagehosting?.superbedToken,
       localStoragePath: config.localStorage?.savePath || null,

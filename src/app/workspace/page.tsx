@@ -291,10 +291,9 @@ export default function WorkspacePage() {
             if (data.config.gemini?.enabled) providers.push('gemini');
             if (data.config.gpt?.enabled) providers.push('gpt');
             if (data.config.volcengine?.enabled) {
-              providers.push('jimeng'); // jimeng 使用火山引擎配置
               providers.push('volcengine');
             }
-            if (data.config.jimeng45?.enabled) providers.push('jimeng45');
+            if (data.config.jimeng?.enabled) providers.push('jimeng');
             if (data.config.qwen?.enabled) providers.push('qwen');
 
             setAvailableProviders(providers);

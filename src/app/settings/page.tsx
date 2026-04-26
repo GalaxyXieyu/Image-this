@@ -16,6 +16,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -25,10 +30,10 @@ import {
 } from '@/components/ui/dialog';
 import Navbar from '@/components/navigation/Navbar';
 import { DesktopUpdateCard } from '@/components/settings/DesktopUpdateCard';
-import { Save, Key, Zap, Sparkles, User, Image, FileText, Plus, Edit, Trash2, Star, StarOff, Cpu, HardDrive, FolderOpen, Folder } from 'lucide-react';
+import { Save, Key, Sparkles, User, Image, FileText, Plus, Edit, Trash2, Star, StarOff, Cpu, HardDrive, FolderOpen, Folder, RefreshCw, Search, ChevronsUpDown } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
-type SettingSection = 'models' | 'imagehosting' | 'profile' | 'prompts';
+type SettingSection = 'models' | 'imagehosting' | 'profile' | 'prompts' | 'updates';
 
 interface PromptTemplate {
   id: string;
@@ -48,6 +53,77 @@ const CATEGORY_LABELS: Record<string, string> = {
   UPSCALE: '高清化',
   ONE_CLICK: '一键增强',
 };
+
+function SearchableModelSelect({
+  value,
+  onChange,
+  options,
+  placeholder,
+  disabled,
+  id,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: string[];
+  placeholder?: string;
+  disabled?: boolean;
+  id?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const filtered = options.filter((o) =>
+    o.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          id={id}
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between"
+          disabled={disabled}
+        >
+          {value || placeholder || '选择模型...'}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0" style={{ width: 'var(--radix-popover-trigger-width)' }}>
+        <div className="flex items-center border-b px-3">
+          <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="搜索模型..."
+            className="h-9 border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+          />
+        </div>
+        <div className="max-h-60 overflow-y-auto py-1">
+          {filtered.length === 0 ? (
+            <div className="px-3 py-2 text-sm text-gray-500">无匹配模型</div>
+          ) : (
+            filtered.map((option) => (
+              <div
+                key={option}
+                onClick={() => {
+                  onChange(option);
+                  setOpen(false);
+                  setSearch('');
+                }}
+                className={`cursor-pointer px-3 py-2 text-sm hover:bg-gray-100 ${value === option ? 'bg-gray-100 font-medium' : ''}`}
+              >
+                {option}
+              </div>
+            ))
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
@@ -78,12 +154,15 @@ export default function SettingsPage() {
     // GPT 配置
     gptApiUrl: 'https://yunwu.ai',
     gptApiKey: '',
+    gptModelName: 'gpt-4o-image-vip',
     // Gemini 配置
     geminiApiKey: '',
     geminiBaseUrl: 'https://toapis.com',
     geminiModelName: 'gemini-3.1-flash-image-preview',
-    // 即梦 4.5 配置
+    // 即梦配置
     arkApiKey: '',
+    jimengBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
+    jimengModelName: 'seedream-4.5',
     // 图床配置
     superbedToken: '',
     // 本地存储配置
@@ -91,6 +170,16 @@ export default function SettingsPage() {
   });
 
   const [isSaving, setIsSaving] = useState(false);
+
+  // 动态模型列表状态
+  const [gptModels, setGptModels] = useState<string[]>([]);
+  const [geminiModels, setGeminiModels] = useState<string[]>([]);
+  const [jimengModels, setJimengModels] = useState<string[]>([]);
+  const [fetchingModels, setFetchingModels] = useState<Record<string, boolean>>({
+    gpt: false,
+    gemini: false,
+    jimeng: false,
+  });
 
   const menuItems = [
     { 
@@ -129,6 +218,15 @@ export default function SettingsPage() {
       bgColor: 'bg-gray-50',
       borderColor: 'border-gray-500'
     },
+    {
+      id: 'updates' as SettingSection,
+      label: '应用更新',
+      subtitle: '检查和安装新版本',
+      icon: RefreshCw,
+      color: 'text-sky-600',
+      bgColor: 'bg-sky-50',
+      borderColor: 'border-sky-500'
+    },
   ];
 
   useEffect(() => {
@@ -150,10 +248,13 @@ export default function SettingsPage() {
               volcengineSecretKey: data.config.volcengine?.secretKey || '',
               gptApiUrl: data.config.gpt?.apiUrl || 'https://yunwu.ai',
               gptApiKey: data.config.gpt?.apiKey || '',
+              gptModelName: data.config.gpt?.modelName || 'gpt-4o-image-vip',
               geminiApiKey: data.config.gemini?.apiKey || '',
               geminiBaseUrl: data.config.gemini?.baseUrl || 'https://toapis.com',
               geminiModelName: data.config.gemini?.modelName || 'gemini-3.1-flash-image-preview',
-              arkApiKey: data.config.jimeng45?.arkApiKey || '',
+              arkApiKey: data.config.jimeng?.arkApiKey || '',
+              jimengBaseUrl: data.config.jimeng?.baseUrl || 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
+              jimengModelName: data.config.jimeng?.modelName || 'seedream-4.5',
               superbedToken: data.config.imagehosting?.superbedToken || '',
               localStoragePath: data.config.localStorage?.savePath || ''
             });
@@ -194,7 +295,8 @@ export default function SettingsPage() {
         gpt: {
           enabled: !!(apiSettings.gptApiKey),
           apiUrl: apiSettings.gptApiUrl,
-          apiKey: apiSettings.gptApiKey
+          apiKey: apiSettings.gptApiKey,
+          modelName: apiSettings.gptModelName
         },
         gemini: {
           enabled: !!(apiSettings.geminiApiKey),
@@ -202,9 +304,13 @@ export default function SettingsPage() {
           baseUrl: apiSettings.geminiBaseUrl,
           modelName: apiSettings.geminiModelName
         },
-        jimeng45: {
-          enabled: !!(apiSettings.arkApiKey),
-          arkApiKey: apiSettings.arkApiKey
+        jimeng: {
+          enabled: !!(apiSettings.arkApiKey || (apiSettings.volcengineAccessKey && apiSettings.volcengineSecretKey)),
+          arkApiKey: apiSettings.arkApiKey,
+          baseUrl: apiSettings.jimengBaseUrl,
+          modelName: apiSettings.jimengModelName,
+          accessKey: apiSettings.volcengineAccessKey,
+          secretKey: apiSettings.volcengineSecretKey
         },
         imagehosting: {
           enabled: !!(apiSettings.superbedToken),
@@ -239,6 +345,54 @@ export default function SettingsPage() {
       ...prev,
       [field]: value
     }));
+  };
+
+  // 获取模型列表
+  const fetchModels = async (provider: 'gpt' | 'gemini' | 'jimeng') => {
+    const baseUrlField = provider === 'gpt' ? 'gptApiUrl' : provider === 'gemini' ? 'geminiBaseUrl' : 'jimengBaseUrl';
+    const apiKeyField = provider === 'gpt' ? 'gptApiKey' : provider === 'gemini' ? 'geminiApiKey' : 'arkApiKey';
+    const baseUrl = apiSettings[baseUrlField as keyof typeof apiSettings] as string;
+    const apiKey = apiSettings[apiKeyField as keyof typeof apiSettings] as string;
+
+    if (!baseUrl || !apiKey) {
+      toast({
+        title: '缺少配置',
+        description: '请先填写 API 地址和密钥',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setFetchingModels(prev => ({ ...prev, [provider]: true }));
+    try {
+      const res = await fetch('/api/models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, baseUrl, apiKey }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || '获取失败');
+      }
+
+      const models = data.models || [];
+      if (provider === 'gpt') setGptModels(models);
+      else if (provider === 'gemini') setGeminiModels(models);
+      else if (provider === 'jimeng') setJimengModels(models);
+
+      toast({
+        title: '获取成功',
+        description: `找到 ${models.length} 个模型`,
+      });
+    } catch (error) {
+      toast({
+        title: '获取模型列表失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        variant: 'destructive',
+      });
+    } finally {
+      setFetchingModels(prev => ({ ...prev, [provider]: false }));
+    }
   };
 
   // 文件夹选择器
@@ -458,40 +612,6 @@ export default function SettingsPage() {
       case 'models':
         return (
           <div className="space-y-6">
-            {/* 火山引擎配置 */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Zap className="w-5 h-5 mr-2 text-orange-600" />
-                  火山引擎（Volcengine）
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-sm text-gray-500 mb-4">
-                  支持：画质增强、智能扩图
-                </div>
-                <div>
-                  <Label htmlFor="volcengineAccessKey">Access Key</Label>
-                  <Input
-                    id="volcengineAccessKey"
-                    placeholder="AKLT..."
-                    value={apiSettings.volcengineAccessKey}
-                    onChange={(e) => handleInputChange('volcengineAccessKey', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="volcengineSecretKey">Secret Key</Label>
-                  <Input
-                    id="volcengineSecretKey"
-                    type="password"
-                    placeholder="输入密钥"
-                    value={apiSettings.volcengineSecretKey}
-                    onChange={(e) => handleInputChange('volcengineSecretKey', e.target.value)}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
             {/* GPT API配置 */}
             <Card>
               <CardHeader>
@@ -512,6 +632,31 @@ export default function SettingsPage() {
                     value={apiSettings.gptApiUrl}
                     onChange={(e) => handleInputChange('gptApiUrl', e.target.value)}
                   />
+                </div>
+                <div>
+                  <Label htmlFor="gptModelName">模型名称</Label>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <SearchableModelSelect
+                        id="gptModelName"
+                        value={apiSettings.gptModelName}
+                        onChange={(value) => handleInputChange('gptModelName', value)}
+                        options={Array.from(new Set([apiSettings.gptModelName, ...gptModels]))}
+                        placeholder="选择或输入模型..."
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => fetchModels('gpt')}
+                      disabled={fetchingModels.gpt}
+                      title="获取模型列表"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${fetchingModels.gpt ? 'animate-spin' : ''}`} />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">选择模型或点击刷新获取列表</p>
                 </div>
                 <div>
                   <Label htmlFor="gptApiKey">API 密钥</Label>
@@ -540,13 +685,28 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <Label htmlFor="geminiModelName">模型名称</Label>
-                  <Input
-                    id="geminiModelName"
-                    placeholder="gemini-3.1-flash-image-preview"
-                    value={apiSettings.geminiModelName}
-                    onChange={(e) => handleInputChange('geminiModelName', e.target.value)}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">用于 Gemini 图片生成请求的模型名</p>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <SearchableModelSelect
+                        id="geminiModelName"
+                        value={apiSettings.geminiModelName}
+                        onChange={(value) => handleInputChange('geminiModelName', value)}
+                        options={Array.from(new Set([apiSettings.geminiModelName, ...geminiModels]))}
+                        placeholder="选择或输入模型..."
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => fetchModels('gemini')}
+                      disabled={fetchingModels.gemini}
+                      title="获取模型列表"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${fetchingModels.gemini ? 'animate-spin' : ''}`} />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">选择模型或点击刷新获取列表</p>
                 </div>
                 <div>
                   <Label htmlFor="geminiBaseUrl">API 地址</Label>
@@ -571,30 +731,86 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
-            {/* 即梦 4.5 配置 */}
+            {/* 即梦配置 */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <Sparkles className="w-5 h-5 mr-2 text-blue-600" />
-                  即梦 4.5 (Seedream 4.5)
+                  即梦
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-sm text-gray-500 mb-4">
-                  支持：高质量图片生成、背景替换（使用 Ark API）
+                  支持：高质量图片生成、背景替换（Ark API 或 Legacy 视觉 API）
+                </div>
+                <div>
+                  <Label htmlFor="jimengBaseUrl">API 地址</Label>
+                  <Input
+                    id="jimengBaseUrl"
+                    placeholder="https://ark.cn-beijing.volces.com/api/v3/images/generations"
+                    value={apiSettings.jimengBaseUrl}
+                    onChange={(e) => handleInputChange('jimengBaseUrl', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="jimengModelName">模型名称</Label>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <SearchableModelSelect
+                        id="jimengModelName"
+                        value={apiSettings.jimengModelName}
+                        onChange={(value) => handleInputChange('jimengModelName', value)}
+                        options={Array.from(new Set([apiSettings.jimengModelName, ...jimengModels]))}
+                        placeholder="选择或输入模型..."
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => fetchModels('jimeng')}
+                      disabled={fetchingModels.jimeng}
+                      title="获取模型列表"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${fetchingModels.jimeng ? 'animate-spin' : ''}`} />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">选择模型或点击刷新获取列表</p>
                 </div>
                 <div>
                   <Label htmlFor="arkApiKey">ARK API Key</Label>
                   <Input
                     id="arkApiKey"
                     type="password"
-                    placeholder="输入 ARK API Key"
+                    placeholder="输入 ARK API Key（推荐，Ark 模式）"
                     value={apiSettings.arkApiKey}
                     onChange={(e) => handleInputChange('arkApiKey', e.target.value)}
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    即梦 4.5 使用火山引擎 Ark API，需要单独的 API Key
+                    推荐：使用火山引擎 Ark API，无需图床
                   </p>
+                </div>
+                <div className="border-t pt-4">
+                  <p className="text-xs text-gray-500 mb-2">Legacy 视觉 API（同时用于画质增强、扩图）</p>
+                  <div>
+                    <Label htmlFor="volcengineAccessKey">Access Key</Label>
+                    <Input
+                      id="volcengineAccessKey"
+                      placeholder="AKLT..."
+                      value={apiSettings.volcengineAccessKey}
+                      onChange={(e) => handleInputChange('volcengineAccessKey', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="volcengineSecretKey">Secret Key</Label>
+                    <Input
+                      id="volcengineSecretKey"
+                      type="password"
+                      placeholder="输入密钥"
+                      value={apiSettings.volcengineSecretKey}
+                      onChange={(e) => handleInputChange('volcengineSecretKey', e.target.value)}
+                    />
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -854,9 +1070,11 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
-            <DesktopUpdateCard />
           </div>
         );
+
+      case 'updates':
+        return <DesktopUpdateCard />;
 
       default:
         return null;
@@ -920,7 +1138,7 @@ export default function SettingsPage() {
             {renderContent()}
 
             {/* 保存按钮 */}
-            {activeSection !== 'profile' && activeSection !== 'prompts' && (
+            {activeSection !== 'profile' && activeSection !== 'prompts' && activeSection !== 'updates' && (
               <div className="flex justify-end">
                 <Button 
                   onClick={handleSave} 

@@ -1,10 +1,20 @@
-name: Build Windows App
+name: Build And Publish Windows App
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: Publish GitHub Release and sync desktop update feed
+        required: false
+        default: false
+        type: boolean
   push:
     tags:
       - 'v*'
+
+concurrency:
+  group: windows-release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build-windows:
@@ -42,17 +52,11 @@ jobs:
           DATABASE_URL=file:./data/app.db
           NEXTAUTH_URL=http://localhost:23000
           NEXTAUTH_SECRET=your-production-secret-key-min-32-chars
-          DESKTOP_UPDATE_BASE_URL=https://your-domain.example.com
+          DESKTOP_UPDATE_BASE_URL=${{ vars.DESKTOP_UPDATE_BASE_URL || 'https://bojie.store' }}
           "@ | Set-Content .env.production
 
-      - name: Generate Prisma Client
-        run: npx prisma generate
-
-      - name: Build Next.js
-        run: npm run build
-
       - name: Build Windows App
-        run: npm run electron:build:win
+        run: npm run build:windows
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -66,10 +70,28 @@ jobs:
             dist-electron/latest*.yml
           retention-days: 30
 
-      - name: Publish private GitHub Release assets
-        if: startsWith(github.ref, 'refs/tags/')
+  publish-release:
+    needs: build-windows
+    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.publish_release)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download Windows build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: dist-electron
+
+      - name: Show downloaded artifacts
+        run: ls -lah dist-electron
+
+      - name: Create or update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('manual-{0}', github.run_number) }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('Manual Desktop Build #{0}', github.run_number) }}
           draft: false
           prerelease: false
           generate_release_notes: true
@@ -79,3 +101,29 @@ jobs:
             dist-electron/latest*.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare remote update directory
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script: |
+            mkdir -p "${{ vars.WINDOWS_UPDATE_REMOTE_DIR || '/data/imagine-this-updates/windows' }}"
+
+      - name: Sync desktop update artifacts to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          source: "dist-electron/latest.yml,dist-electron/ImagineThis-*-Setup.exe,dist-electron/ImagineThis-*-Setup.exe.blockmap,dist-electron/ImagineThis-*-Portable.exe"
+          target: "${{ vars.WINDOWS_UPDATE_REMOTE_DIR || '/data/imagine-this-updates/windows' }}"
+          overwrite: true
+          strip_components: 1
+
+      - name: Verify remote desktop update feed
+        run: |
+          curl --fail --show-error --location "${{ vars.DESKTOP_UPDATE_BASE_URL || 'https://bojie.store' }}/api/desktop-updates/windows/latest.yml"

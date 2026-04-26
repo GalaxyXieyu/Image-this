@@ -34,10 +34,17 @@ async function initializeProvider(userId: string, provider: ImageProvider) {
     }
   }
   
-  if (provider === ImageProvider.JIMENG && !userConfig.imagehosting?.superbedToken) {
-    throw new Error('图床配置未设置，请在设置页面配置 Superbed Token');
+  if (provider === ImageProvider.JIMENG) {
+    const hasArk = !!userConfig.jimeng?.arkApiKey;
+    const hasLegacy = !!(userConfig.jimeng?.accessKey && userConfig.jimeng?.secretKey);
+    if (!hasArk && !hasLegacy) {
+      throw new Error('即梦配置未设置，请在设置页面配置 ARK API Key 或火山引擎 AccessKey/SecretKey');
+    }
+    if (hasLegacy && !userConfig.imagehosting?.superbedToken) {
+      throw new Error('图床配置未设置，Legacy 模式需要在设置页面配置 Superbed Token');
+    }
   }
-  
+
   const providerConfig = {
     volcengine: {
       enabled: provider === ImageProvider.VOLCENGINE && !!userConfig.volcengine,
@@ -47,7 +54,8 @@ async function initializeProvider(userId: string, provider: ImageProvider) {
     gpt: {
       enabled: provider === ImageProvider.GPT && !!userConfig.gpt,
       apiUrl: userConfig.gpt?.apiUrl || 'https://yunwu.ai',
-      apiKey: userConfig.gpt?.apiKey || ''
+      apiKey: userConfig.gpt?.apiKey || '',
+      modelName: userConfig.gpt?.modelName || undefined
     },
     gemini: {
       enabled: provider === ImageProvider.GEMINI && !!userConfig.gemini,
@@ -60,10 +68,12 @@ async function initializeProvider(userId: string, provider: ImageProvider) {
       apiKey: userConfig.gpt?.apiKey || ''
     },
     jimeng: {
-      enabled: provider === ImageProvider.JIMENG && !!userConfig.volcengine,
-      accessKey: userConfig.volcengine?.accessKey || '',
-      secretKey: userConfig.volcengine?.secretKey || '',
-      // 添加图床配置（Jimeng 需要上传图片到图床）
+      enabled: provider === ImageProvider.JIMENG && !!userConfig.jimeng,
+      arkApiKey: userConfig.jimeng?.arkApiKey || '',
+      baseUrl: userConfig.jimeng?.baseUrl || undefined,
+      modelName: userConfig.jimeng?.modelName || undefined,
+      accessKey: userConfig.jimeng?.accessKey || '',
+      secretKey: userConfig.jimeng?.secretKey || '',
       imagehostingConfig: userConfig.imagehosting
     }
   };
@@ -187,7 +197,7 @@ export async function enhanceWithVolcengine(
       gpt: { enabled: false, apiUrl: '', apiKey: '' },
       gemini: { enabled: false, apiKey: '', baseUrl: '', modelName: '' },
       qwen: { enabled: false, apiKey: '' },
-      jimeng: { enabled: false, accessKey: '', secretKey: '' }
+      jimeng: { enabled: false, accessKey: '', secretKey: '', arkApiKey: '', baseUrl: '', modelName: '' }
     });
   } else {
     await initializeProvider(userId, ImageProvider.VOLCENGINE);
@@ -233,7 +243,7 @@ export async function outpaintWithVolcengine(
       gpt: { enabled: false, apiUrl: '', apiKey: '' },
       gemini: { enabled: false, apiKey: '', baseUrl: '', modelName: '' },
       qwen: { enabled: false, apiKey: '' },
-      jimeng: { enabled: false, accessKey: '', secretKey: '' }
+      jimeng: { enabled: false, accessKey: '', secretKey: '', arkApiKey: '', baseUrl: '', modelName: '' }
     });
   } else {
     await initializeProvider(userId, ImageProvider.VOLCENGINE);

@@ -29,8 +29,9 @@ export class GPTProcessor implements IImageProcessor {
         convertToGptImageUrl(referenceImageUrl)
       ];
 
+      const modelName = this.config.modelName || 'gpt-4o-image-vip';
       const payload = {
-        model: "gpt-4o-image-vip",
+        model: modelName,
         messages: [
           {
             role: "user",

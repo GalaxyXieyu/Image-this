@@ -6,14 +6,18 @@
  */
 
 import { spawn } from 'child_process';
-import { existsSync, copyFileSync, cpSync, mkdirSync, readdirSync, rmSync, statSync, unlinkSync } from 'fs';
+import { existsSync, copyFileSync, cpSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, unlinkSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { createRequire } from 'module';
 import readline from 'readline';
+import { rcedit } from 'rcedit';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const projectRoot = join(__dirname, '..');
+const require = createRequire(import.meta.url);
+const { hasWindowsSigningConfig, signFiles } = require('./windows-signing-utils.cjs');
 const prismaCli = process.platform === 'win32'
   ? join(projectRoot, 'node_modules', '.bin', 'prisma.cmd')
   : join(projectRoot, 'node_modules', '.bin', 'prisma');
@@ -98,6 +102,32 @@ function removeFilesByPredicate(dirPath, predicate) {
   }
 
   return removedCount;
+}
+
+async function patchWindowsExecutableIcon() {
+  const iconPath = join(projectRoot, 'build', 'icon.ico');
+  const packageJson = JSON.parse(readFileSync(join(projectRoot, 'package.json'), 'utf8'));
+  const productName = packageJson?.build?.productName || packageJson?.build?.productFilename || 'ImagineThis';
+  const outputDir = join(projectRoot, 'dist-electron');
+  const targets = [
+    join(outputDir, 'win-unpacked', `${productName}.exe`),
+    ...readdirSync(outputDir)
+      .filter((entry) => entry.endsWith('-Portable.exe'))
+      .map((entry) => join(outputDir, entry)),
+  ].filter((targetPath, index, allPaths) => existsSync(targetPath) && allPaths.indexOf(targetPath) === index);
+
+  if (!existsSync(iconPath) || targets.length === 0) {
+    return;
+  }
+
+  log('🪄 写入 Windows 可执行文件图标...', 'yellow');
+
+  for (const targetPath of targets) {
+    await rcedit(targetPath, {
+      icon: iconPath,
+    });
+    log(`✅ 已修正图标: ${targetPath}`, 'green');
+  }
 }
 
 function pruneStandaloneForWindows(standaloneDir) {
@@ -385,6 +415,18 @@ async function main() {
     log('🔨 开始打包...', 'yellow');
     log('⏳ 这可能需要几分钟时间，请耐心等待...\n', 'yellow');
     await runCommand('npm', ['run', 'electron:build:win']);
+    const distDir = join(projectRoot, 'dist-electron');
+    const signableArtifacts = readdirSync(distDir)
+      .filter((entry) => entry.endsWith('.exe'))
+      .map((entry) => join(distDir, entry));
+
+    if (hasWindowsSigningConfig(process.env) && signableArtifacts.length > 0) {
+      log('Signing Windows installer artifacts...', 'yellow');
+      await signFiles(signableArtifacts, process.env);
+      log('Windows installer artifacts signed.', 'green');
+    } else {
+      log('Trusted Windows signing is not configured; Smart App Control may still block this build.', 'yellow');
+    }
 
     // 8. 验证构建
     log('📋 步骤 8/8: 验证构建', 'blue');

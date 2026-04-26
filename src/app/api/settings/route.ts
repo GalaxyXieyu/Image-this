@@ -35,6 +35,7 @@ export async function POST(request: NextRequest) {
       userConfig.gpt = {
         apiUrl: body.gpt.apiUrl,
         apiKey: body.gpt.apiKey,
+        modelName: body.gpt.modelName || undefined,
       };
     }
     
@@ -46,9 +47,13 @@ export async function POST(request: NextRequest) {
       };
     }
 
-    if (body.jimeng45?.enabled && body.jimeng45?.arkApiKey) {
-      userConfig.jimeng45 = {
-        arkApiKey: body.jimeng45.arkApiKey,
+    if (body.jimeng?.enabled && (body.jimeng?.arkApiKey || body.jimeng?.accessKey)) {
+      userConfig.jimeng = {
+        arkApiKey: body.jimeng.arkApiKey || undefined,
+        baseUrl: body.jimeng.baseUrl || undefined,
+        modelName: body.jimeng.modelName || undefined,
+        accessKey: body.jimeng.accessKey || undefined,
+        secretKey: body.jimeng.secretKey || undefined,
       };
     }
 
@@ -110,7 +115,8 @@ export async function GET(request: NextRequest) {
       gpt: {
         enabled: !!userConfig.gpt,
         apiUrl: userConfig.gpt?.apiUrl || 'https://yunwu.ai',
-        apiKey: userConfig.gpt?.apiKey || ''
+        apiKey: userConfig.gpt?.apiKey || '',
+        modelName: userConfig.gpt?.modelName || 'gpt-4o-image-vip'
       },
       gemini: {
         enabled: !!userConfig.gemini,
@@ -118,9 +124,13 @@ export async function GET(request: NextRequest) {
         baseUrl: userConfig.gemini?.baseUrl || 'https://toapis.com',
         modelName: userConfig.gemini?.modelName || 'gemini-3.1-flash-image-preview'
       },
-      jimeng45: {
-        enabled: !!userConfig.jimeng45,
-        arkApiKey: userConfig.jimeng45?.arkApiKey || ''
+      jimeng: {
+        enabled: !!userConfig.jimeng,
+        arkApiKey: userConfig.jimeng?.arkApiKey || '',
+        baseUrl: userConfig.jimeng?.baseUrl || 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
+        modelName: userConfig.jimeng?.modelName || 'seedream-4.5',
+        accessKey: userConfig.jimeng?.accessKey || '',
+        secretKey: userConfig.jimeng?.secretKey || ''
       },
       imagehosting: {
         enabled: !!userConfig.imagehosting,

@@ -26,6 +26,63 @@ if (!fs.existsSync(LOG_DIR)) {
   fs.mkdirSync(LOG_DIR, { recursive: true });
 }
 
+function parseEnvFileContents(contents) {
+  const parsed = {};
+  const lines = contents.split(/\r?\n/);
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue;
+    }
+
+    const separatorIndex = trimmed.indexOf('=');
+    if (separatorIndex === -1) {
+      continue;
+    }
+
+    const key = trimmed.slice(0, separatorIndex).trim();
+    let value = trimmed.slice(separatorIndex + 1).trim();
+
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+
+    value = value
+      .replace(/\\n/g, '\n')
+      .replace(/\\r/g, '\r')
+      .replace(/\\t/g, '\t');
+
+    if (key && process.env[key] === undefined) {
+      parsed[key] = value;
+    }
+  }
+
+  return parsed;
+}
+
+function loadDesktopEnvironment() {
+  const envCandidates = [
+    path.join(__dirname, '..', '.env.production'),
+    path.join(__dirname, '..', '.next', 'standalone', '.env.production'),
+  ];
+
+  for (const envPath of envCandidates) {
+    if (!fs.existsSync(envPath)) {
+      continue;
+    }
+
+    const parsed = parseEnvFileContents(fs.readFileSync(envPath, 'utf8'));
+    Object.assign(process.env, parsed);
+    return envPath;
+  }
+
+  return null;
+}
+
 function log(message, level = 'INFO') {
   const timestamp = new Date().toISOString();
   const logMessage = `[${timestamp}] [${level}] ${message}`;
@@ -40,6 +97,8 @@ function log(message, level = 'INFO') {
     console.error('Failed to write log file:', error);
   }
 }
+
+const loadedDesktopEnvPath = loadDesktopEnvironment();
 
 function escapeHtml(value) {
   return String(value)
@@ -393,6 +452,11 @@ log(`Platform=${process.platform} arch=${process.arch}`);
 log(`App path=${app.getAppPath()}`);
 log(`Resources path=${process.resourcesPath}`);
 log(`User data path=${app.getPath('userData')}`);
+log(
+  loadedDesktopEnvPath
+    ? `Desktop environment loaded from ${loadedDesktopEnvPath}`
+    : 'Desktop environment file not found, using process environment only.'
+);
 
 app.whenReady().then(bootstrapApplication);
 

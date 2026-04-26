@@ -1,6 +1,6 @@
 {
   "name": "imagine-this-nextjs",
-  "version": "0.2.0",
+  "version": "0.2.3",
   "description": "专业的 AI 图像处理平台，支持背景替换、图像扩展、高清化等功能",
   "author": "Imagine This Team",
   "private": true,
@@ -17,6 +17,7 @@
     "screenshots:readme": "node scripts/generate-readme-screenshots.mjs",
     "electron:dev": "concurrently \"NODE_ENV=development npm run dev\" \"wait-on http://localhost:34123 && PORT=34123 NODE_ENV=development electron .\"",
     "build:windows": "npm run clean && node scripts/build-windows.mjs --auto",
+    "publish:windows:update": "powershell -ExecutionPolicy Bypass -File scripts/publish-windows-update.ps1",
     "build:mac": "npm run clean && node scripts/build-mac.mjs",
     "electron:build:win": "electron-builder --win"
   },
@@ -89,6 +90,7 @@
     "playwright": "^1.53.1",
     "png-to-ico": "^3.0.1",
     "postcss": "^8.5.6",
+    "rcedit": "^5.0.2",
     "tailwindcss": "^3.4.10",
     "typescript": "^5",
     "wait-on": "^9.0.3"
@@ -97,6 +99,7 @@
     "appId": "com.imaginethis.app",
     "productName": "ImagineThis",
     "npmRebuild": false,
+    "afterPack": "scripts/electron-after-pack.cjs",
     "directories": {
       "output": "dist-electron"
     },
