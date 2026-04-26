@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Task, ProcessedResult, UploadedImage } from './useWorkspaceState';
+import { mapProviderErrorMessage } from '@/lib/provider-error-utils';
 
 export function useTaskPolling(
   activeTasks: Task[],
@@ -87,7 +88,9 @@ export function useTaskPolling(
             
             onSuccess(`任务 "${task.originalName || '未知'}" 处理完成`);
           } else if (task.status === 'failed') {
-            onError(`任务 "${task.originalName || '未知'}" 处理失败: ${task.errorMessage || '未知错误'}`);
+            onError(
+              `任务 "${task.originalName || '未知'}" 处理失败: ${mapProviderErrorMessage(task.errorMessage || '未知错误')}`
+            );
           }
         });
 

@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
+import { mapProviderErrorMessage } from '@/lib/provider-error-utils';
 
 // 任务类型映射
 const taskTypeMap = {
@@ -152,6 +153,14 @@ export default function TaskCenterPage() {
   });
   const [isRetrying, setIsRetrying] = useState(false);
   const [hasActiveTasks, setHasActiveTasks] = useState(false);
+
+  const getDisplayErrorMessage = useCallback((message?: string | null) => {
+    if (!message) {
+      return '未知错误';
+    }
+
+    return mapProviderErrorMessage(message);
+  }, []);
 
   // 重定向未登录用户
   useEffect(() => {
@@ -900,7 +909,10 @@ export default function TaskCenterPage() {
                               <Loader className="w-6 h-6 text-blue-500 animate-spin" />
                             </div>
                           ) : task.status === 'FAILED' ? (
-                            <div className="w-16 h-16 rounded-lg border border-red-300 bg-red-50 flex items-center justify-center flex-shrink-0" title={task.errorMessage}>
+                            <div
+                              className="w-16 h-16 rounded-lg border border-red-300 bg-red-50 flex items-center justify-center flex-shrink-0"
+                              title={getDisplayErrorMessage(task.errorMessage)}
+                            >
                               <XCircle className="w-6 h-6 text-red-500" />
                             </div>
                           ) : (
@@ -1035,8 +1047,8 @@ export default function TaskCenterPage() {
                           {task.errorMessage && (
                             <div>
                               <h4 className="font-medium text-red-900 mb-2 text-xs">错误信息</h4>
-                              <div className="text-xs text-red-600 bg-red-100 p-2 rounded">
-                                {task.errorMessage}
+                              <div className="text-xs text-red-600 bg-red-100 p-2 rounded whitespace-pre-wrap break-words overflow-hidden">
+                                {getDisplayErrorMessage(task.errorMessage)}
                               </div>
                             </div>
                           )}

@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const fs = require('fs');
 const http = require('http');
+const net = require('net');
 const os = require('os');
 const path = require('path');
 const { fork } = require('child_process');
@@ -15,8 +16,9 @@ let renderRecoveryInProgress = false;
 let applicationUrl = null;
 
 const isDev = process.env.NODE_ENV === 'development';
-const PORT = Number(process.env.PORT || 23000);
+const DEFAULT_PORT = Number(process.env.PORT || 23000);
 const WINDOWS_RENDERER_MAX_OLD_SPACE_MB = 1024;
+let serverPort = DEFAULT_PORT;
 
 const LOG_DIR = path.join(os.homedir(), 'ImagineThis', 'logs');
 const LOG_FILE = path.join(LOG_DIR, `app-${new Date().toISOString().split('T')[0]}.log`);
@@ -254,18 +256,59 @@ function createWindow() {
   }
 }
 
+function isPortAvailable(port) {
+  return new Promise((resolve) => {
+    const tester = net.createServer();
+
+    tester.once('error', () => {
+      resolve(false);
+    });
+
+    tester.once('listening', () => {
+      tester.close(() => resolve(true));
+    });
+
+    tester.listen(port, '0.0.0.0');
+  });
+}
+
+async function resolveServerPort() {
+  if (await isPortAvailable(DEFAULT_PORT)) {
+    return DEFAULT_PORT;
+  }
+
+  const fallbackServer = net.createServer();
+
+  return new Promise((resolve, reject) => {
+    fallbackServer.once('error', reject);
+    fallbackServer.listen(0, '0.0.0.0', () => {
+      const address = fallbackServer.address();
+      const fallbackPort = typeof address === 'object' && address ? address.port : DEFAULT_PORT;
+
+      fallbackServer.close((closeError) => {
+        if (closeError) {
+          reject(closeError);
+          return;
+        }
+
+        resolve(fallbackPort);
+      });
+    });
+  });
+}
+
 function getServerEnv() {
   const { userDataPath, dbPath } = getUserDataPaths(app);
 
   return {
     ...process.env,
     NODE_ENV: 'production',
-    PORT: String(PORT),
+    PORT: String(serverPort),
     HOSTNAME: '0.0.0.0',
     DATABASE_URL: `file:${dbPath}`,
     IMAGINE_THIS_DESKTOP: 'true',
     IMAGINE_THIS_USER_DATA_PATH: userDataPath,
-    NEXTAUTH_URL: `http://localhost:${PORT}`,
+    NEXTAUTH_URL: `http://localhost:${serverPort}`,
     NEXTAUTH_SECRET: 'electron-app-secret-key-min-32-characters-long',
   };
 }
@@ -276,7 +319,7 @@ async function waitForServerReady() {
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       await new Promise((resolve, reject) => {
-        const request = http.get(`http://localhost:${PORT}/api/health`, (response) => {
+        const request = http.get(`http://localhost:${serverPort}/api/health`, (response) => {
           response.resume();
           response.on('end', resolve);
         });
@@ -301,7 +344,7 @@ async function waitForServerReady() {
 
 function startNextServer() {
   if (isDev) {
-    applicationUrl = `http://localhost:${PORT}`;
+    applicationUrl = `http://localhost:${serverPort}`;
     return Promise.resolve();
   }
 
@@ -347,7 +390,7 @@ function startNextServer() {
 
     waitForServerReady()
       .then(() => {
-        applicationUrl = `http://localhost:${PORT}`;
+        applicationUrl = `http://localhost:${serverPort}`;
         resolve();
       })
       .catch(reject);
@@ -358,7 +401,7 @@ async function warmupApi(endpoint, description) {
   const startedAt = Date.now();
 
   return new Promise((resolve) => {
-    const request = http.get(`http://localhost:${PORT}${endpoint}`, (response) => {
+    const request = http.get(`http://localhost:${serverPort}${endpoint}`, (response) => {
       response.resume();
       response.on('end', () => {
         log(`[Warmup] ${description} completed in ${Date.now() - startedAt}ms`);
@@ -399,6 +442,11 @@ async function bootstrapApplication() {
   updateManager.initialize();
 
   try {
+    serverPort = await resolveServerPort();
+    if (serverPort !== DEFAULT_PORT) {
+      log(`Default port ${DEFAULT_PORT} is busy, selected fallback port ${serverPort}`, 'WARN');
+    }
+
     await ensureDesktopDatabaseReady(app, log);
     await startNextServer();
     await warmupApplication();
@@ -441,13 +489,19 @@ process.on('unhandledRejection', (reason) => {
   log(`Unhandled rejection: ${String(reason)}`, 'ERROR');
 });
 
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+
+if (!hasSingleInstanceLock) {
+  app.quit();
+}
+
 if (process.platform === 'win32') {
   app.commandLine.appendSwitch('disable-gpu-sandbox');
   app.commandLine.appendSwitch('disable-software-rasterizer');
   app.commandLine.appendSwitch('js-flags', `--max-old-space-size=${WINDOWS_RENDERER_MAX_OLD_SPACE_MB}`);
 }
 
-log(`Application starting. isDev=${isDev} port=${PORT}`);
+log(`Application starting. isDev=${isDev} preferredPort=${DEFAULT_PORT}`);
 log(`Platform=${process.platform} arch=${process.arch}`);
 log(`App path=${app.getAppPath()}`);
 log(`Resources path=${process.resourcesPath}`);
@@ -459,6 +513,18 @@ log(
 );
 
 app.whenReady().then(bootstrapApplication);
+
+app.on('second-instance', () => {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+
+  mainWindow.focus();
+});
 
 app.on('activate', async () => {
   if (BrowserWindow.getAllWindows().length > 0) {

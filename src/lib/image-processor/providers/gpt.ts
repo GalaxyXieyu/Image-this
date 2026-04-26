@@ -1,10 +1,18 @@
-/**
- * GPT 图片处理器
- */
+import { mapProviderErrorMessage } from '@/lib/provider-error-utils';
+import { GPTConfig, IImageProcessor, ProcessResult } from '../types';
+import { postJson } from '../utils';
 
-import { IImageProcessor, ProcessResult, GPTConfig } from '../types';
-import { convertToGptImageUrl } from '../utils';
-import { postJson } from '../utils/api-client';
+interface GenerationResponse {
+  created?: number;
+  data?: Array<{
+    b64_json?: string;
+    url?: string;
+  }>;
+}
+
+const DEFAULT_BASE_URL = 'https://yunwu.ai';
+const DEFAULT_MODEL = 'gpt-4o-image-vip';
+const DEFAULT_IMAGE_SIZE = '1024x1024';
 
 export class GPTProcessor implements IImageProcessor {
   constructor(private config: GPTConfig) {}
@@ -13,81 +21,91 @@ export class GPTProcessor implements IImageProcessor {
     const { originalImageUrl, referenceImageUrl, prompt, customPrompt } = params;
 
     if (!this.config.apiKey) {
-      throw new Error('GPT API Key未配置');
+      throw new Error('GPT API Key 未配置，请先在设置页完成配置。');
     }
 
-    const baseUrl = this.config.apiUrl || 'https://yunwu.ai';
-    const finalPrompt = customPrompt || prompt || '保持第一张图的产品主体完全不变，仅替换第二张图的背景为类似参考场景的风格（要完全把第二张图的产品去掉），不要有同时出现的情况，保持第一张产品的形状、材质、特征比例、摆放角度及数量完全一致，专业摄影，高质量，4K分辨率';
-
-    console.log('[GPT Processor] 发送请求到:', baseUrl);
+    const baseUrl = this.normalizeBaseUrl(this.config.apiUrl || DEFAULT_BASE_URL);
+    const finalPrompt =
+      customPrompt ||
+      prompt ||
+      '保持第一张图的产品主体完全不变，只替换第二张图的背景风格，去掉第二张图里原有产品，并确保最终画面只有第一张图的产品主体。';
+    const modelName = this.config.modelName || DEFAULT_MODEL;
 
     try {
-      // 构建 content
-      const content = [
-        { type: "text", text: finalPrompt },
-        convertToGptImageUrl(originalImageUrl),
-        convertToGptImageUrl(referenceImageUrl)
-      ];
+      const imageUrls = await Promise.all([
+        this.prepareImageInput(originalImageUrl),
+        this.prepareImageInput(referenceImageUrl),
+      ]);
 
-      const modelName = this.config.modelName || 'gpt-4o-image-vip';
-      const payload = {
-        model: modelName,
-        messages: [
-          {
-            role: "user",
-            content: content
-          }
-        ],
-        max_tokens: 124000
-      };
-
-      const apiUrl = baseUrl.endsWith('/') ?
-        `${baseUrl}v1/chat/completions` :
-        `${baseUrl}/v1/chat/completions`;
-
-      const data = await postJson(
-        apiUrl,
-        payload,
+      const data = await postJson<GenerationResponse>(
+        `${baseUrl}/v1/images/generations`,
         {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${this.config.apiKey}`,
-          'Connection': 'keep-alive'
+          model: modelName,
+          prompt: finalPrompt,
+          size: DEFAULT_IMAGE_SIZE,
+          n: 1,
+          image_urls: imageUrls,
         },
-        { timeout: 300000 } // 5分钟超时
+        {
+          Authorization: `Bearer ${this.config.apiKey}`,
+        },
+        { timeout: 300000 }
       );
 
-      console.log('[GPT Processor] 响应状态: 成功');
-
-      // 从响应中提取图片 URL
-      const content_response = data.choices?.[0]?.message?.content;
-      if (content_response) {
-        const imageUrlMatch = content_response.match(/!\[.*?\]\((https?:\/\/[^\)]+)\)/);
-        if (imageUrlMatch && imageUrlMatch[1]) {
-          const imageUrl = imageUrlMatch[1];
-
-          return {
-            id: `gpt-${Date.now()}`,
-            imageData: imageUrl,
-            imageSize: 0 // GPT 返回的是 URL，无法获取大小
-          };
-        }
+      const imagePayload = data.data?.[0];
+      if (!imagePayload) {
+        throw new Error('GPT 图片生成成功，但没有返回结果数据。');
       }
 
-      throw new Error('未能从 GPT 响应中提取图片 URL');
+      if (imagePayload.b64_json) {
+        return {
+          id: `gpt-${Date.now()}`,
+          imageData: `data:image/png;base64,${imagePayload.b64_json}`,
+          imageSize: Math.floor(imagePayload.b64_json.length * 0.75),
+        };
+      }
 
+      if (imagePayload.url) {
+        return {
+          id: `gpt-${Date.now()}`,
+          imageData: imagePayload.url,
+          imageSize: 0,
+        };
+      }
+
+      throw new Error('GPT 图片生成成功，但返回结果中没有可用图片。');
     } catch (error) {
-      console.error('[GPT Processor] 处理失败:', error instanceof Error ? error.message : 'Unknown error');
-      throw error;
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[GPT Processor] 处理失败:', message);
+      throw new Error(mapProviderErrorMessage(message, 'gpt'));
     }
   }
 
   async enhance(userId: string, imageBase64: string, params?: any): Promise<ProcessResult> {
-    // TODO: 实现 GPT 画质增强逻辑
     throw new Error('GPT enhance not implemented yet');
   }
 
   async generate(userId: string, params: any): Promise<ProcessResult> {
-    // TODO: 实现 GPT 图片生成逻辑
     throw new Error('GPT generate not implemented yet');
+  }
+
+  private async prepareImageInput(source: string): Promise<string> {
+    if (source.startsWith('data:')) {
+      return source;
+    }
+
+    if (source.startsWith('http://') || source.startsWith('https://')) {
+      return source;
+    }
+
+    if (!source) {
+      throw new Error('GPT 图片输入为空，请重新选择图片。');
+    }
+
+    return `data:image/png;base64,${source.replace(/^data:image\/[^;]+;base64,/, '')}`;
+  }
+
+  private normalizeBaseUrl(baseUrl: string): string {
+    return baseUrl.replace(/\/+$/, '');
   }
 }

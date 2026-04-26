@@ -54,6 +54,56 @@ const CATEGORY_LABELS: Record<string, string> = {
   ONE_CLICK: '一键增强',
 };
 
+function getProviderDisplayName(provider: 'gpt' | 'gemini' | 'jimeng') {
+  if (provider === 'gpt') return 'GPT';
+  if (provider === 'gemini') return 'Gemini';
+  return '即梦';
+}
+
+function mapModelRequestError(provider: 'gpt' | 'gemini' | 'jimeng', message: string) {
+  const providerName = getProviderDisplayName(provider);
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes('unsupported operation') ||
+    normalized.includes('requested operation is unsupported') ||
+    normalized.includes('does not support image')
+  ) {
+    return `${providerName} 当前接口不支持图片能力，请确认 Base URL 指向兼容的图片接口，并使用支持的模型。`;
+  }
+
+  if (normalized.includes('401') || normalized.includes('403') || normalized.includes('invalid token')) {
+    return `${providerName} 的 API Key 无效、已过期，或没有对应权限。`;
+  }
+
+  if (normalized.includes('404')) {
+    return `${providerName} 的接口地址不存在，请检查 Base URL 是否填写正确。`;
+  }
+
+  if (normalized.includes('429')) {
+    return `${providerName} 当前请求过于频繁，或账户额度已经用尽。`;
+  }
+
+  if (normalized.includes('500')) {
+    return `${providerName} 服务端暂时异常，请稍后再试。`;
+  }
+
+  if (normalized.includes('timeout') || normalized.includes('aborted')) {
+    return `${providerName} 请求超时，请检查网络或接口地址后重试。`;
+  }
+
+  if (
+    normalized.includes('fetch failed') ||
+    normalized.includes('network') ||
+    normalized.includes('econnrefused') ||
+    normalized.includes('enotfound')
+  ) {
+    return `${providerName} 无法连接，请检查 Base URL、网络或代理设置。`;
+  }
+
+  return message;
+}
+
 function SearchableModelSelect({
   value,
   onChange,
@@ -236,6 +286,28 @@ export default function SettingsPage() {
   }, [status, router]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const originalAlert = window.alert;
+    window.alert = (message?: string) => {
+      const text = typeof message === 'string' ? message : '';
+      const isFailure = /失败|错误|重试/i.test(text);
+
+      toast({
+        title: isFailure ? '操作失败' : '操作成功',
+        description: text || (isFailure ? '请稍后重试。' : '操作已完成。'),
+        variant: isFailure ? 'destructive' : 'default',
+      });
+    };
+
+    return () => {
+      window.alert = originalAlert;
+    };
+  }, [toast]);
+
+  useEffect(() => {
     // 从后端API加载设置
     const loadSettings = async () => {
       try {
@@ -348,6 +420,27 @@ export default function SettingsPage() {
   };
 
   // 获取模型列表
+  const renderInlineSaveButton = () => (
+    <Button
+      type="button"
+      onClick={handleSave}
+      disabled={isSaving}
+      className="min-w-[132px] bg-orange-500 hover:bg-orange-600"
+    >
+      {isSaving ? (
+        <>
+          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+          保存中...
+        </>
+      ) : (
+        <>
+          <Save className="w-4 h-4 mr-2" />
+          保存本区配置
+        </>
+      )}
+    </Button>
+  );
+
   const fetchModels = async (provider: 'gpt' | 'gemini' | 'jimeng') => {
     const baseUrlField = provider === 'gpt' ? 'gptApiUrl' : provider === 'gemini' ? 'geminiBaseUrl' : 'jimengBaseUrl';
     const apiKeyField = provider === 'gpt' ? 'gptApiKey' : provider === 'gemini' ? 'geminiApiKey' : 'arkApiKey';
@@ -385,6 +478,15 @@ export default function SettingsPage() {
         description: `找到 ${models.length} 个模型`,
       });
     } catch (error) {
+      const errorMessage = mapModelRequestError(
+        provider,
+        error instanceof Error ? error.message : '未知错误'
+      );
+
+      if (error instanceof Error) {
+        error.message = errorMessage;
+      }
+
       toast({
         title: '获取模型列表失败',
         description: error instanceof Error ? error.message : '未知错误',
@@ -614,11 +716,12 @@ export default function SettingsPage() {
           <div className="space-y-6">
             {/* GPT API配置 */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-start justify-between space-y-0">
                 <CardTitle className="flex items-center">
                   <Key className="w-5 h-5 mr-2 text-blue-600" />
                   GPT API
                 </CardTitle>
+                {renderInlineSaveButton()}
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-sm text-gray-500 mb-4">
@@ -673,11 +776,12 @@ export default function SettingsPage() {
 
             {/* Google Gemini配置 */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-start justify-between space-y-0">
                 <CardTitle className="flex items-center">
                   <Sparkles className="w-5 h-5 mr-2 text-purple-600" />
                   Google Gemini
                 </CardTitle>
+                {renderInlineSaveButton()}
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-sm text-gray-500 mb-4">
@@ -733,11 +837,12 @@ export default function SettingsPage() {
 
             {/* 即梦配置 */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-start justify-between space-y-0">
                 <CardTitle className="flex items-center">
                   <Sparkles className="w-5 h-5 mr-2 text-blue-600" />
                   即梦
                 </CardTitle>
+                {renderInlineSaveButton()}
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-sm text-gray-500 mb-4">
@@ -821,11 +926,12 @@ export default function SettingsPage() {
         return (
           <div className="space-y-6">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-start justify-between space-y-0">
                 <CardTitle className="flex items-center">
                   <Image className="w-5 h-5 mr-2 text-green-600" />
                   图床服务
                 </CardTitle>
+                {renderInlineSaveButton()}
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-sm text-gray-500 mb-4">
@@ -849,13 +955,14 @@ export default function SettingsPage() {
 
             {/* 本地存储配置 */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-start justify-between space-y-0">
                 <CardTitle className="flex items-center">
                   <div className="flex items-center">
                     <HardDrive className="w-5 h-5 mr-2 text-blue-600" />
                     本地存储配置
                   </div>
                 </CardTitle>
+                {renderInlineSaveButton()}
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-sm text-gray-500 mb-4">

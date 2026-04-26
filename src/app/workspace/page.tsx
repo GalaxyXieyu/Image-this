@@ -48,6 +48,7 @@ import BatchWarningDialog from '@/components/workspace/BatchWarningDialog';
 import { VideoStyleSelector } from '@/components/workspace/VideoStyleSelector';
 import { VideoResultModal } from '@/components/workspace/VideoResultModal';
 import { VIDEO_STYLE_TEMPLATES } from '@/lib/video-style-templates';
+import { mapProviderErrorMessage } from '@/lib/provider-error-utils';
 
 // Custom Hooks
 import { useImageUpload } from '@/hooks/useImageUpload';
@@ -786,9 +787,12 @@ export default function WorkspacePage() {
       }
     } catch (error) {
       console.error('处理失败:', error);
+      const errorMessage = mapProviderErrorMessage(
+        error instanceof Error ? error.message : '未知错误'
+      );
       toast({
         title: "处理失败",
-        description: error instanceof Error ? error.message : '未知错误',
+        description: errorMessage,
         variant: "destructive",
       });
       setIsProcessing(false);

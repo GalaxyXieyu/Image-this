@@ -104,7 +104,7 @@ export default function ParameterSettings({
     // 提供商名称映射
     const providerNames: Record<string, string> = {
         'gemini': 'Gemini',
-        'gpt': 'GPT-4 Vision',
+        'gpt': 'GPT',
         'jimeng': '即梦',
         'volcengine': '火山引擎',
         'qwen': '通义千问'

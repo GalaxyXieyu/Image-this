@@ -1,5 +1,6 @@
 import { useCallback, useRef, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast";
+import { mapProviderErrorMessage } from '@/lib/provider-error-utils';
 
 interface Task {
   id: string;
@@ -135,9 +136,10 @@ export function useTaskPolling({
       const failedTasks = updatedTasks.filter(task => task.status === 'FAILED');
       for (const task of failedTasks) {
         const originalTask = originalTaskMap.get(task.id);
+        const errorMessage = mapProviderErrorMessage(task.errorMessage || '未知错误');
         toast({
           title: "❌ 任务失败",
-          description: `${originalTask?.originalName || '图片'} ${getProcessTypeName(task.type)}处理失败: ${task.errorMessage || '未知错误'}`,
+          description: `${originalTask?.originalName || '图片'} ${getProcessTypeName(task.type)}处理失败: ${errorMessage}`,
           variant: "destructive",
         });
       }
