@@ -86,6 +86,7 @@ jobs:
           SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
         run: |
           set -euxo pipefail
+          mkdir -p ~/.ssh
           install -m 600 /dev/null ~/.ssh/id_deploy
           printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/id_deploy
           ssh-keyscan -p "$SERVER_PORT" -H "$SERVER_HOST" >> ~/.ssh/known_hosts
