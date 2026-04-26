@@ -94,8 +94,10 @@ backup_shared_state() {
     log "$YELLOW" "⚠️ 上传目录为空，跳过备份"
   fi
 
-  ls -t "$BACKUPS_DIR"/app.db.* 2>/dev/null | tail -n +11 | xargs -r rm -f
-  ls -t "$BACKUPS_DIR"/uploads.*.tar.gz 2>/dev/null | tail -n +11 | xargs -r rm -f
+  find "$BACKUPS_DIR" -maxdepth 1 -type f -name 'app.db.*' -printf '%T@ %p\n' 2>/dev/null \
+    | sort -nr | awk 'NR>10{sub(/^[^ ]+ /, ""); print}' | xargs -r rm -f
+  find "$BACKUPS_DIR" -maxdepth 1 -type f -name 'uploads.*.tar.gz' -printf '%T@ %p\n' 2>/dev/null \
+    | sort -nr | awk 'NR>10{sub(/^[^ ]+ /, ""); print}' | xargs -r rm -f
   echo
 }
 
