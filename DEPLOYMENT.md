@@ -1,242 +1,267 @@
-# 🚀 Image-this 自动部署文档
+# 🚀 Image-this 自动部署文档（Standalone / PM2）
 
 ## 概述
 
-该项目已配置 **Docker 自动部署**，当代码推送到 `main` 分支时会自动触发部署流程。
+该项目已改为 **Standalone 制品自动部署**。
+当代码推送到 `main` 分支时，GitHub Actions 会：
+
+1. 在 GitHub Runner 上安装依赖并构建 Next.js standalone 制品
+2. 打包部署 bundle
+3. 通过 SSH / SCP 上传到服务器
+4. 在服务器上解压到 release 目录
+5. 复用共享数据目录（SQLite / uploads / .env）
+6. 执行 `Prisma db push`
+7. 用 PM2 重载服务
+8. 做健康检查并清理旧版本
 
 ### 部署流程
 
-```
-本地开发 → Git Push → GitHub Actions → 构建Docker镜像 → SSH部署到服务器 → 自动重启
-```
-
-## 🔑 配置 GitHub Secrets
-
-### 1. 获取 SSH 私钥
-
-SSH 密钥对已生成，私钥位于服务器：
-
-```bash
-# 在服务器上执行
-cat ~/.ssh/github-actions-deploy
+```text
+本地开发 → Git Push → GitHub Actions 构建 standalone → 上传服务器 → PM2 重载 → 健康检查
 ```
 
-复制全部内容（包括 `-----BEGIN OPENSSH PRIVATE KEY-----` 和 `-----END OPENSSH PRIVATE KEY-----`）
+---
 
-### 2. 在 GitHub 仓库中添加 Secrets
+## 🔑 GitHub Secrets
 
-访问：`https://github.com/GalaxyXieyu/Image-this/settings/secrets/actions`
+访问：
+`https://github.com/GalaxyXieyu/Image-this/settings/secrets/actions`
 
-添加以下 4 个 Secrets：
+需要以下 Secrets：
 
 | Secret 名称 | 值 | 说明 |
 |------------|-----|------|
-| `SERVER_HOST` | `38.76.197.25` | 服务器 IP 地址 |
-| `SERVER_USER` | `root` | SSH 登录用户名 |
-| `SERVER_SSH_KEY` | `<SSH 私钥内容>` | SSH 私钥完整内容 |
-| `SERVER_PORT` | `22` | SSH 端口号（默认 22） |
+| `SERVER_HOST` | 服务器 IP / 域名 | 博杰服务器地址 |
+| `SERVER_USER` | `root` 或部署用户 | SSH 登录用户名 |
+| `SERVER_SSH_KEY` | SSH 私钥内容 | GitHub Actions 用于登录服务器 |
+| `SERVER_PORT` | `22` | SSH 端口 |
 
-### 3. 验证配置
+---
 
-配置完成后，推送任何代码到 `main` 分支即可触发部署：
+## 🗂️ 服务器目录结构
 
-```bash
-git push origin main
-```
-
-然后访问：`https://github.com/GalaxyXieyu/Image-this/actions`
-
-查看部署进度。
-
-## 🛠️ 已创建的文件
-
-以下文件已自动创建：
-
-- ✅ `.github/workflows/deploy-docker.yml` - GitHub Actions 工作流
-- ✅ `docker-compose.production.yml` - Docker Compose 配置
-- ✅ `scripts/deploy-docker.sh` - Docker 部署脚本
-- ✅ `.dockerignore` - Docker 构建优化
-- ✅ `~/.ssh/github-actions-deploy` - SSH 密钥对
-
-## 🐳 Docker 部署特性
-
-### 数据持久化
-
-- **数据库**: `./data` 目录映射到容器内 `/app/data`
-- **上传文件**: `./public/uploads` 映射到容器内 `/app/public/uploads`
-- **备份**: 每次部署前自动备份，保留最近 10 个备份
-
-### 健康检查
-
-- 端点：`http://38.76.197.25:34123/api/health`
-- 间隔：30秒
-- 超时：10秒
-- 重试：3次
-
-### 自动回滚
-
-如果健康检查失败，部署脚本会自动：
-1. 停止新容器
-2. 恢复数据库备份
-3. 恢复上传文件备份
-4. 显示错误日志
-
-## 🔄 Git 工作流
-
-### 分支策略
-
-```
-main (生产分支，推送后自动部署)
-  ↑
-  ├─ feature/xxx (功能开发)
-  ├─ bugfix/xxx (问题修复)
-  └─ hotfix/xxx (紧急修复)
-```
-
-### 开发流程
+部署根目录：
 
 ```bash
-# 1. 创建功能分支
-git checkout -b feature/new-feature
-
-# 2. 开发和提交
-git add .
-git commit -m "feat: add new feature"
-
-# 3. 推送并创建 PR
-git push origin feature/new-feature
-
-# 4. 在 GitHub 上创建 Pull Request
-
-# 5. 合并到 main 触发部署
-# GitHub 上合并 PR → 自动部署
+/root/data/Image-this
 ```
 
-## 🛡️ 故障排查
+关键目录：
 
-### 查看 Docker 日志
+```text
+/root/data/Image-this/
+├── current -> /root/data/Image-this/releases/<commit>
+├── releases/
+│   ├── <commit-a>/
+│   ├── <commit-b>/
+│   └── ...
+├── shared/
+│   ├── .env
+│   ├── data/
+│   │   └── app.db
+│   └── public/
+│       └── uploads/
+├── backups/
+└── scripts/
+    └── deploy-standalone.sh
+```
+
+说明：
+- `releases/`：每次部署一个独立版本目录
+- `current`：当前线上版本软链接
+- `shared/data/app.db`：SQLite 数据库持久化
+- `shared/public/uploads/`：上传文件持久化
+- `shared/.env`：生产环境变量
+
+---
+
+## 🧩 运行方式
+
+线上服务由 PM2 托管：
+
+- PM2 应用名：`imagine-this-web`
+- 启动脚本：`server.js`（由 `.next/standalone` 制品展开到 release 根目录）
+- 监听端口：`34123`
+- 健康检查：`http://image.bojie.store/api/health`
+
+项目使用：
+- `ecosystem.production.config.js`
+- `scripts/deploy-standalone.sh`
+
+---
+
+## 📦 首次部署前准备
+
+### 1. 安装 Node.js 20
+
+项目要求 Node 20。
+
+建议服务器安装并默认切换到 Node 20。
+
+### 2. 安装 PM2
 
 ```bash
-docker logs imagine-this-app
-docker logs imagine-this-app --tail 100
-docker logs -f imagine-this-app  # 实时查看
+npm install -g pm2
+pm2 -v
 ```
 
-### 查看容器状态
+### 3. 准备环境变量文件
+
+在服务器创建：
 
 ```bash
-docker ps
-docker stats imagine-this-app --no-stream
+mkdir -p /root/data/Image-this/shared
+nano /root/data/Image-this/shared/.env
 ```
 
-### 手动执行部署
+至少应包含：
+
+```env
+DATABASE_URL="file:./data/app.db"
+NEXTAUTH_URL="http://image.bojie.store"
+NEXTAUTH_SECRET="请替换成长度足够的随机字符串"
+```
+
+如果项目还依赖其他 AI / MinIO / 第三方配置，也一并写入这个 `.env`。
+
+### 4. 创建共享目录
+
+```bash
+mkdir -p /root/data/Image-this/shared/data
+mkdir -p /root/data/Image-this/shared/public/uploads
+mkdir -p /root/data/Image-this/releases
+mkdir -p /root/data/Image-this/backups
+mkdir -p /root/data/Image-this/scripts
+```
+
+---
+
+## 🔄 自动部署说明
+
+当前 workflow 文件：
+
+- `.github/workflows/deploy-docker.yml`
+
+虽然文件名还叫 `deploy-docker.yml`，但内容已经改成 **standalone + PM2 部署链路**。
+
+### CI 做的事
+
+- `npm ci`
+- `npm run build`
+- 打包 `.next/standalone` 与 Prisma runtime
+- 上传压缩包与部署脚本
+- 服务器执行部署脚本
+
+### 服务器做的事
+
+- 备份 `app.db` / `uploads`
+- 解压新版本到 `releases/<commit>`
+- 软链共享数据目录和 `.env`
+- 执行 `Prisma db push`
+- PM2 reload
+- 健康检查
+- 清理旧 release（保留最近 5 个）
+- 部署失败时回滚到上一个 release
+
+---
+
+## 🛠️ 常用运维命令
+
+### 查看 PM2 状态
+
+```bash
+pm2 list
+pm2 status imagine-this-web
+```
+
+### 查看日志
+
+```bash
+pm2 logs imagine-this-web
+pm2 logs imagine-this-web --lines 100
+```
+
+### 查看当前线上目录
+
+```bash
+readlink -f /root/data/Image-this/current
+```
+
+### 查看 release 列表
+
+```bash
+ls -lah /root/data/Image-this/releases
+```
+
+### 手动执行部署脚本
 
 ```bash
 cd /root/data/Image-this
-bash scripts/deploy-docker.sh
+bash scripts/deploy-standalone.sh <commit> /root/data/Image-this/image-this-<commit>.tar.gz
 ```
 
-### 回滚到上一版本
+### 手动回滚
 
 ```bash
-cd /root/data/Image-this/backups
-ls -lt  # 查看备份
-
-# 恢复数据库
-cp app.db.20260208_120000 ../data/app.db
-
-# 恢复上传文件
-tar -xzf uploads.20260208_120000.tar.gz -C ..
-
-# 重启容器
-docker-compose -f docker-compose.production.yml restart
-```
-
-## 📊 监控
-
-### 健康检查
-
-```bash
-curl http://38.76.197.25:34123/api/health
-```
-
-### 页面访问
-
-- 服务地址：http://38.76.197.25:34123
-- 健康检查：http://38.76.197.25:34123/api/health
-
-## 🚀 首次部署
-
-### 准备服务器环境
-
-```bash
-# 1. 确保 Docker 和 Docker Compose 已安装
-docker --version
-docker-compose --version
-
-# 2. 创建必要目录
 cd /root/data/Image-this
-mkdir -p data backups public/uploads
-
-# 3. 停止现有 PM2 服务（如果使用 Docker）
-pm2 stop imagine-this
-pm2 delete imagine-this
+ls -lah releases
+ln -sfn /root/data/Image-this/releases/<旧commit> current
+cd current
+pm2 startOrReload ecosystem.production.config.js --update-env
 pm2 save
 ```
 
-### 提交配置文件
+---
+
+## 🩺 健康检查
 
 ```bash
-# 1. 创建功能分支
-git checkout -b feat/add-docker-deployment
-
-# 2. 添加文件
-git add .github/ docker-compose.production.yml scripts/ .dockerignore DEPLOYMENT.md
-
-# 3. 提交
-git commit -m "feat(ci): add Docker-based auto-deployment with GitHub Actions"
-
-# 4. 推送
-git push origin feat/add-docker-deployment
-
-# 5. 在 GitHub 创建 PR 并合并到 main
-# 合并后将自动触发第一次部署
+curl http://127.0.0.1:34123/api/health
+curl http://image.bojie.store/api/health
 ```
+
+---
 
 ## ❓ 常见问题
 
-### Q: 部署失败怎么办？
+### Q: 为什么不用 Docker 了？
 
-A: 
-1. 查看 GitHub Actions 日志：`https://github.com/GalaxyXieyu/Image-this/actions`
-2. 查看服务器 Docker 日志：`docker logs imagine-this-app`
-3. 检查 GitHub Secrets 配置是否正确
-4. 检查 SSH 连接是否正常
+A: 因为博杰服务器在国内，拉取 GHCR Docker 镜像稳定性差。改成 GitHub Actions 构建制品后上传服务器，部署成功率更高。
 
-### Q: 如何跳过自动部署？
+### Q: 服务器还需要 `npm ci` 吗？
 
-A: 在提交消息中添加 `[skip ci]`：
+A: 正常情况下不需要。依赖和 standalone bundle 已在 CI 构建并打包上传。
+
+### Q: 数据会不会丢？
+
+A: 不会。数据库和上传文件放在 `shared/` 下，不跟随 release 删除；部署前还会自动备份。
+
+### Q: 怎么看是否真的切到新版本？
+
+A: 查看：
+
 ```bash
-git commit -m "docs: update README [skip ci]"
+readlink -f /root/data/Image-this/current
 ```
 
-### Q: 如何手动触发部署？
+如果路径已经切到新的 commit 目录，说明版本切换成功。
 
-A: 访问 GitHub Actions，点击 "Run workflow" 按钮
-
-### Q: 如何查看部署历史？
-
-A: 访问 `https://github.com/GalaxyXieyu/Image-this/actions`
+---
 
 ## 📝 注意事项
 
-1. **环境变量**: 敏感信息（`NEXTAUTH_SECRET`）已在服务器 `.env` 文件中，无需配置到 GitHub Secrets
-2. **端口映射**: Docker 容器内部端口 3000，映射到服务器端口 34123
-3. **镜像仓库**: 使用 GitHub Container Registry (ghcr.io)，免费且无需额外配置
-4. **数据备份**: 每次部署前自动备份，保留最近 10 个备份
+1. 生产环境推荐 Node 20
+2. `shared/.env` 必须存在，至少包含 `NEXTAUTH_SECRET` 和 `NEXTAUTH_URL`
+3. `shared/data/app.db` 与 `shared/public/uploads/` 是持久化目录，不要删除
+4. 每次部署会保留最近 5 个 release，旧版本会自动清理
+5. 若 PM2 未安装，部署脚本会尝试自动安装
 
-## 🎉 完成！
+---
 
-现在你已经拥有了一个完整的自动化部署流程！
+## 🎉 完成
 
-每次推送代码到 `main` 分支，服务会在 2-3 分钟内自动更新。
+现在该项目已从 Docker 部署切换为更适合国内服务器的：
+
+**GitHub Actions 构建 standalone 制品 → 上传服务器 → PM2 运行**
+
+这能显著降低因拉 Docker 镜像导致的部署失败概率。

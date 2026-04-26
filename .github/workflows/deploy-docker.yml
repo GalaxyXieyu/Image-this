@@ -1,15 +1,19 @@
-name: Deploy to Production (Docker)
+name: Deploy to Production (Standalone)
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:  # 支持手动触发
+  workflow_dispatch:
 
-# 添加权限配置
 permissions:
   contents: read
-  packages: write
+
+env:
+  APP_ROOT: /root/data/Image-this
+  APP_DOMAIN: http://image.bojie.store
+  APP_NAME: imagine-this-web
+  PORT: '34123'
 
 jobs:
   deploy:
@@ -35,44 +39,54 @@ jobs:
         run: npm run lint
         continue-on-error: true
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Prepare build environment
+        run: |
+          cat > .env.production <<'EOF'
+          DATABASE_URL=file:./data/app.db
+          NEXTAUTH_URL=http://image.bojie.store
+          NEXTAUTH_SECRET=build-only-secret-with-32-characters
+          EOF
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build standalone bundle
+        env:
+          DATABASE_URL: file:./data/app.db
+          NEXTAUTH_URL: http://image.bojie.store
+          NEXTAUTH_SECRET: build-only-secret-with-32-characters
+        run: npm run build
 
-      - name: Extract metadata for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository_owner }}/image-this
-          tags: |
-            type=raw,value=latest
-            type=sha,prefix={{branch}}-,format=short
+      - name: Package deployment bundle
+        run: |
+          set -euxo pipefail
+          rm -rf .deploy-bundle
+          mkdir -p .deploy-bundle/node_modules
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          rsync -a .next/standalone/ .deploy-bundle/
+          rsync -a prisma .deploy-bundle/prisma
+          rsync -a ecosystem.production.config.js .deploy-bundle/ecosystem.production.config.js
+          rsync -a package.json .deploy-bundle/package.json
 
-      - name: Sync deployment files to server
+          rsync -a node_modules/prisma .deploy-bundle/node_modules/prisma
+          rsync -a node_modules/@prisma .deploy-bundle/node_modules/@prisma
+          if [ -d node_modules/.prisma ]; then
+            rsync -a node_modules/.prisma .deploy-bundle/node_modules/.prisma
+          fi
+          if [ -d node_modules/.bin ]; then
+            mkdir -p .deploy-bundle/node_modules/.bin
+            rsync -a node_modules/.bin/prisma .deploy-bundle/node_modules/.bin/prisma
+          fi
+
+          tar -czf image-this-${GITHUB_SHA}.tar.gz -C .deploy-bundle .
+          ls -lh image-this-${GITHUB_SHA}.tar.gz
+
+      - name: Sync deployment bundle to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
-          source: "docker-compose.production.yml,scripts/deploy-docker.sh"
-          target: "/root/data/Image-this"
+          source: image-this-${{ github.sha }}.tar.gz,scripts/deploy-standalone.sh
+          target: ${{ env.APP_ROOT }}
           strip_components: 0
 
       - name: Deploy to server via SSH
@@ -85,16 +99,16 @@ jobs:
           timeout: 30s
           command_timeout: 30m
           script: |
-            mkdir -p /root/data/Image-this/scripts /root/data/Image-this/data /root/data/Image-this/public/uploads /root/data/Image-this/backups
-            chmod +x /root/data/Image-this/scripts/deploy-docker.sh
-            cd /root/data/Image-this
-            bash scripts/deploy-docker.sh
+            mkdir -p ${{ env.APP_ROOT }}/scripts ${{ env.APP_ROOT }}/shared/data ${{ env.APP_ROOT }}/shared/public/uploads ${{ env.APP_ROOT }}/releases ${{ env.APP_ROOT }}/backups
+            chmod +x ${{ env.APP_ROOT }}/scripts/deploy-standalone.sh
+            cd ${{ env.APP_ROOT }}
+            bash scripts/deploy-standalone.sh "${{ github.sha }}" "${{ env.APP_ROOT }}/image-this-${{ github.sha }}.tar.gz"
 
       - name: Verify deployment
         run: |
           echo "Waiting for service to be ready..."
           sleep 10
-          curl -f http://image.bojie.store/api/health || exit 1
+          curl -f ${{ env.APP_DOMAIN }}/api/health
           echo "Deployment verification successful!"
 
       - name: Notify deployment success
@@ -103,8 +117,8 @@ jobs:
           echo "=========================================="
           echo "   🎉 Deployment Successful!"
           echo "=========================================="
-          echo "Service URL: http://image.bojie.store"
-          echo "Health Check: http://image.bojie.store/api/health"
+          echo "Service URL: ${{ env.APP_DOMAIN }}"
+          echo "Health Check: ${{ env.APP_DOMAIN }}/api/health"
           echo "Commit: ${{ github.sha }}"
           echo "Author: ${{ github.actor }}"
 
