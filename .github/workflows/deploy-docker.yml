@@ -106,9 +106,9 @@ jobs:
           command_timeout: 30m
           script: |
             mkdir -p ${{ env.APP_ROOT }}/scripts ${{ env.APP_ROOT }}/shared/data ${{ env.APP_ROOT }}/shared/public/uploads ${{ env.APP_ROOT }}/releases ${{ env.APP_ROOT }}/backups
-            chmod +x ${{ env.APP_ROOT }}/scripts/deploy-standalone.sh
+            chmod +x ${{ env.APP_ROOT }}/deploy-standalone.sh
             cd ${{ env.APP_ROOT }}
-            bash scripts/deploy-standalone.sh "${{ github.sha }}" "${{ env.APP_ROOT }}/image-this-${{ github.sha }}.tar.gz"
+            bash deploy-standalone.sh "${{ github.sha }}" "${{ env.APP_ROOT }}/image-this-${{ github.sha }}.tar.gz"
 
       - name: Verify deployment
         run: |
