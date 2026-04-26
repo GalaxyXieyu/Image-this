@@ -92,8 +92,9 @@ while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
         echo -e "${GREEN}✅ 健康检查通过！${NC}"
         echo ""
 
-        # 清理旧镜像
+        # 清理旧镜像（保留 latest，删除其他版本）
         echo -e "${YELLOW}🧹 清理旧镜像...${NC}"
+        docker images "$IMAGE_NAME" --format "{{.ID}} {{.Tag}}" | grep -v "latest" | awk '{print $1}' | xargs -r docker rmi -f 2>/dev/null || true
         docker image prune -f > /dev/null 2>&1
         echo -e "${GREEN}✅ 清理完成${NC}"
         echo ""
