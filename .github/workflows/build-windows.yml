@@ -2,12 +2,6 @@ name: Build And Publish Windows App
 
 on:
   workflow_dispatch:
-    inputs:
-      publish_release:
-        description: Publish GitHub Release and sync desktop update feed
-        required: false
-        default: false
-        type: boolean
   push:
     tags:
       - 'v*'
@@ -52,7 +46,7 @@ jobs:
           DATABASE_URL=file:./data/app.db
           NEXTAUTH_URL=http://localhost:23000
           NEXTAUTH_SECRET=your-production-secret-key-min-32-chars
-          DESKTOP_UPDATE_BASE_URL=${{ vars.DESKTOP_UPDATE_BASE_URL || 'https://bojie.store' }}
+          DESKTOP_UPDATE_BASE_URL=https://bojie.store
           "@ | Set-Content .env.production
 
       - name: Build Windows App
@@ -72,7 +66,7 @@ jobs:
 
   publish-release:
     needs: build-windows
-    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.publish_release)
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -90,8 +84,8 @@ jobs:
       - name: Create or update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('manual-{0}', github.run_number) }}
-          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('Manual Desktop Build #{0}', github.run_number) }}
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
           draft: false
           prerelease: false
           generate_release_notes: true
@@ -108,9 +102,9 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          port: ${{ secrets.SERVER_PORT || 22 }}
+          port: ${{ secrets.SERVER_PORT }}
           script: |
-            mkdir -p "${{ vars.WINDOWS_UPDATE_REMOTE_DIR || '/data/imagine-this-updates/windows' }}"
+            mkdir -p "/data/imagine-this-updates/windows"
 
       - name: Sync desktop update artifacts to server
         uses: appleboy/scp-action@v0.1.7
@@ -118,12 +112,12 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          port: ${{ secrets.SERVER_PORT || 22 }}
+          port: ${{ secrets.SERVER_PORT }}
           source: "dist-electron/latest.yml,dist-electron/ImagineThis-*-Setup.exe,dist-electron/ImagineThis-*-Setup.exe.blockmap,dist-electron/ImagineThis-*-Portable.exe"
-          target: "${{ vars.WINDOWS_UPDATE_REMOTE_DIR || '/data/imagine-this-updates/windows' }}"
+          target: "/data/imagine-this-updates/windows"
           overwrite: true
           strip_components: 1
 
       - name: Verify remote desktop update feed
         run: |
-          curl --fail --show-error --location "${{ vars.DESKTOP_UPDATE_BASE_URL || 'https://bojie.store' }}/api/desktop-updates/windows/latest.yml"
+          curl --fail --show-error --location "https://bojie.store/api/desktop-updates/windows/latest.yml"
