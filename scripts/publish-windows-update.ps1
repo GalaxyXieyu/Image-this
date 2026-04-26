@@ -32,8 +32,10 @@ Write-Host "Preparing remote update directory..."
 ssh $remoteHost "mkdir -p $remoteDir"
 
 Write-Host "Uploading update artifacts..."
-$artifactPaths = $artifactFiles | ForEach-Object { $_.FullName }
-scp @artifactPaths "${remoteHost}:${remoteDir}/"
+foreach ($artifact in $artifactFiles) {
+  Write-Host "  -> $($artifact.Name)"
+  scp $artifact.FullName "${remoteHost}:${remoteDir}/"
+}
 
 Write-Host "Remote files:"
 ssh $remoteHost "ls -lh $remoteDir"
