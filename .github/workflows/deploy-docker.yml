@@ -78,16 +78,21 @@ jobs:
           tar -czf image-this-${GITHUB_SHA}.tar.gz -C .deploy-bundle .
           ls -lh image-this-${GITHUB_SHA}.tar.gz
 
-      - name: Sync deployment bundle to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          port: ${{ secrets.SERVER_PORT || 22 }}
-          source: image-this-${{ github.sha }}.tar.gz,scripts/deploy-standalone.sh
-          target: ${{ env.APP_ROOT }}
-          strip_components: 0
+      - name: Upload deployment bundle via rsync over SSH
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT || 22 }}
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        run: |
+          set -euxo pipefail
+          install -m 600 /dev/null ~/.ssh/id_deploy
+          printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/id_deploy
+          ssh-keyscan -p "$SERVER_PORT" -H "$SERVER_HOST" >> ~/.ssh/known_hosts
+          rsync -avz --progress -e "ssh -i ~/.ssh/id_deploy -p $SERVER_PORT -o StrictHostKeyChecking=yes" \
+            image-this-${GITHUB_SHA}.tar.gz scripts/deploy-standalone.sh \
+            ${SERVER_USER}@${SERVER_HOST}:${APP_ROOT}/
+          rm -f ~/.ssh/id_deploy
 
       - name: Deploy to server via SSH
         uses: appleboy/ssh-action@v1.0.3
