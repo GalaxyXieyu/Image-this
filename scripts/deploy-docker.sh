@@ -63,23 +63,42 @@ echo -e "${GREEN}✅ 旧容器已停止${NC}"
 echo ""
 
 # 4. 创建必要目录
-echo -e "${YELLOW}[4/7] 📁 创建数据目录...${NC}"
+echo -e "${YELLOW}[4/8] 📁 创建数据目录...${NC}"
 mkdir -p data public/uploads
+chown -R 1001:1001 data public/uploads || true
+chmod -R 775 data public/uploads || true
+if [ ! -f "data/app.db" ]; then
+    touch data/app.db
+fi
+chown 1001:1001 data/app.db || true
+chmod 664 data/app.db || true
 echo -e "${GREEN}✅ 目录准备完毕${NC}"
 echo ""
 
-# 5. 启动新容器
-echo -e "${YELLOW}[5/7] 🚀 启动新容器...${NC}"
+# 5. 自动执行数据库迁移 / 建表
+echo -e "${YELLOW}[5/8] 🗄️ 执行 Prisma 数据库迁移...${NC}"
+docker compose -f "$COMPOSE_FILE" run --rm --user root -e HOME=/tmp app sh -lc '
+  mkdir -p /app/data /app/public/uploads && \
+  chown -R 1001:1001 /app/data /app/public/uploads && \
+  chmod -R 775 /app/data /app/public/uploads || true && \
+  chmod 664 /app/data/app.db || true && \
+  ./node_modules/.bin/prisma db push --schema /app/prisma/schema.prisma --accept-data-loss
+'
+echo -e "${GREEN}✅ 数据库迁移完成${NC}"
+echo ""
+
+# 6. 启动新容器
+echo -e "${YELLOW}[6/8] 🚀 启动新容器...${NC}"
 docker compose -f "$COMPOSE_FILE" up -d
 echo -e "${GREEN}✅ 容器启动成功${NC}"
 echo ""
 
-# 6. 等待服务启动
-echo -e "${YELLOW}[6/7] ⏳ 等待服务启动...${NC}"
+# 7. 等待服务启动
+echo -e "${YELLOW}[7/8] ⏳ 等待服务启动...${NC}"
 sleep 15
 
-# 7. 健康检查
-echo -e "${YELLOW}[7/7] 🏥 执行健康检查...${NC}"
+# 8. 健康检查
+echo -e "${YELLOW}[8/8] 🏥 执行健康检查...${NC}"
 MAX_ATTEMPTS=30
 ATTEMPT=0
 HEALTH_URL="http://localhost:34123/api/health"
@@ -102,8 +121,8 @@ while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
         echo -e "${GREEN}========================================${NC}"
         echo -e "${GREEN}   🎉 部署成功！${NC}"
         echo -e "${GREEN}========================================${NC}"
-        echo -e "${BLUE}服务地址: http://38.76.197.25:34123${NC}"
-        echo -e "${BLUE}健康检查: $HEALTH_URL${NC}"
+        echo -e "${BLUE}服务地址: http://image.bojie.store${NC}"
+        echo -e "${BLUE}健康检查: http://image.bojie.store/api/health${NC}"
         echo -e "${BLUE}查看日志: docker logs imagine-this-app${NC}"
         echo ""
         exit 0

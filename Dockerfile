@@ -58,13 +58,19 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 
-# 创建上传目录
-RUN mkdir -p /app/uploads && chown nextjs:nodejs /app/uploads
+# 创建运行目录并给 Prisma CLI 一个可写 HOME
+RUN mkdir -p /app/data /app/uploads /tmp/hermes-home \
+    && chown -R nextjs:nodejs /app/data /app/uploads /tmp/hermes-home
 
-# 切换到非 root 用户
+# 默认以应用用户运行；迁移阶段可由 docker compose run --user root 覆盖
 USER nextjs
+ENV HOME=/tmp/hermes-home
+ENV PRISMA_HIDE_UPDATE_MESSAGE=true
+ENV PRISMA_DISABLE_WARNINGS=true
+ENV PRISMA_SKIP_POSTINSTALL_GENERATE=true
+ENV CI=true
 
 # 暴露端口
 EXPOSE 3000
