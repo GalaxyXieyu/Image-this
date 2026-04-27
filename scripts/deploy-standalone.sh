@@ -82,8 +82,12 @@ backup_shared_state() {
   log "$YELLOW" "[1/8] 📦 备份共享数据..."
 
   if [ -f "$SHARED_DIR/data/app.db" ]; then
-    cp "$SHARED_DIR/data/app.db" "$BACKUPS_DIR/app.db.$TIMESTAMP"
-    log "$GREEN" "✅ 数据库备份完成"
+    if command -v fuser >/dev/null 2>&1 && fuser "$SHARED_DIR/data/app.db" >/dev/null 2>&1; then
+      log "$YELLOW" "⚠️ 检测到 SQLite 正在被占用，跳过本次数据库文件备份以避免阻塞部署"
+    else
+      cp "$SHARED_DIR/data/app.db" "$BACKUPS_DIR/app.db.$TIMESTAMP"
+      log "$GREEN" "✅ 数据库备份完成"
+    fi
   else
     log "$YELLOW" "⚠️ 数据库文件不存在，跳过备份"
   fi
@@ -102,8 +106,20 @@ backup_shared_state() {
   echo
 }
 
+stop_existing_service() {
+  log "$YELLOW" "[2/9] ⏹️ 停止旧服务释放端口..."
+  if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
+    pm2 delete "$APP_NAME" >/dev/null 2>&1 || true
+    pm2 save >/dev/null || true
+    log "$GREEN" "✅ 已停止旧 PM2 服务"
+  else
+    log "$YELLOW" "⚠️ 未发现运行中的 PM2 服务"
+  fi
+  echo
+}
+
 extract_release() {
-  log "$YELLOW" "[2/8] 📂 解压新版本..."
+  log "$YELLOW" "[3/9] 📂 解压新版本..."
   rm -rf "$NEW_RELEASE_DIR"
   mkdir -p "$NEW_RELEASE_DIR"
   tar -xzf "$ARCHIVE_PATH" -C "$NEW_RELEASE_DIR"
@@ -113,7 +129,7 @@ extract_release() {
 }
 
 link_shared_resources() {
-  log "$YELLOW" "[3/8] 🔗 关联共享数据目录..."
+  log "$YELLOW" "[4/9] 🔗 关联共享数据目录..."
   rm -rf "$NEW_RELEASE_DIR/data"
   ln -sfn "$SHARED_DIR/data" "$NEW_RELEASE_DIR/data"
 
@@ -126,7 +142,7 @@ link_shared_resources() {
 }
 
 run_prisma_push() {
-  log "$YELLOW" "[4/8] 🗄️ 执行 Prisma db push..."
+  log "$YELLOW" "[5/9] 🗄️ 执行 Prisma db push..."
   (
     cd "$NEW_RELEASE_DIR"
     export DATABASE_URL="file:./data/app.db"
@@ -143,7 +159,7 @@ run_prisma_push() {
 }
 
 switch_release() {
-  log "$YELLOW" "[5/8] 🔁 切换 current 软链接..."
+  log "$YELLOW" "[6/9] 🔁 切换 current 软链接..."
   if [ -L "$CURRENT_LINK" ]; then
     PREVIOUS_RELEASE="$(readlink -f "$CURRENT_LINK")"
   fi
@@ -153,7 +169,7 @@ switch_release() {
 }
 
 restart_service() {
-  log "$YELLOW" "[6/8] 🚀 重启 PM2 服务..."
+  log "$YELLOW" "[7/9] 🚀 重启 PM2 服务..."
   (
     cd "$CURRENT_LINK"
 
@@ -171,7 +187,7 @@ restart_service() {
 }
 
 health_check() {
-  log "$YELLOW" "[7/8] 🏥 执行健康检查..."
+  log "$YELLOW" "[8/9] 🏥 执行健康检查..."
   for attempt in $(seq 1 30); do
     echo -e "${BLUE}✓ 尝试 ${attempt}/30...${NC}"
 
@@ -230,7 +246,7 @@ rollback() {
 }
 
 cleanup_old_releases() {
-  log "$YELLOW" "[8/8] 🧹 清理旧版本与临时包..."
+  log "$YELLOW" "[9/9] 🧹 清理旧版本与临时包..."
   rm -f "$ARCHIVE_PATH"
 
   mapfile -t release_paths < <(find "$RELEASES_DIR" -mindepth 1 -maxdepth 1 -type d | sort)
@@ -273,6 +289,7 @@ echo
 prepare_shared_dirs
 ensure_runtime
 backup_shared_state
+stop_existing_service
 extract_release
 link_shared_resources
 run_prisma_push
