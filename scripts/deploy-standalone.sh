@@ -156,8 +156,15 @@ restart_service() {
   log "$YELLOW" "[6/8] 🚀 重启 PM2 服务..."
   (
     cd "$CURRENT_LINK"
-    pm2 startOrReload ecosystem.production.config.js --update-env
+
+    if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
+      log "$BLUE" "ℹ️ 检测到已存在的 PM2 进程，先删除以刷新 cwd / script / env"
+      pm2 delete "$APP_NAME" >/dev/null 2>&1 || true
+    fi
+
+    pm2 start ecosystem.production.config.js --only "$APP_NAME" --update-env
     pm2 save >/dev/null
+    pm2 describe "$APP_NAME"
   )
   log "$GREEN" "✅ PM2 服务已重启"
   echo
@@ -167,10 +174,30 @@ health_check() {
   log "$YELLOW" "[7/8] 🏥 执行健康检查..."
   for attempt in $(seq 1 30); do
     echo -e "${BLUE}✓ 尝试 ${attempt}/30...${NC}"
-    if curl -fsS "$HEALTH_URL" >/dev/null 2>&1; then
+
+    if ! pm2 describe "$APP_NAME" >/dev/null 2>&1; then
+      log "$YELLOW" "⚠️ PM2 进程不存在，等待重新拉起..."
+      sleep 2
+      continue
+    fi
+
+    pm2_status="$(pm2 jlist 2>/dev/null | node -e '
+      const fs = require("fs");
+      const raw = fs.readFileSync(0, "utf8").trim();
+      if (!raw) process.exit(0);
+      const apps = JSON.parse(raw);
+      const app = apps.find((item) => item.name === process.argv[1]);
+      if (app?.pm2_env?.status) process.stdout.write(String(app.pm2_env.status));
+    ' "$APP_NAME" 2>/dev/null || true)"
+
+    if [ "$pm2_status" = "online" ] && curl -fsS "$HEALTH_URL" >/dev/null 2>&1; then
       log "$GREEN" "✅ 健康检查通过"
       echo
       return 0
+    fi
+
+    if [ -n "$pm2_status" ]; then
+      log "$BLUE" "ℹ️ 当前 PM2 状态: $pm2_status"
     fi
     sleep 2
   done
@@ -189,8 +216,12 @@ rollback() {
     ln -sfn "$PREVIOUS_RELEASE" "$CURRENT_LINK"
     (
       cd "$CURRENT_LINK"
-      pm2 startOrReload ecosystem.production.config.js --update-env || true
+      if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
+        pm2 delete "$APP_NAME" >/dev/null 2>&1 || true
+      fi
+      pm2 start ecosystem.production.config.js --only "$APP_NAME" --update-env || true
       pm2 save >/dev/null || true
+      pm2 describe "$APP_NAME" || true
     )
     log "$GREEN" "✅ 已回滚到上一个版本: $PREVIOUS_RELEASE"
   else
