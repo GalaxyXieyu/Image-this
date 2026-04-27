@@ -66,6 +66,13 @@ jobs:
           rsync -a ecosystem.production.config.js .deploy-bundle/ecosystem.production.config.js
           rsync -a package.json .deploy-bundle/package.json
 
+          rm -rf .deploy-bundle/node_modules
+          if [ -d .next/standalone/node_modules ]; then
+            cp -a .next/standalone/node_modules .deploy-bundle/
+          else
+            mkdir -p .deploy-bundle/node_modules
+          fi
+
           rm -rf .deploy-bundle/node_modules/prisma .deploy-bundle/node_modules/@prisma .deploy-bundle/node_modules/.prisma .deploy-bundle/node_modules/.bin
           rsync -a node_modules/prisma/ .deploy-bundle/node_modules/prisma/
           rsync -a node_modules/@prisma/ .deploy-bundle/node_modules/@prisma/
@@ -75,6 +82,18 @@ jobs:
           if [ -d node_modules/.bin ]; then
             mkdir -p .deploy-bundle/node_modules/.bin
             rsync -a node_modules/.bin/prisma .deploy-bundle/node_modules/.bin/prisma
+          fi
+
+          if [ -d .deploy-bundle/node_modules/@prisma/@prisma ]; then
+            rm -rf .deploy-bundle/node_modules/@prisma/@prisma
+          fi
+          if [ -d .deploy-bundle/node_modules/prisma/prisma ]; then
+            tmp_prisma_dir="$(mktemp -d)"
+            cp -a .deploy-bundle/node_modules/prisma/prisma/. "$tmp_prisma_dir/"
+            rm -rf .deploy-bundle/node_modules/prisma
+            mkdir -p .deploy-bundle/node_modules/prisma
+            cp -a "$tmp_prisma_dir/." .deploy-bundle/node_modules/prisma/
+            rm -rf "$tmp_prisma_dir"
           fi
 
           tar -czf image-this-${GITHUB_SHA}.tar.gz -C .deploy-bundle .

@@ -24,6 +24,12 @@ const envVars = {
   ...readEnvFile(path.join(cwd, '.env.production')),
   ...readEnvFile(path.join(cwd, '.env')),
 };
+if (Object.keys(envVars).length === 0 && process.env.NEXTAUTH_SECRET) {
+  envVars.NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET;
+}
+if (Object.keys(envVars).length === 0 && process.env.NEXTAUTH_URL) {
+  envVars.NEXTAUTH_URL = process.env.NEXTAUTH_URL;
+}
 
 module.exports = {
   apps: [
