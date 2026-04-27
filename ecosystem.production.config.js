@@ -21,8 +21,8 @@ function readEnvFile(filePath) {
 
 const cwd = __dirname;
 const envVars = {
-  ...readEnvFile(path.join(cwd, '.env')),
   ...readEnvFile(path.join(cwd, '.env.production')),
+  ...readEnvFile(path.join(cwd, '.env')),
 };
 
 module.exports = {

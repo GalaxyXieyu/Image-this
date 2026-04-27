@@ -1,8 +1,5 @@
 name: Deploy to Production (Standalone)
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
-
 on:
   push:
     branches:
@@ -13,6 +10,7 @@ permissions:
   contents: read
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
   APP_ROOT: /root/data/Image-this
   APP_DOMAIN: http://image.bojie.store
   APP_NAME: imagine-this-web
