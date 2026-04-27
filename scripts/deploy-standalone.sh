@@ -48,7 +48,8 @@ ensure_runtime() {
   local node_major
   node_major="$(node -p 'process.versions.node.split(".")[0]')"
   if [ "$node_major" != "20" ]; then
-    log "$YELLOW" "⚠️ 当前 Node 版本为 $(node -v)，项目推荐 Node 20。继续尝试部署。"
+    log "$RED" "❌ 当前 Node 版本为 $(node -v)，该项目要求 Node 20。请先完成服务器 Node 20 升级后再部署。"
+    exit 1
   else
     log "$GREEN" "✅ Node 版本: $(node -v)"
   fi
@@ -129,8 +130,10 @@ run_prisma_push() {
   (
     cd "$NEW_RELEASE_DIR"
     export DATABASE_URL="file:./data/app.db"
-    if [ -x "node_modules/.bin/prisma" ]; then
+    if [ -f "node_modules/prisma/build/index.js" ]; then
       node node_modules/prisma/build/index.js db push --schema prisma/schema.prisma --accept-data-loss
+    elif [ -x "node_modules/.bin/prisma" ]; then
+      node node_modules/.bin/prisma db push --schema prisma/schema.prisma --accept-data-loss
     else
       npx prisma db push --schema prisma/schema.prisma --accept-data-loss
     fi

@@ -1,5 +1,8 @@
 name: Deploy to Production (Standalone)
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 on:
   push:
     branches:
@@ -24,10 +27,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
@@ -65,10 +68,11 @@ jobs:
           rsync -a ecosystem.production.config.js .deploy-bundle/ecosystem.production.config.js
           rsync -a package.json .deploy-bundle/package.json
 
-          rsync -a node_modules/prisma .deploy-bundle/node_modules/prisma
-          rsync -a node_modules/@prisma .deploy-bundle/node_modules/@prisma
+          rm -rf .deploy-bundle/node_modules/prisma .deploy-bundle/node_modules/@prisma .deploy-bundle/node_modules/.prisma .deploy-bundle/node_modules/.bin
+          rsync -a node_modules/prisma/ .deploy-bundle/node_modules/prisma/
+          rsync -a node_modules/@prisma/ .deploy-bundle/node_modules/@prisma/
           if [ -d node_modules/.prisma ]; then
-            rsync -a node_modules/.prisma .deploy-bundle/node_modules/.prisma
+            rsync -a node_modules/.prisma/ .deploy-bundle/node_modules/.prisma/
           fi
           if [ -d node_modules/.bin ]; then
             mkdir -p .deploy-bundle/node_modules/.bin
