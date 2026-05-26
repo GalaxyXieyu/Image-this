@@ -100,8 +100,11 @@ interface Task {
   priority: number;
   totalSteps: number;
   completedSteps: number;
-  inputData: string;
+  inputData?: string;
   outputData?: string;
+  originalImageUrl?: string | null;
+  resultImageUrl?: string | null;
+  videoUrl?: string | null;
   errorMessage?: string;
   createdAt: string;
   updatedAt: string;
@@ -529,6 +532,9 @@ export default function TaskCenterPage() {
 
   // 解析任务输入数据获取原图 URL
   const getOriginalImageUrl = (task: Task): string | null => {
+    if (task.originalImageUrl) {
+      return task.originalImageUrl;
+    }
     // 1. 优先从 processedImage 获取原图 URL（API 已返回此字段）
     if (task.processedImage?.originalUrl) {
       return task.processedImage.originalUrl;
@@ -551,6 +557,9 @@ export default function TaskCenterPage() {
 
   // 获取任务结果图 URL
   const getResultImageUrl = (task: Task): string | null => {
+    if (task.resultImageUrl) {
+      return task.resultImageUrl;
+    }
     // 1. 优先从关联的 processedImage 获取
     if (task.processedImage?.processedUrl) {
       return task.processedImage.processedUrl;
@@ -577,6 +586,9 @@ export default function TaskCenterPage() {
   // 获取视频任务的视频 URL
   const getVideoUrl = (task: Task): string | null => {
     if (task.type !== 'VIDEO_GENERATION') return null;
+    if (task.videoUrl) {
+      return task.videoUrl;
+    }
     if (task.outputData) {
       try {
         const outputData = JSON.parse(task.outputData);

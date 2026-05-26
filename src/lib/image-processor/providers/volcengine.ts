@@ -128,8 +128,7 @@ export class VolcengineProcessor implements IImageProcessor {
         const imageUrl = await this.uploadToImageHost(dataUrl, superbedToken);
         requestBody = this.buildOutpaintRequest(imageUrl, prompt, top, bottom, left, right, maxHeight, maxWidth, false);
       } else if (isBase64DataUrl(imageInput)) {
-        // base64：可以直接使用或上传
-        const cleanBase64 = extractBase64FromDataUrl(imageInput);
+        const cleanBase64 = await this.normalizeOutpaintBase64(imageInput);
         requestBody = this.buildOutpaintRequest(cleanBase64, prompt, top, bottom, left, right, maxHeight, maxWidth, true);
       } else {
         // URL：直接使用
@@ -214,6 +213,38 @@ export class VolcengineProcessor implements IImageProcessor {
         ...baseRequest,
         image_urls: [imageData]
       };
+    }
+  }
+
+  private async normalizeOutpaintBase64(imageInput: string): Promise<string> {
+    const rawBase64 = extractBase64FromDataUrl(imageInput).trim();
+    if (!rawBase64) {
+      throw new Error('VOLCENGINE_INVALID_IMAGE_DATA: 扩图输入图片为空，无法提交给火山引擎');
+    }
+
+    try {
+      const sharp = (await import('sharp')).default;
+      const imageBuffer = Buffer.from(rawBase64, 'base64');
+      const metadata = await sharp(imageBuffer).metadata();
+
+      if (!metadata.width || !metadata.height) {
+        throw new Error('图片宽高解析失败');
+      }
+
+      const normalizedBuffer = await sharp(imageBuffer)
+        .rotate()
+        .flatten({ background: '#ffffff' })
+        .jpeg({ quality: 95, mozjpeg: true })
+        .toBuffer();
+
+      console.log(
+        `[Volcengine Processor] 扩图输入已规范化: ${metadata.format || 'unknown'} ${metadata.width}x${metadata.height}, ${Math.round(normalizedBuffer.length / 1024)}KB JPEG`
+      );
+
+      return normalizedBuffer.toString('base64');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '未知错误';
+      throw new Error(`VOLCENGINE_INVALID_IMAGE_DATA: 扩图输入图片无法解码或格式不支持，请换一张 JPG/PNG 图片重试。原始错误：${message}`);
     }
   }
 

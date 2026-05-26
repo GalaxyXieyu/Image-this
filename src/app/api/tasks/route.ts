@@ -9,6 +9,20 @@ type TaskInputData = {
   inputAsset?: unknown;
   referenceAsset?: unknown;
   imageUrl?: string;
+  originalUrl?: string;
+  sourceUrl?: string;
+  [key: string]: unknown;
+};
+
+type TaskOutputData = {
+  processedImageUrl?: string;
+  processedUrl?: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  result?: {
+    processedUrl?: string;
+    processedImageUrl?: string;
+  };
   [key: string]: unknown;
 };
 
@@ -21,6 +35,64 @@ function normalizeTaskInputData(rawInputData: string): string {
     return rawInputData;
   } catch {
     return rawInputData;
+  }
+}
+
+function getClientUrlFromAsset(asset: unknown): string | null {
+  if (!asset || typeof asset !== 'object') {
+    return null;
+  }
+
+  const value = (asset as { clientUrl?: unknown }).clientUrl;
+  return typeof value === 'string' ? normalizeImageUrlForClient(value) : null;
+}
+
+function extractOriginalImageUrl(inputData?: string | null): string | null {
+  if (!inputData) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(inputData) as TaskInputData;
+    return getClientUrlFromAsset(parsed.inputAsset)
+      || normalizeImageUrlForClient(parsed.imageUrl)
+      || normalizeImageUrlForClient(parsed.originalUrl)
+      || normalizeImageUrlForClient(parsed.sourceUrl);
+  } catch {
+    return null;
+  }
+}
+
+function extractResultImageUrl(outputData?: string | null): string | null {
+  if (!outputData) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(outputData) as TaskOutputData;
+    return normalizeImageUrlForClient(
+      parsed.processedImageUrl
+      || parsed.processedUrl
+      || parsed.imageUrl
+      || parsed.result?.processedUrl
+      || parsed.result?.processedImageUrl
+      || null
+    );
+  } catch {
+    return null;
+  }
+}
+
+function extractVideoUrl(taskType: string, outputData?: string | null): string | null {
+  if (taskType !== 'VIDEO_GENERATION' || !outputData) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(outputData) as TaskOutputData;
+    return normalizeImageUrlForClient(parsed.videoUrl || null);
+  } catch {
+    return null;
   }
 }
 
@@ -196,7 +268,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 查询任务 - 排除大型 JSON 字段以提升性能
+    // 列表只返回轻量摘要。inputData/outputData 可能包含大 JSON/base64，避免每次轮询整页读出。
     const tasks = await prisma.taskQueue.findMany({
       where,
       orderBy: [
@@ -222,8 +294,8 @@ export async function GET(request: NextRequest) {
         userId: true,
         projectId: true,
         processedImageId: true,
-        inputData: true, // 需要 inputData 来获取原图 URL
-        outputData: true, // 需要 outputData 来获取处理结果和触发审核
+        inputData: true,
+        outputData: true,
         project: {
           select: { id: true, name: true }
         },
@@ -233,17 +305,46 @@ export async function GET(request: NextRequest) {
       }
     });
 
+    const normalizedTasks = tasks.map((task) => {
+      const originalImageUrl = task.processedImage?.originalUrl
+        ? normalizeImageUrlForClient(task.processedImage.originalUrl)
+        : extractOriginalImageUrl(task.inputData);
+      const resultImageUrl = task.processedImage?.processedUrl
+        ? normalizeImageUrlForClient(task.processedImage.processedUrl)
+        : extractResultImageUrl(task.outputData);
+
+      return {
+        id: task.id,
+        type: task.type,
+        status: task.status,
+        priority: task.priority,
+        progress: task.progress,
+        currentStep: task.currentStep,
+        totalSteps: task.totalSteps,
+        completedSteps: task.completedSteps,
+        errorMessage: task.errorMessage,
+        createdAt: task.createdAt,
+        updatedAt: task.updatedAt,
+        startedAt: task.startedAt,
+        completedAt: task.completedAt,
+        userId: task.userId,
+        projectId: task.projectId,
+        processedImageId: task.processedImageId,
+        originalImageUrl,
+        resultImageUrl,
+        videoUrl: extractVideoUrl(task.type, task.outputData),
+        project: task.project,
+        processedImage: task.processedImage
+          ? {
+              ...task.processedImage,
+              originalUrl: normalizeImageUrlForClient(task.processedImage.originalUrl),
+              processedUrl: normalizeImageUrlForClient(task.processedImage.processedUrl),
+            }
+          : null,
+      };
+    });
+
     // 并行获取总数和状态统计（一次数据库往返）
-    const normalizedTasks = tasks.map((task) => ({
-      ...task,
-      processedImage: task.processedImage
-        ? {
-            ...task.processedImage,
-            originalUrl: normalizeImageUrlForClient(task.processedImage.originalUrl),
-            processedUrl: normalizeImageUrlForClient(task.processedImage.processedUrl),
-          }
-        : null,
-    }));
 
     const [total, statusCounts] = await Promise.all([
       prisma.taskQueue.count({ where }),
