@@ -38,6 +38,10 @@ const USER_COLUMN_PATCHES = [
     name: 'hasJimengCredentials',
     sql: `ALTER TABLE "users" ADD COLUMN "hasJimengCredentials" BOOLEAN NOT NULL DEFAULT false`,
   },
+  {
+    name: 'taskConcurrency',
+    sql: `ALTER TABLE "users" ADD COLUMN "taskConcurrency" INTEGER NOT NULL DEFAULT 2`,
+  },
 ];
 
 function ensureDirectory(dirPath) {

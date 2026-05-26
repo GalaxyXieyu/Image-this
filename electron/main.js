@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const fs = require('fs');
 const http = require('http');
 const net = require('net');
@@ -23,18 +23,158 @@ const WINDOWS_RENDERER_MAX_OLD_SPACE_MB = 1024;
 let serverPort = DEFAULT_PORT;
 const WORKER_SCHEDULER_INTERVAL_MS = 8000;
 
-const LOG_DIR = path.join(os.homedir(), 'ImagineThis', 'logs');
-const LOG_FILE = path.join(LOG_DIR, `app-${new Date().toISOString().split('T')[0]}.log`);
-const ERROR_LOG_FILE = path.join(LOG_DIR, `error-${new Date().toISOString().split('T')[0]}.log`);
+const LEGACY_LOG_DIR = path.join(os.homedir(), 'ImagineThis', 'logs');
+const DESKTOP_SETTINGS_FILE = 'desktop-settings.json';
+const MAX_LOG_READ_BYTES = 256 * 1024;
+let currentLogDir = null;
+let currentLogFile = null;
+let currentErrorLogFile = null;
 let logStream = null;
 let errorLogStream = null;
 
-if (!fs.existsSync(LOG_DIR)) {
-  fs.mkdirSync(LOG_DIR, { recursive: true });
+function ensureDirectory(dirPath) {
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
 }
 
-logStream = fs.createWriteStream(LOG_FILE, { flags: 'a' });
-errorLogStream = fs.createWriteStream(ERROR_LOG_FILE, { flags: 'a' });
+function getDesktopSettingsPath() {
+  const { configDir } = getUserDataPaths(app);
+  ensureDirectory(configDir);
+  return path.join(configDir, DESKTOP_SETTINGS_FILE);
+}
+
+function readDesktopSettings() {
+  if (!app.isReady()) {
+    return {};
+  }
+
+  const settingsPath = getDesktopSettingsPath();
+  if (!fs.existsSync(settingsPath)) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+function writeDesktopSettings(settings) {
+  const settingsPath = getDesktopSettingsPath();
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
+}
+
+function getDefaultLogDir() {
+  return LEGACY_LOG_DIR;
+}
+
+function resolveLogDir() {
+  const settings = readDesktopSettings();
+  if (typeof settings.logDirectory === 'string' && settings.logDirectory.trim()) {
+    return path.resolve(settings.logDirectory.trim());
+  }
+  return getDefaultLogDir();
+}
+
+function getTodayLogPaths(logDir) {
+  const date = new Date().toISOString().split('T')[0];
+  return {
+    appLogFile: path.join(logDir, `app-${date}.log`),
+    errorLogFile: path.join(logDir, `error-${date}.log`),
+  };
+}
+
+function initializeLogStreams(reason = 'startup') {
+  const nextLogDir = resolveLogDir();
+  ensureDirectory(nextLogDir);
+  const { appLogFile, errorLogFile } = getTodayLogPaths(nextLogDir);
+
+  logStream?.end();
+  errorLogStream?.end();
+
+  currentLogDir = nextLogDir;
+  currentLogFile = appLogFile;
+  currentErrorLogFile = errorLogFile;
+  logStream = fs.createWriteStream(currentLogFile, { flags: 'a' });
+  errorLogStream = fs.createWriteStream(currentErrorLogFile, { flags: 'a' });
+
+  if (reason !== 'startup') {
+    log(`Log directory switched to ${currentLogDir}`, 'INFO');
+  }
+}
+
+function isPathInside(parentDir, targetPath) {
+  const relativePath = path.relative(parentDir, targetPath);
+  return Boolean(relativePath) && !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
+}
+
+function sanitizeLogContent(content) {
+  return content
+    .replace(/(apiKey|api_key|secretKey|secret_key|token|authorization|accessKey|secretKey)(["'\s:=]+)([^"'\s,}]+)/gi, '$1$2***')
+    .replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]+/gi, '$1***');
+}
+
+function readLogTail(fileName, maxBytes = MAX_LOG_READ_BYTES) {
+  if (!currentLogDir) {
+    return '';
+  }
+
+  const safeFileName = path.basename(fileName || '');
+  if (!safeFileName.endsWith('.log')) {
+    throw new Error('Only .log files can be read.');
+  }
+
+  const filePath = path.join(currentLogDir, safeFileName);
+  if (!isPathInside(currentLogDir, filePath) || !fs.existsSync(filePath)) {
+    return '';
+  }
+
+  const stats = fs.statSync(filePath);
+  const bytesToRead = Math.min(Math.max(1, Number(maxBytes) || MAX_LOG_READ_BYTES), MAX_LOG_READ_BYTES, stats.size);
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    const buffer = Buffer.alloc(bytesToRead);
+    fs.readSync(fd, buffer, 0, bytesToRead, stats.size - bytesToRead);
+    return sanitizeLogContent(buffer.toString('utf8'));
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function getLogInfo() {
+  const settings = readDesktopSettings();
+  return {
+    directory: currentLogDir || resolveLogDir(),
+    defaultDirectory: getDefaultLogDir(),
+    isCustom: Boolean(settings.logDirectory),
+    appLogFile: currentLogFile ? path.basename(currentLogFile) : null,
+    errorLogFile: currentErrorLogFile ? path.basename(currentErrorLogFile) : null,
+  };
+}
+
+function listLogFiles() {
+  if (!currentLogDir || !fs.existsSync(currentLogDir)) {
+    return [];
+  }
+
+  return fs
+    .readdirSync(currentLogDir)
+    .filter((fileName) => fileName.endsWith('.log'))
+    .map((fileName) => {
+      const filePath = path.join(currentLogDir, fileName);
+      const stats = fs.statSync(filePath);
+      return {
+        name: fileName,
+        sizeBytes: stats.size,
+        modifiedAt: stats.mtime.toISOString(),
+      };
+    })
+    .sort((left, right) => right.modifiedAt.localeCompare(left.modifiedAt));
+}
+
+initializeLogStreams();
 
 function parseEnvFileContents(contents) {
   const parsed = {};
@@ -449,7 +589,7 @@ function triggerBackgroundWorker(reason = 'manual') {
   workerTriggerInFlight = true;
 
   return new Promise((resolve) => {
-    const payload = JSON.stringify({ batch: true, maxTasks: 2 });
+    const payload = JSON.stringify({ batch: true });
     const request = http.request(
       {
         hostname: '127.0.0.1',
@@ -519,6 +659,7 @@ function stopWorkerScheduler() {
 }
 
 async function bootstrapApplication() {
+  initializeLogStreams('app-ready');
   createWindow();
 
   updateManager = createUpdateManager({
@@ -559,7 +700,7 @@ async function bootstrapApplication() {
     log(error.stack || 'No stack available', 'ERROR');
     showWindowStatusPage(
       '启动失败',
-      `${error.message}\n\n日志文件: ${LOG_FILE}`,
+      `${error.message}\n\n日志文件: ${currentLogFile || getTodayLogPaths(resolveLogDir()).appLogFile}`,
       '#dc2626'
     );
   }
@@ -672,6 +813,52 @@ ipcMain.handle('select-directory', async () => {
     properties: ['openDirectory'],
   });
   return result.filePaths;
+});
+
+ipcMain.handle('logs:get-info', async () => {
+  return getLogInfo();
+});
+
+ipcMain.handle('logs:list-files', async () => {
+  return listLogFiles();
+});
+
+ipcMain.handle('logs:read-tail', async (_event, payload = {}) => {
+  const fileName = payload?.fileName || path.basename(currentErrorLogFile || currentLogFile || '');
+  return {
+    fileName,
+    content: readLogTail(fileName, payload?.maxBytes),
+  };
+});
+
+ipcMain.handle('logs:open-directory', async () => {
+  ensureDirectory(currentLogDir || resolveLogDir());
+  await shell.openPath(currentLogDir || resolveLogDir());
+  return true;
+});
+
+ipcMain.handle('logs:choose-directory', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory', 'createDirectory'],
+  });
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return getLogInfo();
+  }
+
+  const settings = readDesktopSettings();
+  settings.logDirectory = result.filePaths[0];
+  writeDesktopSettings(settings);
+  initializeLogStreams('directory-change');
+  return getLogInfo();
+});
+
+ipcMain.handle('logs:reset-directory', async () => {
+  const settings = readDesktopSettings();
+  delete settings.logDirectory;
+  writeDesktopSettings(settings);
+  initializeLogStreams('directory-reset');
+  return getLogInfo();
 });
 
 ipcMain.handle('updates:get-status', async () => {

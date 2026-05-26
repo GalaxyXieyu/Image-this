@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-05-26)
 
 **Core value:** 桌面端任务必须稳定入队、持续后台处理，并在 Windows 上保持可接受的启动与接口响应速度。
-**Current focus:** Phase 2 - Task Input Asset References
+**Current focus:** Phase 3 - App Log Observability
 
 ## Current Position
 
-Phase: 2 of 2 (Task Input Asset References)
-Plan: Phase 2 code plans complete
-Status: In progress
-Last activity: 2026-05-26 — 已沉淀 02-03 summary，Phase 2 三个代码计划完成，输入资产引用链路已闭环
+Phase: 3 of 3 (App Log Observability)
+Plan: 03-01 planned
+Status: Planned
+Last activity: 2026-05-26 — 应用户要求盘点桌面日志体验，新增 Phase 3 应用内日志查看与日志目录配置计划
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -47,6 +47,8 @@ Recent decisions affecting current work:
 - [Phase 1]: 浮动任务入口改用专门 recent 卡片接口，避免前端继续解析任务大字段
 - [Phase 2]: 去 base64 化从输入资产基础设施开始，先落本地 asset 引用，再改前端和 worker
 - [Phase 2]: 新任务创建已开始使用 `/api/input-assets`，下一步必须补 worker 消费与迁移兼容闭环
+- [Phase 3]: 日志诊断应优先做成应用内能力，通过 Electron IPC 受控读取 tail，不让前端任意读文件
+- [Phase 3]: 自定义日志目录第一版不自动迁移旧日志，只切换新写入目录，避免误删或移动用户数据
 
 ### Pending Todos
 

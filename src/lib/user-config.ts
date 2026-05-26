@@ -15,6 +15,14 @@ type UserConfigCacheEntry = {
 
 const userConfigCache = new Map<string, UserConfigCacheEntry>();
 
+export function normalizeTaskConcurrency(value: unknown): number {
+  const parsed = typeof value === 'number' ? value : parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(parsed)) {
+    return 2;
+  }
+  return Math.max(1, Math.min(10, Math.floor(parsed)));
+}
+
 export interface UserConfig {
   volcengine?: {
     accessKey: string;
@@ -42,6 +50,9 @@ export interface UserConfig {
   };
   localStorage?: {
     savePath: string;
+  };
+  taskRuntime?: {
+    concurrency: number;
   };
 }
 
@@ -81,6 +92,7 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
       superbedToken: true,
       hasSuperbedToken: true,
       localStoragePath: true,
+      taskConcurrency: true,
     }
   });
 
@@ -166,6 +178,10 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
     };
   }
 
+  config.taskRuntime = {
+    concurrency: normalizeTaskConcurrency(user.taskConcurrency),
+  };
+
   userConfigCache.set(userId, {
     config: cloneUserConfig(config),
     expiresAt: Date.now() + USER_CONFIG_CACHE_TTL_MS,
@@ -224,6 +240,7 @@ export async function saveUserConfig(userId: string, config: UserConfig): Promis
       superbedToken: isDesktopSecretStoreEnabled() ? null : config.imagehosting?.superbedToken || null,
       hasSuperbedToken: !!config.imagehosting?.superbedToken,
       localStoragePath: config.localStorage?.savePath || null,
+      taskConcurrency: normalizeTaskConcurrency(config.taskRuntime?.concurrency),
     }
   });
 

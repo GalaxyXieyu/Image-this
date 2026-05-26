@@ -21,12 +21,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 查找原始任务
+    // 查找原始任务。失败、取消、已完成都允许重新运行，便于修复模型配置后批量补跑。
     const originalTasks = await prisma.taskQueue.findMany({
       where: {
         id: { in: taskIds },
         userId: session.user.id,
-        status: { in: ['FAILED', 'CANCELLED', 'COMPLETED'] } // 允许重试失败、取消或已完成的任务
+        status: { in: ['FAILED', 'CANCELLED', 'COMPLETED'] }
       },
       select: {
         id: true,
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
 
     if (originalTasks.length === 0) {
       return NextResponse.json(
-        { error: '没有找到可重试的任务（可重试失败、已取消或已完成的任务）' },
+        { error: '没有找到可重新运行的任务（支持失败、已取消或已完成的任务）' },
         { status: 400 }
       );
     }

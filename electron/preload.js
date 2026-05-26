@@ -15,6 +15,14 @@ contextBridge.exposeInMainWorld('electron', {
       };
     },
   },
+  logs: {
+    getInfo: () => ipcRenderer.invoke('logs:get-info'),
+    listFiles: () => ipcRenderer.invoke('logs:list-files'),
+    readTail: (payload) => ipcRenderer.invoke('logs:read-tail', payload),
+    openDirectory: () => ipcRenderer.invoke('logs:open-directory'),
+    chooseDirectory: () => ipcRenderer.invoke('logs:choose-directory'),
+    resetDirectory: () => ipcRenderer.invoke('logs:reset-directory'),
+  },
   platform: process.platform,
   isElectron: true,
 });

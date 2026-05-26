@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { getUserConfig, saveUserConfig, UserConfig } from '@/lib/user-config';
+import { getUserConfig, normalizeTaskConcurrency, saveUserConfig, UserConfig } from '@/lib/user-config';
 
 export async function POST(request: NextRequest) {
   try {
@@ -68,6 +68,10 @@ export async function POST(request: NextRequest) {
         savePath: body.localStorage.savePath,
       };
     }
+
+    userConfig.taskRuntime = {
+      concurrency: normalizeTaskConcurrency(body.taskRuntime?.concurrency),
+    };
     
     const saved = await saveUserConfig(session.user.id, userConfig);
     
@@ -138,6 +142,9 @@ export async function GET(request: NextRequest) {
       },
       localStorage: {
         savePath: userConfig.localStorage?.savePath || ''
+      },
+      taskRuntime: {
+        concurrency: normalizeTaskConcurrency(userConfig.taskRuntime?.concurrency)
       }
     };
     

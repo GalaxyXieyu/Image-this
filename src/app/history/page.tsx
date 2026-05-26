@@ -429,7 +429,7 @@ export default function TaskCenterPage() {
     }
   };
 
-  // 重试单个任务
+  // 重新运行单个任务
   const retryTask = async (taskId: string) => {
     try {
       const response = await fetch('/api/tasks/retry', {
@@ -457,14 +457,14 @@ export default function TaskCenterPage() {
       }
     } catch {
       toast({
-        title: "重试失败",
-        description: "重试任务时出现错误，请重试",
+        title: "重新运行失败",
+        description: "重新运行任务时出现错误，请重试",
         variant: "destructive",
       });
     }
   };
 
-  // 批量重试选中的任务
+  // 批量重新运行选中的任务
   const retrySelectedTasks = async () => {
     const retryableSelectedTasks = Array.from(selectedTasks).filter(taskId => {
       const task = tasks.find(t => t.id === taskId);
@@ -508,8 +508,8 @@ export default function TaskCenterPage() {
       }
     } catch {
       toast({
-        title: "重试失败",
-        description: "批量重试任务时出现错误，请重试",
+        title: "批量重新运行失败",
+        description: "批量重新运行任务时出现错误，请重试",
         variant: "destructive",
       });
     } finally {
@@ -588,7 +588,7 @@ export default function TaskCenterPage() {
     return null;
   };
 
-  // 检查选中任务中是否有可重新运行的（包括已完成的）
+  // 检查选中任务中是否有可重新运行的（失败、取消、已完成都可以重新跑）
   const hasRetryableTasks = Array.from(selectedTasks).some(taskId => {
     const task = tasks.find(t => t.id === taskId);
     return task && (task.status === 'FAILED' || task.status === 'CANCELLED' || task.status === 'COMPLETED');
@@ -755,7 +755,7 @@ export default function TaskCenterPage() {
                   ) : (
                     <RotateCcw className="w-4 h-4 mr-1.5" />
                   )}
-                  重跑 ({Array.from(selectedTasks).filter(id => {
+                  重新运行 ({Array.from(selectedTasks).filter(id => {
                     const t = tasks.find(task => task.id === id);
                     return t && (t.status === 'FAILED' || t.status === 'CANCELLED' || t.status === 'COMPLETED');
                   }).length})
@@ -1017,7 +1017,7 @@ export default function TaskCenterPage() {
                               size="sm"
                               onClick={() => retryTask(task.id)}
                               className="h-7 w-7 p-0 hover:bg-orange-50 text-orange-600"
-                              title="重新运行任务"
+                              title="重新运行这个任务"
                             >
                               <RotateCcw className="w-3.5 h-3.5" />
                             </Button>

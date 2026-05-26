@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { uploadBase64Image } from '@/lib/storage';
 import { addWatermarkToImage } from '@/lib/watermark';
-import { getUserConfig } from '@/lib/user-config';
+import { getUserConfig, normalizeTaskConcurrency } from '@/lib/user-config';
 import fs from 'fs/promises';
 
 type TaskAssetRef = {
@@ -18,6 +18,16 @@ type ParsedTaskInput = Record<string, any> & {
   inputAsset?: TaskAssetRef;
   referenceAsset?: TaskAssetRef;
   watermarkLogoAsset?: TaskAssetRef;
+};
+
+type QueueTaskForProcessing = {
+  id: string;
+  type: string;
+  inputData: string;
+  totalSteps: number;
+  userId: string;
+  retryCount?: number;
+  maxRetries?: number;
 };
 
 async function readAssetAsDataUrl(asset?: TaskAssetRef): Promise<string | null> {
@@ -41,7 +51,6 @@ export const runtime = 'nodejs';
 // 任务处理器
 class TaskProcessor {
   private isProcessing = false;
-  private maxConcurrentTasks = parseInt(process.env.MAX_CONCURRENT_TASKS || '1'); // 串行处理，避免即梦API并发限制
 
   private buildPersistedResult(taskType: string, result: any) {
     switch (taskType) {
@@ -61,9 +70,93 @@ class TaskProcessor {
     }
   }
 
-  async processNextTask() {
-    let currentTaskId: string | null = null;
+  private async getConfiguredConcurrencyLimit(requestedMaxTasks?: number) {
+    let configuredLimit = normalizeTaskConcurrency(process.env.MAX_CONCURRENT_TASKS ?? 2);
+    const nextPendingTask = await prisma.taskQueue.findFirst({
+      where: { status: 'PENDING' },
+      orderBy: [
+        { priority: 'desc' },
+        { createdAt: 'asc' },
+      ],
+      select: { userId: true },
+    });
 
+    if (nextPendingTask) {
+      const userConfig = await getUserConfig(nextPendingTask.userId);
+      configuredLimit = normalizeTaskConcurrency(userConfig.taskRuntime?.concurrency);
+    }
+
+    if (typeof requestedMaxTasks === 'number') {
+      return Math.min(configuredLimit, normalizeTaskConcurrency(requestedMaxTasks));
+    }
+
+    return configuredLimit;
+  }
+
+  private async getAvailableSlots(requestedMaxTasks?: number) {
+    const runningTasks = await prisma.taskQueue.count({
+      where: { status: 'PROCESSING' },
+    });
+    const concurrencyLimit = await this.getConfiguredConcurrencyLimit(requestedMaxTasks);
+    const availableSlots = Math.max(0, concurrencyLimit - runningTasks);
+
+    return {
+      concurrencyLimit,
+      runningTasks,
+      availableSlots,
+    };
+  }
+
+  private async claimPendingTasks(limit: number): Promise<QueueTaskForProcessing[]> {
+    if (limit <= 0) {
+      return [];
+    }
+
+    const candidates = await prisma.taskQueue.findMany({
+      where: { status: 'PENDING' },
+      orderBy: [
+        { priority: 'desc' },
+        { createdAt: 'asc' },
+      ],
+      take: limit,
+      select: {
+        id: true,
+        type: true,
+        inputData: true,
+        totalSteps: true,
+        userId: true,
+        retryCount: true,
+        maxRetries: true,
+      },
+    });
+
+    const claimedTasks: QueueTaskForProcessing[] = [];
+
+    for (const task of candidates) {
+      const retryCount = task.retryCount ?? 0;
+      const retryInfo = retryCount > 0 ? ` (重试 ${retryCount} 次)` : '';
+      const claimed = await prisma.taskQueue.updateMany({
+        where: {
+          id: task.id,
+          status: 'PENDING',
+        },
+        data: {
+          status: 'PROCESSING',
+          startedAt: new Date(),
+          currentStep: `开始处理任务${retryInfo}`,
+          progress: 0,
+        },
+      });
+
+      if (claimed.count === 1) {
+        claimedTasks.push(task);
+      }
+    }
+
+    return claimedTasks;
+  }
+
+  async processNextTask() {
     if (this.isProcessing) {
       return { message: '处理器正在运行中' };
     }
@@ -71,33 +164,21 @@ class TaskProcessor {
     this.isProcessing = true;
 
     try {
-      // 获取下一个待处理任务（按优先级和创建时间排序）
-      const task = await prisma.taskQueue.findFirst({
-        where: {
-          status: 'PENDING'
-        },
-        orderBy: [
-          { priority: 'desc' },
-          { createdAt: 'asc' }
-        ]
-      });
+      const { concurrencyLimit, runningTasks, availableSlots } = await this.getAvailableSlots(1);
 
-      if (!task) {
-        return { message: '没有待处理的任务' };
+      if (availableSlots <= 0) {
+        return {
+          message: `并发已满，当前 ${runningTasks}/${concurrencyLimit} 个任务处理中`,
+          running: runningTasks,
+          limit: concurrencyLimit,
+        };
       }
 
-      currentTaskId = task.id;
+      const [task] = await this.claimPendingTasks(1);
 
-      // 更新任务状态为处理中
-      await prisma.taskQueue.update({
-        where: { id: task.id },
-        data: {
-          status: 'PROCESSING',
-          startedAt: new Date(),
-          currentStep: '开始处理任务',
-          progress: 0
-        }
-      });
+      if (!task) {
+        return { message: '没有待处理的任务', running: runningTasks, limit: concurrencyLimit };
+      }
 
       // 根据任务类型处理
       let result;
@@ -148,29 +229,6 @@ class TaskProcessor {
       };
 
     } catch (error) {
-      // 如果有当前任务，更新为失败状态
-      const currentTask = currentTaskId
-        ? await prisma.taskQueue.findUnique({
-            where: { id: currentTaskId },
-            select: { id: true, status: true }
-          })
-        : await prisma.taskQueue.findFirst({
-            where: { status: 'PROCESSING' },
-            orderBy: { updatedAt: 'desc' }
-          });
-
-      if (currentTask?.status === 'PROCESSING') {
-        await prisma.taskQueue.update({
-          where: { id: currentTask.id },
-          data: {
-            status: 'FAILED',
-            completedAt: new Date(),
-            errorMessage: error instanceof Error ? error.message : '未知错误',
-            currentStep: '处理失败'
-          }
-        });
-      }
-
       throw error;
     } finally {
       this.isProcessing = false;
@@ -221,57 +279,54 @@ class TaskProcessor {
     return results;
   }
 
-  async processBatch(maxTasks = 10, maxRounds = 5) {
+  async processBatch(maxTasks?: number) {
     try {
       let totalProcessed = 0;
       let totalSuccessful = 0;
       let totalFailed = 0;
-      let rounds = 0;
-      const concurrency = Math.max(1, Math.min(this.maxConcurrentTasks, maxTasks));
+      const { concurrencyLimit, runningTasks, availableSlots } = await this.getAvailableSlots(maxTasks);
 
-      while (rounds < maxRounds) {
-        // 获取待处理任务
-        const pendingTasks = await prisma.taskQueue.findMany({
-          where: { status: 'PENDING' },
-          orderBy: [
-            { priority: 'desc' },
-            { createdAt: 'asc' }
-          ],
-          take: maxTasks
-        });
-
-        if (pendingTasks.length === 0) {
-          break; // 没有更多任务，退出循环
-        }
-
-        totalProcessed += pendingTasks.length;
-        const results = await this.processConcurrently<typeof pendingTasks[0], any>(
-          pendingTasks,
-          (task) => this.processSingleTask(task as { id: string; type: string; inputData: string; totalSteps: number; userId: string; retryCount?: number; maxRetries?: number }),
-          concurrency
-        );
-
-        const successful = results.filter(r => r.status === 'fulfilled').length;
-        const failed = results.filter(r => r.status === 'rejected').length;
-        totalSuccessful += successful;
-        totalFailed += failed;
-        rounds++;
-
-        // 如果处理的任务数少于maxTasks，说明队列基本清空了
-        if (pendingTasks.length < maxTasks) {
-          break;
-        }
-
-        // 短暂延迟，避免过于频繁的数据库查询
-        await new Promise(resolve => setTimeout(resolve, 100));
+      if (availableSlots <= 0) {
+        return {
+          message: `并发已满，当前 ${runningTasks}/${concurrencyLimit} 个任务处理中`,
+          processedCount: 0,
+          successful: 0,
+          failed: 0,
+          running: runningTasks,
+          limit: concurrencyLimit,
+        };
       }
 
+      const pendingTasks = await this.claimPendingTasks(availableSlots);
+
+      if (pendingTasks.length === 0) {
+        return {
+          message: '没有待处理的任务',
+          processedCount: 0,
+          successful: 0,
+          failed: 0,
+          running: runningTasks,
+          limit: concurrencyLimit,
+        };
+      }
+
+      totalProcessed += pendingTasks.length;
+      const results = await this.processConcurrently<QueueTaskForProcessing, any>(
+        pendingTasks,
+        (task) => this.processSingleTask(task),
+        pendingTasks.length
+      );
+
+      totalSuccessful += results.filter(r => r.status === 'fulfilled').length;
+      totalFailed += results.filter(r => r.status === 'rejected').length;
+
       return {
-        message: totalProcessed > 0 ? `批量处理完成，共${rounds}轮` : '没有待处理的任务',
+        message: totalProcessed > 0 ? `批量处理完成，本次领取 ${totalProcessed} 个任务` : '没有待处理的任务',
         processedCount: totalProcessed,
         successful: totalSuccessful,
         failed: totalFailed,
-        rounds
+        running: runningTasks,
+        limit: concurrencyLimit,
       };
 
     } catch (error) {
@@ -280,7 +335,7 @@ class TaskProcessor {
     }
   }
 
-  private async processSingleTask(task: { id: string; type: string; inputData: string; totalSteps: number; userId: string; retryCount?: number; maxRetries?: number }) {
+  private async processSingleTask(task: QueueTaskForProcessing) {
     try {
       const userConfig = await getUserConfig(task.userId);
       
@@ -290,20 +345,6 @@ class TaskProcessor {
       inputData.imagehostingConfig = userConfig.imagehosting;
       task.inputData = JSON.stringify(inputData);
       
-      const retryCount = task.retryCount ?? 0;
-      const retryInfo = retryCount > 0 ? ` (重试 ${retryCount} 次)` : '';
-      
-      // 更新任务状态为处理中
-      await prisma.taskQueue.update({
-        where: { id: task.id },
-        data: {
-          status: 'PROCESSING',
-          startedAt: new Date(),
-          currentStep: `开始处理任务${retryInfo}`,
-          progress: 0
-        }
-      });
-
       // 添加超时机制 - 10分钟超时
       const taskTimeout = 10 * 60 * 1000; // 10分钟
       const taskPromise = this.executeTaskWithType(task);
@@ -988,9 +1029,9 @@ export async function POST(request: NextRequest) {
     const startTime = Date.now();
     
     const body = await request.json();
-    const { batch = false, maxTasks = parseInt(process.env.MAX_CONCURRENT_TASKS || '2') } = body;
+    const { batch = false, maxTasks } = body;
 
-    console.log(`Worker模式: ${batch ? '批量处理' : '单任务处理'}, 最大并发: ${maxTasks}`);
+    console.log(`Worker模式: ${batch ? '批量处理' : '单任务处理'}, 请求并发: ${maxTasks ?? '按设置'}`);
 
     let result;
     if (batch) {

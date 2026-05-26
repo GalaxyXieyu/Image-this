@@ -8,6 +8,7 @@
 
 - [ ] **Phase 1: Desktop Runtime & Performance** - 稳定桌面端后台任务链路并完成 Windows 性能治理
 - [ ] **Phase 2: Task Input Asset References** - 把任务输入从 base64 JSON 迁移为本地资产引用
+- [ ] **Phase 3: App Log Observability** - 在应用内查看、定位和配置桌面日志，降低 Windows 排障成本
 
 ## Phase Details
 
@@ -49,6 +50,21 @@ Plans:
 - [x] 02-02: 前端任务创建链路引用化
 - [x] 02-03: worker 输入消费与迁移兼容
 
+### Phase 3: App Log Observability
+**Goal**: 让用户不需要手动打开日志目录，也能在应用内查看 app/error 日志、打开目录、配置日志目录并快速定位后台/更新/启动问题
+**Depends on**: Phase 1
+**Requirements**: [LOG-01, LOG-02, LOG-03, LOG-04, LOG-05]
+**Success Criteria** (what must be TRUE):
+  1. 设置页能展示当前日志目录和日志文件列表
+  2. 用户能在应用内读取最近 app/error 日志内容，且不会一次性加载大文件
+  3. 用户能一键打开日志目录
+  4. 用户能选择自定义日志目录，切换后新日志写入新目录
+  5. 日志目录配置不会影响数据库、历史任务和安装更新保库策略
+**Plans**: 1 plan
+
+Plans:
+- [ ] 03-01: 应用内日志查看器与日志目录配置
+
 ## Progress
 
 **Execution Order:**
@@ -58,3 +74,4 @@ Phases execute in numeric order: 1
 |-------|----------------|--------|-----------|
 | 1. Desktop Runtime & Performance | 3/3 | In progress (awaiting Windows verification) | - |
 | 2. Task Input Asset References | 3/3 | Complete (code) | - |
+| 3. App Log Observability | 0/1 | Planned | - |
