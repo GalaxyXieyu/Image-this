@@ -374,6 +374,20 @@ function patchUserSchemaColumns(dbPath, log) {
   }
 }
 
+function applyDesktopPragmas(dbPath, log) {
+  const database = new DatabaseSync(dbPath);
+
+  try {
+    const journalMode = database.prepare('PRAGMA journal_mode = WAL').get();
+    database.exec('PRAGMA synchronous = NORMAL');
+    database.exec('PRAGMA temp_store = MEMORY');
+    database.exec('PRAGMA foreign_keys = ON');
+    log(`Applied desktop SQLite pragmas (journal_mode=${journalMode?.journal_mode || 'WAL'})`);
+  } finally {
+    database.close();
+  }
+}
+
 async function ensureDesktopDatabaseReady(app, log) {
   const { dataDir, configDir, dbPath, backupDir } = getUserDataPaths(app);
   ensureDirectory(dataDir);
@@ -400,6 +414,7 @@ async function ensureDesktopDatabaseReady(app, log) {
   runSqlMigrations(app, dbPath, log);
   patchUserSchemaColumns(dbPath, log);
   migrateLegacySecrets(app, dbPath, log);
+  applyDesktopPragmas(dbPath, log);
 
   return dbPath;
 }

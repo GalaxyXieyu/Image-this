@@ -1,15 +1,7 @@
-!macro CleanImagineThisUserData
-  RMDir /r "$APPDATA\ImagineThis"
-  RMDir /r "$LOCALAPPDATA\ImagineThis"
-  RMDir /r "$PROFILE\ImagineThis"
-!macroend
-
 !macro customInstall
-  DetailPrint "Cleaning old ImagineThis database, history, and cache..."
-  !insertmacro CleanImagineThisUserData
+  DetailPrint "Preserving existing ImagineThis user data during install/update."
 !macroend
 
 !macro customUnInstall
-  DetailPrint "Removing ImagineThis database, history, and cache..."
-  !insertmacro CleanImagineThisUserData
+  DetailPrint "Preserving ImagineThis user data during uninstall."
 !macroend

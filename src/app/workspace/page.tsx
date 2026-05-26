@@ -93,6 +93,15 @@ interface Task {
   processedImageId?: string;
 }
 
+type InputAssetRef = {
+  assetId: string;
+  filePath: string;
+  clientUrl: string;
+  originalFilename: string;
+  mimeType: string;
+  sizeBytes: number;
+};
+
 export default function WorkspacePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -828,12 +837,23 @@ export default function WorkspacePage() {
         prompt = template?.prompt || '';
       }
 
-      // 转换图片为 base64
-      const imageBase64 = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(selectedImage.file);
+      const formData = new FormData();
+      formData.append('input', selectedImage.file);
+      const assetResponse = await fetch('/api/input-assets', {
+        method: 'POST',
+        body: formData,
       });
+
+      if (!assetResponse.ok) {
+        const errorData = await assetResponse.json().catch(() => null);
+        throw new Error(errorData?.error || '创建输入资产失败');
+      }
+
+      const assetData = await assetResponse.json();
+      const inputAsset = assetData.inputAsset as InputAssetRef | undefined;
+      if (!inputAsset) {
+        throw new Error('视频输入资产创建失败');
+      }
 
       // 创建任务
       const response = await fetch('/api/tasks', {
@@ -842,7 +862,7 @@ export default function WorkspacePage() {
         body: JSON.stringify({
           type: 'VIDEO_GENERATION',
           inputData: JSON.stringify({
-            imageUrl: imageBase64,
+            inputAsset,
             prompt,
             frames: videoDuration,
             aspectRatio: videoAspectRatio_VideoTab,
@@ -869,11 +889,35 @@ export default function WorkspacePage() {
       });
 
       // 触发 worker
-      fetch('/api/tasks/worker', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ batch: true }),
-      });
+      try {
+        const workerResponse = await fetch('/api/tasks/worker', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ batch: true }),
+        });
+
+        if (!workerResponse.ok) {
+          let errorMessage = `HTTP ${workerResponse.status}`;
+          try {
+            const errorData = await workerResponse.json();
+            errorMessage = errorData?.details || errorData?.error || errorMessage;
+          } catch {
+            // ignore json parse failure
+          }
+
+          toast({
+            title: "任务已入队，但后台处理器启动失败",
+            description: `请前往任务中心手动重试：${errorMessage}`,
+            variant: "destructive",
+          });
+        }
+      } catch (workerError) {
+        toast({
+          title: "任务已入队，但后台处理器启动失败",
+          description: workerError instanceof Error ? workerError.message : '无法连接后台处理器，请稍后重试',
+          variant: "destructive",
+        });
+      }
 
     } catch (error) {
       console.error('视频生成失败:', error);

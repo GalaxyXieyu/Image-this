@@ -5,6 +5,25 @@ import { prisma } from '@/lib/prisma';
 import { deleteImage } from '@/lib/storage';
 import { normalizeImageUrlForClient } from '@/lib/image-url';
 
+type TaskInputData = {
+  inputAsset?: unknown;
+  referenceAsset?: unknown;
+  imageUrl?: string;
+  [key: string]: unknown;
+};
+
+function normalizeTaskInputData(rawInputData: string): string {
+  try {
+    const parsed = JSON.parse(rawInputData) as TaskInputData;
+    if (parsed.inputAsset || parsed.referenceAsset || parsed.imageUrl) {
+      return JSON.stringify(parsed);
+    }
+    return rawInputData;
+  } catch {
+    return rawInputData;
+  }
+}
+
 // 创建新任务
 export async function POST(request: NextRequest) {
   try {
@@ -34,7 +53,7 @@ export async function POST(request: NextRequest) {
         return prisma.taskQueue.create({
           data: {
             type,
-            inputData,
+            inputData: normalizeTaskInputData(inputData),
             priority,
             totalSteps,
             userId: session.user.id,
@@ -80,7 +99,7 @@ export async function POST(request: NextRequest) {
     const task = await prisma.taskQueue.create({
       data: {
         type,
-        inputData,
+        inputData: normalizeTaskInputData(inputData),
         priority,
         totalSteps,
         userId: session.user.id,
@@ -125,7 +144,7 @@ export async function GET(request: NextRequest) {
     // 限制最大返回数量
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
     const offset = parseInt(searchParams.get('offset') || '0');
-    const taskIds = searchParams.get('ids')?.split(','); // 新增：按ID列表查询
+    const taskIds = searchParams.get('ids')?.split(',').map((id) => id.trim()).filter(Boolean); // 新增：按ID列表查询
 
     // 构建查询条件
     const where: Record<string, unknown> = {
@@ -145,6 +164,8 @@ export async function GET(request: NextRequest) {
       where.id = { in: taskIds };
     }
 
+    const isStatusQuery = Boolean(taskIds && taskIds.length > 0);
+
     // 查询任务 - 排除大型 JSON 字段以提升性能
     const tasks = await prisma.taskQueue.findMany({
       where,
@@ -154,33 +175,54 @@ export async function GET(request: NextRequest) {
       ],
       take: limit,
       skip: offset,
-      select: {
-        id: true,
-        type: true,
-        status: true,
-        priority: true,
-        progress: true,
-        currentStep: true,
-        totalSteps: true,
-        completedSteps: true,
-        errorMessage: true,
-        createdAt: true,
-        updatedAt: true,
-        startedAt: true,
-        completedAt: true,
-        userId: true,
-        projectId: true,
-        processedImageId: true,
-        inputData: true, // 需要 inputData 来获取原图 URL
-        outputData: true, // 需要 outputData 来获取处理结果和触发审核
-        project: {
-          select: { id: true, name: true }
-        },
-        processedImage: {
-          select: { id: true, filename: true, originalUrl: true, processedUrl: true, qualityScore: true }
-        }
-      }
+      select: isStatusQuery
+        ? {
+            id: true,
+            type: true,
+            status: true,
+            progress: true,
+            currentStep: true,
+            errorMessage: true,
+            createdAt: true,
+            updatedAt: true,
+            completedAt: true,
+            processedImageId: true,
+            outputData: true,
+          }
+        : {
+            id: true,
+            type: true,
+            status: true,
+            priority: true,
+            progress: true,
+            currentStep: true,
+            totalSteps: true,
+            completedSteps: true,
+            errorMessage: true,
+            createdAt: true,
+            updatedAt: true,
+            startedAt: true,
+            completedAt: true,
+            userId: true,
+            projectId: true,
+            processedImageId: true,
+            inputData: true, // 需要 inputData 来获取原图 URL
+            outputData: true, // 需要 outputData 来获取处理结果和触发审核
+            project: {
+              select: { id: true, name: true }
+            },
+            processedImage: {
+              select: { id: true, filename: true, originalUrl: true, processedUrl: true, qualityScore: true }
+            }
+          }
     });
+
+    if (isStatusQuery) {
+      return NextResponse.json({
+        success: true,
+        tasks,
+      });
+    }
 
     // 并行获取总数和状态统计（一次数据库往返）
     const normalizedTasks = tasks.map((task) => ({

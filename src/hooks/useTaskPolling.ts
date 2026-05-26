@@ -63,7 +63,7 @@ export function useTaskPolling({
 
     try {
       const taskIds = tasksSnapshot.map(task => task.id).join(',');
-      const response = await fetch(`/api/tasks?ids=${taskIds}`, {
+      const response = await fetch(`/api/tasks/status?ids=${taskIds}`, {
         signal: AbortSignal.timeout(5000) // 5秒超时
       });
 

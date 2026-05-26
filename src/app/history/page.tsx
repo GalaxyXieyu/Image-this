@@ -252,9 +252,28 @@ export default function TaskCenterPage() {
 
       if (response.ok) {
         await fetchTasks();
+      } else {
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData?.details || errorData?.error || errorMessage;
+        } catch {
+          // ignore json parse failure
+        }
+
+        toast({
+          title: '后台处理器启动失败',
+          description: `请稍后重试：${errorMessage}`,
+          variant: 'destructive',
+        });
       }
     } catch (err) {
       console.error('触发任务处理器失败:', err);
+      toast({
+        title: '后台处理器启动失败',
+        description: err instanceof Error ? err.message : '无法连接后台处理器，请稍后重试',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -518,7 +537,11 @@ export default function TaskCenterPage() {
     if (task.inputData) {
       try {
         const inputData = JSON.parse(task.inputData);
-        return inputData.imageUrl || inputData.originalUrl || inputData.sourceUrl || null;
+        return inputData.inputAsset?.clientUrl
+          || inputData.imageUrl
+          || inputData.originalUrl
+          || inputData.sourceUrl
+          || null;
       } catch {
         return null;
       }

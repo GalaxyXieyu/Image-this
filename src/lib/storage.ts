@@ -10,23 +10,30 @@ import {
   deleteImageFromLocal,
   generateAndUploadThumbnail as generateLocalThumbnail,
   ensureUploadDirExists,
-  checkImageExists as checkLocalImageExists
+  checkImageExists as checkLocalImageExists,
+  saveInputAssetToLocal,
+  type StoredInputAssetRef
 } from './local-storage';
 import { getUserConfig } from './user-config';
 
+async function resolveCustomStoragePath(userId?: string): Promise<string | undefined> {
+  if (!userId) {
+    return undefined;
+  }
+
+  try {
+    const userConfig = await getUserConfig(userId);
+    return userConfig.localStorage?.savePath;
+  } catch (error) {
+    console.error('获取用户配置失败，使用默认路径:', error);
+    return undefined;
+  }
+}
+
 // 确保存储目录可用
 export async function ensureBucketExists(userId?: string) {
-  if (userId) {
-    // 获取用户配置的保存路径
-    try {
-      const userConfig = await getUserConfig(userId);
-      return ensureUploadDirExists(userConfig.localStorage?.savePath);
-    } catch (error) {
-      console.error('获取用户配置失败，使用默认路径:', error);
-      return ensureUploadDirExists();
-    }
-  }
-  return ensureUploadDirExists();
+  const customPath = await resolveCustomStoragePath(userId);
+  return ensureUploadDirExists(customPath);
 }
 
 // 上传图片
@@ -36,17 +43,7 @@ export async function uploadImage(
   contentType: string = 'image/jpeg',
   userId?: string
 ): Promise<string> {
-  let customPath: string | undefined;
-  
-  if (userId) {
-    try {
-      const userConfig = await getUserConfig(userId);
-      customPath = userConfig.localStorage?.savePath;
-    } catch (error) {
-      console.error('获取用户配置失败，使用默认路径:', error);
-    }
-  }
-  
+  const customPath = await resolveCustomStoragePath(userId);
   return uploadImageToLocal(imageBuffer, filename, contentType, customPath);
 }
 
@@ -56,33 +53,13 @@ export async function uploadBase64Image(
   filename: string,
   userId?: string
 ): Promise<string> {
-  let customPath: string | undefined;
-  
-  if (userId) {
-    try {
-      const userConfig = await getUserConfig(userId);
-      customPath = userConfig.localStorage?.savePath;
-    } catch (error) {
-      console.error('获取用户配置失败，使用默认路径:', error);
-    }
-  }
-  
+  const customPath = await resolveCustomStoragePath(userId);
   return uploadBase64ImageToLocal(base64Data, filename, customPath);
 }
 
 // 删除图片
 export async function deleteImage(objectName: string, userId?: string): Promise<void> {
-  let customPath: string | undefined;
-  
-  if (userId) {
-    try {
-      const userConfig = await getUserConfig(userId);
-      customPath = userConfig.localStorage?.savePath;
-    } catch (error) {
-      console.error('获取用户配置失败，使用默认路径:', error);
-    }
-  }
-  
+  const customPath = await resolveCustomStoragePath(userId);
   return deleteImageFromLocal(objectName, customPath);
 }
 
@@ -92,17 +69,7 @@ export async function generateAndUploadThumbnail(
   filename: string,
   userId?: string
 ): Promise<string> {
-  let customPath: string | undefined;
-  
-  if (userId) {
-    try {
-      const userConfig = await getUserConfig(userId);
-      customPath = userConfig.localStorage?.savePath;
-    } catch (error) {
-      console.error('获取用户配置失败，使用默认路径:', error);
-    }
-  }
-  
+  const customPath = await resolveCustomStoragePath(userId);
   return generateLocalThumbnail(originalImageBuffer, filename, customPath);
 }
 
@@ -111,16 +78,18 @@ export async function checkImageExists(
   urlPath: string,
   userId?: string
 ): Promise<boolean> {
-  let customPath: string | undefined;
-  
-  if (userId) {
-    try {
-      const userConfig = await getUserConfig(userId);
-      customPath = userConfig.localStorage?.savePath;
-    } catch (error) {
-      console.error('获取用户配置失败，使用默认路径:', error);
-    }
-  }
-  
+  const customPath = await resolveCustomStoragePath(userId);
   return checkLocalImageExists(urlPath, customPath);
+}
+
+export type InputAssetRef = StoredInputAssetRef;
+
+export async function saveInputAsset(
+  fileBuffer: Buffer,
+  filename: string,
+  mimeType: string,
+  userId?: string
+): Promise<InputAssetRef> {
+  const customPath = await resolveCustomStoragePath(userId);
+  return saveInputAssetToLocal(fileBuffer, filename, mimeType, customPath);
 }

@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/components/ui/use-toast';
 import { ListTodo, Clock, Loader, CheckCircle, XCircle } from 'lucide-react';
 
 interface QueueStats {
@@ -15,6 +16,7 @@ interface QueueStats {
 }
 
 export default function TaskStatsPopover() {
+  const { toast } = useToast();
   const [stats, setStats] = useState<QueueStats>({
     pending: 0,
     processing: 0,
@@ -23,6 +25,7 @@ export default function TaskStatsPopover() {
     total: 0
   });
   const [isOpen, setIsOpen] = useState(false);
+  const previousFailedCountRef = useRef<number | null>(null);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -33,6 +36,19 @@ export default function TaskStatsPopover() {
         if (response.ok) {
           const data = await response.json();
           if (data.success && data.status) {
+            const nextFailedCount = data.status.failed ?? 0;
+            const previousFailedCount = previousFailedCountRef.current;
+
+            if (previousFailedCount !== null && nextFailedCount > previousFailedCount) {
+              const newlyFailedCount = nextFailedCount - previousFailedCount;
+              toast({
+                title: '后台任务处理失败',
+                description: `新增 ${newlyFailedCount} 个失败任务，请前往任务中心查看详情并重试。`,
+                variant: 'destructive',
+              });
+            }
+
+            previousFailedCountRef.current = nextFailedCount;
             setStats(data.status);
           }
         }
@@ -52,7 +68,7 @@ export default function TaskStatsPopover() {
     const interval = setInterval(fetchStats, pollingDelay);
 
     return () => clearInterval(interval);
-  }, [isOpen]);
+  }, [isOpen, toast]);
 
   const hasActiveTasks = stats.pending > 0 || stats.processing > 0;
 

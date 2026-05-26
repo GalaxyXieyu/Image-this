@@ -26,6 +26,8 @@ function getDefaultUploadDir(): string {
 
 // 默认上传目录
 const DEFAULT_UPLOAD_DIR = getDefaultUploadDir();
+const ensuredUploadDirs = new Set<string>();
+const INPUT_ASSET_DIR_NAME = 'input-assets';
 
 /**
  * 获取上传目录路径
@@ -48,18 +50,72 @@ export function getUploadDir(customPath?: string | null): string {
   return DEFAULT_UPLOAD_DIR;
 }
 
+export function getInputAssetDir(customPath?: string | null): string {
+  return path.join(getUploadDir(customPath), INPUT_ASSET_DIR_NAME);
+}
+
 /**
  * 确保上传目录存在
  * @param customPath 用户自定义路径（可选）
  */
 export async function ensureUploadDirExists(customPath?: string | null) {
   const uploadDir = getUploadDir(customPath);
+  if (ensuredUploadDirs.has(uploadDir)) {
+    return uploadDir;
+  }
   try {
     await fs.access(uploadDir);
   } catch {
     await fs.mkdir(uploadDir, { recursive: true });
   }
+  ensuredUploadDirs.add(uploadDir);
   return uploadDir;
+}
+
+export async function ensureInputAssetDirExists(customPath?: string | null) {
+  const inputAssetDir = getInputAssetDir(customPath);
+  if (ensuredUploadDirs.has(inputAssetDir)) {
+    return inputAssetDir;
+  }
+
+  await fs.mkdir(inputAssetDir, { recursive: true });
+  ensuredUploadDirs.add(inputAssetDir);
+  return inputAssetDir;
+}
+
+export type StoredInputAssetRef = {
+  assetId: string;
+  filePath: string;
+  clientUrl: string;
+  originalFilename: string;
+  mimeType: string;
+  sizeBytes: number;
+};
+
+export async function saveInputAssetToLocal(
+  buffer: Buffer,
+  filename: string,
+  mimeType: string,
+  customPath?: string | null
+): Promise<StoredInputAssetRef> {
+  const inputAssetDir = await ensureInputAssetDirExists(customPath);
+  const safeFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
+  const assetId = `asset-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const storedFilename = `${assetId}-${safeFilename}`;
+  const filePath = path.join(inputAssetDir, storedFilename);
+
+  await fs.writeFile(filePath, buffer);
+
+  const clientUrl = `/api/files/${INPUT_ASSET_DIR_NAME}/${storedFilename}`;
+
+  return {
+    assetId,
+    filePath,
+    clientUrl,
+    originalFilename: filename,
+    mimeType,
+    sizeBytes: buffer.byteLength,
+  };
 }
 
 /**

@@ -14,19 +14,27 @@ let nextServer = null;
 let updateManager = null;
 let renderRecoveryInProgress = false;
 let applicationUrl = null;
+let workerSchedulerTimer = null;
+let workerTriggerInFlight = false;
 
 const isDev = process.env.NODE_ENV === 'development';
 const DEFAULT_PORT = Number(process.env.PORT || 23000);
 const WINDOWS_RENDERER_MAX_OLD_SPACE_MB = 1024;
 let serverPort = DEFAULT_PORT;
+const WORKER_SCHEDULER_INTERVAL_MS = 8000;
 
 const LOG_DIR = path.join(os.homedir(), 'ImagineThis', 'logs');
 const LOG_FILE = path.join(LOG_DIR, `app-${new Date().toISOString().split('T')[0]}.log`);
 const ERROR_LOG_FILE = path.join(LOG_DIR, `error-${new Date().toISOString().split('T')[0]}.log`);
+let logStream = null;
+let errorLogStream = null;
 
 if (!fs.existsSync(LOG_DIR)) {
   fs.mkdirSync(LOG_DIR, { recursive: true });
 }
+
+logStream = fs.createWriteStream(LOG_FILE, { flags: 'a' });
+errorLogStream = fs.createWriteStream(ERROR_LOG_FILE, { flags: 'a' });
 
 function parseEnvFileContents(contents) {
   const parsed = {};
@@ -91,9 +99,9 @@ function log(message, level = 'INFO') {
   console.log(logMessage);
 
   try {
-    fs.appendFileSync(LOG_FILE, `${logMessage}\n`);
-    if (level === 'ERROR') {
-      fs.appendFileSync(ERROR_LOG_FILE, `${logMessage}\n`);
+    logStream?.write(`${logMessage}\n`);
+    if (level === 'ERROR' || level === 'WARN') {
+      errorLogStream?.write(`${logMessage}\n`);
     }
   } catch (error) {
     console.error('Failed to write log file:', error);
@@ -384,6 +392,7 @@ function startNextServer() {
 
     nextServer.once('error', reject);
     nextServer.on('exit', (code, signal) => {
+      stopWorkerScheduler();
       const level = code === 0 || signal === 'SIGTERM' ? 'INFO' : 'ERROR';
       log(`Next.js server exited with code ${code}, signal: ${signal}`, level);
     });
@@ -432,6 +441,83 @@ async function warmupApplication() {
   ]);
 }
 
+function triggerBackgroundWorker(reason = 'manual') {
+  if (!applicationUrl || workerTriggerInFlight) {
+    return Promise.resolve(false);
+  }
+
+  workerTriggerInFlight = true;
+
+  return new Promise((resolve) => {
+    const payload = JSON.stringify({ batch: true, maxTasks: 2 });
+    const request = http.request(
+      {
+        hostname: '127.0.0.1',
+        port: serverPort,
+        path: '/api/tasks/worker',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+        },
+      },
+      (response) => {
+        let responseBody = '';
+        response.setEncoding('utf8');
+        response.on('data', (chunk) => {
+          responseBody += chunk;
+        });
+        response.on('end', () => {
+          workerTriggerInFlight = false;
+          if ((response.statusCode || 500) >= 200 && (response.statusCode || 500) < 300) {
+            log(`[Worker Scheduler] Triggered (${reason}) with status ${response.statusCode}`);
+            resolve(true);
+            return;
+          }
+
+          log(
+            `[Worker Scheduler] Trigger failed (${reason}): HTTP ${response.statusCode} ${responseBody.slice(0, 200)}`,
+            'WARN'
+          );
+          resolve(false);
+        });
+      }
+    );
+
+    request.on('error', (error) => {
+      workerTriggerInFlight = false;
+      log(`[Worker Scheduler] Trigger failed (${reason}): ${error.message}`, 'WARN');
+      resolve(false);
+    });
+
+    request.setTimeout(5000, () => {
+      request.destroy(new Error('timeout'));
+    });
+
+    request.write(payload);
+    request.end();
+  });
+}
+
+function startWorkerScheduler() {
+  if (workerSchedulerTimer) {
+    return;
+  }
+
+  log(`Starting background worker scheduler (${WORKER_SCHEDULER_INTERVAL_MS}ms interval)...`);
+  void triggerBackgroundWorker('startup');
+  workerSchedulerTimer = setInterval(() => {
+    void triggerBackgroundWorker('interval');
+  }, WORKER_SCHEDULER_INTERVAL_MS);
+}
+
+function stopWorkerScheduler() {
+  if (workerSchedulerTimer) {
+    clearInterval(workerSchedulerTimer);
+    workerSchedulerTimer = null;
+  }
+}
+
 async function bootstrapApplication() {
   createWindow();
 
@@ -449,13 +535,19 @@ async function bootstrapApplication() {
 
     await ensureDesktopDatabaseReady(app, log);
     await startNextServer();
-    await warmupApplication();
+    startWorkerScheduler();
 
     if (!mainWindow || mainWindow.isDestroyed()) {
       return;
     }
 
     await mainWindow.loadURL(applicationUrl);
+
+    setTimeout(() => {
+      warmupApplication().catch((error) => {
+        log(`Warmup failed: ${error.message}`, 'WARN');
+      });
+    }, 1500);
 
     setTimeout(() => {
       updateManager?.checkForUpdates().catch((error) => {
@@ -474,6 +566,9 @@ async function bootstrapApplication() {
 }
 
 function cleanupServerProcess() {
+  stopWorkerScheduler();
+  logStream?.end();
+  errorLogStream?.end();
   if (nextServer && !nextServer.killed) {
     log('Stopping Next.js child process...');
     nextServer.kill('SIGTERM');
