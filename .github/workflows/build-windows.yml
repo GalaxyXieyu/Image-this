@@ -46,7 +46,7 @@ jobs:
           DATABASE_URL=file:./data/app.db
           NEXTAUTH_URL=http://localhost:23000
           NEXTAUTH_SECRET=your-production-secret-key-min-32-chars
-          DESKTOP_UPDATE_BASE_URL=https://bojie.store
+          DESKTOP_UPDATE_FEED_URL=https://github.com/GalaxyXieyu/Image-this/releases/latest/download
           "@ | Set-Content .env.production
 
       - name: Build Windows App

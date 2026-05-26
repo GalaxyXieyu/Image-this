@@ -14,6 +14,7 @@ function normalizeBaseUrl(baseUrl) {
 }
 
 function createUpdateManager({ getMainWindow, log }) {
+  const defaultFeedUrl = 'https://github.com/GalaxyXieyu/Image-this/releases/latest/download';
   const isPortableBuild = Boolean(process.env.PORTABLE_EXECUTABLE_DIR);
   const state = {
     supported: process.platform === 'win32' && app.isPackaged && !isPortableBuild,
@@ -45,11 +46,17 @@ function createUpdateManager({ getMainWindow, log }) {
   }
 
   function getFeedUrl() {
-    const configuredBaseUrl = process.env.DESKTOP_UPDATE_BASE_URL;
-    if (!configuredBaseUrl) {
-      return '';
+    const configuredFeedUrl = process.env.DESKTOP_UPDATE_FEED_URL;
+    if (configuredFeedUrl) {
+      return normalizeBaseUrl(configuredFeedUrl);
     }
-    return `${normalizeBaseUrl(configuredBaseUrl)}/api/desktop-updates/windows`;
+
+    const configuredBaseUrl = process.env.DESKTOP_UPDATE_BASE_URL;
+    if (configuredBaseUrl) {
+      return `${normalizeBaseUrl(configuredBaseUrl)}/api/desktop-updates/windows`;
+    }
+
+    return defaultFeedUrl;
   }
 
   function schedulePeriodicChecks() {

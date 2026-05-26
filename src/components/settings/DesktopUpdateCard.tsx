@@ -21,7 +21,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 function getStatusHint(status: string, message: string) {
   if (status === 'disabled') {
-    return message || '还没有配置 DESKTOP_UPDATE_BASE_URL，所以当前无法连接更新服务。';
+    return message || '还没有配置 DESKTOP_UPDATE_FEED_URL，所以当前无法连接更新服务。';
   }
 
   if (status === 'unsupported') {
@@ -147,8 +147,8 @@ export function DesktopUpdateCard() {
                 还没有配置更新地址
               </div>
               <div className="mt-2">
-                请在打包用的 `.env.production` 里配置 `DESKTOP_UPDATE_BASE_URL`，并让该地址能访问
-                `/api/desktop-updates/windows/latest.yml`。
+                请在打包用的 `.env.production` 里配置 `DESKTOP_UPDATE_FEED_URL`，并确保该地址能访问
+                `latest.yml` 和安装包。
               </div>
             </div>
           ) : null}

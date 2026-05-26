@@ -1,6 +1,6 @@
 {
   "name": "imagine-this-nextjs",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "description": "专业的 AI 图像处理平台，支持背景替换、图像扩展、高清化等功能",
   "author": "Imagine This Team",
   "private": true,

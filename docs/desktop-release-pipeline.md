@@ -1,14 +1,14 @@
 # Desktop Release Pipeline
 
-This project publishes Windows desktop updates through GitHub Actions and a static update feed hosted on `bojie.store`.
+This project publishes Windows desktop updates through GitHub Releases. The desktop app uses a generic electron-updater feed that points at the latest release assets.
 
 ## What happens on release
 
 1. Push a version tag like `v0.2.3`.
 2. GitHub Actions builds the Windows installer and portable package.
 3. The workflow uploads the artifacts to a GitHub Release.
-4. The same workflow syncs `latest.yml`, the installer, the blockmap, and the portable build to the update server.
-5. Installed desktop clients check `DESKTOP_UPDATE_BASE_URL/api/desktop-updates/windows/latest.yml` and auto-download updates.
+4. Installed desktop clients check `DESKTOP_UPDATE_FEED_URL/latest.yml` and auto-download updates.
+5. The legacy `bojie.store` upload remains in the workflow for compatibility, but GitHub Release assets are the preferred update source.
 
 ## Required GitHub configuration
 
@@ -26,7 +26,7 @@ Repository variables:
 
 Recommended values for the current setup:
 
-- `DESKTOP_UPDATE_BASE_URL=https://bojie.store`
+- `DESKTOP_UPDATE_FEED_URL=https://github.com/GalaxyXieyu/Image-this/releases/latest/download`
 - `WINDOWS_UPDATE_REMOTE_DIR=/data/imagine-this-updates/windows`
 
 ## Release steps

@@ -22,6 +22,7 @@ const DEFAULT_PORT = Number(process.env.PORT || 23000);
 const WINDOWS_RENDERER_MAX_OLD_SPACE_MB = 1024;
 let serverPort = DEFAULT_PORT;
 const WORKER_SCHEDULER_INTERVAL_MS = 8000;
+const SERVER_SHUTDOWN_TIMEOUT_MS = 5000;
 
 const LEGACY_LOG_DIR = path.join(os.homedir(), 'ImagineThis', 'logs');
 const DESKTOP_SETTINGS_FILE = 'desktop-settings.json';
@@ -708,12 +709,19 @@ async function bootstrapApplication() {
 
 function cleanupServerProcess() {
   stopWorkerScheduler();
-  logStream?.end();
-  errorLogStream?.end();
   if (nextServer && !nextServer.killed) {
     log('Stopping Next.js child process...');
     nextServer.kill('SIGTERM');
+    const serverToKill = nextServer;
+    setTimeout(() => {
+      if (!serverToKill.killed) {
+        log('Force killing Next.js child process after shutdown timeout...', 'WARN');
+        serverToKill.kill('SIGKILL');
+      }
+    }, SERVER_SHUTDOWN_TIMEOUT_MS).unref();
   }
+  logStream?.end();
+  errorLogStream?.end();
 }
 
 process.on('uncaughtException', (error) => {
@@ -779,9 +787,8 @@ app.on('activate', async () => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  log('All windows closed; quitting desktop app and stopping worker runtime.');
+  app.quit();
 });
 
 app.on('before-quit', () => {
