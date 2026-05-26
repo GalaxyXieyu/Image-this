@@ -327,6 +327,58 @@ function showWindowStatusPage(title, message, accent) {
   });
 }
 
+function isAppNavigationUrl(targetUrl) {
+  if (!targetUrl || !applicationUrl) {
+    return false;
+  }
+
+  try {
+    const target = new URL(targetUrl);
+    const appTarget = new URL(applicationUrl);
+    return target.origin === appTarget.origin;
+  } catch {
+    return false;
+  }
+}
+
+function openAppUrlInMainWindow(targetUrl) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  mainWindow.loadURL(targetUrl).catch((error) => {
+    log(`Failed to navigate main window to ${targetUrl}: ${error.message}`, 'ERROR');
+  });
+}
+
+function installNavigationGuards(window) {
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    if (isAppNavigationUrl(url)) {
+      log(`Redirecting app popup navigation into main window: ${url}`);
+      openAppUrlInMainWindow(url);
+      return { action: 'deny' };
+    }
+
+    log(`Opening external URL in system browser: ${url}`);
+    shell.openExternal(url).catch((error) => {
+      log(`Failed to open external URL ${url}: ${error.message}`, 'ERROR');
+    });
+    return { action: 'deny' };
+  });
+
+  window.webContents.on('will-navigate', (event, url) => {
+    if (isAppNavigationUrl(url)) {
+      return;
+    }
+
+    event.preventDefault();
+    log(`Blocked external navigation in app window: ${url}`);
+    shell.openExternal(url).catch((error) => {
+      log(`Failed to open external navigation ${url}: ${error.message}`, 'ERROR');
+    });
+  });
+}
+
 function recoverMainWindow(reason) {
   if (!mainWindow || mainWindow.isDestroyed() || renderRecoveryInProgress) {
     return;
@@ -376,6 +428,7 @@ function createWindow() {
   };
 
   mainWindow = new BrowserWindow(windowOptions);
+  installNavigationGuards(mainWindow);
   showWindowStatusPage('正在启动', '正在准备数据库和桌面服务，请稍候。', '#2563eb');
 
   mainWindow.once('ready-to-show', () => {

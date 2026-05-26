@@ -228,16 +228,11 @@ export class VolcengineProcessor implements IImageProcessor {
       console.log(`[Volcengine Processor] 图片已上传到图床: ${publicUrl.substring(0, 50)}...`);
       return publicUrl;
     } catch (error) {
-      console.error('[Volcengine Processor] 图床上传失败，尝试使用本地存储:', error);
-      // 如果图床上传失败，尝试保存到本地并返回公网 URL
-      const { uploadBase64Image } = await import('@/lib/storage');
-      const localPath = await uploadBase64Image(dataUrl, `volcengine-temp-${Date.now()}.jpg`);
-      
-      // 构造完整的公网 URL
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL || 'http://localhost:3000';
-      const fullUrl = `${baseUrl}${localPath}`;
-      console.log(`[Volcengine Processor] 使用本地存储: ${fullUrl}`);
-      return fullUrl;
+      const message = error instanceof Error ? error.message : '未知错误';
+      console.error('[Volcengine Processor] 图床上传失败，无法继续调用火山引擎:', message);
+      throw new Error(
+        `VOLCENGINE_PUBLIC_IMAGE_URL_REQUIRED: 火山引擎需要能从公网下载输入图片。请在设置页配置有效的 Superbed Token；本地 localhost 或 /api/files 图片无法被火山引擎访问。原始错误：${message}`
+      );
     }
   }
 }

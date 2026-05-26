@@ -30,9 +30,9 @@ import {
 } from '@/components/ui/dialog';
 import Navbar from '@/components/navigation/Navbar';
 import { DesktopUpdateCard } from '@/components/settings/DesktopUpdateCard';
-import { Save, Key, Sparkles, User, Image, FileText, Plus, Edit, Trash2, Star, StarOff, Cpu, HardDrive, FolderOpen, Folder, RefreshCw, Search, ChevronsUpDown, SlidersHorizontal, Clipboard, FileSearch } from 'lucide-react';
+import { LogDiagnosticsCard } from '@/components/settings/LogDiagnosticsCard';
+import { Save, Key, Sparkles, User, Image, FileText, Plus, Edit, Trash2, Star, StarOff, Cpu, HardDrive, FolderOpen, Folder, RefreshCw, Search, ChevronsUpDown, SlidersHorizontal, FileSearch } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
-import type { DesktopLogFile, DesktopLogInfo } from '@/types/electron';
 
 type SettingSection = 'models' | 'imagehosting' | 'runtime' | 'logs' | 'profile' | 'prompts' | 'updates';
 
@@ -233,12 +233,6 @@ export default function SettingsPage() {
     gemini: false,
     jimeng: false,
   });
-  const [logInfo, setLogInfo] = useState<DesktopLogInfo | null>(null);
-  const [logFiles, setLogFiles] = useState<DesktopLogFile[]>([]);
-  const [selectedLogFile, setSelectedLogFile] = useState('');
-  const [logContent, setLogContent] = useState('');
-  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
-
   const menuItems = [
     { 
       id: 'models' as SettingSection, 
@@ -527,108 +521,6 @@ export default function SettingsPage() {
     }
   };
 
-  const loadLogs = async (preferredFile?: string) => {
-    if (typeof window === 'undefined' || !window.electron?.logs) {
-      setLogInfo(null);
-      setLogFiles([]);
-      setLogContent('');
-      return;
-    }
-
-    setIsLoadingLogs(true);
-    try {
-      const [info, files] = await Promise.all([
-        window.electron.logs.getInfo(),
-        window.electron.logs.listFiles(),
-      ]);
-      setLogInfo(info);
-      setLogFiles(files);
-
-      const nextFile = preferredFile
-        || selectedLogFile
-        || info.errorLogFile
-        || info.appLogFile
-        || files[0]?.name
-        || '';
-      setSelectedLogFile(nextFile);
-
-      if (nextFile) {
-        const tail = await window.electron.logs.readTail({
-          fileName: nextFile,
-          maxBytes: 128 * 1024,
-        });
-        setLogContent(tail.content || '');
-      } else {
-        setLogContent('');
-      }
-    } catch (error) {
-      toast({
-        title: '日志读取失败',
-        description: error instanceof Error ? error.message : '无法读取日志',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoadingLogs(false);
-    }
-  };
-
-  const handleSelectLogFile = async (fileName: string) => {
-    setSelectedLogFile(fileName);
-    if (!window.electron?.logs) return;
-    setIsLoadingLogs(true);
-    try {
-      const tail = await window.electron.logs.readTail({
-        fileName,
-        maxBytes: 128 * 1024,
-      });
-      setLogContent(tail.content || '');
-    } catch (error) {
-      toast({
-        title: '日志读取失败',
-        description: error instanceof Error ? error.message : '无法读取日志',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoadingLogs(false);
-    }
-  };
-
-  const handleOpenLogDirectory = async () => {
-    if (!window.electron?.logs) {
-      toast({ title: '当前环境不可用', description: '日志目录只能在桌面版中打开。', variant: 'destructive' });
-      return;
-    }
-    await window.electron.logs.openDirectory();
-  };
-
-  const handleChooseLogDirectory = async () => {
-    if (!window.electron?.logs) {
-      toast({ title: '当前环境不可用', description: '日志目录只能在桌面版中配置。', variant: 'destructive' });
-      return;
-    }
-    const info = await window.electron.logs.chooseDirectory();
-    setLogInfo(info);
-    await loadLogs();
-  };
-
-  const handleResetLogDirectory = async () => {
-    if (!window.electron?.logs) {
-      return;
-    }
-    const info = await window.electron.logs.resetDirectory();
-    setLogInfo(info);
-    await loadLogs();
-  };
-
-  const handleCopyLogContent = async () => {
-    if (!logContent) return;
-    await navigator.clipboard.writeText(logContent);
-    toast({
-      title: '已复制',
-      description: '当前日志内容已复制到剪贴板',
-    });
-  };
-
   // 文件夹选择器
   const handleSelectFolder = async () => {
     try {
@@ -838,12 +730,6 @@ export default function SettingsPage() {
   useEffect(() => {
     if (activeSection === 'prompts' && status === 'authenticated') {
       loadTemplates();
-    }
-  }, [activeSection, status]);
-
-  useEffect(() => {
-    if (activeSection === 'logs' && status === 'authenticated') {
-      loadLogs();
     }
   }, [activeSection, status]);
 
@@ -1331,108 +1217,7 @@ export default function SettingsPage() {
         );
 
       case 'logs':
-        return (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <CardTitle className="flex items-center">
-                      <FileSearch className="w-5 h-5 mr-2 text-amber-600" />
-                      日志诊断
-                    </CardTitle>
-                    <CardDescription className="mt-1">
-                      查看桌面端启动、后台任务、更新和接口错误日志
-                    </CardDescription>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button type="button" variant="outline" onClick={() => loadLogs()} disabled={isLoadingLogs}>
-                      <RefreshCw className={`w-4 h-4 mr-2 ${isLoadingLogs ? 'animate-spin' : ''}`} />
-                      刷新
-                    </Button>
-                    <Button type="button" variant="outline" onClick={handleOpenLogDirectory}>
-                      <FolderOpen className="w-4 h-4 mr-2" />
-                      打开目录
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                <div className="rounded-md border bg-gray-50 p-3">
-                  <div className="text-xs text-gray-500 mb-1">当前日志目录</div>
-                  <div className="font-mono text-sm text-gray-800 break-all">
-                    {logInfo?.directory || '仅桌面版可用'}
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Button type="button" size="sm" variant="outline" onClick={handleChooseLogDirectory}>
-                      <Folder className="w-4 h-4 mr-2" />
-                      选择目录
-                    </Button>
-                    {logInfo?.isCustom && (
-                      <Button type="button" size="sm" variant="ghost" onClick={handleResetLogDirectory}>
-                        恢复默认目录
-                      </Button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
-                  <div className="rounded-md border overflow-hidden">
-                    <div className="px-3 py-2 bg-gray-50 border-b text-sm font-medium text-gray-700">
-                      日志文件
-                    </div>
-                    <div className="max-h-[420px] overflow-y-auto">
-                      {logFiles.length === 0 ? (
-                        <div className="p-4 text-sm text-gray-500">暂无日志文件</div>
-                      ) : (
-                        logFiles.map((file) => (
-                          <button
-                            key={file.name}
-                            type="button"
-                            onClick={() => handleSelectLogFile(file.name)}
-                            className={`w-full text-left px-3 py-2 border-b last:border-b-0 hover:bg-amber-50 ${
-                              selectedLogFile === file.name ? 'bg-amber-50 text-amber-700' : 'text-gray-700'
-                            }`}
-                          >
-                            <div className="text-sm font-medium truncate">{file.name}</div>
-                            <div className="text-xs text-gray-500">
-                              {(file.sizeBytes / 1024).toFixed(1)} KB · {new Date(file.modifiedAt).toLocaleString('zh-CN')}
-                            </div>
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="rounded-md border overflow-hidden">
-                    <div className="px-3 py-2 bg-gray-50 border-b flex items-center justify-between gap-3">
-                      <div className="text-sm font-medium text-gray-700 truncate">
-                        {selectedLogFile || '未选择日志'}
-                      </div>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={handleCopyLogContent}
-                        disabled={!logContent}
-                      >
-                        <Clipboard className="w-4 h-4 mr-2" />
-                        复制
-                      </Button>
-                    </div>
-                    <pre className="h-[420px] overflow-auto bg-neutral-950 text-neutral-100 p-4 text-xs leading-5 whitespace-pre-wrap">
-                      {isLoadingLogs ? '正在读取日志...' : (logContent || '暂无日志内容')}
-                    </pre>
-                  </div>
-                </div>
-
-                <div className="text-xs text-gray-500">
-                  日志内容会在读取时做基础脱敏，并且只读取文件末尾片段，避免大日志卡住界面。
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        );
+        return <LogDiagnosticsCard />;
 
       case 'profile':
         return (
