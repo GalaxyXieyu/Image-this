@@ -1,6 +1,6 @@
- 'use client';
+'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { ChangeEvent, useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/navigation/Navbar';
@@ -139,6 +139,7 @@ export default function TaskCenterPage() {
   const [filterScore, setFilterScore] = useState('all');
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
+  const [lastSelectedTaskId, setLastSelectedTaskId] = useState<string | null>(null);
   const [queueStats, setQueueStats] = useState({
     pending: 0,
     processing: 0,
@@ -312,15 +313,39 @@ export default function TaskCenterPage() {
     setExpandedTasks(newExpanded);
   };
 
-  // 选择任务
-  const handleSelectTask = (taskId: string) => {
+  // 选择任务。支持 Shift 区间选择，以及 Ctrl/Command 累加选择。
+  const handleSelectTask = (taskId: string, event?: ChangeEvent<HTMLInputElement>) => {
     const newSelected = new Set(selectedTasks);
+    const isRangeSelection = Boolean((event?.nativeEvent as globalThis.MouseEvent | undefined)?.shiftKey);
+    const shouldSelect = event?.target.checked ?? !newSelected.has(taskId);
+
+    if (isRangeSelection && lastSelectedTaskId) {
+      const currentIndex = filteredTasks.findIndex(task => task.id === taskId);
+      const lastIndex = filteredTasks.findIndex(task => task.id === lastSelectedTaskId);
+
+      if (currentIndex !== -1 && lastIndex !== -1) {
+        const [start, end] = [currentIndex, lastIndex].sort((a, b) => a - b);
+        filteredTasks.slice(start, end + 1).forEach(task => {
+          if (shouldSelect) {
+            newSelected.add(task.id);
+          } else {
+            newSelected.delete(task.id);
+          }
+        });
+        setSelectedTasks(newSelected);
+        setLastSelectedTaskId(taskId);
+        return;
+      }
+    }
+
     if (newSelected.has(taskId)) {
       newSelected.delete(taskId);
     } else {
       newSelected.add(taskId);
     }
+
     setSelectedTasks(newSelected);
+    setLastSelectedTaskId(taskId);
   };
 
   // 获取任务类型显示名称
@@ -659,8 +684,10 @@ export default function TaskCenterPage() {
   const toggleSelectAll = () => {
     if (selectedTasks.size === filteredTasks.length) {
       setSelectedTasks(new Set());
+      setLastSelectedTaskId(null);
     } else {
       setSelectedTasks(new Set(filteredTasks.map(task => task.id)));
+      setLastSelectedTaskId(filteredTasks[0]?.id || null);
     }
   };
 
@@ -865,7 +892,7 @@ export default function TaskCenterPage() {
                         <input
                           type="checkbox"
                           checked={selectedTasks.has(task.id)}
-                          onChange={() => handleSelectTask(task.id)}
+                          onChange={(event) => handleSelectTask(task.id, event)}
                           className="w-4 h-4 text-orange-600 rounded border-gray-300"
                         />
                       </div>

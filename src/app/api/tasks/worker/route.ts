@@ -480,7 +480,8 @@ class TaskProcessor {
       aiModel = 'gemini',
       backgroundPrompt = '',
       outpaintPrompt = '',
-      volcengineConfig
+      volcengineConfig,
+      imagehostingConfig
     } = inputData;
     
     await this.updateTaskProgress(task.id, 'Step 1/3: 准备处理...', 10, 1);
@@ -508,7 +509,8 @@ class TaskProcessor {
         backgroundPrompt,
         outpaintPrompt,
         userId: task.userId,
-        volcengineConfig
+        volcengineConfig,
+        imagehostingConfig
       });
       
       await this.updateTaskProgress(task.id, 'Step 3/3: 处理完成', 100, 3);
