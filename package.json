@@ -1,6 +1,6 @@
 {
   "name": "imagine-this-nextjs",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "description": "专业的 AI 图像处理平台，支持背景替换、图像扩展、高清化等功能",
   "author": "Imagine This Team",
   "private": true,
@@ -191,6 +191,8 @@
     },
     "nsis": {
       "include": "build/installer.nsh",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "deleteAppDataOnUninstall": false,

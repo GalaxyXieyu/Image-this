@@ -415,6 +415,7 @@ async function main() {
     log('🔨 开始打包...', 'yellow');
     log('⏳ 这可能需要几分钟时间，请耐心等待...\n', 'yellow');
     await runCommand('npm', ['run', 'electron:build:win']);
+    await patchWindowsExecutableIcon();
     const distDir = join(projectRoot, 'dist-electron');
     const signableArtifacts = readdirSync(distDir)
       .filter((entry) => entry.endsWith('.exe'))
