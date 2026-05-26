@@ -225,6 +225,13 @@ function runSqlMigrations(app, dbPath, log) {
       }
 
       const migrationSql = fs.readFileSync(migration.filePath, 'utf8');
+      if (isMigrationAlreadySatisfied(database, migrationSql)) {
+        markMigrationApplied(database, migration.name, migrationSql);
+        appliedNames.add(migration.name);
+        log(`Marked already-satisfied desktop migration as applied: ${migration.name}`);
+        continue;
+      }
+
       log(`Applying desktop migration: ${migration.name}`);
       database.exec('BEGIN');
       try {
@@ -239,6 +246,44 @@ function runSqlMigrations(app, dbPath, log) {
   } finally {
     database.close();
   }
+}
+
+function isMigrationAlreadySatisfied(database, migrationSql) {
+  const addColumnStatements = migrationSql
+    .split(';')
+    .map((statement) => statement.trim())
+    .filter(Boolean)
+    .map(parseAddColumnStatement);
+
+  if (addColumnStatements.length === 0 || addColumnStatements.some((statement) => !statement)) {
+    return false;
+  }
+
+  return addColumnStatements.every(({ tableName, columnName }) => {
+    const existingColumns = new Set(
+      database
+        .prepare(`PRAGMA table_info("${tableName.replace(/"/g, '""')}")`)
+        .all()
+        .map((column) => column.name)
+    );
+
+    return existingColumns.has(columnName);
+  });
+}
+
+function parseAddColumnStatement(statement) {
+  const matched = statement.match(
+    /^ALTER\s+TABLE\s+"?([^"\s]+)"?\s+ADD\s+COLUMN\s+"?([^"\s]+)"?/i
+  );
+
+  if (!matched) {
+    return null;
+  }
+
+  return {
+    tableName: matched[1],
+    columnName: matched[2],
+  };
 }
 
 function migrateLegacySecrets(app, dbPath, log) {
