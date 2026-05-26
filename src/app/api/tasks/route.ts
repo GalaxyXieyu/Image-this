@@ -166,6 +166,36 @@ export async function GET(request: NextRequest) {
 
     const isStatusQuery = Boolean(taskIds && taskIds.length > 0);
 
+    if (isStatusQuery) {
+      const tasks = await prisma.taskQueue.findMany({
+        where,
+        orderBy: [
+          { priority: 'desc' },
+          { createdAt: 'desc' }
+        ],
+        take: limit,
+        skip: offset,
+        select: {
+          id: true,
+          type: true,
+          status: true,
+          progress: true,
+          currentStep: true,
+          errorMessage: true,
+          createdAt: true,
+          updatedAt: true,
+          completedAt: true,
+          processedImageId: true,
+          outputData: true,
+        }
+      });
+
+      return NextResponse.json({
+        success: true,
+        tasks,
+      });
+    }
+
     // 查询任务 - 排除大型 JSON 字段以提升性能
     const tasks = await prisma.taskQueue.findMany({
       where,
@@ -175,54 +205,33 @@ export async function GET(request: NextRequest) {
       ],
       take: limit,
       skip: offset,
-      select: isStatusQuery
-        ? {
-            id: true,
-            type: true,
-            status: true,
-            progress: true,
-            currentStep: true,
-            errorMessage: true,
-            createdAt: true,
-            updatedAt: true,
-            completedAt: true,
-            processedImageId: true,
-            outputData: true,
-          }
-        : {
-            id: true,
-            type: true,
-            status: true,
-            priority: true,
-            progress: true,
-            currentStep: true,
-            totalSteps: true,
-            completedSteps: true,
-            errorMessage: true,
-            createdAt: true,
-            updatedAt: true,
-            startedAt: true,
-            completedAt: true,
-            userId: true,
-            projectId: true,
-            processedImageId: true,
-            inputData: true, // 需要 inputData 来获取原图 URL
-            outputData: true, // 需要 outputData 来获取处理结果和触发审核
-            project: {
-              select: { id: true, name: true }
-            },
-            processedImage: {
-              select: { id: true, filename: true, originalUrl: true, processedUrl: true, qualityScore: true }
-            }
-          }
+      select: {
+        id: true,
+        type: true,
+        status: true,
+        priority: true,
+        progress: true,
+        currentStep: true,
+        totalSteps: true,
+        completedSteps: true,
+        errorMessage: true,
+        createdAt: true,
+        updatedAt: true,
+        startedAt: true,
+        completedAt: true,
+        userId: true,
+        projectId: true,
+        processedImageId: true,
+        inputData: true, // 需要 inputData 来获取原图 URL
+        outputData: true, // 需要 outputData 来获取处理结果和触发审核
+        project: {
+          select: { id: true, name: true }
+        },
+        processedImage: {
+          select: { id: true, filename: true, originalUrl: true, processedUrl: true, qualityScore: true }
+        }
+      }
     });
-
-    if (isStatusQuery) {
-      return NextResponse.json({
-        success: true,
-        tasks,
-      });
-    }
 
     // 并行获取总数和状态统计（一次数据库往返）
     const normalizedTasks = tasks.map((task) => ({
