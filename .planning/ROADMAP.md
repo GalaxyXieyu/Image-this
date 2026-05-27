@@ -7,7 +7,7 @@
 ## Phases
 
 - [x] **Phase 1: Product Visual Workbench Foundation** - 建立新版 app shell、路由、设计 token、workflow state 和 typed API contract 基础 (completed 2026-05-27)
-- [ ] **Phase 2: Template Library and Preset Model** - 实现模板库页面、预设数据模型和模板到工作流的入口
+- [x] **Phase 2: Template Library and Preset Model** - 实现模板库页面、预设数据模型和模板到工作流的入口 (completed 2026-05-27)
 - [ ] **Phase 3: Scene Image Guided Workflow** - 实现场景图商品信息、候选生成、结果调整三步流程
 - [ ] **Phase 4: Unified Smart Toolbox** - 用统一编辑器 shell 重建 AI 换背景、加水印、高清化、扩图等工具
 - [ ] **Phase 5: Workflow API and Worker Contract Refactor** - 将任务提交、worker dispatch、结果 payload 规范化为 typed workflow contract
@@ -56,7 +56,7 @@ Plans:
 
 Plans:
 
-- [ ] 02-01: Template library and preset model
+- [x] 02-01: Template library and preset model
 
 ### Phase 3: Scene Image Guided Workflow
 
@@ -135,12 +135,12 @@ Plans:
 
 ## Progress
 
-**Current focus:** Phase 1 - Product Visual Workbench Foundation
+**Current focus:** Phase 3 - Scene Image Guided Workflow
 
 | Phase | Plans Complete | Status |
 |-------|----------------|--------|
 | 1. Product Visual Workbench Foundation | 1/1 | Complete |
-| 2. Template Library and Preset Model | 0/TBD | Pending |
+| 2. Template Library and Preset Model | 1/1 | Complete |
 | 3. Scene Image Guided Workflow | 0/TBD | Pending |
 | 4. Unified Smart Toolbox | 0/TBD | Pending |
 | 5. Workflow API and Worker Contract Refactor | 0/TBD | Pending |

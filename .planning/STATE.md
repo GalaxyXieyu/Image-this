@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to plan
-stopped_at: Phase 1 complete — Product Visual Workbench Foundation verified
-last_updated: "2026-05-27T15:30:00.000Z"
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-05-27T07:19:53.632Z"
 progress:
   total_phases: 6
-  completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
+  completed_phases: 4
+  total_plans: 9
+  completed_plans: 8
 ---
 
 # Project State
@@ -25,7 +25,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-27)
 ## Current Position
 
 Phase: 2 of 6 (in progress)
-Plan: 02-01 ready for execution
+Plan: 02-01 complete
 
 ## Accumulated Context
 
@@ -36,6 +36,8 @@ Plan: 02-01 ready for execution
 - [2026-05-27]: 保留 main 分支的桌面 runtime、任务瘦身、输入资产引用和日志诊断优化作为工程基线。
 - [2026-05-27]: 新任务链路必须 typed contract 化，避免继续扩散任意 `inputData` JSON。
 - [2026-05-27]: 先做 foundation，再做模板库、场景图工作流、智能工具箱、API/worker 收敛和旧前端删除。
+- [2026-05-27]: 模板库使用静态 seed 数据，DB 迁移推迟到 Phase 5+。
+- [2026-05-27]: VideoParams 加入 ToolParameters union 以支持视频预设。
 
 ### Active Canonical References
 
@@ -44,6 +46,9 @@ Plan: 02-01 ready for execution
 - `.planning/ROADMAP.md`
 - `.planning/phases/01-product-visual-workbench-rebuild/01-CONTEXT.md`
 - `.planning/phases/01-product-visual-workbench-rebuild/01-01-PLAN.md`
+- `.planning/phases/02-template-library-preset-model/02-CONTEXT.md`
+- `.planning/phases/02-template-library-preset-model/02-01-PLAN.md`
+- `.planning/phases/02-template-library-preset-model/02-01-SUMMARY.md`
 - `/Users/galaxyxieyu/Documents/image-this.pen`
 - `src/app/workspace/page.tsx`
 - `src/app/api/tasks/route.ts`
@@ -61,7 +66,7 @@ The following phase folders remain useful for regression and engineering context
 ### Pending Todos
 
 - [x] Execute Phase 1 foundation plan.
-- [ ] Plan Phase 2: Template Library and Preset Model.
+- [x] Plan Phase 2: Template Library and Preset Model.
 - [ ] Decide whether to archive or renumber historical phase folders after the rebuild branch stabilizes.
 - [ ] Validate Windows/Electron baseline after first UI foundation changes.
 
@@ -73,6 +78,6 @@ The following phase folders remain useful for regression and engineering context
 
 ## Session Continuity
 
-Last session: 2026-05-27T06:17:42.033Z
-Stopped at: Completed 01-01-PLAN.md
+Last session: 2026-05-27T07:19:53.629Z
+Stopped at: Completed 02-01-PLAN.md
 Resume file: None
