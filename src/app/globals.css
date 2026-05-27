@@ -23,6 +23,29 @@
   --color-input: #e5e5e5;
   --color-ring: #171717;
   --radius: 0.5rem;
+
+  /* Workbench Design Tokens - Pencil-inspired neutral palette */
+  --color-wb-surface: #ffffff;
+  --color-wb-surface-raised: #fafafa;
+  --color-wb-surface-inset: #f3f4f6;
+  --color-wb-border: #e5e7eb;
+  --color-wb-border-strong: #d1d5db;
+  --color-wb-text: #111827;
+  --color-wb-text-secondary: #6b7280;
+  --color-wb-text-tertiary: #9ca3af;
+  --color-wb-accent: #2563eb;
+  --color-wb-accent-hover: #1d4ed8;
+  --color-wb-accent-light: #eff6ff;
+  --color-wb-success: #10b981;
+  --color-wb-warning: #f59e0b;
+  --color-wb-error: #ef4444;
+
+  /* Panel dimensions */
+  --wb-sidebar-width: 224px;
+  --wb-topnav-height: 56px;
+  --wb-actionbar-height: 56px;
+  --wb-detail-panel-width: 320px;
+  --wb-stepbar-height: 72px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -46,6 +69,18 @@
     --color-border: #262626;
     --color-input: #262626;
     --color-ring: #d4d4d8;
+
+    --color-wb-surface: #0a0a0a;
+    --color-wb-surface-raised: #171717;
+    --color-wb-surface-inset: #262626;
+    --color-wb-border: #262626;
+    --color-wb-border-strong: #404040;
+    --color-wb-text: #fafafa;
+    --color-wb-text-secondary: #a3a3a3;
+    --color-wb-text-tertiary: #737373;
+    --color-wb-accent: #3b82f6;
+    --color-wb-accent-hover: #60a5fa;
+    --color-wb-accent-light: #1e3a5f;
   }
 }
 
@@ -99,7 +134,7 @@ html {
   --primary-orange: #f97316;
   --primary-orange-light: #fed7aa;
   --primary-orange-dark: #ea580c;
-  
+
   /* 统一的蓝色系统 */
   --primary-blue: #2563eb;        /* blue-600 - 主要蓝色 */
   --primary-blue-hover: #1d4ed8;   /* blue-700 - 悬停状态 */
@@ -107,7 +142,7 @@ html {
   --primary-blue-lighter: #eff6ff; /* blue-50 - 超浅蓝背景 */
   --primary-blue-border: #93c5fd;  /* blue-300 - 边框 */
   --primary-blue-ring: #3b82f6;    /* blue-500 - 焦点环 */
-  
+
   --neutral-gray: #6b7280;
   --neutral-gray-light: #f9fafb;
   --neutral-gray-dark: #374151;
