@@ -29,6 +29,16 @@ import {
 
 type Step = 1 | 2 | 3;
 
+interface WorkflowData {
+  productName: string;
+  productType: string;
+  targetAudience: string;
+  usageScene: string;
+  sellingPoints: string;
+  platforms: string[];
+  selectedTemplates: string[];
+}
+
 function StepBar({ currentStep }: { currentStep: Step }) {
   const steps = [
     { num: 1, label: "填写产品信息" },
@@ -118,21 +128,24 @@ function TopNav() {
   );
 }
 
-function ProductInfoStep({ onNext }: { onNext: () => void }) {
-  const [productName, setProductName] = useState("");
-  const [productType, setProductType] = useState("");
+const platforms = [
+  { id: "taobao", label: "淘宝/天猫" },
+  { id: "jd", label: "京东" },
+  { id: "pdd", label: "拼多多" },
+  { id: "douyin", label: "抖音" },
+  { id: "xiaohongshu", label: "小红书" },
+  { id: "wechat", label: "微信小程序" },
+];
 
-  const platforms = [
-    { id: "taobao", label: "淘宝/天猫" },
-    { id: "jd", label: "京东" },
-    { id: "pdd", label: "拼多多" },
-    { id: "douyin", label: "抖音" },
-    { id: "xiaohongshu", label: "小红书" },
-    { id: "wechat", label: "微信小程序" },
-  ];
-
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
-
+function ProductInfoStep({
+  onNext,
+  workflowData,
+  setWorkflowData,
+}: {
+  onNext: () => void;
+  workflowData: WorkflowData;
+  setWorkflowData: React.Dispatch<React.SetStateAction<WorkflowData>>;
+}) {
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-auto p-8">
@@ -155,14 +168,21 @@ function ProductInfoStep({ onNext }: { onNext: () => void }) {
                 <Label style={{ fontFamily: "Inter, sans-serif" }}>产品名称</Label>
                 <Input
                   placeholder="例如：某某品牌保湿面霜"
-                  value={productName}
-                  onChange={(e) => setProductName(e.target.value)}
+                  value={workflowData.productName}
+                  onChange={(e) =>
+                    setWorkflowData((prev) => ({ ...prev, productName: e.target.value }))
+                  }
                   style={{ fontFamily: "Geist, sans-serif" }}
                 />
               </div>
               <div className="space-y-2">
                 <Label style={{ fontFamily: "Inter, sans-serif" }}>产品类型</Label>
-                <Select value={productType} onValueChange={setProductType}>
+                <Select
+                  value={workflowData.productType}
+                  onValueChange={(value) =>
+                    setWorkflowData((prev) => ({ ...prev, productType: value }))
+                  }
+                >
                   <SelectTrigger style={{ fontFamily: "Geist, sans-serif" }}>
                     <SelectValue placeholder="选择产品类型" />
                   </SelectTrigger>
@@ -181,6 +201,10 @@ function ProductInfoStep({ onNext }: { onNext: () => void }) {
                 <Label style={{ fontFamily: "Inter, sans-serif" }}>目标人群</Label>
                 <Input
                   placeholder="例如：25-35 岁女性"
+                  value={workflowData.targetAudience}
+                  onChange={(e) =>
+                    setWorkflowData((prev) => ({ ...prev, targetAudience: e.target.value }))
+                  }
                   style={{ fontFamily: "Geist, sans-serif" }}
                 />
               </div>
@@ -188,6 +212,10 @@ function ProductInfoStep({ onNext }: { onNext: () => void }) {
                 <Label style={{ fontFamily: "Inter, sans-serif" }}>使用场景</Label>
                 <Input
                   placeholder="例如：日常护肤"
+                  value={workflowData.usageScene}
+                  onChange={(e) =>
+                    setWorkflowData((prev) => ({ ...prev, usageScene: e.target.value }))
+                  }
                   style={{ fontFamily: "Geist, sans-serif" }}
                 />
               </div>
@@ -197,6 +225,10 @@ function ProductInfoStep({ onNext }: { onNext: () => void }) {
               <Textarea
                 placeholder="请列出产品的核心卖点..."
                 rows={3}
+                value={workflowData.sellingPoints}
+                onChange={(e) =>
+                  setWorkflowData((prev) => ({ ...prev, sellingPoints: e.target.value }))
+                }
                 style={{ fontFamily: "Geist, sans-serif" }}
               />
             </div>
@@ -215,20 +247,24 @@ function ProductInfoStep({ onNext }: { onNext: () => void }) {
                   key={platform.id}
                   className={cn(
                     "flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer transition-colors",
-                    selectedPlatforms.includes(platform.id)
+                    workflowData.platforms.includes(platform.id)
                       ? "border-primary bg-primary/5"
                       : "border-border hover:border-muted-foreground"
                   )}
                 >
                   <Checkbox
-                    checked={selectedPlatforms.includes(platform.id)}
+                    checked={workflowData.platforms.includes(platform.id)}
                     onCheckedChange={(checked) => {
                       if (checked) {
-                        setSelectedPlatforms([...selectedPlatforms, platform.id]);
+                        setWorkflowData((prev) => ({
+                          ...prev,
+                          platforms: [...prev.platforms, platform.id],
+                        }));
                       } else {
-                        setSelectedPlatforms(
-                          selectedPlatforms.filter((p) => p !== platform.id)
-                        );
+                        setWorkflowData((prev) => ({
+                          ...prev,
+                          platforms: prev.platforms.filter((p) => p !== platform.id),
+                        }));
                       }
                     }}
                   />
@@ -287,7 +323,17 @@ function ProductInfoStep({ onNext }: { onNext: () => void }) {
   );
 }
 
-function StyleTemplateStep({ onBack, onNext }: { onBack: () => void; onNext: () => void }) {
+function StyleTemplateStep({
+  onBack,
+  onNext,
+  workflowData,
+  setWorkflowData,
+}: {
+  onBack: () => void;
+  onNext: () => void;
+  workflowData: WorkflowData;
+  setWorkflowData: React.Dispatch<React.SetStateAction<WorkflowData>>;
+}) {
   const templates = [
     { id: "elegant", name: "简约自然", desc: "适合美妆护肤", icon: ShoppingBag },
     { id: "lifestyle", name: "生活场景", desc: "适合家居日用", icon: ShoppingBag },
@@ -299,7 +345,7 @@ function StyleTemplateStep({ onBack, onNext }: { onBack: () => void; onNext: () 
     { id: "festival", name: "节日氛围", desc: "适合节日促销", icon: ShoppingBag },
   ];
 
-  const [selected, setSelected] = useState<string[]>([]);
+  const selected = workflowData.selectedTemplates;
 
   return (
     <div className="flex flex-col h-full">
@@ -327,9 +373,17 @@ function StyleTemplateStep({ onBack, onNext }: { onBack: () => void; onNext: () 
                   key={template.id}
                   onClick={() => {
                     if (isSelected) {
-                      setSelected(selected.filter((s) => s !== template.id));
+                      setWorkflowData((prev) => ({
+                        ...prev,
+                        selectedTemplates: prev.selectedTemplates.filter(
+                          (s) => s !== template.id
+                        ),
+                      }));
                     } else {
-                      setSelected([...selected, template.id]);
+                      setWorkflowData((prev) => ({
+                        ...prev,
+                        selectedTemplates: [...prev.selectedTemplates, template.id],
+                      }));
                     }
                   }}
                   className={cn(
@@ -374,7 +428,13 @@ function StyleTemplateStep({ onBack, onNext }: { onBack: () => void; onNext: () 
   );
 }
 
-function GenerateAdjustStep({ onBack }: { onBack: () => void }) {
+function GenerateAdjustStep({
+  onBack,
+  workflowData,
+}: {
+  onBack: () => void;
+  workflowData: WorkflowData;
+}) {
   const [generating, setGenerating] = useState(false);
   const [results, setResults] = useState<{ id: string; name: string; status: string }[]>([]);
   const [taskId, setTaskId] = useState<string | null>(null);
@@ -385,8 +445,7 @@ function GenerateAdjustStep({ onBack }: { onBack: () => void }) {
       const res = await apiPost<{ success: boolean; task: { id: string } }>("/api/tasks", {
         type: "SCENE_GENERATION",
         inputData: JSON.stringify({
-          prompt: "生成商品场景图",
-          style: "elegant",
+          ...workflowData,
           count: 4,
         }),
         totalSteps: 4,
@@ -504,14 +563,41 @@ function GenerateAdjustStep({ onBack }: { onBack: () => void }) {
 
 export default function SceneWorkspacePage() {
   const [step, setStep] = useState<Step>(1);
+  const [workflowData, setWorkflowData] = useState<WorkflowData>({
+    productName: "",
+    productType: "",
+    targetAudience: "",
+    usageScene: "",
+    sellingPoints: "",
+    platforms: [],
+    selectedTemplates: [],
+  });
 
   return (
     <div className="h-screen flex flex-col bg-background">
       <TopNav />
       <StepBar currentStep={step} />
-      {step === 1 && <ProductInfoStep onNext={() => setStep(2)} />}
-      {step === 2 && <StyleTemplateStep onBack={() => setStep(1)} onNext={() => setStep(3)} />}
-      {step === 3 && <GenerateAdjustStep onBack={() => setStep(2)} />}
+      {step === 1 && (
+        <ProductInfoStep
+          onNext={() => setStep(2)}
+          workflowData={workflowData}
+          setWorkflowData={setWorkflowData}
+        />
+      )}
+      {step === 2 && (
+        <StyleTemplateStep
+          onBack={() => setStep(1)}
+          onNext={() => setStep(3)}
+          workflowData={workflowData}
+          setWorkflowData={setWorkflowData}
+        />
+      )}
+      {step === 3 && (
+        <GenerateAdjustStep
+          onBack={() => setStep(2)}
+          workflowData={workflowData}
+        />
+      )}
     </div>
   );
 }

@@ -9,6 +9,8 @@ import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import { useUpload } from "@/lib/use-upload";
 import { useImageProcess } from "@/lib/use-image-process";
+import { apiPost } from "@/lib/api-client";
+import { useToast } from "@/components/ui/use-toast";
 import {
   Image as ImageIcon,
   Wand2,
@@ -81,6 +83,16 @@ const TAB_TO_TYPE: Record<string, string> = {
   upscale: "enhance",
 };
 
+function mapTabToProcessType(tab: string): string {
+  const map: Record<string, string> = {
+    background: "BACKGROUND_REMOVAL",
+    "remove-bg": "BACKGROUND_REMOVAL",
+    outpaint: "OUTPAINT",
+    upscale: "UPSCALE",
+  };
+  return map[tab] || "BACKGROUND_REMOVAL";
+}
+
 export default function ToolboxPage() {
   const [activeTab, setActiveTab] = useState("background");
   const [batchMode, setBatchMode] = useState(false);
@@ -89,6 +101,7 @@ export default function ToolboxPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { upload, uploading } = useUpload();
   const { process: processImage, processing, result, error: processError, reset } = useImageProcess();
+  const { toast } = useToast();
 
   const handleFileSelect = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -138,6 +151,14 @@ export default function ToolboxPage() {
       });
       if (res.processedUrl || res.imageData) {
         setResultUrl(res.processedUrl || res.imageData || null);
+        await apiPost("/api/images", {
+          filename: `processed-${Date.now()}.png`,
+          originalUrl: imageUrl,
+          processedUrl: res.processedUrl || res.imageData,
+          processType: mapTabToProcessType(activeTab),
+          status: "COMPLETED",
+        });
+        toast({ title: "已保存到结果管理", description: "处理结果已自动保存" });
       }
     } catch {
       // error handled in hook
