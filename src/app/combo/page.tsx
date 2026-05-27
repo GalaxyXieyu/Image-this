@@ -152,11 +152,11 @@ function TopNav() {
           任务中心
         </Link>
         <Link
-          href="/assets"
+          href="/results"
           className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           style={{ fontFamily: "Geist, sans-serif" }}
         >
-          品牌资产
+          结果管理
         </Link>
       </nav>
     </header>

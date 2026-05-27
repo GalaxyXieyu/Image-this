@@ -35,8 +35,8 @@ function TopNav() {
         <Link href="/tasks" className="text-sm text-muted-foreground hover:text-foreground transition-colors" style={{ fontFamily: "Geist, sans-serif" }}>
           任务中心
         </Link>
-        <Link href="/assets" className="text-sm text-muted-foreground hover:text-foreground transition-colors" style={{ fontFamily: "Geist, sans-serif" }}>
-          品牌资产
+        <Link href="/results" className="text-sm text-muted-foreground hover:text-foreground transition-colors" style={{ fontFamily: "Geist, sans-serif" }}>
+          结果管理
         </Link>
       </nav>
     </header>

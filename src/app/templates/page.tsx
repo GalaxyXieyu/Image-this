@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, Suspense } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { WorkbenchShell } from "@/components/workbench/WorkbenchShell";
 import { WorkbenchTopNav } from "@/components/workbench/WorkbenchTopNav";
@@ -170,32 +171,36 @@ function TemplatesPageInner() {
       <WorkbenchTopNav
         title="模板库"
         rightContent={
-          <div className="flex items-center gap-4">
-            <span
-              className="text-sm text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+          <nav className="flex items-center gap-6">
+            <Link
+              href="/"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               style={{ fontFamily: "Geist, sans-serif" }}
             >
               首页
-            </span>
-            <span
+            </Link>
+            <Link
+              href="/templates"
               className="text-sm text-foreground font-medium"
               style={{ fontFamily: "Geist, sans-serif" }}
             >
               模板库
-            </span>
-            <span
-              className="text-sm text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+            </Link>
+            <Link
+              href="/tasks"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               style={{ fontFamily: "Geist, sans-serif" }}
             >
               任务中心
-            </span>
-            <span
-              className="text-sm text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+            </Link>
+            <Link
+              href="/results"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               style={{ fontFamily: "Geist, sans-serif" }}
             >
-              品牌资产
-            </span>
-          </div>
+              结果管理
+            </Link>
+          </nav>
         }
       />
       <div className="flex flex-1 overflow-hidden">
