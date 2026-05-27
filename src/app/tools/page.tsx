@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
+import { useUpload } from "@/lib/use-upload";
+import { useImageProcess } from "@/lib/use-image-process";
 import {
   Image as ImageIcon,
   Wand2,
@@ -15,6 +17,8 @@ import {
   Upload,
   Download,
   Sparkles,
+  Loader2,
+  X,
 } from "lucide-react";
 
 const TOOL_TABS = [
@@ -63,15 +67,82 @@ function TopNav() {
   );
 }
 
+const TAB_TO_TYPE: Record<string, string> = {
+  background: "background-replace",
+  "remove-bg": "background-replace",
+  outpaint: "outpaint",
+  upscale: "enhance",
+};
+
 export default function ToolboxPage() {
   const [activeTab, setActiveTab] = useState("background");
   const [batchMode, setBatchMode] = useState(false);
-  const [hasImage, setHasImage] = useState(false);
-  const [processing, setProcessing] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { upload, uploading } = useUpload();
+  const { process: processImage, processing, result, error: processError, reset } = useImageProcess();
 
-  const handleProcess = () => {
-    setProcessing(true);
-    setTimeout(() => setProcessing(false), 2000);
+  const handleFileSelect = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      reset();
+      setResultUrl(null);
+      try {
+        const res = await upload({ input: file });
+        if (res.inputAsset?.clientUrl) {
+          setImageUrl(res.inputAsset.clientUrl);
+        }
+      } catch {
+        // error handled in hook
+      }
+    },
+    [upload, reset]
+  );
+
+  const handleDrop = useCallback(
+    async (e: React.DragEvent) => {
+      e.preventDefault();
+      const file = e.dataTransfer.files?.[0];
+      if (!file) return;
+      reset();
+      setResultUrl(null);
+      try {
+        const res = await upload({ input: file });
+        if (res.inputAsset?.clientUrl) {
+          setImageUrl(res.inputAsset.clientUrl);
+        }
+      } catch {
+        // error handled in hook
+      }
+    },
+    [upload, reset]
+  );
+
+  const handleProcess = async () => {
+    if (!imageUrl) return;
+    reset();
+    const type = TAB_TO_TYPE[activeTab] as "background-replace" | "enhance" | "outpaint" | "watermark";
+    try {
+      const res = await processImage({
+        type,
+        imageUrl,
+      });
+      if (res.processedUrl || res.imageData) {
+        setResultUrl(res.processedUrl || res.imageData || null);
+      }
+    } catch {
+      // error handled in hook
+    }
+  };
+
+  const handleDownload = () => {
+    if (!resultUrl) return;
+    const a = document.createElement("a");
+    a.href = resultUrl;
+    a.download = `processed-${Date.now()}.png`;
+    a.click();
   };
 
   return (
@@ -140,29 +211,50 @@ export default function ToolboxPage() {
               >
                 上传图片
               </h3>
-              {!hasImage ? (
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+              {!imageUrl ? (
                 <div
                   className="border-2 border-dashed border-border rounded-xl p-8 flex flex-col items-center justify-center gap-3 hover:border-muted-foreground transition-colors cursor-pointer"
-                  onClick={() => setHasImage(true)}
+                  onClick={() => fileInputRef.current?.click()}
+                  onDrop={handleDrop}
+                  onDragOver={(e) => e.preventDefault()}
                 >
-                  <Upload className="w-8 h-8 text-muted-foreground" />
+                  {uploading ? (
+                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                  ) : (
+                    <Upload className="w-8 h-8 text-muted-foreground" />
+                  )}
                   <p
                     className="text-sm text-muted-foreground text-center"
                     style={{ fontFamily: "Geist, sans-serif" }}
                   >
-                    点击或拖拽上传图片
+                    {uploading ? "上传中..." : "点击或拖拽上传图片"}
                   </p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div className="aspect-square bg-muted rounded-lg flex items-center justify-center">
-                    <ImageIcon className="w-8 h-8 text-muted-foreground" />
+                  <div className="aspect-square bg-muted rounded-lg flex items-center justify-center overflow-hidden">
+                    <img
+                      src={imageUrl}
+                      alt="上传图片"
+                      className="w-full h-full object-contain"
+                    />
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
                     className="w-full"
-                    onClick={() => setHasImage(false)}
+                    onClick={() => {
+                      setImageUrl(null);
+                      setResultUrl(null);
+                      reset();
+                    }}
                   >
                     重新上传
                   </Button>
@@ -231,38 +323,34 @@ export default function ToolboxPage() {
         </aside>
 
         {/* Canvas */}
-        <main className="flex-1 bg-muted flex items-center justify-center p-8">
-          {!hasImage ? (
+        <main className="flex-1 bg-muted flex items-center justify-center p-8 overflow-auto">
+          {!imageUrl ? (
             <div className="text-center">
               <ImageIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <p
-                className="text-muted-foreground"
-                style={{ fontFamily: "Geist, sans-serif" }}
-              >
+              <p className="text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
                 请先上传图片
               </p>
             </div>
           ) : processing ? (
             <div className="text-center">
               <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-              <p
-                className="text-muted-foreground"
-                style={{ fontFamily: "Geist, sans-serif" }}
-              >
+              <p className="text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
                 处理中...
               </p>
             </div>
+          ) : resultUrl ? (
+            <div className="w-full max-w-2xl aspect-square bg-card rounded-xl border border-border overflow-hidden shadow-sm relative">
+              <img src={resultUrl} alt="处理结果" className="w-full h-full object-contain" />
+              <button
+                onClick={() => setResultUrl(null)}
+                className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           ) : (
-            <div className="w-full max-w-2xl aspect-square bg-card rounded-xl border border-border flex items-center justify-center shadow-sm">
-              <div className="text-center">
-                <Sparkles className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-                <p
-                  className="text-muted-foreground"
-                  style={{ fontFamily: "Geist, sans-serif" }}
-                >
-                  点击「应用效果」开始处理
-                </p>
-              </div>
+            <div className="w-full max-w-2xl aspect-square bg-card rounded-xl border border-border flex items-center justify-center shadow-sm relative overflow-hidden">
+              <img src={imageUrl} alt="原图" className="w-full h-full object-contain" />
             </div>
           )}
         </main>
@@ -302,22 +390,30 @@ export default function ToolboxPage() {
             <div className="pt-4 space-y-3">
               <Button
                 className="w-full bg-[#0066FF] hover:bg-[#0052CC] text-white"
-                disabled={!hasImage || processing}
+                disabled={!imageUrl || processing}
                 onClick={handleProcess}
                 style={{ fontFamily: "Inter, sans-serif" }}
               >
-                <Sparkles className="w-4 h-4 mr-2" />
-                应用效果
+                {processing ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4 mr-2" />
+                )}
+                {processing ? "处理中..." : "应用效果"}
               </Button>
               <Button
                 variant="outline"
                 className="w-full"
-                disabled={!hasImage}
+                disabled={!resultUrl}
+                onClick={handleDownload}
                 style={{ fontFamily: "Geist, sans-serif" }}
               >
                 <Download className="w-4 h-4 mr-2" />
                 下载
               </Button>
+              {processError && (
+                <p className="text-xs text-destructive text-center">{processError}</p>
+              )}
             </div>
           </div>
         </aside>
