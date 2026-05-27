@@ -172,27 +172,70 @@ export interface OneClickParams {
 // Template / Preset
 // ---------------------------------------------------------------------------
 
-/** Template preset for scene or tool configurations */
+/** Preset category matching the Pencil design sidebar */
+export type PresetCategory =
+  | 'all'
+  | 'listing'
+  | 'whitebg'
+  | 'scene'
+  | 'poster'
+  | 'video'
+  | 'image-process';
+
+/** Preset type: scene workflow, single tool, or combo */
+export type PresetType = 'scene' | 'tool' | 'combo';
+
+/** Tool type for tool presets */
+export type PresetToolType =
+  | 'background'
+  | 'watermark'
+  | 'upscale'
+  | 'outpaint'
+  | 'video';
+
+/** Template preset for scene, tool, or combo configurations */
 export interface TemplatePreset {
   id: string;
   name: string;
   description?: string;
-  category: TemplateCategory;
+  category: PresetCategory;
+  type: PresetType;
+  /** For tool presets: which tool */
+  toolType?: PresetToolType;
   thumbnailUrl?: string;
-  tags: string[];
-  /** For scene templates: product info defaults */
-  productInfo?: Partial<ProductInfo>;
-  /** For tool templates: parameter defaults */
-  toolParameters?: Partial<ToolParameters>;
-  /** Prompt template if applicable */
-  promptTemplate?: string;
-  isSystem: boolean;
-  isDefault: boolean;
+  /** Number of times this preset has been used */
   usageCount: number;
+  /** Semantic version */
+  version: string;
+  /** Tags for search/filter */
+  tags: string[];
+  /** Is a system preset (not user-created) */
+  isSystem: boolean;
+  /** Is the default preset for its category */
+  isDefault: boolean;
+  /** Preset parameters: scene draft or tool draft */
+  params: Partial<SceneWorkflowDraft> | Partial<ToolRunDraft>;
   createdAt: string;
   updatedAt: string;
 }
 
+/** Combo preset: groups multiple presets together */
+export interface ComboPreset {
+  id: string;
+  name: string;
+  description?: string;
+  /** Preset IDs included in this combo */
+  presetIds: string[];
+  thumbnailUrl?: string;
+  usageCount: number;
+  version: string;
+  tags: string[];
+  isSystem: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Legacy template category (for backward compat) */
 export type TemplateCategory =
   | 'scene'
   | 'background'
