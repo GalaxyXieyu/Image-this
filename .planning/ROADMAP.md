@@ -52,7 +52,11 @@ Plans:
 3. 系统预设可以 seed 或静态加载，后续可迁移到 DB。
 4. 从模板详情进入场景工作流或工具箱时能携带 preset。
 
-**Plans**: TBD after Phase 1
+**Plans**: 1 plan
+
+Plans:
+
+- [ ] 02-01: Template library and preset model
 
 ### Phase 3: Scene Image Guided Workflow
 
