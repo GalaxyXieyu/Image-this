@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { apiPost } from "@/lib/api-client";
 import {
   Settings,
   Trash2,
@@ -21,6 +22,7 @@ import {
   Droplets,
   Sparkles,
   ChevronRight,
+  Loader2,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -175,6 +177,37 @@ export default function ComboPage() {
   const [resolution, setResolution] = useState("1024x1024");
   const [watermarkEnabled, setWatermarkEnabled] = useState(true);
   const [autoRetry, setAutoRetry] = useState(true);
+  const [executing, setExecuting] = useState(false);
+
+  const typeToApiType: Record<StepType, string> = {
+    scene: "SCENE_GENERATION",
+    background: "BACKGROUND_REMOVAL",
+    upscale: "UPSCALE",
+    watermark: "WATERMARK",
+    outpaint: "OUTPAINT",
+  };
+
+  const handleExecute = async () => {
+    if (steps.length === 0) return;
+    setExecuting(true);
+    try {
+      const tasks = steps.map((step) => ({
+        type: typeToApiType[step.type],
+        inputData: JSON.stringify({
+          resolution,
+          watermarkEnabled,
+          autoRetry,
+          batchCount,
+          stepName: step.name,
+        }),
+        totalSteps: 1,
+      }));
+      await apiPost("/api/tasks", tasks);
+      window.location.href = "/tasks";
+    } catch {
+      setExecuting(false);
+    }
+  };
 
   /* ---- step helpers ---- */
   const addStep = () => {
@@ -578,9 +611,15 @@ export default function ComboPage() {
               <Button
                 className="w-full bg-[#0066FF] hover:bg-[#0052CC] text-white"
                 style={{ fontFamily: "Inter, sans-serif" }}
+                onClick={handleExecute}
+                disabled={executing || steps.length === 0}
               >
-                <Play className="w-4 h-4 mr-2" />
-                执行批量处理
+                {executing ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Play className="w-4 h-4 mr-2" />
+                )}
+                {executing ? "提交中..." : "执行批量处理"}
               </Button>
             </div>
           </div>
