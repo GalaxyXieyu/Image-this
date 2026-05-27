@@ -112,7 +112,7 @@ export default function FloatingTaskButton() {
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
           <Button 
-            className="h-14 w-14 rounded-full shadow-lg bg-orange-500 hover:bg-orange-600 text-white relative"
+            className="h-14 w-14 rounded-full shadow-lg bg-[#0066FF] hover:bg-[#0052CC] text-white relative"
             size="icon"
           >
             <ListTodo className="w-6 h-6" />
@@ -133,13 +133,13 @@ export default function FloatingTaskButton() {
               <h3 className="font-semibold text-gray-900">任务队列</h3>
               <div className="flex items-center gap-2 text-xs">
                 {stats.processing > 0 && (
-                  <Badge className="bg-blue-100 text-blue-700 border-blue-200">
+                  <Badge className="bg-blue-50 text-blue-600 border-blue-200">
                     <Loader className="w-3 h-3 mr-1 animate-spin" />
                     {stats.processing} 处理中
                   </Badge>
                 )}
                 {stats.pending > 0 && (
-                  <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">
+                  <Badge className="bg-amber-50 text-amber-600 border-amber-200">
                     <Clock className="w-3 h-3 mr-1" />
                     {stats.pending} 等待
                   </Badge>
@@ -205,7 +205,7 @@ export default function FloatingTaskButton() {
                       {/* 任务信息 */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <TaskIcon className="w-3.5 h-3.5 text-orange-500 flex-shrink-0" />
+                          <TaskIcon className="w-3.5 h-3.5 text-[#0066FF] flex-shrink-0" />
                           <span className="text-sm font-medium text-gray-900 truncate">
                             {taskTypeMap[task.type] || task.type}
                           </span>
@@ -220,7 +220,7 @@ export default function FloatingTaskButton() {
                           <div className="mt-1 flex items-center gap-1.5">
                             <div className="flex-1 bg-gray-200 rounded-full h-1">
                               <div 
-                                className="bg-orange-500 h-1 rounded-full transition-all duration-300"
+                                className="bg-[#0066FF] h-1 rounded-full transition-all duration-300"
                                 style={{ width: `${Math.max(task.progress, 5)}%` }}
                               />
                             </div>
@@ -237,10 +237,10 @@ export default function FloatingTaskButton() {
             {/* 底部操作 */}
             <div className="pt-2 border-t flex gap-2">
               <Button 
-                className="flex-1 bg-orange-500 hover:bg-orange-600" 
+                className="flex-1 bg-[#0066FF] hover:bg-[#0052CC]"
                 size="sm"
                 onClick={() => {
-                  window.location.href = '/history';
+                  window.location.href = '/tasks';
                   setIsOpen(false);
                 }}
               >

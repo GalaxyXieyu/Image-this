@@ -9,8 +9,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Imagine This - AI 图像处理平台",
-  description: "专业的 AI 图像处理平台，支持背景替换、图像扩展、高清化等功能。",
+  title: "AI 商品视觉工作台",
+  description: "专业的 AI 商品图像处理平台，支持场景图生成、背景替换、智能扩图、高清放大等功能。",
   icons: {
     icon: "/icon.png",
     shortcut: "/icon.png",
