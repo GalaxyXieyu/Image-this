@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { WorkbenchShell } from "@/components/workbench/WorkbenchShell";
 import { WorkbenchTopNav } from "@/components/workbench/WorkbenchTopNav";
@@ -10,7 +10,6 @@ import { TemplateDetailPanel } from "@/components/templates/TemplateDetailPanel"
 import {
   type TemplatePreset,
   type PresetCategory,
-  type PresetType,
 } from "@/types/workbench";
 import {
   ALL_PRESETS,
@@ -18,7 +17,6 @@ import {
   getPresetsByCategory,
   searchPresets,
   getPresetById,
-  PRESET_CATEGORY_LABELS,
 } from "@/lib/workbench/presets";
 import { Input } from "@/components/ui/input";
 import {
@@ -32,7 +30,7 @@ import { Search } from "lucide-react";
 
 type SortOption = "newest" | "popular";
 
-export default function TemplatesPage() {
+function TemplatesPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -252,5 +250,24 @@ export default function TemplatesPage() {
         />
       </div>
     </WorkbenchShell>
+  );
+}
+
+export default function TemplatesPage() {
+  return (
+    <Suspense fallback={
+      <WorkbenchShell>
+        <WorkbenchTopNav title="模板库" />
+        <div className="flex flex-1 overflow-hidden">
+          <aside className="w-[260px] h-full border-r border-border bg-muted shrink-0" />
+          <main className="flex-1 bg-background flex items-center justify-center">
+            <p className="text-muted-foreground">加载中...</p>
+          </main>
+          <aside className="w-[320px] h-full border-l border-border bg-card shrink-0" />
+        </div>
+      </WorkbenchShell>
+    }>
+      <TemplatesPageInner />
+    </Suspense>
   );
 }

@@ -10,9 +10,9 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import {
-  type PresetCategory,
   PRESET_CATEGORY_LABELS,
 } from "@/lib/workbench/presets";
+import { type PresetCategory } from "@/types/workbench";
 import { COMBO_PRESETS } from "@/lib/workbench/presets";
 import { LayoutGrid, Wand2, Image, Droplets, Expand, Zap, Video, FileImage } from "lucide-react";
 

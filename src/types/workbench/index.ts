@@ -100,7 +100,8 @@ export type ToolType =
   | 'watermark'
   | 'upscale'
   | 'outpaint'
-  | 'one_click';
+  | 'one_click'
+  | 'video_generation';
 
 export type ToolRunStatus =
   | 'draft'
@@ -116,7 +117,8 @@ export type ToolParameters =
   | WatermarkParams
   | UpscaleParams
   | OutpaintParams
-  | OneClickParams;
+  | OneClickParams
+  | VideoParams;
 
 export interface BackgroundReplaceParams {
   prompt: string;
@@ -164,6 +166,11 @@ export interface OneClickParams {
   yScale: number;
   upscaleFactor: number;
   watermarkParams?: WatermarkParams;
+  aiModel: string;
+  outputResolution: string;
+}
+
+export interface VideoParams {
   aiModel: string;
   outputResolution: string;
 }
@@ -462,10 +469,11 @@ export function buildLegacyInputData(
       });
     }
     case 'video_generation': {
-      // Video uses its own parameter shape; kept minimal for compatibility
+      const p = parameters as VideoParams;
       return JSON.stringify({
         ...base,
-        ...parameters,
+        aiModel: p.aiModel,
+        outputResolution: p.outputResolution,
       });
     }
     default:
