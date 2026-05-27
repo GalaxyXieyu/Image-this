@@ -1,13 +1,15 @@
 "use client";
 
+import { Suspense } from "react";
 import { WorkbenchShell } from "@/components/workbench/WorkbenchShell";
 import { WorkbenchTopNav } from "@/components/workbench/WorkbenchTopNav";
 import { WorkbenchSidebar } from "@/components/workbench/WorkbenchSidebar";
 import { WorkbenchCanvas } from "@/components/workbench/WorkbenchCanvas";
 import { WorkbenchDetailPanel } from "@/components/workbench/WorkbenchDetailPanel";
 import { WorkbenchActionBar } from "@/components/workbench/WorkbenchActionBar";
+import { PresetLoader } from "@/components/workbench/PresetLoader";
 
-export default function BackgroundToolPage() {
+function BackgroundToolPageInner() {
   return (
     <WorkbenchShell>
       <WorkbenchTopNav title="AI换背景" />
@@ -31,5 +33,22 @@ export default function BackgroundToolPage() {
         primaryAction={{ label: "开始处理", onClick: () => {} }}
       />
     </WorkbenchShell>
+  );
+}
+
+export default function BackgroundToolPage() {
+  return (
+    <Suspense fallback={
+      <WorkbenchShell>
+        <WorkbenchTopNav title="AI换背景" />
+        <div className="flex flex-1 items-center justify-center">
+          <p className="text-muted-foreground">加载中...</p>
+        </div>
+      </WorkbenchShell>
+    }>
+      <PresetLoader>
+        <BackgroundToolPageInner />
+      </PresetLoader>
+    </Suspense>
   );
 }
