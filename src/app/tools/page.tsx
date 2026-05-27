@@ -201,7 +201,7 @@ export default function ToolboxPage() {
                     <Label style={{ fontFamily: "Geist, sans-serif" }}>
                       自动优化
                     </Label>
-                    <Switch defaultChecked />
+                    <Switch checked={true} />
                   </div>
                 </div>
               )}

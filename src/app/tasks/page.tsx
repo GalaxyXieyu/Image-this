@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import { apiGet, apiDelete } from "@/lib/api-client";
 import {
   RefreshCw,
   MoreHorizontal,
@@ -14,6 +15,7 @@ import {
   RotateCcw,
   Trash2,
   Image as ImageIcon,
+  Loader2,
 } from "lucide-react";
 
 type TaskStatus = "pending" | "running" | "completed" | "failed";
@@ -29,57 +31,33 @@ interface Task {
   type: string;
 }
 
-const MOCK_TASKS: Task[] = [
-  {
-    id: "1",
-    name: "批量生成场景图 - 美妆护肤系列",
-    status: "completed",
-    progress: 100,
-    total: 12,
-    completed: 12,
-    createdAt: "2024-05-20 14:30",
-    type: "scene",
-  },
-  {
-    id: "2",
-    name: "智能抠图 - 食品饮料系列",
-    status: "running",
-    progress: 65,
-    total: 8,
-    completed: 5,
-    createdAt: "2024-05-20 15:00",
-    type: "remove-bg",
-  },
-  {
-    id: "3",
-    name: "高清放大 - 3C产品图",
-    status: "failed",
-    progress: 30,
-    total: 6,
-    completed: 2,
-    createdAt: "2024-05-20 13:00",
-    type: "upscale",
-  },
-  {
-    id: "4",
-    name: "AI换背景 - 家居用品系列",
-    status: "pending",
-    progress: 0,
-    total: 10,
-    completed: 0,
-    createdAt: "2024-05-20 16:00",
-    type: "background",
-  },
-  {
-    id: "5",
-    name: "批量生成场景图 - 服装服饰系列",
-    status: "running",
-    progress: 45,
-    total: 20,
-    completed: 9,
-    createdAt: "2024-05-20 14:00",
-    type: "scene",
-  },];
+function mapBackendStatus(status: string): TaskStatus {
+  switch (status) {
+    case "PENDING": return "pending";
+    case "PROCESSING": return "running";
+    case "COMPLETED": return "completed";
+    case "FAILED": return "failed";
+    default: return "pending";
+  }
+}
+
+function mapTaskType(type: string): string {
+  const map: Record<string, string> = {
+    BACKGROUND_REMOVAL: "AI换背景",
+    UPSCALE: "高清放大",
+    OUTPAINT: "扩图",
+    WATERMARK: "加水印",
+    VIDEO_GENERATION: "视频生成",
+    ONE_CLICK: "一键处理",
+    SCENE_GENERATION: "场景图生成",
+  };
+  return map[type] || type;
+}
+
+function formatDate(dateStr: string | Date): string {
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
 
 const TABS = [
   { id: "all", label: "全部" },
@@ -158,9 +136,86 @@ function StatusBadge({ status }: { status: TaskStatus }) {
   );
 }
 
+interface BackendTask {
+  id: string;
+  type: string;
+  status: string;
+  progress: number;
+  currentStep: string;
+  totalSteps: number;
+  completedSteps: number;
+  errorMessage: string | null;
+  createdAt: string;
+}
+
+interface TasksApiResponse {
+  success: boolean;
+  tasks: BackendTask[];
+  pagination: { total: number; limit: number; offset: number; hasMore: boolean };
+  stats: { pending: number; processing: number; completed: number; failed: number; total: number };
+}
+
 export default function TasksPage() {
   const [activeTab, setActiveTab] = useState("all");
-  const [tasks] = useState(MOCK_TASKS);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState({ pending: 0, running: 0, completed: 0, failed: 0, total: 0 });
+
+  const fetchTasks = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      if (activeTab !== "all") {
+        const statusMap: Record<string, string> = {
+          running: "PROCESSING",
+          completed: "COMPLETED",
+          failed: "FAILED",
+        };
+        if (statusMap[activeTab]) params.append("status", statusMap[activeTab]);
+      }
+      params.append("limit", "50");
+
+      const data = await apiGet<TasksApiResponse>(`/api/tasks?${params.toString()}`);
+      const mapped = data.tasks.map((t) => ({
+        id: t.id,
+        name: `${mapTaskType(t.type)} - ${t.currentStep || "处理中"}`,
+        status: mapBackendStatus(t.status),
+        progress: t.progress ?? 0,
+        total: t.totalSteps ?? 1,
+        completed: t.completedSteps ?? 0,
+        createdAt: formatDate(t.createdAt),
+        type: t.type,
+      }));
+      setTasks(mapped);
+      setStats({
+        pending: data.stats.pending,
+        running: data.stats.processing,
+        completed: data.stats.completed,
+        failed: data.stats.failed,
+        total: data.stats.total,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "加载失败");
+    } finally {
+      setLoading(false);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    fetchTasks();
+  }, [fetchTasks]);
+
+  const handleDelete = async (taskId: string) => {
+    if (!confirm("确定要删除这个任务吗？")) return;
+    try {
+      await apiDelete(`/api/tasks/${taskId}`);
+      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "删除失败");
+    }
+  };
 
   const filteredTasks = tasks.filter((task) => {
     if (activeTab === "all") return true;
@@ -168,48 +223,39 @@ export default function TasksPage() {
     return task.status === activeTab;
   });
 
+  const tabLabels = [
+    { id: "all", label: `全部 (${stats.total})` },
+    { id: "running", label: `进行中 (${stats.running + stats.pending})` },
+    { id: "completed", label: `已完成 (${stats.completed})` },
+    { id: "failed", label: `失败 (${stats.failed})` },
+  ];
+
   return (
-    <div className="h-screen flex flex-col bg-background"
-    >
+    <div className="h-screen flex flex-col bg-background">
       <TopNav />
 
       {/* Header */}
-      <div className="px-8 py-6 flex items-center justify-between shrink-0"
-      >
+      <div className="px-8 py-6 flex items-center justify-between shrink-0">
         <div>
-          <h1
-            className="text-xl font-semibold text-foreground"
-            style={{ fontFamily: "Inter, sans-serif" }}
-          >
+          <h1 className="text-xl font-semibold text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
             任务中心
           </h1>
-          <p
-            className="text-sm text-muted-foreground mt-0.5"
-            style={{ fontFamily: "Geist, sans-serif" }}
-          >
+          <p className="text-sm text-muted-foreground mt-0.5" style={{ fontFamily: "Geist, sans-serif" }}>
             查看和管理你的生成任务
           </p>
         </div>
-        <div className="flex items-center gap-3"
-        >
-          <Button variant="outline" size="sm"
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={fetchTasks} disabled={loading}>
+            <RefreshCw className={cn("w-4 h-4 mr-2", loading && "animate-spin")} />
             刷新
-          </Button>
-          <Button variant="outline" size="sm"
-          >
-            批量操作
           </Button>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="px-8 border-b border-border shrink-0"
-      >
-        <div className="flex gap-1"
-        >
-          {TABS.map((tab) => (
+      <div className="px-8 border-b border-border shrink-0">
+        <div className="flex gap-1">
+          {tabLabels.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -228,34 +274,47 @@ export default function TasksPage() {
       </div>
 
       {/* Task List */}
-      <div className="flex-1 overflow-auto p-8"
-      >
-        <div className="max-w-5xl mx-auto space-y-4"
-        >
+      <div className="flex-1 overflow-auto p-8">
+        <div className="max-w-5xl mx-auto space-y-4">
+          {loading && (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            </div>
+          )}
+
+          {error && (
+            <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-6 text-center">
+              <p className="text-sm text-destructive">{error}</p>
+              <Button variant="outline" size="sm" className="mt-3" onClick={fetchTasks}>
+                重试
+              </Button>
+            </div>
+          )}
+
+          {!loading && !error && filteredTasks.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+              <ImageIcon className="w-10 h-10 mb-3" />
+              <p className="text-sm" style={{ fontFamily: "Geist, sans-serif" }}>
+                暂无任务
+              </p>
+            </div>
+          )}
+
           {filteredTasks.map((task) => (
             <div
               key={task.id}
               className="rounded-xl border border-border bg-card p-5 hover:shadow-sm transition-shadow"
             >
-              <div className="flex items-start justify-between"
-              >
-                <div className="flex items-center gap-4"
-                >
-                  <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center"
-                  >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
                     <ImageIcon className="w-5 h-5 text-muted-foreground" />
                   </div>
                   <div>
-                    <h3
-                      className="text-sm font-medium text-foreground"
-                      style={{ fontFamily: "Inter, sans-serif" }}
-                    >
+                    <h3 className="text-sm font-medium text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
                       {task.name}
                     </h3>
-                    <p
-                      className="text-xs text-muted-foreground mt-0.5"
-                      style={{ fontFamily: "Geist, sans-serif" }}
-                    >
+                    <p className="text-xs text-muted-foreground mt-0.5" style={{ fontFamily: "Geist, sans-serif" }}>
                       {task.createdAt} · {task.completed}/{task.total} 张
                     </p>
                   </div>
@@ -263,21 +322,13 @@ export default function TasksPage() {
                 <StatusBadge status={task.status} />
               </div>
 
-              {task.status === "running" && (
-                <div className="mt-4"
-                >
-                  <div className="flex items-center justify-between mb-1.5"
-                  >
-                    <span
-                      className="text-xs text-muted-foreground"
-                      style={{ fontFamily: "Geist, sans-serif" }}
-                    >
+              {(task.status === "running" || task.status === "pending") && (
+                <div className="mt-4">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
                       进度 {task.progress}%
                     </span>
-                    <span
-                      className="text-xs text-muted-foreground"
-                      style={{ fontFamily: "Geist, sans-serif" }}
-                    >
+                    <span className="text-xs text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
                       {task.completed}/{task.total}
                     </span>
                   </div>
@@ -285,39 +336,23 @@ export default function TasksPage() {
                 </div>
               )}
 
-              <div className="flex items-center gap-2 mt-4 pt-4 border-t border-border"
-              >
-                {task.status === "running" && (
-                  <Button variant="ghost" size="sm"
-                  >
-                    <Pause className="w-4 h-4 mr-1.5" />
-                    暂停
-                  </Button>
-                )}
-                {task.status === "pending" && (
-                  <Button variant="ghost" size="sm"
-                  >
-                    <Play className="w-4 h-4 mr-1.5" />
-                    开始
-                  </Button>
-                )}
+              <div className="flex items-center gap-2 mt-4 pt-4 border-t border-border">
                 {task.status === "failed" && (
-                  <Button variant="ghost" size="sm"
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => alert("重试功能待实现")}>
                     <RotateCcw className="w-4 h-4 mr-1.5" />
                     重试
                   </Button>
                 )}
                 {task.status === "completed" && (
-                  <Button variant="ghost" size="sm" asChild
-                  >
-                    <Link href={`/results?task=${task.id}`}
-                    >
-                      查看结果
-                    </Link>
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link href={`/results?task=${task.id}`}>查看结果</Link>
                   </Button>
                 )}
-                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-destructive"
+                  onClick={() => handleDelete(task.id)}
                 >
                   <Trash2 className="w-4 h-4 mr-1.5" />
                   删除

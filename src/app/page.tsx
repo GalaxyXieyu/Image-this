@@ -5,13 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   ShoppingBag,
-  CropFree,
+  Scan,
   Image,
   Palette,
   Wrench,
   Users,
   Zap,
-  Storefront,
+  Store,
   CheckCircle,
   ArrowRight,
 } from "lucide-react";
@@ -94,7 +94,7 @@ function TrustBar() {
   const items = [
     { icon: Users, value: "10万+", label: "电商卖家信赖" },
     { icon: Zap, value: "5000万+", label: "素材已生成" },
-    { icon: Storefront, value: "6 大平台", label: "全平台适配" },
+    { icon: Store, value: "6 大平台", label: "全平台适配" },
     { icon: CheckCircle, value: "99.5%", label: "生成成功率" },
   ];
 
@@ -123,7 +123,7 @@ function TrustBar() {
 function QuickActions() {
   const actions = [
     { icon: ShoppingBag, title: "上架图生成", desc: "多平台适配" },
-    { icon: CropFree, title: "白底图", desc: "智能抠图" },
+    { icon: Scan, title: "白底图", desc: "智能抠图" },
     { icon: Image, title: "场景图", desc: "AI 合成场景" },
     { icon: Palette, title: "海报设计", desc: "营销海报" },
     { icon: Wrench, title: "智能工具箱", desc: "换背景/水印/组合" },
