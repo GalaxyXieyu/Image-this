@@ -28,11 +28,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import Navbar from '@/components/navigation/Navbar';
 import { DesktopUpdateCard } from '@/components/settings/DesktopUpdateCard';
 import { LogDiagnosticsCard } from '@/components/settings/LogDiagnosticsCard';
 import { Save, Key, Sparkles, User, Image, FileText, Plus, Edit, Trash2, Star, StarOff, Cpu, HardDrive, FolderOpen, Folder, RefreshCw, Search, ChevronsUpDown, SlidersHorizontal, FileSearch } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import Link from 'next/link';
 
 type SettingSection = 'models' | 'imagehosting' | 'runtime' | 'logs' | 'profile' | 'prompts' | 'updates';
 
@@ -154,7 +154,7 @@ function SearchableModelSelect({
         </div>
         <div className="max-h-60 overflow-y-auto py-1">
           {filtered.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-gray-500">无匹配模型</div>
+            <div className="px-3 py-2 text-sm text-muted-foreground">无匹配模型</div>
           ) : (
             filtered.map((option) => (
               <div
@@ -164,7 +164,7 @@ function SearchableModelSelect({
                   setOpen(false);
                   setSearch('');
                 }}
-                className={`cursor-pointer px-3 py-2 text-sm hover:bg-gray-100 ${value === option ? 'bg-gray-100 font-medium' : ''}`}
+                className={`cursor-pointer px-3 py-2 text-sm hover:bg-muted ${value === option ? 'bg-muted font-medium' : ''}`}
               >
                 {option}
               </div>
@@ -239,63 +239,63 @@ export default function SettingsPage() {
       label: 'AI模型配置', 
       subtitle: '文生图、图生图、扩图',
       icon: Cpu, 
-      color: 'text-pink-600',
-      bgColor: 'bg-pink-50',
-      borderColor: 'border-pink-500'
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-50',
+      borderColor: 'border-blue-500'
     },
-    { 
-      id: 'imagehosting' as SettingSection, 
-      label: '图床服务', 
+    {
+      id: 'imagehosting' as SettingSection,
+      label: '图床服务',
       subtitle: '图片存储和访问',
-      icon: Image, 
-      color: 'text-green-600',
-      bgColor: 'bg-green-50',
-      borderColor: 'border-green-500'
+      icon: Image,
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-50',
+      borderColor: 'border-blue-500'
     },
-    { 
-      id: 'prompts' as SettingSection, 
-      label: '提示词模板', 
+    {
+      id: 'prompts' as SettingSection,
+      label: '提示词模板',
       subtitle: '管理 AI 提示词',
-      icon: FileText, 
-      color: 'text-indigo-600',
-      bgColor: 'bg-indigo-50',
-      borderColor: 'border-indigo-500'
+      icon: FileText,
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-50',
+      borderColor: 'border-blue-500'
     },
     {
       id: 'runtime' as SettingSection,
       label: '后台任务',
       subtitle: '并发与队列',
       icon: SlidersHorizontal,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-50',
-      borderColor: 'border-orange-500'
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-50',
+      borderColor: 'border-blue-500'
     },
     {
       id: 'logs' as SettingSection,
       label: '日志诊断',
       subtitle: '查看与定位问题',
       icon: FileSearch,
-      color: 'text-amber-600',
-      bgColor: 'bg-amber-50',
-      borderColor: 'border-amber-500'
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-50',
+      borderColor: 'border-blue-500'
     },
-    { 
-      id: 'profile' as SettingSection, 
-      label: '用户信息', 
+    {
+      id: 'profile' as SettingSection,
+      label: '用户信息',
       subtitle: '查看账户信息',
-      icon: User, 
-      color: 'text-gray-600',
-      bgColor: 'bg-gray-50',
-      borderColor: 'border-gray-500'
+      icon: User,
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-50',
+      borderColor: 'border-blue-500'
     },
     {
       id: 'updates' as SettingSection,
       label: '应用更新',
       subtitle: '检查和安装新版本',
       icon: RefreshCw,
-      color: 'text-sky-600',
-      bgColor: 'bg-sky-50',
-      borderColor: 'border-sky-500'
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-50',
+      borderColor: 'border-blue-500'
     },
   ];
 
@@ -365,7 +365,7 @@ export default function SettingsPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">加载中...</p>
+          <p className="text-muted-foreground">加载中...</p>
         </div>
       </div>
     );
@@ -748,7 +748,7 @@ export default function SettingsPage() {
                 {renderInlineSaveButton()}
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="text-sm text-gray-500 mb-4">
+                <div className="text-sm text-muted-foreground mb-4">
                   支持：背景替换、图片生成
                 </div>
                 <div>
@@ -783,7 +783,7 @@ export default function SettingsPage() {
                       <RefreshCw className={`h-4 w-4 ${fetchingModels.gpt ? 'animate-spin' : ''}`} />
                     </Button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">选择模型或点击刷新获取列表</p>
+                  <p className="text-xs text-muted-foreground mt-1">选择模型或点击刷新获取列表</p>
                 </div>
                 <div>
                   <Label htmlFor="gptApiKey">API 密钥</Label>
@@ -808,7 +808,7 @@ export default function SettingsPage() {
                 {renderInlineSaveButton()}
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="text-sm text-gray-500 mb-4">
+                <div className="text-sm text-muted-foreground mb-4">
                   支持：图片生成、图片理解（即将推出）
                 </div>
                 <div>
@@ -834,7 +834,7 @@ export default function SettingsPage() {
                       <RefreshCw className={`h-4 w-4 ${fetchingModels.gemini ? 'animate-spin' : ''}`} />
                     </Button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">选择模型或点击刷新获取列表</p>
+                  <p className="text-xs text-muted-foreground mt-1">选择模型或点击刷新获取列表</p>
                 </div>
                 <div>
                   <Label htmlFor="geminiBaseUrl">API 地址</Label>
@@ -844,7 +844,7 @@ export default function SettingsPage() {
                     value={apiSettings.geminiBaseUrl}
                     onChange={(e) => handleInputChange('geminiBaseUrl', e.target.value)}
                   />
-                  <p className="text-xs text-gray-500 mt-1">例如 toapis 的基础地址 https://toapis.com</p>
+                  <p className="text-xs text-muted-foreground mt-1">例如 toapis 的基础地址 https://toapis.com</p>
                 </div>
                 <div>
                   <Label htmlFor="geminiApiKey">API 密钥</Label>
@@ -869,7 +869,7 @@ export default function SettingsPage() {
                 {renderInlineSaveButton()}
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="text-sm text-gray-500 mb-4">
+                <div className="text-sm text-muted-foreground mb-4">
                   支持：高质量图片生成、背景替换（Ark API 或 Legacy 视觉 API）
                 </div>
                 <div>
@@ -904,7 +904,7 @@ export default function SettingsPage() {
                       <RefreshCw className={`h-4 w-4 ${fetchingModels.jimeng ? 'animate-spin' : ''}`} />
                     </Button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">选择模型或点击刷新获取列表</p>
+                  <p className="text-xs text-muted-foreground mt-1">选择模型或点击刷新获取列表</p>
                 </div>
                 <div>
                   <Label htmlFor="arkApiKey">ARK API Key</Label>
@@ -915,12 +915,12 @@ export default function SettingsPage() {
                     value={apiSettings.arkApiKey}
                     onChange={(e) => handleInputChange('arkApiKey', e.target.value)}
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     推荐：使用火山引擎 Ark API，无需图床
                   </p>
                 </div>
                 <div className="border-t pt-4">
-                  <p className="text-xs text-gray-500 mb-2">Legacy 视觉 API（同时用于画质增强、扩图）</p>
+                  <p className="text-xs text-muted-foreground mb-2">Legacy 视觉 API（同时用于画质增强、扩图）</p>
                   <div>
                     <Label htmlFor="volcengineAccessKey">Access Key</Label>
                     <Input
@@ -958,7 +958,7 @@ export default function SettingsPage() {
                 {renderInlineSaveButton()}
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="text-sm text-gray-500 mb-4">
+                <div className="text-sm text-muted-foreground mb-4">
                   支持：Superbed 图床服务，用于存储和访问生成的图片
                 </div>
                 <div>
@@ -970,7 +970,7 @@ export default function SettingsPage() {
                     value={apiSettings.superbedToken}
                     onChange={(e) => handleInputChange('superbedToken', e.target.value)}
                   />
-                  <div className="text-xs text-gray-500 mt-1">
+                  <div className="text-xs text-muted-foreground mt-1">
                     访问 <a href="https://superbed.cn/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">superbed.cn</a> 获取 API Token
                   </div>
                 </div>
@@ -989,7 +989,7 @@ export default function SettingsPage() {
                 {renderInlineSaveButton()}
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="text-sm text-gray-500 mb-4">
+                <div className="text-sm text-muted-foreground mb-4">
                   配置图片本地保存路径，默认为应用目录下的 public/uploads/
                 </div>
                 <div>
@@ -1018,7 +1018,7 @@ export default function SettingsPage() {
                       浏览
                     </Button>
                   </div>
-                  <div className="text-xs text-gray-500 mt-2 space-y-1">
+                  <div className="text-xs text-muted-foreground mt-2 space-y-1">
                     <div>• 留空使用默认路径：public/uploads/</div>
                     <div>• 支持绝对路径：/Users/yourname/Pictures/ai-images</div>
                     <div>• 支持相对路径：./my-images（相对于项目根目录）</div>
@@ -1081,7 +1081,7 @@ export default function SettingsPage() {
             {isLoadingTemplates ? (
               <div className="text-center py-12">
                 <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p className="text-gray-600">加载中...</p>
+                <p className="text-muted-foreground">加载中...</p>
               </div>
             ) : filteredTemplates.length > 0 ? (
               <div className="grid gap-4 md:grid-cols-2">
@@ -1112,10 +1112,10 @@ export default function SettingsPage() {
                     </CardHeader>
                     <CardContent>
                       {template.description && (
-                        <p className="text-sm text-gray-600 mb-3">{template.description}</p>
+                        <p className="text-sm text-muted-foreground mb-3">{template.description}</p>
                       )}
-                      <div className="bg-gray-50 p-3 rounded-md border border-gray-200 mb-4">
-                        <p className="text-xs text-gray-700 line-clamp-3">{template.prompt}</p>
+                      <div className="bg-muted p-3 rounded-md border border-border mb-4">
+                        <p className="text-xs text-muted-foreground line-clamp-3">{template.prompt}</p>
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <Button
@@ -1163,8 +1163,8 @@ export default function SettingsPage() {
             ) : (
               <Card>
                 <CardContent className="text-center py-12">
-                  <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500 mb-4">暂无提示词模板</p>
+                  <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground mb-4">暂无提示词模板</p>
                   <Button onClick={() => setIsCreateDialogOpen(true)} className="gap-2">
                     <Plus className="w-4 h-4" />
                     创建第一个模板
@@ -1206,7 +1206,7 @@ export default function SettingsPage() {
                     }}
                     className="max-w-xs"
                   />
-                  <div className="text-xs text-gray-500 mt-2 space-y-1">
+                  <div className="text-xs text-muted-foreground mt-2 space-y-1">
                     <div>建议保持 1-2，避免触发大模型或图床限流。</div>
                     <div>修改后新触发的后台队列会按该值领取任务。</div>
                   </div>
@@ -1225,20 +1225,20 @@ export default function SettingsPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
-                  <User className="w-5 h-5 mr-2 text-gray-600" />
+                  <User className="w-5 h-5 mr-2 text-muted-foreground" />
                   用户信息
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
                   <Label>邮箱</Label>
-                  <div className="text-gray-700 bg-gray-50 px-3 py-2 rounded border">
+                  <div className="text-muted-foreground bg-muted px-3 py-2 rounded border">
                     {session.user?.email}
                   </div>
                 </div>
                 <div>
                   <Label>用户ID</Label>
-                  <div className="text-gray-700 bg-gray-50 px-3 py-2 rounded border font-mono text-sm">
+                  <div className="text-muted-foreground bg-muted px-3 py-2 rounded border font-mono text-sm">
                     {session.user?.id}
                   </div>
                 </div>
@@ -1257,20 +1257,62 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <Navbar />
-      
-      <div className="flex-1 px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* TopNav */}
+      <header className="h-14 border-b border-border bg-card flex items-center px-4 shrink-0">
+        <div className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-primary-foreground" />
+            </div>
+            <span className="font-semibold text-sm text-foreground">AI 商品视觉工作台</span>
+          </Link>
+          <span className="text-muted-foreground">/</span>
+          <span className="text-sm text-foreground font-medium">设置</span>
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          <Link
+            href="/"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            style={{ fontFamily: "Geist, sans-serif" }}
+          >
+            首页
+          </Link>
+          <Link
+            href="/templates"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            style={{ fontFamily: "Geist, sans-serif" }}
+          >
+            模板库
+          </Link>
+          <Link
+            href="/tasks"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            style={{ fontFamily: "Geist, sans-serif" }}
+          >
+            任务中心
+          </Link>
+          <Link
+            href="/results"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            style={{ fontFamily: "Geist, sans-serif" }}
+          >
+            结果管理
+          </Link>
+        </div>
+      </header>
+
+      <div className="flex-1 px-4 sm:px-6 lg:px-8 py-8 bg-background">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">设置</h1>
-          <p className="text-gray-600 mt-2">管理您的 AI 服务配置和账户信息</p>
+          <h1 className="text-3xl font-bold text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>设置</h1>
+          <p className="text-muted-foreground mt-2" style={{ fontFamily: "Geist, sans-serif" }}>管理您的 AI 服务配置和账户信息</p>
         </div>
 
         <div className="flex gap-6 h-[calc(100vh-12rem)]">
           {/* 左侧边栏 */}
           <aside className="w-72 flex-shrink-0">
             <div className="h-full">
-              <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden h-full flex flex-col">
+              <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden h-full flex flex-col">
                 <nav className="p-2 space-y-1 flex-1 overflow-y-auto">
                   {menuItems.map((item) => {
                     const Icon = item.icon;
@@ -1282,7 +1324,7 @@ export default function SettingsPage() {
                         className={`w-full flex items-start px-4 py-3.5 rounded-lg text-left transition-all duration-200 relative group ${
                           isActive
                             ? `${item.bgColor} ${item.color} font-medium`
-                            : 'text-gray-700 hover:bg-gray-50'
+                            : 'text-muted-foreground hover:bg-muted'
                         }`}
                       >
                         {/* 左侧高亮边框 */}
@@ -1290,13 +1332,13 @@ export default function SettingsPage() {
                           <div className={`absolute left-0 top-0 bottom-0 w-1 ${item.borderColor.replace('border-', 'bg-')} rounded-r-sm`}></div>
                         )}
                         
-                        <Icon className={`w-5 h-5 mr-3 mt-0.5 flex-shrink-0 ${isActive ? item.color : 'text-gray-400 group-hover:text-gray-600'}`} />
+                        <Icon className={`w-5 h-5 mr-3 mt-0.5 flex-shrink-0 ${isActive ? item.color : 'text-muted-foreground group-hover:text-muted-foreground'}`} />
                         
                         <div className="flex-1 min-w-0">
-                          <div className={`text-sm font-medium leading-tight ${isActive ? item.color : 'text-gray-900'}`}>
+                          <div className={`text-sm font-medium leading-tight ${isActive ? item.color : 'text-foreground'}`}>
                             {item.label}
                           </div>
-                          <div className={`text-xs mt-1 leading-tight ${isActive ? 'text-gray-600' : 'text-gray-500'}`}>
+                          <div className={`text-xs mt-1 leading-tight ${isActive ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
                             {item.subtitle}
                           </div>
                         </div>

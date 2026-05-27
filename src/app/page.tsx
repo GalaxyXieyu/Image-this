@@ -38,6 +38,13 @@ function TopNav() {
         <Link href="/results" className="text-sm text-muted-foreground hover:text-foreground transition-colors" style={{ fontFamily: "Geist, sans-serif" }}>
           结果管理
         </Link>
+        <Link
+          href="/settings"
+          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          style={{ fontFamily: "Geist, sans-serif" }}
+        >
+          设置
+        </Link>
       </nav>
     </header>
   );
