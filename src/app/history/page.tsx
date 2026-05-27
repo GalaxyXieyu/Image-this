@@ -1,6 +1,6 @@
- 'use client';
+'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { ChangeEvent, useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/navigation/Navbar';
@@ -100,8 +100,11 @@ interface Task {
   priority: number;
   totalSteps: number;
   completedSteps: number;
-  inputData: string;
+  inputData?: string;
   outputData?: string;
+  originalImageUrl?: string | null;
+  resultImageUrl?: string | null;
+  videoUrl?: string | null;
   errorMessage?: string;
   createdAt: string;
   updatedAt: string;
@@ -136,6 +139,7 @@ export default function TaskCenterPage() {
   const [filterScore, setFilterScore] = useState('all');
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
+  const [lastSelectedTaskId, setLastSelectedTaskId] = useState<string | null>(null);
   const [queueStats, setQueueStats] = useState({
     pending: 0,
     processing: 0,
@@ -252,9 +256,28 @@ export default function TaskCenterPage() {
 
       if (response.ok) {
         await fetchTasks();
+      } else {
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData?.details || errorData?.error || errorMessage;
+        } catch {
+          // ignore json parse failure
+        }
+
+        toast({
+          title: '后台处理器启动失败',
+          description: `请稍后重试：${errorMessage}`,
+          variant: 'destructive',
+        });
       }
     } catch (err) {
       console.error('触发任务处理器失败:', err);
+      toast({
+        title: '后台处理器启动失败',
+        description: err instanceof Error ? err.message : '无法连接后台处理器，请稍后重试',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -290,15 +313,39 @@ export default function TaskCenterPage() {
     setExpandedTasks(newExpanded);
   };
 
-  // 选择任务
-  const handleSelectTask = (taskId: string) => {
+  // 选择任务。支持 Shift 区间选择，以及 Ctrl/Command 累加选择。
+  const handleSelectTask = (taskId: string, event?: ChangeEvent<HTMLInputElement>) => {
     const newSelected = new Set(selectedTasks);
+    const isRangeSelection = Boolean((event?.nativeEvent as globalThis.MouseEvent | undefined)?.shiftKey);
+    const shouldSelect = event?.target.checked ?? !newSelected.has(taskId);
+
+    if (isRangeSelection && lastSelectedTaskId) {
+      const currentIndex = filteredTasks.findIndex(task => task.id === taskId);
+      const lastIndex = filteredTasks.findIndex(task => task.id === lastSelectedTaskId);
+
+      if (currentIndex !== -1 && lastIndex !== -1) {
+        const [start, end] = [currentIndex, lastIndex].sort((a, b) => a - b);
+        filteredTasks.slice(start, end + 1).forEach(task => {
+          if (shouldSelect) {
+            newSelected.add(task.id);
+          } else {
+            newSelected.delete(task.id);
+          }
+        });
+        setSelectedTasks(newSelected);
+        setLastSelectedTaskId(taskId);
+        return;
+      }
+    }
+
     if (newSelected.has(taskId)) {
       newSelected.delete(taskId);
     } else {
       newSelected.add(taskId);
     }
+
     setSelectedTasks(newSelected);
+    setLastSelectedTaskId(taskId);
   };
 
   // 获取任务类型显示名称
@@ -410,7 +457,7 @@ export default function TaskCenterPage() {
     }
   };
 
-  // 重试单个任务
+  // 重新运行单个任务
   const retryTask = async (taskId: string) => {
     try {
       const response = await fetch('/api/tasks/retry', {
@@ -438,14 +485,14 @@ export default function TaskCenterPage() {
       }
     } catch {
       toast({
-        title: "重试失败",
-        description: "重试任务时出现错误，请重试",
+        title: "重新运行失败",
+        description: "重新运行任务时出现错误，请重试",
         variant: "destructive",
       });
     }
   };
 
-  // 批量重试选中的任务
+  // 批量重新运行选中的任务
   const retrySelectedTasks = async () => {
     const retryableSelectedTasks = Array.from(selectedTasks).filter(taskId => {
       const task = tasks.find(t => t.id === taskId);
@@ -489,8 +536,8 @@ export default function TaskCenterPage() {
       }
     } catch {
       toast({
-        title: "重试失败",
-        description: "批量重试任务时出现错误，请重试",
+        title: "批量重新运行失败",
+        description: "批量重新运行任务时出现错误，请重试",
         variant: "destructive",
       });
     } finally {
@@ -510,6 +557,9 @@ export default function TaskCenterPage() {
 
   // 解析任务输入数据获取原图 URL
   const getOriginalImageUrl = (task: Task): string | null => {
+    if (task.originalImageUrl) {
+      return task.originalImageUrl;
+    }
     // 1. 优先从 processedImage 获取原图 URL（API 已返回此字段）
     if (task.processedImage?.originalUrl) {
       return task.processedImage.originalUrl;
@@ -518,7 +568,11 @@ export default function TaskCenterPage() {
     if (task.inputData) {
       try {
         const inputData = JSON.parse(task.inputData);
-        return inputData.imageUrl || inputData.originalUrl || inputData.sourceUrl || null;
+        return inputData.inputAsset?.clientUrl
+          || inputData.imageUrl
+          || inputData.originalUrl
+          || inputData.sourceUrl
+          || null;
       } catch {
         return null;
       }
@@ -528,6 +582,9 @@ export default function TaskCenterPage() {
 
   // 获取任务结果图 URL
   const getResultImageUrl = (task: Task): string | null => {
+    if (task.resultImageUrl) {
+      return task.resultImageUrl;
+    }
     // 1. 优先从关联的 processedImage 获取
     if (task.processedImage?.processedUrl) {
       return task.processedImage.processedUrl;
@@ -554,6 +611,9 @@ export default function TaskCenterPage() {
   // 获取视频任务的视频 URL
   const getVideoUrl = (task: Task): string | null => {
     if (task.type !== 'VIDEO_GENERATION') return null;
+    if (task.videoUrl) {
+      return task.videoUrl;
+    }
     if (task.outputData) {
       try {
         const outputData = JSON.parse(task.outputData);
@@ -565,7 +625,7 @@ export default function TaskCenterPage() {
     return null;
   };
 
-  // 检查选中任务中是否有可重新运行的（包括已完成的）
+  // 检查选中任务中是否有可重新运行的（失败、取消、已完成都可以重新跑）
   const hasRetryableTasks = Array.from(selectedTasks).some(taskId => {
     const task = tasks.find(t => t.id === taskId);
     return task && (task.status === 'FAILED' || task.status === 'CANCELLED' || task.status === 'COMPLETED');
@@ -624,8 +684,10 @@ export default function TaskCenterPage() {
   const toggleSelectAll = () => {
     if (selectedTasks.size === filteredTasks.length) {
       setSelectedTasks(new Set());
+      setLastSelectedTaskId(null);
     } else {
       setSelectedTasks(new Set(filteredTasks.map(task => task.id)));
+      setLastSelectedTaskId(filteredTasks[0]?.id || null);
     }
   };
 
@@ -732,7 +794,7 @@ export default function TaskCenterPage() {
                   ) : (
                     <RotateCcw className="w-4 h-4 mr-1.5" />
                   )}
-                  重跑 ({Array.from(selectedTasks).filter(id => {
+                  重新运行 ({Array.from(selectedTasks).filter(id => {
                     const t = tasks.find(task => task.id === id);
                     return t && (t.status === 'FAILED' || t.status === 'CANCELLED' || t.status === 'COMPLETED');
                   }).length})
@@ -830,7 +892,7 @@ export default function TaskCenterPage() {
                         <input
                           type="checkbox"
                           checked={selectedTasks.has(task.id)}
-                          onChange={() => handleSelectTask(task.id)}
+                          onChange={(event) => handleSelectTask(task.id, event)}
                           className="w-4 h-4 text-orange-600 rounded border-gray-300"
                         />
                       </div>
@@ -994,7 +1056,7 @@ export default function TaskCenterPage() {
                               size="sm"
                               onClick={() => retryTask(task.id)}
                               className="h-7 w-7 p-0 hover:bg-orange-50 text-orange-600"
-                              title="重新运行任务"
+                              title="重新运行这个任务"
                             >
                               <RotateCcw className="w-3.5 h-3.5" />
                             </Button>

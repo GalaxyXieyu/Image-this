@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { checkImageExists } from '@/lib/storage';
+import { checkImageExists, deleteImage } from '@/lib/storage';
 import { normalizeImageUrlForClient } from '@/lib/image-url';
 
 // 图片查询结果类型
@@ -24,6 +24,11 @@ interface ImageQueryResult {
     id: string;
     name: string;
   } | null;
+  taskQueue?: {
+    id: string;
+    status: string;
+    type: string;
+  }[];
 }
 
 // 获取用户的图片列表
@@ -114,6 +119,15 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             name: true
+          }
+        },
+        taskQueue: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            status: true,
+            type: true
           }
         }
       }
@@ -335,6 +349,30 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    const deleteImageFiles = async (imagesToDelete: { originalUrl: string | null; processedUrl: string | null; thumbnailUrl: string | null }[]) => {
+      const extractFilename = (url: string): string | null => {
+        try {
+          return url.startsWith('/') ? url.substring(1) : url;
+        } catch {
+          return url;
+        }
+      };
+
+      for (const image of imagesToDelete) {
+        for (const url of [image.originalUrl, image.processedUrl, image.thumbnailUrl]) {
+          if (!url) continue;
+          try {
+            const filename = extractFilename(url);
+            if (filename) {
+              await deleteImage(filename, session.user.id);
+            }
+          } catch (deleteError) {
+            console.error('删除图片文件失败:', deleteError);
+          }
+        }
+      }
+    };
+
     let result;
 
     switch (action) {
@@ -369,6 +407,7 @@ export async function PATCH(request: NextRequest) {
       }
 
       case 'delete': {
+        await deleteImageFiles(images);
         result = await prisma.processedImage.deleteMany({
           where: {
             id: { in: imageIds },

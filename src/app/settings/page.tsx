@@ -30,10 +30,11 @@ import {
 } from '@/components/ui/dialog';
 import Navbar from '@/components/navigation/Navbar';
 import { DesktopUpdateCard } from '@/components/settings/DesktopUpdateCard';
-import { Save, Key, Sparkles, User, Image, FileText, Plus, Edit, Trash2, Star, StarOff, Cpu, HardDrive, FolderOpen, Folder, RefreshCw, Search, ChevronsUpDown } from 'lucide-react';
+import { LogDiagnosticsCard } from '@/components/settings/LogDiagnosticsCard';
+import { Save, Key, Sparkles, User, Image, FileText, Plus, Edit, Trash2, Star, StarOff, Cpu, HardDrive, FolderOpen, Folder, RefreshCw, Search, ChevronsUpDown, SlidersHorizontal, FileSearch } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
-type SettingSection = 'models' | 'imagehosting' | 'profile' | 'prompts' | 'updates';
+type SettingSection = 'models' | 'imagehosting' | 'runtime' | 'logs' | 'profile' | 'prompts' | 'updates';
 
 interface PromptTemplate {
   id: string;
@@ -216,7 +217,9 @@ export default function SettingsPage() {
     // 图床配置
     superbedToken: '',
     // 本地存储配置
-    localStoragePath: ''
+    localStoragePath: '',
+    // 后台任务配置
+    taskConcurrency: 2
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -230,7 +233,6 @@ export default function SettingsPage() {
     gemini: false,
     jimeng: false,
   });
-
   const menuItems = [
     { 
       id: 'models' as SettingSection, 
@@ -258,6 +260,24 @@ export default function SettingsPage() {
       color: 'text-indigo-600',
       bgColor: 'bg-indigo-50',
       borderColor: 'border-indigo-500'
+    },
+    {
+      id: 'runtime' as SettingSection,
+      label: '后台任务',
+      subtitle: '并发与队列',
+      icon: SlidersHorizontal,
+      color: 'text-orange-600',
+      bgColor: 'bg-orange-50',
+      borderColor: 'border-orange-500'
+    },
+    {
+      id: 'logs' as SettingSection,
+      label: '日志诊断',
+      subtitle: '查看与定位问题',
+      icon: FileSearch,
+      color: 'text-amber-600',
+      bgColor: 'bg-amber-50',
+      borderColor: 'border-amber-500'
     },
     { 
       id: 'profile' as SettingSection, 
@@ -328,7 +348,8 @@ export default function SettingsPage() {
               jimengBaseUrl: data.config.jimeng?.baseUrl || 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
               jimengModelName: data.config.jimeng?.modelName || 'seedream-4.5',
               superbedToken: data.config.imagehosting?.superbedToken || '',
-              localStoragePath: data.config.localStorage?.savePath || ''
+              localStoragePath: data.config.localStorage?.savePath || '',
+              taskConcurrency: data.config.taskRuntime?.concurrency || 2
             });
           }
         }
@@ -390,6 +411,9 @@ export default function SettingsPage() {
         },
         localStorage: {
           savePath: apiSettings.localStoragePath
+        },
+        taskRuntime: {
+          concurrency: Number(apiSettings.taskConcurrency) || 2
         }
       };
       
@@ -412,7 +436,7 @@ export default function SettingsPage() {
     }
   };
 
-  const handleInputChange = (field: string, value: string | boolean) => {
+  const handleInputChange = (field: string, value: string | number | boolean) => {
     setApiSettings(prev => ({
       ...prev,
       [field]: value
@@ -1151,6 +1175,50 @@ export default function SettingsPage() {
           </div>
         );
 
+      case 'runtime':
+        return (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader className="flex flex-row items-start justify-between space-y-0">
+                <div>
+                  <CardTitle className="flex items-center">
+                    <SlidersHorizontal className="w-5 h-5 mr-2 text-orange-600" />
+                    后台任务并发
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    控制同时调用大模型、视频和图床服务的任务数量
+                  </CardDescription>
+                </div>
+                {renderInlineSaveButton()}
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="taskConcurrency">最大并发任务数</Label>
+                  <Input
+                    id="taskConcurrency"
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={apiSettings.taskConcurrency}
+                    onChange={(e) => {
+                      const value = Math.max(1, Math.min(10, Number(e.target.value) || 1));
+                      handleInputChange('taskConcurrency', value);
+                    }}
+                    className="max-w-xs"
+                  />
+                  <div className="text-xs text-gray-500 mt-2 space-y-1">
+                    <div>建议保持 1-2，避免触发大模型或图床限流。</div>
+                    <div>修改后新触发的后台队列会按该值领取任务。</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+
+      case 'logs':
+        return <LogDiagnosticsCard />;
+
       case 'profile':
         return (
           <div className="space-y-6">
@@ -1245,7 +1313,7 @@ export default function SettingsPage() {
             {renderContent()}
 
             {/* 保存按钮 */}
-            {activeSection !== 'profile' && activeSection !== 'prompts' && activeSection !== 'updates' && (
+            {activeSection !== 'profile' && activeSection !== 'prompts' && activeSection !== 'updates' && activeSection !== 'runtime' && (
               <div className="flex justify-end">
                 <Button 
                   onClick={handleSave} 

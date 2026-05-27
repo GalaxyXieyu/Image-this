@@ -128,8 +128,7 @@ export class VolcengineProcessor implements IImageProcessor {
         const imageUrl = await this.uploadToImageHost(dataUrl, superbedToken);
         requestBody = this.buildOutpaintRequest(imageUrl, prompt, top, bottom, left, right, maxHeight, maxWidth, false);
       } else if (isBase64DataUrl(imageInput)) {
-        // base64：可以直接使用或上传
-        const cleanBase64 = extractBase64FromDataUrl(imageInput);
+        const cleanBase64 = await this.normalizeOutpaintBase64(imageInput);
         requestBody = this.buildOutpaintRequest(cleanBase64, prompt, top, bottom, left, right, maxHeight, maxWidth, true);
       } else {
         // URL：直接使用
@@ -217,6 +216,38 @@ export class VolcengineProcessor implements IImageProcessor {
     }
   }
 
+  private async normalizeOutpaintBase64(imageInput: string): Promise<string> {
+    const rawBase64 = extractBase64FromDataUrl(imageInput).trim();
+    if (!rawBase64) {
+      throw new Error('VOLCENGINE_INVALID_IMAGE_DATA: 扩图输入图片为空，无法提交给火山引擎');
+    }
+
+    try {
+      const sharp = (await import('sharp')).default;
+      const imageBuffer = Buffer.from(rawBase64, 'base64');
+      const metadata = await sharp(imageBuffer).metadata();
+
+      if (!metadata.width || !metadata.height) {
+        throw new Error('图片宽高解析失败');
+      }
+
+      const normalizedBuffer = await sharp(imageBuffer)
+        .rotate()
+        .flatten({ background: '#ffffff' })
+        .jpeg({ quality: 95, mozjpeg: true })
+        .toBuffer();
+
+      console.log(
+        `[Volcengine Processor] 扩图输入已规范化: ${metadata.format || 'unknown'} ${metadata.width}x${metadata.height}, ${Math.round(normalizedBuffer.length / 1024)}KB JPEG`
+      );
+
+      return normalizedBuffer.toString('base64');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '未知错误';
+      throw new Error(`VOLCENGINE_INVALID_IMAGE_DATA: 扩图输入图片无法解码或格式不支持，请换一张 JPG/PNG 图片重试。原始错误：${message}`);
+    }
+  }
+
   /**
    * 上传图片到图床
    */
@@ -228,16 +259,11 @@ export class VolcengineProcessor implements IImageProcessor {
       console.log(`[Volcengine Processor] 图片已上传到图床: ${publicUrl.substring(0, 50)}...`);
       return publicUrl;
     } catch (error) {
-      console.error('[Volcengine Processor] 图床上传失败，尝试使用本地存储:', error);
-      // 如果图床上传失败，尝试保存到本地并返回公网 URL
-      const { uploadBase64Image } = await import('@/lib/storage');
-      const localPath = await uploadBase64Image(dataUrl, `volcengine-temp-${Date.now()}.jpg`);
-      
-      // 构造完整的公网 URL
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL || 'http://localhost:3000';
-      const fullUrl = `${baseUrl}${localPath}`;
-      console.log(`[Volcengine Processor] 使用本地存储: ${fullUrl}`);
-      return fullUrl;
+      const message = error instanceof Error ? error.message : '未知错误';
+      console.error('[Volcengine Processor] 图床上传失败，无法继续调用火山引擎:', message);
+      throw new Error(
+        `VOLCENGINE_PUBLIC_IMAGE_URL_REQUIRED: 火山引擎需要能从公网下载输入图片。请在设置页配置有效的 Superbed Token；本地 localhost 或 /api/files 图片无法被火山引擎访问。原始错误：${message}`
+      );
     }
   }
 }

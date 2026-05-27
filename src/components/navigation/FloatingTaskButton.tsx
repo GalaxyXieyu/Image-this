@@ -21,12 +21,10 @@ interface Task {
   status: string;
   progress: number;
   currentStep: string;
-  inputData: string;
-  outputData?: string;
   createdAt: string;
-  processedImage?: {
-    processedUrl: string;
-  };
+  originalImageUrl?: string | null;
+  resultImageUrl?: string | null;
+  videoUrl?: string | null;
 }
 
 // 任务类型映射
@@ -76,7 +74,7 @@ export default function FloatingTaskButton() {
         }
         
         // 获取最近任务列表
-        const tasksRes = await fetch('/api/tasks?limit=5&offset=0', {
+        const tasksRes = await fetch('/api/tasks/recent', {
           signal: AbortSignal.timeout(3000)
         });
         if (tasksRes.ok) {
@@ -103,46 +101,6 @@ export default function FloatingTaskButton() {
   }, [isOpen]);
 
   const hasActiveTasks = stats.pending > 0 || stats.processing > 0;
-
-  // 获取原图URL
-  const getOriginalImageUrl = (task: Task): string | null => {
-    try {
-      const inputData = JSON.parse(task.inputData);
-      return inputData.imageUrl || null;
-    } catch {
-      return null;
-    }
-  };
-
-  // 获取结果图URL
-  const getResultImageUrl = (task: Task): string | null => {
-    if (task.processedImage?.processedUrl) {
-      return task.processedImage.processedUrl;
-    }
-    if (task.outputData) {
-      try {
-        const outputData = JSON.parse(task.outputData);
-        return outputData.processedImageUrl || outputData.processedUrl || outputData.imageUrl || null;
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  };
-
-  // 获取视频URL
-  const getVideoUrl = (task: Task): string | null => {
-    if (task.type !== 'VIDEO_GENERATION') return null;
-    if (task.outputData) {
-      try {
-        const outputData = JSON.parse(task.outputData);
-        return outputData.videoUrl || null;
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  };
 
   // 只在登录状态下显示
   if (!session) {
@@ -199,9 +157,9 @@ export default function FloatingTaskButton() {
               ) : (
                 tasks.map((task) => {
                   const TaskIcon = taskTypeIcons[task.type] || ListTodo;
-                  const originalUrl = getOriginalImageUrl(task);
-                  const resultUrl = getResultImageUrl(task);
-                  const videoUrl = getVideoUrl(task);
+                  const originalUrl = task.originalImageUrl || null;
+                  const resultUrl = task.resultImageUrl || null;
+                  const videoUrl = task.videoUrl || null;
                   const isVideoTask = task.type === 'VIDEO_GENERATION';
                   const displayUrl = isVideoTask ? (videoUrl || originalUrl) : (resultUrl || originalUrl);
 

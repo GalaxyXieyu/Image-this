@@ -38,6 +38,10 @@ const USER_COLUMN_PATCHES = [
     name: 'hasJimengCredentials',
     sql: `ALTER TABLE "users" ADD COLUMN "hasJimengCredentials" BOOLEAN NOT NULL DEFAULT false`,
   },
+  {
+    name: 'taskConcurrency',
+    sql: `ALTER TABLE "users" ADD COLUMN "taskConcurrency" INTEGER NOT NULL DEFAULT 2`,
+  },
 ];
 
 function ensureDirectory(dirPath) {
@@ -221,6 +225,13 @@ function runSqlMigrations(app, dbPath, log) {
       }
 
       const migrationSql = fs.readFileSync(migration.filePath, 'utf8');
+      if (isMigrationAlreadySatisfied(database, migrationSql)) {
+        markMigrationApplied(database, migration.name, migrationSql);
+        appliedNames.add(migration.name);
+        log(`Marked already-satisfied desktop migration as applied: ${migration.name}`);
+        continue;
+      }
+
       log(`Applying desktop migration: ${migration.name}`);
       database.exec('BEGIN');
       try {
@@ -235,6 +246,44 @@ function runSqlMigrations(app, dbPath, log) {
   } finally {
     database.close();
   }
+}
+
+function isMigrationAlreadySatisfied(database, migrationSql) {
+  const addColumnStatements = migrationSql
+    .split(';')
+    .map((statement) => statement.trim())
+    .filter(Boolean)
+    .map(parseAddColumnStatement);
+
+  if (addColumnStatements.length === 0 || addColumnStatements.some((statement) => !statement)) {
+    return false;
+  }
+
+  return addColumnStatements.every(({ tableName, columnName }) => {
+    const existingColumns = new Set(
+      database
+        .prepare(`PRAGMA table_info("${tableName.replace(/"/g, '""')}")`)
+        .all()
+        .map((column) => column.name)
+    );
+
+    return existingColumns.has(columnName);
+  });
+}
+
+function parseAddColumnStatement(statement) {
+  const matched = statement.match(
+    /^ALTER\s+TABLE\s+"?([^"\s]+)"?\s+ADD\s+COLUMN\s+"?([^"\s]+)"?/i
+  );
+
+  if (!matched) {
+    return null;
+  }
+
+  return {
+    tableName: matched[1],
+    columnName: matched[2],
+  };
 }
 
 function migrateLegacySecrets(app, dbPath, log) {
@@ -374,6 +423,20 @@ function patchUserSchemaColumns(dbPath, log) {
   }
 }
 
+function applyDesktopPragmas(dbPath, log) {
+  const database = new DatabaseSync(dbPath);
+
+  try {
+    const journalMode = database.prepare('PRAGMA journal_mode = WAL').get();
+    database.exec('PRAGMA synchronous = NORMAL');
+    database.exec('PRAGMA temp_store = MEMORY');
+    database.exec('PRAGMA foreign_keys = ON');
+    log(`Applied desktop SQLite pragmas (journal_mode=${journalMode?.journal_mode || 'WAL'})`);
+  } finally {
+    database.close();
+  }
+}
+
 async function ensureDesktopDatabaseReady(app, log) {
   const { dataDir, configDir, dbPath, backupDir } = getUserDataPaths(app);
   ensureDirectory(dataDir);
@@ -400,6 +463,7 @@ async function ensureDesktopDatabaseReady(app, log) {
   runSqlMigrations(app, dbPath, log);
   patchUserSchemaColumns(dbPath, log);
   migrateLegacySecrets(app, dbPath, log);
+  applyDesktopPragmas(dbPath, log);
 
   return dbPath;
 }

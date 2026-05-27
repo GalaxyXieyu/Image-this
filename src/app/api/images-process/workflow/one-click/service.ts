@@ -5,6 +5,14 @@ import { processWithGemini, processWithGPT, processWithJimeng, outpaintWithVolce
 const DEFAULT_BACKGROUND_PROMPT = '保持第一张图的产品主体完全不变，仅替换第二张图的背景为类似参考场景的风格（要完全把第二张图的产品去掉），不要有同时出现的情况，保持第一张产品的形状、材质、特征比例、摆放角度及数量完全一致，专业摄影，高质量，4K分辨率';
 const DEFAULT_OUTPAINT_PROMPT = '扩展图像，保持产品主体和风格完全一致，自然延伸背景';
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function stopWorkflow(stepName: string, error: unknown): never {
+  throw new Error(`${stepName}失败，已停止后续步骤：${getErrorMessage(error)}`);
+}
+
 export interface OneClickWorkflowParams {
   imageUrl: string;
   referenceImageUrl?: string;
@@ -181,8 +189,9 @@ export async function executeOneClickWorkflow(
           throw new Error('背景替换返回结果为空');
         }
       } catch (error) {
-        console.error('背景替换失败，继续使用原图:', error);
-        stepErrors.backgroundReplace = error instanceof Error ? error.message : String(error);
+        console.error('背景替换失败，停止一键增强流程:', error);
+        stepErrors.backgroundReplace = getErrorMessage(error);
+        stopWorkflow('背景替换', error);
       }
     } else {
       console.log('=== 跳过背景替换步骤 ===');
@@ -222,8 +231,9 @@ export async function executeOneClickWorkflow(
         const outpaintDuration = ((Date.now() - outpaintStartTime) / 1000).toFixed(2);
         console.log(`扩图处理完成，图片大小: ${Math.round(result.imageSize / 1024)}KB, 耗时: ${outpaintDuration}秒`);
       } catch (error) {
-        console.error('扩图失败，继续使用当前图片:', error);
-        stepErrors.outpaint = error instanceof Error ? error.message : String(error);
+        console.error('扩图失败，停止一键增强流程:', error);
+        stepErrors.outpaint = getErrorMessage(error);
+        stopWorkflow('扩图', error);
       }
     } else {
       console.log('=== 跳过扩图步骤 ===');
@@ -252,8 +262,9 @@ export async function executeOneClickWorkflow(
         const enhanceDuration = ((Date.now() - enhanceStartTime) / 1000).toFixed(2);
         console.log(`智能画质增强完成 (${aiModel})，耗时: ${enhanceDuration}秒`);
       } catch (error) {
-        console.error('智能画质增强失败，继续使用当前图片:', error);
-        stepErrors.upscale = error instanceof Error ? error.message : String(error);
+        console.error('智能画质增强失败，停止一键增强流程:', error);
+        stepErrors.upscale = getErrorMessage(error);
+        stopWorkflow('智能画质增强', error);
       }
     } else {
       console.log('=== 跳过智能画质增强步骤 ===');
@@ -277,8 +288,9 @@ export async function executeOneClickWorkflow(
         });
         console.log('水印添加完成');
       } catch (error) {
-        console.error('水印添加失败，继续使用当前图片:', error);
-        stepErrors.watermark = error instanceof Error ? error.message : String(error);
+        console.error('水印添加失败，停止一键增强流程:', error);
+        stepErrors.watermark = getErrorMessage(error);
+        stopWorkflow('水印添加', error);
       }
     } else {
       console.log('=== 跳过水印步骤 ===');
@@ -309,7 +321,8 @@ export async function executeOneClickWorkflow(
         console.log(`视频生成任务已提交，任务ID: ${videoTaskId}，耗时: ${videoDuration}秒`);
       } catch (error) {
         console.error('视频生成失败:', error);
-        stepErrors.video = error instanceof Error ? error.message : String(error);
+        stepErrors.video = getErrorMessage(error);
+        stopWorkflow('视频生成', error);
       }
     } else {
       console.log('=== 跳过视频生成步骤 ===');

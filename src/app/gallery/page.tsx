@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { ChangeEvent, MouseEvent, useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { LazyImage } from '@/components/ui/lazy-image';
@@ -62,6 +62,11 @@ interface ProcessedImage {
     id: string;
     name: string;
   };
+  taskQueue?: {
+    id: string;
+    status: string;
+    type: string;
+  }[];
 }
 
 
@@ -81,6 +86,8 @@ export default function GalleryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
   const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [lastSelectedImageId, setLastSelectedImageId] = useState<string | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
   const [dragOverProject, setDragOverProject] = useState<string | null>(null);
   const [contextMenuProject, setContextMenuProject] = useState<string | null>(null);
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
@@ -362,23 +369,53 @@ export default function GalleryPage() {
   }, [contextMenuProject]);
 
   // 批量操作函数
-  const toggleImageSelection = (imageId: string) => {
+  const toggleImageSelection = (imageId: string, event?: ChangeEvent<HTMLInputElement> | MouseEvent<HTMLElement>) => {
     const newSelected = new Set(selectedImages);
+    const nativeEvent = event?.nativeEvent as globalThis.MouseEvent | undefined;
+    const isRangeSelection = Boolean(nativeEvent?.shiftKey);
+    const checked = 'target' in (event || {}) && (event?.target as HTMLInputElement | undefined)?.checked;
+    const shouldSelect = typeof checked === 'boolean' ? checked : !newSelected.has(imageId);
+
+    if (isRangeSelection && lastSelectedImageId) {
+      const currentIndex = filteredImages.findIndex(image => image.id === imageId);
+      const lastIndex = filteredImages.findIndex(image => image.id === lastSelectedImageId);
+
+      if (currentIndex !== -1 && lastIndex !== -1) {
+        const [start, end] = [currentIndex, lastIndex].sort((a, b) => a - b);
+        filteredImages.slice(start, end + 1).forEach(image => {
+          if (shouldSelect) {
+            newSelected.add(image.id);
+          } else {
+            newSelected.delete(image.id);
+          }
+        });
+        setSelectedImages(newSelected);
+        setLastSelectedImageId(imageId);
+        setIsSelectionMode(newSelected.size > 0);
+        return;
+      }
+    }
+
     if (newSelected.has(imageId)) {
       newSelected.delete(imageId);
     } else {
       newSelected.add(imageId);
     }
     setSelectedImages(newSelected);
+    setLastSelectedImageId(imageId);
+    setIsSelectionMode(newSelected.size > 0);
   };
 
   const selectAllImages = () => {
     setSelectedImages(new Set(filteredImages.map(img => img.id)));
+    setLastSelectedImageId(filteredImages[0]?.id || null);
+    setIsSelectionMode(filteredImages.length > 0);
   };
 
   const clearSelection = () => {
     setSelectedImages(new Set());
     setIsSelectionMode(false);
+    setLastSelectedImageId(null);
   };
 
   const downloadImage = async (imageUrl: string, filename: string) => {
@@ -428,35 +465,90 @@ export default function GalleryPage() {
   };
 
   const batchDelete = async () => {
-    if (!confirm(`确定要删除选中的 ${selectedImages.size} 张图片吗？`)) {
+    const selectedCount = selectedImages.size;
+    if (!confirm(`确定要删除选中的 ${selectedCount} 张图片吗？`)) {
       return;
     }
 
     try {
       toast({
         title: "正在删除",
-        description: `正在删除 ${selectedImages.size} 张图片...`,
+        description: `正在删除 ${selectedCount} 张图片...`,
       });
 
-      const deletePromises = Array.from(selectedImages).map(imageId =>
-        fetch(`/api/images/${imageId}`, { method: 'DELETE' })
-      );
+      const response = await fetch('/api/images', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageIds: Array.from(selectedImages),
+          action: 'delete',
+          data: {}
+        })
+      });
 
-      await Promise.all(deletePromises);
-      loadImages();
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || '批量删除失败');
+      }
+
+      setImages(prev => prev.filter(image => !selectedImages.has(image.id)));
+      loadCategoryStats();
       clearSelection();
 
       toast({
         title: "删除成功",
-        description: `成功删除 ${selectedImages.size} 张图片`,
+        description: `成功删除 ${selectedCount} 张图片`,
       });
-    } catch {
-      // console.error('Batch delete failed:', error);
+    } catch (error) {
       toast({
         title: "删除失败",
-        description: "删除图片时出现错误，请重试",
+        description: error instanceof Error ? error.message : "删除图片时出现错误，请重试",
         variant: "destructive",
       });
+    }
+  };
+
+  const selectedRetryableTaskIds = Array.from(selectedImages)
+    .map(imageId => images.find(image => image.id === imageId)?.taskQueue?.[0]?.id)
+    .filter((taskId): taskId is string => Boolean(taskId));
+
+  const retrySelectedImages = async () => {
+    if (selectedRetryableTaskIds.length === 0) {
+      toast({
+        title: "无法重新运行",
+        description: "选中的图片没有找到关联任务",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsRetrying(true);
+      const response = await fetch('/api/tasks/retry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskIds: selectedRetryableTaskIds })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || '重新运行失败');
+      }
+
+      const data = await response.json();
+      clearSelection();
+      toast({
+        title: "已重新运行",
+        description: `已创建 ${data.retryCount || selectedRetryableTaskIds.length} 个重试任务`,
+      });
+    } catch (error) {
+      toast({
+        title: "重新运行失败",
+        description: error instanceof Error ? error.message : "重新运行任务时出现错误，请重试",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRetrying(false);
     }
   };
 
@@ -643,6 +735,18 @@ export default function GalleryPage() {
                   <Download className="w-4 h-4 mr-2" />
                   下载选中
                 </Button>
+                {selectedRetryableTaskIds.length > 0 && (
+                  <Button
+                    onClick={retrySelectedImages}
+                    variant="outline"
+                    size="sm"
+                    className="text-orange-600 hover:text-orange-700"
+                    disabled={isRetrying}
+                  >
+                    <RefreshCw className={`w-4 h-4 mr-2 ${isRetrying ? 'animate-spin' : ''}`} />
+                    重新运行 ({selectedRetryableTaskIds.length})
+                  </Button>
+                )}
                 <Button onClick={batchDelete} variant="outline" size="sm" className="text-red-600 hover:text-red-700">
                   <Trash2 className="w-4 h-4 mr-2" />
                   删除选中
@@ -843,9 +947,9 @@ export default function GalleryPage() {
                   draggable={true}
                   onDragStart={(e) => handleDragStart(e, image.id)}
                   onDragEnd={handleDragEnd}
-                  onClick={() => {
+                  onClick={(event) => {
                     if (isSelectionMode || selectedImages.size > 0) {
-                      toggleImageSelection(image.id);
+                      toggleImageSelection(image.id, event);
                     } else {
                       openImageViewer(index);
                     }
@@ -866,15 +970,23 @@ export default function GalleryPage() {
                           {image.status}
                         </span>
                       </div>
-                      {(isSelectionMode || selectedImages.size > 0) && (
-                        <div className={`absolute top-2 left-2 w-5 h-5 rounded border-2 transition-all duration-200 ${
+                      <label
+                        className={`absolute top-2 left-2 w-6 h-6 rounded border-2 transition-all duration-200 flex items-center justify-center cursor-pointer ${
                           selectedImages.has(image.id)
                             ? 'bg-blue-600 border-blue-600 text-white'
-                            : 'border-gray-300 bg-white'
-                        }`}>
-                          {selectedImages.has(image.id) && <Check className="w-4 h-4" />}
-                        </div>
-                      )}
+                            : 'border-gray-300 bg-white/95'
+                        } ${isSelectionMode || selectedImages.size > 0 ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                        title="选择图片，按 Shift 可区间选择"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedImages.has(image.id)}
+                          onChange={(event) => toggleImageSelection(image.id, event)}
+                          className="sr-only"
+                        />
+                        {selectedImages.has(image.id) && <Check className="w-4 h-4" />}
+                      </label>
                       {!isSelectionMode && selectedImages.size === 0 && (
                         <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <div className="flex space-x-1">
@@ -941,7 +1053,7 @@ export default function GalleryPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredImages.map(image => (
+                  {filteredImages.map((image, index) => (
                     <tr
                       key={image.id}
                       className={`border-b hover:bg-gray-50 cursor-pointer ${
@@ -950,9 +1062,11 @@ export default function GalleryPage() {
                       draggable={true}
                       onDragStart={(e) => handleDragStart(e, image.id)}
                       onDragEnd={handleDragEnd}
-                      onClick={() => {
+                      onClick={(event) => {
                         if (isSelectionMode || selectedImages.size > 0) {
-                          toggleImageSelection(image.id);
+                          toggleImageSelection(image.id, event);
+                        } else {
+                          openImageViewer(index);
                         }
                       }}
                     >
@@ -961,7 +1075,8 @@ export default function GalleryPage() {
                           <input
                             type="checkbox"
                             checked={selectedImages.has(image.id)}
-                            onChange={() => toggleImageSelection(image.id)}
+                            onChange={(event) => toggleImageSelection(image.id, event)}
+                            onClick={(event) => event.stopPropagation()}
                             className="rounded"
                           />
                         </td>

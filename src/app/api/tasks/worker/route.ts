@@ -2,7 +2,47 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { uploadBase64Image } from '@/lib/storage';
 import { addWatermarkToImage } from '@/lib/watermark';
-import { getUserConfig } from '@/lib/user-config';
+import { getUserConfig, normalizeTaskConcurrency } from '@/lib/user-config';
+import fs from 'fs/promises';
+
+type TaskAssetRef = {
+  assetId: string;
+  filePath: string;
+  clientUrl: string;
+  originalFilename?: string;
+  mimeType?: string;
+  sizeBytes?: number;
+};
+
+type ParsedTaskInput = Record<string, any> & {
+  inputAsset?: TaskAssetRef;
+  referenceAsset?: TaskAssetRef;
+  watermarkLogoAsset?: TaskAssetRef;
+};
+
+type QueueTaskForProcessing = {
+  id: string;
+  type: string;
+  inputData: string;
+  totalSteps: number;
+  userId: string;
+  retryCount?: number;
+  maxRetries?: number;
+};
+
+async function readAssetAsDataUrl(asset?: TaskAssetRef): Promise<string | null> {
+  if (!asset?.filePath) {
+    return null;
+  }
+
+  const buffer = await fs.readFile(asset.filePath);
+  const mimeType = asset.mimeType || 'application/octet-stream';
+  return `data:${mimeType};base64,${buffer.toString('base64')}`;
+}
+
+async function resolveTaskInputData(rawInputData: string): Promise<ParsedTaskInput> {
+  return JSON.parse(rawInputData) as ParsedTaskInput;
+}
 
 // 告诉 Next.js 这是一个动态路由，不要在构建时预渲染
 export const dynamic = 'force-dynamic';
@@ -11,7 +51,110 @@ export const runtime = 'nodejs';
 // 任务处理器
 class TaskProcessor {
   private isProcessing = false;
-  private maxConcurrentTasks = parseInt(process.env.MAX_CONCURRENT_TASKS || '1'); // 串行处理，避免即梦API并发限制
+
+  private buildPersistedResult(taskType: string, result: any) {
+    switch (taskType) {
+      case 'VIDEO_GENERATION':
+        return {
+          videoUrl: result.videoUrl,
+          jimengTaskId: result.jimengTaskId,
+          prompt: result.prompt,
+          frames: result.frames,
+          aspectRatio: result.aspectRatio,
+        };
+      default:
+        return {
+          processedImageId: result.processedImageId || result.id || null,
+          processedImageUrl: result.processedImageUrl || result.processedUrl || result.imageUrl || null,
+        };
+    }
+  }
+
+  private async getConfiguredConcurrencyLimit(requestedMaxTasks?: number) {
+    let configuredLimit = normalizeTaskConcurrency(process.env.MAX_CONCURRENT_TASKS ?? 2);
+    const nextPendingTask = await prisma.taskQueue.findFirst({
+      where: { status: 'PENDING' },
+      orderBy: [
+        { priority: 'desc' },
+        { createdAt: 'asc' },
+      ],
+      select: { userId: true },
+    });
+
+    if (nextPendingTask) {
+      const userConfig = await getUserConfig(nextPendingTask.userId);
+      configuredLimit = normalizeTaskConcurrency(userConfig.taskRuntime?.concurrency);
+    }
+
+    if (typeof requestedMaxTasks === 'number') {
+      return Math.min(configuredLimit, normalizeTaskConcurrency(requestedMaxTasks));
+    }
+
+    return configuredLimit;
+  }
+
+  private async getAvailableSlots(requestedMaxTasks?: number) {
+    const runningTasks = await prisma.taskQueue.count({
+      where: { status: 'PROCESSING' },
+    });
+    const concurrencyLimit = await this.getConfiguredConcurrencyLimit(requestedMaxTasks);
+    const availableSlots = Math.max(0, concurrencyLimit - runningTasks);
+
+    return {
+      concurrencyLimit,
+      runningTasks,
+      availableSlots,
+    };
+  }
+
+  private async claimPendingTasks(limit: number): Promise<QueueTaskForProcessing[]> {
+    if (limit <= 0) {
+      return [];
+    }
+
+    const candidates = await prisma.taskQueue.findMany({
+      where: { status: 'PENDING' },
+      orderBy: [
+        { priority: 'desc' },
+        { createdAt: 'asc' },
+      ],
+      take: limit,
+      select: {
+        id: true,
+        type: true,
+        inputData: true,
+        totalSteps: true,
+        userId: true,
+        retryCount: true,
+        maxRetries: true,
+      },
+    });
+
+    const claimedTasks: QueueTaskForProcessing[] = [];
+
+    for (const task of candidates) {
+      const retryCount = task.retryCount ?? 0;
+      const retryInfo = retryCount > 0 ? ` (重试 ${retryCount} 次)` : '';
+      const claimed = await prisma.taskQueue.updateMany({
+        where: {
+          id: task.id,
+          status: 'PENDING',
+        },
+        data: {
+          status: 'PROCESSING',
+          startedAt: new Date(),
+          currentStep: `开始处理任务${retryInfo}`,
+          progress: 0,
+        },
+      });
+
+      if (claimed.count === 1) {
+        claimedTasks.push(task);
+      }
+    }
+
+    return claimedTasks;
+  }
 
   async processNextTask() {
     if (this.isProcessing) {
@@ -21,31 +164,21 @@ class TaskProcessor {
     this.isProcessing = true;
 
     try {
-      // 获取下一个待处理任务（按优先级和创建时间排序）
-      const task = await prisma.taskQueue.findFirst({
-        where: {
-          status: 'PENDING'
-        },
-        orderBy: [
-          { priority: 'desc' },
-          { createdAt: 'asc' }
-        ]
-      });
+      const { concurrencyLimit, runningTasks, availableSlots } = await this.getAvailableSlots(1);
 
-      if (!task) {
-        return { message: '没有待处理的任务' };
+      if (availableSlots <= 0) {
+        return {
+          message: `并发已满，当前 ${runningTasks}/${concurrencyLimit} 个任务处理中`,
+          running: runningTasks,
+          limit: concurrencyLimit,
+        };
       }
 
-      // 更新任务状态为处理中
-      await prisma.taskQueue.update({
-        where: { id: task.id },
-        data: {
-          status: 'PROCESSING',
-          startedAt: new Date(),
-          currentStep: '开始处理任务',
-          progress: 0
-        }
-      });
+      const [task] = await this.claimPendingTasks(1);
+
+      if (!task) {
+        return { message: '没有待处理的任务', running: runningTasks, limit: concurrencyLimit };
+      }
 
       // 根据任务类型处理
       let result;
@@ -72,6 +205,8 @@ class TaskProcessor {
           throw new Error(`不支持的任务类型: ${task.type}`);
       }
 
+      const persistedResult = this.buildPersistedResult(task.type, result);
+
       // 更新任务为完成状态，并关联处理结果
       await prisma.taskQueue.update({
         where: { id: task.id },
@@ -80,9 +215,9 @@ class TaskProcessor {
           progress: 100,
           currentStep: '处理完成',
           completedAt: new Date(),
-          outputData: JSON.stringify(result),
+          outputData: JSON.stringify(persistedResult),
           completedSteps: task.totalSteps,
-          processedImageId: (result as { processedImageId?: string })?.processedImageId || null
+          processedImageId: persistedResult.processedImageId || null
         }
       });
 
@@ -90,28 +225,10 @@ class TaskProcessor {
         message: '任务处理完成', 
         taskId: task.id,
         type: task.type,
-        result 
+        result: persistedResult
       };
 
     } catch (error) {
-      // 如果有当前任务，更新为失败状态
-      const currentTask = await prisma.taskQueue.findFirst({
-        where: { status: 'PROCESSING' },
-        orderBy: { updatedAt: 'desc' }
-      });
-
-      if (currentTask) {
-        await prisma.taskQueue.update({
-          where: { id: currentTask.id },
-          data: {
-            status: 'FAILED',
-            completedAt: new Date(),
-            errorMessage: error instanceof Error ? error.message : '未知错误',
-            currentStep: '处理失败'
-          }
-        });
-      }
-
       throw error;
     } finally {
       this.isProcessing = false;
@@ -162,56 +279,54 @@ class TaskProcessor {
     return results;
   }
 
-  async processBatch(maxTasks = 10, maxRounds = 5) {
+  async processBatch(maxTasks?: number) {
     try {
       let totalProcessed = 0;
       let totalSuccessful = 0;
       let totalFailed = 0;
-      let rounds = 0;
-      const maxRounds = 10; // 防止无限循环
+      const { concurrencyLimit, runningTasks, availableSlots } = await this.getAvailableSlots(maxTasks);
 
-      while (rounds < maxRounds) {
-        // 获取待处理任务
-        const pendingTasks = await prisma.taskQueue.findMany({
-          where: { status: 'PENDING' },
-          orderBy: [
-            { priority: 'desc' },
-            { createdAt: 'asc' }
-          ],
-          take: maxTasks
-        });
-
-        if (pendingTasks.length === 0) {
-          break; // 没有更多任务，退出循环
-        }
-
-        const results = await this.processConcurrently<typeof pendingTasks[0], any>(
-          pendingTasks,
-          (task) => this.processSingleTask(task as { id: string; type: string; inputData: string; totalSteps: number; userId: string }),
-          1
-        );
-
-        const successful = results.filter(r => r.status === 'fulfilled').length;
-        const failed = results.filter(r => r.status === 'rejected').length;
-        totalSuccessful += successful;
-        totalFailed += failed;
-        rounds++;
-
-        // 如果处理的任务数少于maxTasks，说明队列基本清空了
-        if (pendingTasks.length < maxTasks) {
-          break;
-        }
-
-        // 短暂延迟，避免过于频繁的数据库查询
-        await new Promise(resolve => setTimeout(resolve, 100));
+      if (availableSlots <= 0) {
+        return {
+          message: `并发已满，当前 ${runningTasks}/${concurrencyLimit} 个任务处理中`,
+          processedCount: 0,
+          successful: 0,
+          failed: 0,
+          running: runningTasks,
+          limit: concurrencyLimit,
+        };
       }
 
+      const pendingTasks = await this.claimPendingTasks(availableSlots);
+
+      if (pendingTasks.length === 0) {
+        return {
+          message: '没有待处理的任务',
+          processedCount: 0,
+          successful: 0,
+          failed: 0,
+          running: runningTasks,
+          limit: concurrencyLimit,
+        };
+      }
+
+      totalProcessed += pendingTasks.length;
+      const results = await this.processConcurrently<QueueTaskForProcessing, any>(
+        pendingTasks,
+        (task) => this.processSingleTask(task),
+        pendingTasks.length
+      );
+
+      totalSuccessful += results.filter(r => r.status === 'fulfilled').length;
+      totalFailed += results.filter(r => r.status === 'rejected').length;
+
       return {
-        message: totalProcessed > 0 ? `批量处理完成，共${rounds}轮` : '没有待处理的任务',
+        message: totalProcessed > 0 ? `批量处理完成，本次领取 ${totalProcessed} 个任务` : '没有待处理的任务',
         processedCount: totalProcessed,
         successful: totalSuccessful,
         failed: totalFailed,
-        rounds
+        running: runningTasks,
+        limit: concurrencyLimit,
       };
 
     } catch (error) {
@@ -220,30 +335,16 @@ class TaskProcessor {
     }
   }
 
-  private async processSingleTask(task: { id: string; type: string; inputData: string; totalSteps: number; userId: string; retryCount?: number; maxRetries?: number }) {
+  private async processSingleTask(task: QueueTaskForProcessing) {
     try {
       const userConfig = await getUserConfig(task.userId);
       
       // 将用户配置注入到 inputData 中
-      const inputData = JSON.parse(task.inputData);
+      const inputData = await resolveTaskInputData(task.inputData);
       inputData.volcengineConfig = userConfig.volcengine;
       inputData.imagehostingConfig = userConfig.imagehosting;
       task.inputData = JSON.stringify(inputData);
       
-      const retryCount = task.retryCount ?? 0;
-      const retryInfo = retryCount > 0 ? ` (重试 ${retryCount} 次)` : '';
-      
-      // 更新任务状态为处理中
-      await prisma.taskQueue.update({
-        where: { id: task.id },
-        data: {
-          status: 'PROCESSING',
-          startedAt: new Date(),
-          currentStep: `开始处理任务${retryInfo}`,
-          progress: 0
-        }
-      });
-
       // 添加超时机制 - 10分钟超时
       const taskTimeout = 10 * 60 * 1000; // 10分钟
       const taskPromise = this.executeTaskWithType(task);
@@ -267,6 +368,7 @@ class TaskProcessor {
       ]);
       
       clearTimeout(timeoutHandle!);
+      const persistedResult = this.buildPersistedResult(task.type, result);
       
       // 更新任务为完成状态，并关联处理结果
       await prisma.taskQueue.update({
@@ -276,13 +378,13 @@ class TaskProcessor {
           progress: 100,
           currentStep: '处理完成',
           completedAt: new Date(),
-          outputData: JSON.stringify(result),
+          outputData: JSON.stringify(persistedResult),
           completedSteps: task.totalSteps,
-          processedImageId: (result as { processedImageId?: string })?.processedImageId || null
+          processedImageId: persistedResult.processedImageId || null
         }
       });
 
-      return result;
+      return persistedResult;
 
     } catch (error) {
       console.error(`=== 任务处理失败 ===`);
@@ -358,10 +460,11 @@ class TaskProcessor {
   }
 
   private async processOneClickWorkflow(task: { id: string; inputData: string; userId: string }) {
-    const inputData = JSON.parse(task.inputData);
+    const inputData = await resolveTaskInputData(task.inputData);
+    const imageUrl = (await readAssetAsDataUrl(inputData.inputAsset)) || inputData.imageUrl;
+    const referenceImageUrl = (await readAssetAsDataUrl(inputData.referenceAsset)) || inputData.referenceImageUrl;
+    const watermarkLogoUrl = (await readAssetAsDataUrl(inputData.watermarkLogoAsset)) || inputData.watermarkLogoUrl;
     const { 
-      imageUrl, 
-      referenceImageUrl,
       xScale = 2.0, 
       yScale = 2.0, 
       upscaleFactor = 2,
@@ -373,12 +476,12 @@ class TaskProcessor {
       watermarkOpacity = 0.3,
       watermarkPosition = 'bottom-right',
       watermarkType = 'text',
-      watermarkLogoUrl,
       outputResolution = 'original',
       aiModel = 'gemini',
       backgroundPrompt = '',
       outpaintPrompt = '',
-      volcengineConfig
+      volcengineConfig,
+      imagehostingConfig
     } = inputData;
     
     await this.updateTaskProgress(task.id, 'Step 1/3: 准备处理...', 10, 1);
@@ -406,7 +509,8 @@ class TaskProcessor {
         backgroundPrompt,
         outpaintPrompt,
         userId: task.userId,
-        volcengineConfig
+        volcengineConfig,
+        imagehostingConfig
       });
       
       await this.updateTaskProgress(task.id, 'Step 3/3: 处理完成', 100, 3);
@@ -430,8 +534,10 @@ class TaskProcessor {
   }
 
   private async processBackgroundRemoval(task: { id: string; inputData: string; userId: string }) {
-    const inputData = JSON.parse(task.inputData);
-    const { imageUrl, referenceImageUrl, customPrompt, aiModel = 'gemini', volcengineConfig, imagehostingConfig } = inputData;
+    const inputData = await resolveTaskInputData(task.inputData);
+    const imageUrl = (await readAssetAsDataUrl(inputData.inputAsset)) || inputData.imageUrl;
+    const referenceImageUrl = (await readAssetAsDataUrl(inputData.referenceAsset)) || inputData.referenceImageUrl;
+    const { customPrompt, aiModel = 'gemini', volcengineConfig, imagehostingConfig } = inputData;
 
     await this.updateTaskProgress(task.id, `使用 ${aiModel} 生成图像中...`, 30, 1);
     
@@ -603,8 +709,9 @@ class TaskProcessor {
   }
 
   private async processImageExpansion(task: { id: string; inputData: string; userId: string }) {
-    const inputData = JSON.parse(task.inputData);
-    const { imageUrl, xScale = 2.0, yScale = 2.0, prompt = '扩展图像，保持产品主体和风格完全一致，自然延伸背景', volcengineConfig, imagehostingConfig } = inputData;
+    const inputData = await resolveTaskInputData(task.inputData);
+    const imageUrl = (await readAssetAsDataUrl(inputData.inputAsset)) || inputData.imageUrl;
+    const { xScale = 2.0, yScale = 2.0, prompt = '扩展图像，保持产品主体和风格完全一致，自然延伸背景', volcengineConfig, imagehostingConfig } = inputData;
     
     await this.updateTaskProgress(task.id, '图像扩展处理中...', 50, 1);
     
@@ -675,8 +782,9 @@ class TaskProcessor {
   }
 
   private async processImageUpscaling(task: { id: string; inputData: string; userId: string }) {
-    const inputData = JSON.parse(task.inputData);
-    const { imageUrl, upscaleFactor = 2, aiModel = 'volcengine', volcengineConfig, imagehostingConfig } = inputData;
+    const inputData = await resolveTaskInputData(task.inputData);
+    const imageUrl = (await readAssetAsDataUrl(inputData.inputAsset)) || inputData.imageUrl;
+    const { upscaleFactor = 2, aiModel = 'volcengine', volcengineConfig, imagehostingConfig } = inputData;
     
     await this.updateTaskProgress(task.id, '智能画质增强中...', 50, 1);
     
@@ -740,14 +848,14 @@ class TaskProcessor {
   }
 
   private async processWatermark(task: { id: string; inputData: string; userId: string }) {
-    const inputData = JSON.parse(task.inputData);
+    const inputData = await resolveTaskInputData(task.inputData);
+    const imageUrl = (await readAssetAsDataUrl(inputData.inputAsset)) || inputData.imageUrl;
+    const watermarkLogoUrl = (await readAssetAsDataUrl(inputData.watermarkLogoAsset)) || inputData.watermarkLogoUrl;
     const {
-      imageUrl,
       watermarkText = 'Watermark',
       watermarkOpacity = 0.3,
       watermarkPosition = 'bottom-right',
       watermarkType = 'logo',
-      watermarkLogoUrl,
       outputResolution = 'original'
     } = inputData;
 
@@ -823,7 +931,7 @@ class TaskProcessor {
       
       return {
         processedImageId: updatedImage.id,
-        processedImageUrl: watermarkedImageData,
+        processedImageUrl: uploadedUrl,
         watermarkText,
         watermarkOpacity,
         watermarkPosition,
@@ -838,8 +946,9 @@ class TaskProcessor {
   }
 
   private async processVideoGeneration(task: { id: string; inputData: string; userId: string }) {
-    const inputData = JSON.parse(task.inputData);
-    const { imageUrl, prompt, frames = 121, aspectRatio = '16:9' } = inputData;
+    const inputData = await resolveTaskInputData(task.inputData);
+    const imageUrl = (await readAssetAsDataUrl(inputData.inputAsset)) || inputData.imageUrl;
+    const { prompt, frames = 121, aspectRatio = '16:9' } = inputData;
 
     await this.updateTaskProgress(task.id, '提交视频生成任务...', 10, 1);
 
@@ -922,9 +1031,9 @@ export async function POST(request: NextRequest) {
     const startTime = Date.now();
     
     const body = await request.json();
-    const { batch = false, maxTasks = parseInt(process.env.MAX_CONCURRENT_TASKS || '2') } = body;
+    const { batch = false, maxTasks } = body;
 
-    console.log(`Worker模式: ${batch ? '批量处理' : '单任务处理'}, 最大并发: ${maxTasks}`);
+    console.log(`Worker模式: ${batch ? '批量处理' : '单任务处理'}, 请求并发: ${maxTasks ?? '按设置'}`);
 
     let result;
     if (batch) {

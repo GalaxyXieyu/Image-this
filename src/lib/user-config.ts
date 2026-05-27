@@ -6,6 +6,23 @@
 import { prisma } from '@/lib/prisma';
 import { getStoredSecrets, isDesktopSecretStoreEnabled, setStoredSecrets } from '@/lib/desktop-secret-store';
 
+const USER_CONFIG_CACHE_TTL_MS = 30 * 1000;
+
+type UserConfigCacheEntry = {
+  config: UserConfig;
+  expiresAt: number;
+};
+
+const userConfigCache = new Map<string, UserConfigCacheEntry>();
+
+export function normalizeTaskConcurrency(value: unknown): number {
+  const parsed = typeof value === 'number' ? value : parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(parsed)) {
+    return 2;
+  }
+  return Math.max(1, Math.min(10, Math.floor(parsed)));
+}
+
 export interface UserConfig {
   volcengine?: {
     accessKey: string;
@@ -34,6 +51,13 @@ export interface UserConfig {
   localStorage?: {
     savePath: string;
   };
+  taskRuntime?: {
+    concurrency: number;
+  };
+}
+
+function cloneUserConfig(config: UserConfig): UserConfig {
+  return JSON.parse(JSON.stringify(config));
 }
 
 /**
@@ -42,6 +66,11 @@ export interface UserConfig {
  * @returns 用户配置（用户不存在时返回空配置）
  */
 export async function getUserConfig(userId: string): Promise<UserConfig> {
+  const cached = userConfigCache.get(userId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cloneUserConfig(cached.config);
+  }
+
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
@@ -63,6 +92,7 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
       superbedToken: true,
       hasSuperbedToken: true,
       localStoragePath: true,
+      taskConcurrency: true,
     }
   });
 
@@ -148,6 +178,15 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
     };
   }
 
+  config.taskRuntime = {
+    concurrency: normalizeTaskConcurrency(user.taskConcurrency),
+  };
+
+  userConfigCache.set(userId, {
+    config: cloneUserConfig(config),
+    expiresAt: Date.now() + USER_CONFIG_CACHE_TTL_MS,
+  });
+
   return config;
 }
 
@@ -201,8 +240,11 @@ export async function saveUserConfig(userId: string, config: UserConfig): Promis
       superbedToken: isDesktopSecretStoreEnabled() ? null : config.imagehosting?.superbedToken || null,
       hasSuperbedToken: !!config.imagehosting?.superbedToken,
       localStoragePath: config.localStorage?.savePath || null,
+      taskConcurrency: normalizeTaskConcurrency(config.taskRuntime?.concurrency),
     }
   });
+
+  userConfigCache.delete(userId);
   
   return true;
 }

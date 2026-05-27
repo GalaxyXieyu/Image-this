@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const fs = require('fs');
 const http = require('http');
 const net = require('net');
@@ -14,19 +14,168 @@ let nextServer = null;
 let updateManager = null;
 let renderRecoveryInProgress = false;
 let applicationUrl = null;
+let workerSchedulerTimer = null;
+let workerTriggerInFlight = false;
 
 const isDev = process.env.NODE_ENV === 'development';
 const DEFAULT_PORT = Number(process.env.PORT || 23000);
 const WINDOWS_RENDERER_MAX_OLD_SPACE_MB = 1024;
 let serverPort = DEFAULT_PORT;
+const WORKER_SCHEDULER_INTERVAL_MS = 8000;
+const SERVER_SHUTDOWN_TIMEOUT_MS = 5000;
 
-const LOG_DIR = path.join(os.homedir(), 'ImagineThis', 'logs');
-const LOG_FILE = path.join(LOG_DIR, `app-${new Date().toISOString().split('T')[0]}.log`);
-const ERROR_LOG_FILE = path.join(LOG_DIR, `error-${new Date().toISOString().split('T')[0]}.log`);
+const LEGACY_LOG_DIR = path.join(os.homedir(), 'ImagineThis', 'logs');
+const DESKTOP_SETTINGS_FILE = 'desktop-settings.json';
+const MAX_LOG_READ_BYTES = 256 * 1024;
+let currentLogDir = null;
+let currentLogFile = null;
+let currentErrorLogFile = null;
+let logStream = null;
+let errorLogStream = null;
 
-if (!fs.existsSync(LOG_DIR)) {
-  fs.mkdirSync(LOG_DIR, { recursive: true });
+function ensureDirectory(dirPath) {
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
 }
+
+function getDesktopSettingsPath() {
+  const { configDir } = getUserDataPaths(app);
+  ensureDirectory(configDir);
+  return path.join(configDir, DESKTOP_SETTINGS_FILE);
+}
+
+function readDesktopSettings() {
+  if (!app.isReady()) {
+    return {};
+  }
+
+  const settingsPath = getDesktopSettingsPath();
+  if (!fs.existsSync(settingsPath)) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+function writeDesktopSettings(settings) {
+  const settingsPath = getDesktopSettingsPath();
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
+}
+
+function getDefaultLogDir() {
+  return LEGACY_LOG_DIR;
+}
+
+function resolveLogDir() {
+  const settings = readDesktopSettings();
+  if (typeof settings.logDirectory === 'string' && settings.logDirectory.trim()) {
+    return path.resolve(settings.logDirectory.trim());
+  }
+  return getDefaultLogDir();
+}
+
+function getTodayLogPaths(logDir) {
+  const date = new Date().toISOString().split('T')[0];
+  return {
+    appLogFile: path.join(logDir, `app-${date}.log`),
+    errorLogFile: path.join(logDir, `error-${date}.log`),
+  };
+}
+
+function initializeLogStreams(reason = 'startup') {
+  const nextLogDir = resolveLogDir();
+  ensureDirectory(nextLogDir);
+  const { appLogFile, errorLogFile } = getTodayLogPaths(nextLogDir);
+
+  logStream?.end();
+  errorLogStream?.end();
+
+  currentLogDir = nextLogDir;
+  currentLogFile = appLogFile;
+  currentErrorLogFile = errorLogFile;
+  logStream = fs.createWriteStream(currentLogFile, { flags: 'a' });
+  errorLogStream = fs.createWriteStream(currentErrorLogFile, { flags: 'a' });
+
+  if (reason !== 'startup') {
+    log(`Log directory switched to ${currentLogDir}`, 'INFO');
+  }
+}
+
+function isPathInside(parentDir, targetPath) {
+  const relativePath = path.relative(parentDir, targetPath);
+  return Boolean(relativePath) && !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
+}
+
+function sanitizeLogContent(content) {
+  return content
+    .replace(/(apiKey|api_key|secretKey|secret_key|token|authorization|accessKey|secretKey)(["'\s:=]+)([^"'\s,}]+)/gi, '$1$2***')
+    .replace(/(Bearer\s+)[A-Za-z0-9._~+/=-]+/gi, '$1***');
+}
+
+function readLogTail(fileName, maxBytes = MAX_LOG_READ_BYTES) {
+  if (!currentLogDir) {
+    return '';
+  }
+
+  const safeFileName = path.basename(fileName || '');
+  if (!safeFileName.endsWith('.log')) {
+    throw new Error('Only .log files can be read.');
+  }
+
+  const filePath = path.join(currentLogDir, safeFileName);
+  if (!isPathInside(currentLogDir, filePath) || !fs.existsSync(filePath)) {
+    return '';
+  }
+
+  const stats = fs.statSync(filePath);
+  const bytesToRead = Math.min(Math.max(1, Number(maxBytes) || MAX_LOG_READ_BYTES), MAX_LOG_READ_BYTES, stats.size);
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    const buffer = Buffer.alloc(bytesToRead);
+    fs.readSync(fd, buffer, 0, bytesToRead, stats.size - bytesToRead);
+    return sanitizeLogContent(buffer.toString('utf8'));
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function getLogInfo() {
+  const settings = readDesktopSettings();
+  return {
+    directory: currentLogDir || resolveLogDir(),
+    defaultDirectory: getDefaultLogDir(),
+    isCustom: Boolean(settings.logDirectory),
+    appLogFile: currentLogFile ? path.basename(currentLogFile) : null,
+    errorLogFile: currentErrorLogFile ? path.basename(currentErrorLogFile) : null,
+  };
+}
+
+function listLogFiles() {
+  if (!currentLogDir || !fs.existsSync(currentLogDir)) {
+    return [];
+  }
+
+  return fs
+    .readdirSync(currentLogDir)
+    .filter((fileName) => fileName.endsWith('.log'))
+    .map((fileName) => {
+      const filePath = path.join(currentLogDir, fileName);
+      const stats = fs.statSync(filePath);
+      return {
+        name: fileName,
+        sizeBytes: stats.size,
+        modifiedAt: stats.mtime.toISOString(),
+      };
+    })
+    .sort((left, right) => right.modifiedAt.localeCompare(left.modifiedAt));
+}
+
+initializeLogStreams();
 
 function parseEnvFileContents(contents) {
   const parsed = {};
@@ -91,9 +240,9 @@ function log(message, level = 'INFO') {
   console.log(logMessage);
 
   try {
-    fs.appendFileSync(LOG_FILE, `${logMessage}\n`);
-    if (level === 'ERROR') {
-      fs.appendFileSync(ERROR_LOG_FILE, `${logMessage}\n`);
+    logStream?.write(`${logMessage}\n`);
+    if (level === 'ERROR' || level === 'WARN') {
+      errorLogStream?.write(`${logMessage}\n`);
     }
   } catch (error) {
     console.error('Failed to write log file:', error);
@@ -178,6 +327,58 @@ function showWindowStatusPage(title, message, accent) {
   });
 }
 
+function isAppNavigationUrl(targetUrl) {
+  if (!targetUrl || !applicationUrl) {
+    return false;
+  }
+
+  try {
+    const target = new URL(targetUrl);
+    const appTarget = new URL(applicationUrl);
+    return target.origin === appTarget.origin;
+  } catch {
+    return false;
+  }
+}
+
+function openAppUrlInMainWindow(targetUrl) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  mainWindow.loadURL(targetUrl).catch((error) => {
+    log(`Failed to navigate main window to ${targetUrl}: ${error.message}`, 'ERROR');
+  });
+}
+
+function installNavigationGuards(window) {
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    if (isAppNavigationUrl(url)) {
+      log(`Redirecting app popup navigation into main window: ${url}`);
+      openAppUrlInMainWindow(url);
+      return { action: 'deny' };
+    }
+
+    log(`Opening external URL in system browser: ${url}`);
+    shell.openExternal(url).catch((error) => {
+      log(`Failed to open external URL ${url}: ${error.message}`, 'ERROR');
+    });
+    return { action: 'deny' };
+  });
+
+  window.webContents.on('will-navigate', (event, url) => {
+    if (isAppNavigationUrl(url)) {
+      return;
+    }
+
+    event.preventDefault();
+    log(`Blocked external navigation in app window: ${url}`);
+    shell.openExternal(url).catch((error) => {
+      log(`Failed to open external navigation ${url}: ${error.message}`, 'ERROR');
+    });
+  });
+}
+
 function recoverMainWindow(reason) {
   if (!mainWindow || mainWindow.isDestroyed() || renderRecoveryInProgress) {
     return;
@@ -227,6 +428,7 @@ function createWindow() {
   };
 
   mainWindow = new BrowserWindow(windowOptions);
+  installNavigationGuards(mainWindow);
   showWindowStatusPage('正在启动', '正在准备数据库和桌面服务，请稍候。', '#2563eb');
 
   mainWindow.once('ready-to-show', () => {
@@ -384,6 +586,7 @@ function startNextServer() {
 
     nextServer.once('error', reject);
     nextServer.on('exit', (code, signal) => {
+      stopWorkerScheduler();
       const level = code === 0 || signal === 'SIGTERM' ? 'INFO' : 'ERROR';
       log(`Next.js server exited with code ${code}, signal: ${signal}`, level);
     });
@@ -432,7 +635,85 @@ async function warmupApplication() {
   ]);
 }
 
+function triggerBackgroundWorker(reason = 'manual') {
+  if (!applicationUrl || workerTriggerInFlight) {
+    return Promise.resolve(false);
+  }
+
+  workerTriggerInFlight = true;
+
+  return new Promise((resolve) => {
+    const payload = JSON.stringify({ batch: true });
+    const request = http.request(
+      {
+        hostname: '127.0.0.1',
+        port: serverPort,
+        path: '/api/tasks/worker',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+        },
+      },
+      (response) => {
+        let responseBody = '';
+        response.setEncoding('utf8');
+        response.on('data', (chunk) => {
+          responseBody += chunk;
+        });
+        response.on('end', () => {
+          workerTriggerInFlight = false;
+          if ((response.statusCode || 500) >= 200 && (response.statusCode || 500) < 300) {
+            log(`[Worker Scheduler] Triggered (${reason}) with status ${response.statusCode}`);
+            resolve(true);
+            return;
+          }
+
+          log(
+            `[Worker Scheduler] Trigger failed (${reason}): HTTP ${response.statusCode} ${responseBody.slice(0, 200)}`,
+            'WARN'
+          );
+          resolve(false);
+        });
+      }
+    );
+
+    request.on('error', (error) => {
+      workerTriggerInFlight = false;
+      log(`[Worker Scheduler] Trigger failed (${reason}): ${error.message}`, 'WARN');
+      resolve(false);
+    });
+
+    request.setTimeout(5000, () => {
+      request.destroy(new Error('timeout'));
+    });
+
+    request.write(payload);
+    request.end();
+  });
+}
+
+function startWorkerScheduler() {
+  if (workerSchedulerTimer) {
+    return;
+  }
+
+  log(`Starting background worker scheduler (${WORKER_SCHEDULER_INTERVAL_MS}ms interval)...`);
+  void triggerBackgroundWorker('startup');
+  workerSchedulerTimer = setInterval(() => {
+    void triggerBackgroundWorker('interval');
+  }, WORKER_SCHEDULER_INTERVAL_MS);
+}
+
+function stopWorkerScheduler() {
+  if (workerSchedulerTimer) {
+    clearInterval(workerSchedulerTimer);
+    workerSchedulerTimer = null;
+  }
+}
+
 async function bootstrapApplication() {
+  initializeLogStreams('app-ready');
   createWindow();
 
   updateManager = createUpdateManager({
@@ -449,13 +730,19 @@ async function bootstrapApplication() {
 
     await ensureDesktopDatabaseReady(app, log);
     await startNextServer();
-    await warmupApplication();
+    startWorkerScheduler();
 
     if (!mainWindow || mainWindow.isDestroyed()) {
       return;
     }
 
     await mainWindow.loadURL(applicationUrl);
+
+    setTimeout(() => {
+      warmupApplication().catch((error) => {
+        log(`Warmup failed: ${error.message}`, 'WARN');
+      });
+    }, 1500);
 
     setTimeout(() => {
       updateManager?.checkForUpdates().catch((error) => {
@@ -467,17 +754,27 @@ async function bootstrapApplication() {
     log(error.stack || 'No stack available', 'ERROR');
     showWindowStatusPage(
       '启动失败',
-      `${error.message}\n\n日志文件: ${LOG_FILE}`,
+      `${error.message}\n\n日志文件: ${currentLogFile || getTodayLogPaths(resolveLogDir()).appLogFile}`,
       '#dc2626'
     );
   }
 }
 
 function cleanupServerProcess() {
+  stopWorkerScheduler();
   if (nextServer && !nextServer.killed) {
     log('Stopping Next.js child process...');
     nextServer.kill('SIGTERM');
+    const serverToKill = nextServer;
+    setTimeout(() => {
+      if (!serverToKill.killed) {
+        log('Force killing Next.js child process after shutdown timeout...', 'WARN');
+        serverToKill.kill('SIGKILL');
+      }
+    }, SERVER_SHUTDOWN_TIMEOUT_MS).unref();
   }
+  logStream?.end();
+  errorLogStream?.end();
 }
 
 process.on('uncaughtException', (error) => {
@@ -543,9 +840,8 @@ app.on('activate', async () => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  log('All windows closed; quitting desktop app and stopping worker runtime.');
+  app.quit();
 });
 
 app.on('before-quit', () => {
@@ -577,6 +873,52 @@ ipcMain.handle('select-directory', async () => {
     properties: ['openDirectory'],
   });
   return result.filePaths;
+});
+
+ipcMain.handle('logs:get-info', async () => {
+  return getLogInfo();
+});
+
+ipcMain.handle('logs:list-files', async () => {
+  return listLogFiles();
+});
+
+ipcMain.handle('logs:read-tail', async (_event, payload = {}) => {
+  const fileName = payload?.fileName || path.basename(currentErrorLogFile || currentLogFile || '');
+  return {
+    fileName,
+    content: readLogTail(fileName, payload?.maxBytes),
+  };
+});
+
+ipcMain.handle('logs:open-directory', async () => {
+  ensureDirectory(currentLogDir || resolveLogDir());
+  await shell.openPath(currentLogDir || resolveLogDir());
+  return true;
+});
+
+ipcMain.handle('logs:choose-directory', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory', 'createDirectory'],
+  });
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return getLogInfo();
+  }
+
+  const settings = readDesktopSettings();
+  settings.logDirectory = result.filePaths[0];
+  writeDesktopSettings(settings);
+  initializeLogStreams('directory-change');
+  return getLogInfo();
+});
+
+ipcMain.handle('logs:reset-directory', async () => {
+  const settings = readDesktopSettings();
+  delete settings.logDirectory;
+  writeDesktopSettings(settings);
+  initializeLogStreams('directory-reset');
+  return getLogInfo();
 });
 
 ipcMain.handle('updates:get-status', async () => {
