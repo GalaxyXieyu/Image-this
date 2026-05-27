@@ -35,11 +35,14 @@ Image This 正在从传统多 Tab 图片处理工具，重构为面向电商卖�
 - [x] **Phase 1 (2026-05-27)**: 任务提交 API typed workflow contract 草案完成 — 10 个接口 + 2 个 legacy 适配器。
 - [x] **Phase 1 (2026-05-27)**: 轻量任务轮询和批量 UX 基础完成 — `useWorkflowTaskPolling` hook。
 - [x] **Phase 1 (2026-05-27)**: 设置、历史、任务中心、Electron 打包和 Windows 数据安全策略继续可用 — `npm run build` 通过，旧代码未动。
+- [x] **Phase 2 (2026-05-27)**: 模板库页面实现 — 三栏布局（260px 侧边栏 + 网格 + 320px 详情面板），20 系统预设 + 2 组合模板，搜索/分类/排序，URL 同步。
+- [x] **Phase 2 (2026-05-27)**: 预设数据模型 — TemplatePreset / ComboPreset / PresetCategory 类型，支持场景图/工具/组合参数。
+- [x] **Phase 2 (2026-05-27)**: 模板到工作流入口 — "使用此模板"导航到对应工作流页面并携带 `?preset=` 参数（draft 初始化待 Phase 3/4）。
 
 ### Active
 
 - [ ] 旧 `/workspace` 巨型客户端页面应被拆分或替换，不再作为主要开发基础。
-- [ ] 模板库需要成为可落地的数据与页面能力，而不是静态展示。
+- [x] 模板库需要成为可落地的数据与页面能力，而不是静态展示。（Phase 2 完成）
 - [ ] 场景图工作流需要支持三步流程、批量生成、候选结果、调整和保存。
 - [ ] 智能工具箱需要复用统一编辑器 shell，避免每个工具重复造页面状态。
 - [ ] 任务提交 API 需要从松散 `type + inputData string` 收敛为 typed workflow contract。（contract 草案已完成，worker 适配待 Phase 5）
