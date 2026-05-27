@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { apiGet, apiDelete } from "@/lib/api-client";
+import { useTaskPolling } from "@/lib/use-task-polling";
 import {
   RefreshCw,
   MoreHorizontal,
@@ -16,6 +17,7 @@ import {
   Trash2,
   Image as ImageIcon,
   Loader2,
+  Radio,
 } from "lucide-react";
 
 type TaskStatus = "pending" | "running" | "completed" | "failed";
@@ -224,6 +226,28 @@ export default function TasksPage() {
     }
   };
 
+  const activeTaskIds = tasks
+    .filter((t) => t.status === "running" || t.status === "pending")
+    .map((t) => t.id);
+
+  const updateTasksFromPolling = useCallback((polledTasks: import("@/lib/use-task-polling").PollingTask[]) => {
+    setTasks((prev) => {
+      const updated = prev.map((task) => {
+        const polled = polledTasks.find((p) => p.id === task.id);
+        if (!polled) return task;
+        return {
+          ...task,
+          status: mapBackendStatus(polled.status),
+          progress: polled.progress ?? 0,
+          name: `${mapTaskType(polled.type)} - ${polled.currentStep || "处理中"}`,
+        };
+      });
+      return updated;
+    });
+  }, []);
+
+  const { isPolling } = useTaskPolling(activeTaskIds, updateTasksFromPolling);
+
   const filteredTasks = tasks.filter((task) => {
     if (activeTab === "all") return true;
     if (activeTab === "running") return task.status === "running" || task.status === "pending";
@@ -252,6 +276,12 @@ export default function TasksPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {isPolling && (
+            <div className="flex items-center gap-1.5 text-xs text-blue-600">
+              <Radio className="w-3.5 h-3.5 animate-pulse" />
+              实时更新中
+            </div>
+          )}
           <Button variant="outline" size="sm" onClick={fetchTasks} disabled={loading}>
             <RefreshCw className={cn("w-4 h-4 mr-2", loading && "animate-spin")} />
             刷新
