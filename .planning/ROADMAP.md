@@ -1,77 +1,144 @@
-# Roadmap: Image This
+# Roadmap: AI Product Visual Workbench Rebuild
 
 ## Overview
 
-当前版本已经具备桌面端 AI 图像处理的主要业务能力，但运行时架构和任务链路开始成为明显瓶颈。第一阶段不扩功能，集中修复后台运行稳定性、Windows 接口慢和任务队列负载过重的问题，为后续继续迭代模型能力和桌面体验打基础。
+当前主线从桌面性能治理切换为新版 AI 商品视觉工作台重构。main 分支带入的 runtime、任务队列、输入资产引用和日志可观测性优化是新版的工程基线；接下来按 Pencil 设计稿重建前端信息架构、页面流程和 typed workflow API。
 
 ## Phases
 
-- [ ] **Phase 1: Desktop Runtime & Performance** - 稳定桌面端后台任务链路并完成 Windows 性能治理
-- [ ] **Phase 2: Task Input Asset References** - 把任务输入从 base64 JSON 迁移为本地资产引用
-- [ ] **Phase 3: App Log Observability** - 在应用内查看、定位和配置桌面日志，降低 Windows 排障成本
+- [x] **Phase 1: Product Visual Workbench Foundation** - 建立新版 app shell、路由、设计 token、workflow state 和 typed API contract 基础 (completed 2026-05-27)
+- [ ] **Phase 2: Template Library and Preset Model** - 实现模板库页面、预设数据模型和模板到工作流的入口
+- [ ] **Phase 3: Scene Image Guided Workflow** - 实现场景图商品信息、候选生成、结果调整三步流程
+- [ ] **Phase 4: Unified Smart Toolbox** - 用统一编辑器 shell 重建 AI 换背景、加水印、高清化、扩图等工具
+- [ ] **Phase 5: Workflow API and Worker Contract Refactor** - 将任务提交、worker dispatch、结果 payload 规范化为 typed workflow contract
+- [ ] **Phase 6: Old Frontend Removal and Regression Hardening** - 删除旧 workspace、补回归验证、检查 Electron/Windows 基线
 
 ## Phase Details
 
-### Phase 1: Desktop Runtime & Performance
-**Goal**: 把桌面端运行时从“前端触发式任务处理”收敛为稳定的后台处理体系，并显著降低 Windows 版接口与任务相关页面的延迟
-**Depends on**: Nothing (first phase)
-**Requirements**: [PERF-01, PERF-02, PERF-03, PERF-04, PERF-05, PERF-06]
-**Success Criteria** (what must be TRUE):
-  1. 用户关闭或切换主界面后，任务队列仍能被稳定消费，不依赖页面触发 `/api/tasks/worker`
-  2. 任务轮询接口不再返回大体积 `inputData/outputData`，状态查询链路只承载轻量字段
-  3. Windows 版启动后访问健康检查、任务状态和最近任务列表的体感明显改善，并有代码层面的 IO / DB 调优落地
-  4. worker 失败、重试失败和触发失败都能在前端可见，不再只留在日志里
-  5. Windows 安装、重装和自动更新不会删除既有数据库、配置和历史任务
-  6. Phase 内每个 plan 都有明确验证方式，后续可以直接进入 execute
-**Plans**: 3 plans
+### Phase 1: Product Visual Workbench Foundation
 
-Plans:
-- [x] 01-01: 常驻后台 worker、失败上报与桌面 runtime 稳定性改造
-- [x] 01-02: 任务接口瘦身与轮询链路降载
-- [x] 01-03: SQLite、文件 IO、安装更新数据安全与 Windows 专项性能调优
+**Goal**: 建立新版产品工作台基础架构，让后续页面开发不再依赖旧的 `src/app/workspace/page.tsx` 巨型客户端组件。
 
-Manual verification artifacts:
-- `01-WINDOWS-REGRESSION.md` - Windows 实机专项回归步骤
-- `01-UAT.md` - 当前阻塞中的 Windows UAT 跟踪文件
+**Depends on**: main 分支 runtime/task/input-asset 优化基线
 
-### Phase 2: Task Input Asset References
-**Goal**: 把任务输入从前端直接传 base64 的模式迁移为“输入资产先落地，任务只传引用”，降低前端、接口、队列和 SQLite 负载
-**Depends on**: Phase 1
-**Requirements**: [ASSET-01, ASSET-02, ASSET-03, ASSET-04, ASSET-05, ASSET-06]
-**Success Criteria** (what must be TRUE):
-  1. 前端创建任务时不再直接把原图/参考图的大 base64 塞进 `task_queue.inputData`
-  2. worker 可以从输入资产引用读取文件，并只在 provider 边界按需转 base64
-  3. 重试、恢复和历史页在迁移期兼容新旧任务模型
-  4. 新任务的请求体和队列 payload 明显变轻
-**Plans**: 3 plans
+**Requirements**: [WB-01, WB-05, WB-06, WB-09]
 
-Plans:
-- [x] 02-01: 输入资产落地与引用协议
-- [x] 02-02: 前端任务创建链路引用化
-- [x] 02-03: worker 输入消费与迁移兼容
+**Success Criteria**:
 
-### Phase 3: App Log Observability
-**Goal**: 让用户不需要手动打开日志目录，也能在应用内查看 app/error 日志、打开目录、配置日志目录并快速定位后台/更新/启动问题
-**Depends on**: Phase 1
-**Requirements**: [LOG-01, LOG-02, LOG-03, LOG-04, LOG-05]
-**Success Criteria** (what must be TRUE):
-  1. 设置页能展示当前日志目录和日志文件列表
-  2. 用户能在应用内读取最近 app/error 日志内容，且不会一次性加载大文件
-  3. 用户能一键打开日志目录
-  4. 用户能选择自定义日志目录，切换后新日志写入新目录
-  5. 日志目录配置不会影响数据库、历史任务和安装更新保库策略
+1. 新 app shell、导航、步骤条、面板、画布和 action bar 有可复用组件。
+2. 新 route map 明确覆盖首页、模板库、场景流程和工具箱。
+3. workflow/domain 类型定义完成，区分 draft state、task state、result asset。
+4. typed workflow API contract 草案完成，并能映射到现有任务系统。
+5. 不破坏现有 settings、history、task、provider 和 Electron runtime。
+
 **Plans**: 1 plan
 
 Plans:
-- [ ] 03-01: 应用内日志查看器与日志目录配置
+
+- [x] 01-01: Product visual workbench foundation
+
+### Phase 2: Template Library and Preset Model
+
+**Goal**: 建立模板库作为新版工作流入口，支持分类、预览、详情和一键使用。
+
+**Depends on**: Phase 1
+
+**Requirements**: [WB-02, WB-07]
+
+**Success Criteria**:
+
+1. 模板库页面符合设计稿三栏布局。
+2. 模板/预设数据结构可表达场景图、背景、工具参数和提示词。
+3. 系统预设可以 seed 或静态加载，后续可迁移到 DB。
+4. 从模板详情进入场景工作流或工具箱时能携带 preset。
+
+**Plans**: TBD after Phase 1
+
+### Phase 3: Scene Image Guided Workflow
+
+**Goal**: 实现场景图三步工作流，覆盖商品信息、候选生成和结果调整。
+
+**Depends on**: Phase 1, Phase 2
+
+**Requirements**: [WB-03, WB-05, WB-06, WB-07]
+
+**Success Criteria**:
+
+1. 商品素材和信息录入页可创建 scene workflow draft。
+2. 候选生成页可提交任务并展示批量/单图进度。
+3. 结果调整页可查看、选择、调整、保存结果。
+4. 所有任务状态通过轻量 task/batch 查询驱动。
+
+**Plans**: TBD after Phase 2
+
+### Phase 4: Unified Smart Toolbox
+
+**Goal**: 将单工具能力统一到一个编辑器 shell，减少旧 tab 模式重复状态。
+
+**Depends on**: Phase 1
+
+**Requirements**: [WB-04, WB-05, WB-06]
+
+**Success Criteria**:
+
+1. AI 换背景、加水印、高清化至少三个工具可用。
+2. 左参数面板、中心画布、右结果面板和批量模式共享。
+3. 旧工具组件中有价值的编辑器/上传/预览能力被复用或改造。
+
+**Plans**: TBD after Phase 1
+
+### Phase 5: Workflow API and Worker Contract Refactor
+
+**Goal**: 把任务创建、worker dispatch 和结果 payload 从历史松散 JSON 收敛为可维护的 workflow contract。
+
+**Depends on**: Phase 1, Phase 3, Phase 4
+
+**Requirements**: [WB-05, WB-06, WB-07, WB-09]
+
+**Success Criteria**:
+
+1. 新 UI 不直接构造任意 `TaskQueue.inputData` 字符串。
+2. worker 按 typed workflow/tool handler 分发。
+3. 结果 payload 对场景图、工具输出、批量任务保持一致。
+4. 旧任务和历史记录在迁移期仍可读取。
+
+**Plans**: TBD after Phase 3/4
+
+### Phase 6: Old Frontend Removal and Regression Hardening
+
+**Goal**: 删除旧 workspace 代码，补齐新流程回归验证，并确认桌面端基线未退化。
+
+**Depends on**: Phase 2, Phase 3, Phase 4, Phase 5
+
+**Requirements**: [WB-08, WB-09]
+
+**Success Criteria**:
+
+1. 旧 workspace tab store、旧页面和无引用组件被删除。
+2. 首页、模板库、场景流程、工具箱、设置、历史均有 smoke 验证。
+3. `npm run build` 通过。
+4. Electron 启动、任务后台处理、输入资产引用和数据安全策略仍有效。
+
+**Plans**: TBD after Phase 5
+
+## Historical Baseline
+
+以下已合入 main 的 GSD phase 保留为工程基线和回归参考，不再代表当前执行主线：
+
+- `01-desktop-runtime-performance`
+- `02-task-input-asset-references`
+- `03-app-log-observability`
 
 ## Progress
 
-**Execution Order:**
-Phases execute in numeric order: 1
+**Current focus:** Phase 1 - Product Visual Workbench Foundation
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 1. Desktop Runtime & Performance | 3/3 | In progress (awaiting Windows verification) | - |
-| 2. Task Input Asset References | 3/3 | Complete (code) | - |
-| 3. App Log Observability | 0/1 | Planned | - |
+| Phase | Plans Complete | Status |
+|-------|----------------|--------|
+| 1. Product Visual Workbench Foundation | 1/1 | Complete |
+| 2. Template Library and Preset Model | 0/TBD | Pending |
+| 3. Scene Image Guided Workflow | 0/TBD | Pending |
+| 4. Unified Smart Toolbox | 0/TBD | Pending |
+| 5. Workflow API and Worker Contract Refactor | 0/TBD | Pending |
+| 6. Old Frontend Removal and Regression Hardening | 0/TBD | Pending |
+
