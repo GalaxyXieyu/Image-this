@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { apiPost } from "@/lib/api-client";
 import {
   ArrowLeft,
   ArrowRight,
@@ -23,6 +24,7 @@ import {
   Image as ImageIcon,
   Wand2,
   ShoppingBag,
+  Loader2,
 } from "lucide-react";
 
 type Step = 1 | 2 | 3;
@@ -368,19 +370,44 @@ function StyleTemplateStep({ onBack, onNext }: { onBack: () => void; onNext: () 
 function GenerateAdjustStep({ onBack }: { onBack: () => void }) {
   const [generating, setGenerating] = useState(false);
   const [results, setResults] = useState<{ id: string; name: string; status: string }[]>([]);
+  const [taskId, setTaskId] = useState<string | null>(null);
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     setGenerating(true);
-    setResults([
-      { id: "1", name: "简约自然风格", status: "pending" },
-      { id: "2", name: "生活场景风格", status: "pending" },
-      { id: "3", name: "极简商务风格", status: "pending" },
-      { id: "4", name: "温馨居家风格", status: "pending" },
-    ]);
-    setTimeout(() => {
-      setResults((prev) => prev.map((r) => ({ ...r, status: "done" })));
+    try {
+      const res = await apiPost<{ success: boolean; task: { id: string } }>("/api/tasks", {
+        type: "SCENE_GENERATION",
+        inputData: JSON.stringify({
+          prompt: "生成商品场景图",
+          style: "elegant",
+          count: 4,
+        }),
+        totalSteps: 4,
+      });
+      setTaskId(res.task.id);
+      setResults([
+        { id: "1", name: "简约自然风格", status: "pending" },
+        { id: "2", name: "生活场景风格", status: "pending" },
+        { id: "3", name: "极简商务风格", status: "pending" },
+        { id: "4", name: "温馨居家风格", status: "pending" },
+      ]);
+      // Poll for completion
+      const poll = setInterval(async () => {
+        const statusRes = await fetch(`/api/tasks/${res.task.id}`, { credentials: "same-origin" });
+        if (statusRes.ok) {
+          const data = await statusRes.json();
+          if (data.task?.status === "COMPLETED" || data.task?.status === "FAILED") {
+            clearInterval(poll);
+            setResults((prev) => prev.map((r) => ({ ...r, status: "done" })));
+            setGenerating(false);
+          }
+        }
+      }, 3000);
+      // Auto-clear after 30s to avoid hanging
+      setTimeout(() => { clearInterval(poll); setGenerating(false); }, 30000);
+    } catch {
       setGenerating(false);
-    }, 3000);
+    }
   };
 
   return (
