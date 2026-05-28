@@ -39,10 +39,17 @@ export async function POST(request: NextRequest) {
       userId = session.user.id;
     }
 
+    const originalUrlForRecord = imageUrl.startsWith('data:')
+      ? await uploadBase64Image(imageUrl, `original-watermark-${Date.now()}.png`, userId)
+      : imageUrl;
+    const watermarkLogoUrlForRecord = typeof watermarkLogoUrl === 'string' && watermarkLogoUrl.startsWith('data:')
+      ? await uploadBase64Image(watermarkLogoUrl, `logo-watermark-${Date.now()}.png`, userId)
+      : watermarkLogoUrl;
+
     const processedImage = await prisma.processedImage.create({
       data: {
         filename: `watermark-${Date.now()}.png`,
-        originalUrl: imageUrl,
+        originalUrl: originalUrlForRecord,
         processType: 'WATERMARK',
         status: 'PROCESSING',
         userId: userId,
@@ -51,7 +58,7 @@ export async function POST(request: NextRequest) {
           watermarkOpacity,
           watermarkPosition,
           watermarkType,
-          watermarkLogoUrl,
+          watermarkLogoUrl: watermarkLogoUrlForRecord,
           outputResolution,
         })
       }

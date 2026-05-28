@@ -8,7 +8,10 @@ import { normalizeImageUrlForClient } from '@/lib/image-url';
 type TaskInputData = {
   inputAsset?: unknown;
   referenceAsset?: unknown;
+  watermarkLogoAsset?: unknown;
   imageUrl?: string;
+  referenceImageUrl?: string;
+  watermarkLogoUrl?: string;
   originalUrl?: string;
   sourceUrl?: string;
   [key: string]: unknown;

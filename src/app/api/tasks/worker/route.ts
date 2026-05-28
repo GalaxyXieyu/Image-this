@@ -44,6 +44,22 @@ async function resolveTaskInputData(rawInputData: string): Promise<ParsedTaskInp
   return JSON.parse(rawInputData) as ParsedTaskInput;
 }
 
+function getAssetClientUrl(asset?: TaskAssetRef): string {
+  return asset?.clientUrl || '';
+}
+
+async function persistRecordUrl(source: string | undefined, filename: string, userId: string): Promise<string> {
+  if (!source) {
+    return '';
+  }
+
+  if (source.startsWith('data:')) {
+    return uploadBase64Image(source, filename, userId);
+  }
+
+  return source;
+}
+
 // 告诉 Next.js 这是一个动态路由，不要在构建时预渲染
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -464,6 +480,12 @@ class TaskProcessor {
     const imageUrl = (await readAssetAsDataUrl(inputData.inputAsset)) || inputData.imageUrl;
     const referenceImageUrl = (await readAssetAsDataUrl(inputData.referenceAsset)) || inputData.referenceImageUrl;
     const watermarkLogoUrl = (await readAssetAsDataUrl(inputData.watermarkLogoAsset)) || inputData.watermarkLogoUrl;
+    const originalImageUrlForRecord = getAssetClientUrl(inputData.inputAsset)
+      || await persistRecordUrl(inputData.imageUrl, `input-one-click-${task.id}.jpg`, task.userId);
+    const referenceImageUrlForRecord = getAssetClientUrl(inputData.referenceAsset)
+      || await persistRecordUrl(inputData.referenceImageUrl, `reference-one-click-${task.id}.jpg`, task.userId);
+    const watermarkLogoUrlForRecord = getAssetClientUrl(inputData.watermarkLogoAsset)
+      || await persistRecordUrl(inputData.watermarkLogoUrl, `logo-one-click-${task.id}.png`, task.userId);
     const { 
       xScale = 2.0, 
       yScale = 2.0, 
@@ -510,7 +532,10 @@ class TaskProcessor {
         outpaintPrompt,
         userId: task.userId,
         volcengineConfig,
-        imagehostingConfig
+        imagehostingConfig,
+        originalImageUrlForRecord,
+        referenceImageUrlForRecord,
+        watermarkLogoUrlForRecord
       });
       
       await this.updateTaskProgress(task.id, 'Step 3/3: 处理完成', 100, 3);
@@ -538,6 +563,10 @@ class TaskProcessor {
     const imageUrl = (await readAssetAsDataUrl(inputData.inputAsset)) || inputData.imageUrl;
     const referenceImageUrl = (await readAssetAsDataUrl(inputData.referenceAsset)) || inputData.referenceImageUrl;
     const { customPrompt, aiModel = 'gemini', volcengineConfig, imagehostingConfig } = inputData;
+    const originalImageUrlForRecord = getAssetClientUrl(inputData.inputAsset)
+      || await persistRecordUrl(inputData.imageUrl, `input-bg-replace-${task.id}.jpg`, task.userId);
+    const referenceImageUrlForRecord = getAssetClientUrl(inputData.referenceAsset)
+      || await persistRecordUrl(inputData.referenceImageUrl, `reference-bg-replace-${task.id}.jpg`, task.userId);
 
     await this.updateTaskProgress(task.id, `使用 ${aiModel} 生成图像中...`, 30, 1);
     
@@ -576,7 +605,7 @@ class TaskProcessor {
         const processedImage = await prisma.processedImage.create({
           data: {
             filename: `gpt-bg-replace-${Date.now()}.jpg`,
-            originalUrl: imageUrl,
+            originalUrl: originalImageUrlForRecord,
             processedUrl: processedUrl,
             processType: 'BACKGROUND_REMOVAL',
             status: 'COMPLETED',
@@ -584,7 +613,7 @@ class TaskProcessor {
             metadata: JSON.stringify({
               provider: 'gpt',
               prompt,
-              referenceImageUrl,
+              referenceImageUrl: referenceImageUrlForRecord,
               processingCompletedAt: new Date().toISOString()
             }),
             userId: task.userId
@@ -621,7 +650,7 @@ class TaskProcessor {
         const processedImage = await prisma.processedImage.create({
           data: {
             filename: `gemini-bg-replace-${Date.now()}.jpg`,
-            originalUrl: imageUrl,
+            originalUrl: originalImageUrlForRecord,
             processedUrl: processedUrl,
             processType: 'BACKGROUND_REMOVAL',
             status: 'COMPLETED',
@@ -629,7 +658,7 @@ class TaskProcessor {
             metadata: JSON.stringify({
               provider: 'gemini',
               prompt,
-              referenceImageUrl,
+              referenceImageUrl: referenceImageUrlForRecord,
               processingCompletedAt: new Date().toISOString()
             }),
             userId: task.userId
@@ -666,7 +695,7 @@ class TaskProcessor {
         const processedImage = await prisma.processedImage.create({
           data: {
             filename: `jimeng-bg-replace-${Date.now()}.jpg`,
-            originalUrl: imageUrl,
+            originalUrl: originalImageUrlForRecord,
             processedUrl: processedUrl,
             processType: 'BACKGROUND_REMOVAL',
             status: 'COMPLETED',
@@ -674,7 +703,7 @@ class TaskProcessor {
             metadata: JSON.stringify({
               provider: 'jimeng',
               prompt,
-              referenceImageUrl,
+              referenceImageUrl: referenceImageUrlForRecord,
               processingCompletedAt: new Date().toISOString()
             }),
             userId: task.userId
@@ -712,6 +741,8 @@ class TaskProcessor {
     const inputData = await resolveTaskInputData(task.inputData);
     const imageUrl = (await readAssetAsDataUrl(inputData.inputAsset)) || inputData.imageUrl;
     const { xScale = 2.0, yScale = 2.0, prompt = '扩展图像，保持产品主体和风格完全一致，自然延伸背景', volcengineConfig, imagehostingConfig } = inputData;
+    const originalImageUrlForRecord = getAssetClientUrl(inputData.inputAsset)
+      || await persistRecordUrl(inputData.imageUrl, `input-outpaint-${task.id}.jpg`, task.userId);
     
     await this.updateTaskProgress(task.id, '图像扩展处理中...', 50, 1);
     
@@ -751,7 +782,7 @@ class TaskProcessor {
       const processedImage = await prisma.processedImage.create({
         data: {
           filename: `outpaint-${Date.now()}.jpg`,
-          originalUrl: imageUrl,
+          originalUrl: originalImageUrlForRecord,
           processedUrl: processedUrl,
           processType: 'IMAGE_OUTPAINTING',
           status: 'COMPLETED',
@@ -785,6 +816,8 @@ class TaskProcessor {
     const inputData = await resolveTaskInputData(task.inputData);
     const imageUrl = (await readAssetAsDataUrl(inputData.inputAsset)) || inputData.imageUrl;
     const { upscaleFactor = 2, aiModel = 'volcengine', volcengineConfig, imagehostingConfig } = inputData;
+    const originalImageUrlForRecord = getAssetClientUrl(inputData.inputAsset)
+      || await persistRecordUrl(inputData.imageUrl, `input-upscale-${task.id}.jpg`, task.userId);
     
     await this.updateTaskProgress(task.id, '智能画质增强中...', 50, 1);
     
@@ -817,7 +850,7 @@ class TaskProcessor {
       const processedImage = await prisma.processedImage.create({
         data: {
           filename: `enhance-${Date.now()}.jpg`,
-          originalUrl: imageUrl,
+          originalUrl: originalImageUrlForRecord,
           processedUrl: processedUrl,
           processType: 'IMAGE_UPSCALING',
           status: 'COMPLETED',
@@ -851,6 +884,10 @@ class TaskProcessor {
     const inputData = await resolveTaskInputData(task.inputData);
     const imageUrl = (await readAssetAsDataUrl(inputData.inputAsset)) || inputData.imageUrl;
     const watermarkLogoUrl = (await readAssetAsDataUrl(inputData.watermarkLogoAsset)) || inputData.watermarkLogoUrl;
+    const originalImageUrlForRecord = getAssetClientUrl(inputData.inputAsset)
+      || await persistRecordUrl(inputData.imageUrl, `input-watermark-${task.id}.png`, task.userId);
+    const watermarkLogoUrlForRecord = getAssetClientUrl(inputData.watermarkLogoAsset)
+      || await persistRecordUrl(inputData.watermarkLogoUrl, `logo-watermark-${task.id}.png`, task.userId);
     const {
       watermarkText = 'Watermark',
       watermarkOpacity = 0.3,
@@ -873,7 +910,7 @@ class TaskProcessor {
       const processedImage = await prisma.processedImage.create({
         data: {
           filename: `watermark-${Date.now()}.png`,
-          originalUrl: imageUrl,
+          originalUrl: originalImageUrlForRecord,
           processType: 'WATERMARK',
           status: 'PROCESSING',
           userId: task.userId,
@@ -882,7 +919,7 @@ class TaskProcessor {
             watermarkOpacity,
             watermarkPosition,
             watermarkType,
-            watermarkLogoUrl,
+            watermarkLogoUrl: watermarkLogoUrlForRecord,
             outputResolution,
           })
         }

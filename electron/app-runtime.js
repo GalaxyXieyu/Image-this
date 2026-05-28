@@ -68,6 +68,29 @@ function resolveUserConfiguredDataRoot(app) {
   return null;
 }
 
+function writeDataRootPointer(app, dataRoot, source = 'unknown') {
+  if (typeof dataRoot !== 'string' || !dataRoot.trim()) {
+    return false;
+  }
+
+  const legacyUserDataPath = getLegacyUserDataPath(app);
+  const pointerPath = path.join(legacyUserDataPath, DATA_ROOT_POINTER_FILE);
+  const nextDataRoot = path.resolve(dataRoot.trim());
+
+  fs.mkdirSync(legacyUserDataPath, { recursive: true });
+  fs.writeFileSync(
+    pointerPath,
+    JSON.stringify({
+      dataRoot: nextDataRoot,
+      source,
+      updatedAt: new Date().toISOString(),
+    }, null, 2),
+    'utf8'
+  );
+
+  return true;
+}
+
 function canUseDirectory(dirPath) {
   try {
     fs.mkdirSync(dirPath, { recursive: true });
@@ -92,6 +115,56 @@ function getPreferredUserDataPath(app) {
   }
 
   return getLegacyUserDataPath(app);
+}
+
+function readLegacyLocalStoragePath(app) {
+  const legacyDbPath = path.join(getLegacyUserDataPath(app), 'data', 'app.db');
+  if (!fs.existsSync(legacyDbPath)) {
+    return null;
+  }
+
+  let database = null;
+  try {
+    const { DatabaseSync } = require('node:sqlite');
+    database = new DatabaseSync(legacyDbPath, { readOnly: true });
+    const table = database.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'users'").get();
+    if (!table) {
+      return null;
+    }
+    const column = database.prepare("PRAGMA table_info('users')").all().find((item) => item.name === 'localStoragePath');
+    if (!column) {
+      return null;
+    }
+    const row = database
+      .prepare("SELECT localStoragePath FROM users WHERE localStoragePath IS NOT NULL AND TRIM(localStoragePath) != '' ORDER BY updatedAt DESC LIMIT 1")
+      .get();
+    return typeof row?.localStoragePath === 'string' ? row.localStoragePath : null;
+  } catch {
+    return null;
+  } finally {
+    database?.close();
+  }
+}
+
+function ensureConfiguredDataRootFromLegacySettings(app, log) {
+  if (resolveUserConfiguredDataRoot(app)) {
+    return null;
+  }
+
+  const legacyLocalStoragePath = readLegacyLocalStoragePath(app);
+  if (!legacyLocalStoragePath) {
+    return null;
+  }
+
+  const nextDataRoot = path.resolve(legacyLocalStoragePath);
+  if (!canUseDirectory(nextDataRoot)) {
+    log?.(`Legacy localStoragePath is not writable, cannot promote to data root: ${nextDataRoot}`, 'WARN');
+    return null;
+  }
+
+  writeDataRootPointer(app, nextDataRoot, 'legacy-localStoragePath');
+  log?.(`Promoted legacy localStoragePath to desktop data root: ${nextDataRoot}`);
+  return nextDataRoot;
 }
 
 function getUserDataPaths(app) {
@@ -166,7 +239,7 @@ function copyDirectoryContents(sourceDir, targetDir, log, relativeBase = '', opt
 
 function ensureExternalUserDataMigrated(app, log) {
   const legacyUserDataPath = getLegacyUserDataPath(app);
-  const configuredDataRoot = resolveUserConfiguredDataRoot(app);
+  const configuredDataRoot = resolveUserConfiguredDataRoot(app) || ensureConfiguredDataRootFromLegacySettings(app, log);
   const externalUserDataPath = configuredDataRoot || getPackagedExternalUserDataPath(app);
 
   if (!externalUserDataPath || externalUserDataPath === legacyUserDataPath) {
@@ -244,6 +317,7 @@ module.exports = {
   getStandaloneDir,
   getPrismaDir,
   ensureExternalUserDataMigrated,
+  writeDataRootPointer,
   getLegacyUserDataPath,
   getUserDataPaths,
 };

@@ -45,6 +45,7 @@ function writeDesktopDataRootPointer(dataRoot?: string) {
     pointerPath,
     JSON.stringify({
       dataRoot: nextDataRoot,
+      source: 'settings-api',
       updatedAt: new Date().toISOString(),
     }, null, 2),
     'utf8'

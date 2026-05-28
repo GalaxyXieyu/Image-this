@@ -13,6 +13,18 @@ function stopWorkflow(stepName: string, error: unknown): never {
   throw new Error(`${stepName}失败，已停止后续步骤：${getErrorMessage(error)}`);
 }
 
+async function persistRecordUrl(source: string | undefined, filename: string, userId: string): Promise<string> {
+  if (!source) {
+    return '';
+  }
+
+  if (source.startsWith('data:')) {
+    return uploadBase64Image(source, filename, userId);
+  }
+
+  return source;
+}
+
 export interface OneClickWorkflowParams {
   imageUrl: string;
   referenceImageUrl?: string;
@@ -41,6 +53,9 @@ export interface OneClickWorkflowParams {
   userId: string;
   volcengineConfig?: { accessKey: string; secretKey: string };
   imagehostingConfig?: { superbedToken: string };
+  originalImageUrlForRecord?: string;
+  referenceImageUrlForRecord?: string;
+  watermarkLogoUrlForRecord?: string;
 }
 
 export interface OneClickWorkflowResult {
@@ -100,7 +115,10 @@ export async function executeOneClickWorkflow(
     videoSeed = -1,
     userId,
     volcengineConfig,
-    imagehostingConfig
+    imagehostingConfig,
+    originalImageUrlForRecord,
+    referenceImageUrlForRecord,
+    watermarkLogoUrlForRecord
   } = params;
 
   // 参数验证
@@ -113,12 +131,18 @@ export async function executeOneClickWorkflow(
   }
 
   // 配置会在具体调用时检查，这里不再预先检查
+  const originalUrlForRecord = originalImageUrlForRecord
+    || await persistRecordUrl(imageUrl, `input-one-click-${Date.now()}.jpg`, userId);
+  const referenceUrlForRecord = referenceImageUrlForRecord
+    || await persistRecordUrl(referenceImageUrl, `reference-one-click-${Date.now()}.jpg`, userId);
+  const watermarkLogoUrlForDatabase = watermarkLogoUrlForRecord
+    || await persistRecordUrl(watermarkLogoUrl, `logo-one-click-${Date.now()}.png`, userId);
 
   // 创建处理记录
   const processedImage = await prisma.processedImage.create({
     data: {
       filename: `one-click-${Date.now()}.jpg`,
-      originalUrl: imageUrl,
+      originalUrl: originalUrlForRecord,
       processType: 'ONE_CLICK_WORKFLOW',
       status: 'PROCESSING',
       userId: userId,
@@ -138,7 +162,8 @@ export async function executeOneClickWorkflow(
         watermarkType,
         outputResolution,
         aiModel,
-        referenceImageUrl,
+        referenceImageUrl: referenceUrlForRecord,
+        watermarkLogoUrl: watermarkLogoUrlForDatabase,
         isWorkflowFinal: true
       })
     }

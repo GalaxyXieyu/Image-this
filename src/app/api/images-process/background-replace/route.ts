@@ -36,6 +36,12 @@ export async function POST(request: NextRequest) {
     } = body;
 
     const finalPrompt = customPrompt || prompt || DEFAULT_PROMPT;
+    const originalUrlForRecord = originalImageUrl.startsWith('data:')
+      ? await uploadBase64Image(originalImageUrl, `original-bg-replace-${Date.now()}.jpg`, userId)
+      : originalImageUrl;
+    const referenceUrlForRecord = referenceImageUrl.startsWith('data:')
+      ? await uploadBase64Image(referenceImageUrl, `reference-bg-replace-${Date.now()}.jpg`, userId)
+      : referenceImageUrl;
 
     console.log(`[背景替换API] 使用提供商: ${provider}`);
 
@@ -49,8 +55,8 @@ export async function POST(request: NextRequest) {
         metadata: JSON.stringify({
           provider,
           prompt: finalPrompt,
-          originalImageSize: originalImageUrl.length,
-          referenceImageSize: referenceImageUrl.length
+          originalImageUrl: originalUrlForRecord,
+          referenceImageUrl: referenceUrlForRecord
         }),
         userId,
         projectId: projectId || null
@@ -119,16 +125,10 @@ export async function POST(request: NextRequest) {
         userId
       );
 
-      const originalUrl = await uploadBase64Image(
-        originalImageUrl,
-        `original-${processedImage.id}.jpg`,
-        userId
-      );
-
       const updatedImage = await prisma.processedImage.update({
         where: { id: processedImage.id },
         data: {
-          originalUrl: originalUrl,
+          originalUrl: originalUrlForRecord,
           processedUrl: processedUrl,
           status: 'COMPLETED',
           fileSize: imageDataUrl.length,
