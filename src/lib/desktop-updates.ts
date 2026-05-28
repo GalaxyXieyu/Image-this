@@ -17,6 +17,7 @@ export interface DesktopUpdateState {
   targetVersion: string | null;
   progress: number;
   message: string;
+  installMode: 'on-quit' | null;
   feedUrl: string;
   error: string | null;
   downloadedFileName: string | null;
@@ -26,6 +27,7 @@ export interface DesktopUpdatesApi {
   getStatus: () => Promise<DesktopUpdateState | null>;
   check: () => Promise<DesktopUpdateState | null>;
   restartAndInstall: () => Promise<boolean>;
+  installOnQuit: () => Promise<boolean>;
   subscribe: (callback: (state: DesktopUpdateState) => void) => () => void;
 }
 

@@ -1,5 +1,5 @@
 const path = require('path');
-const { app } = require('electron');
+const { app, dialog } = require('electron');
 const { getStandaloneDir } = require('./app-runtime');
 
 function loadAutoUpdater() {
@@ -24,6 +24,7 @@ function createUpdateManager({ getMainWindow, log }) {
     targetVersion: null,
     progress: 0,
     message: '',
+    installMode: null,
     feedUrl: '',
     error: null,
     downloadedFileName: null,
@@ -32,6 +33,7 @@ function createUpdateManager({ getMainWindow, log }) {
   let autoUpdater = null;
   let initialized = false;
   let checkTimer = null;
+  let downloadPromptShownForVersion = null;
 
   function sendStatus() {
     const mainWindow = getMainWindow();
@@ -164,9 +166,12 @@ function createUpdateManager({ getMainWindow, log }) {
           status: 'downloaded',
           targetVersion: info.version,
           progress: 100,
-          message: 'Update downloaded. Restart to install.',
+          message: '更新已下载，可以立即重启安装，或退出应用时自动安装。',
           error: null,
           downloadedFileName: info.files?.[0]?.url || null,
+        });
+        promptForDownloadedUpdate(info).catch((error) => {
+          log(`Failed to show update prompt: ${error.message}`, 'WARN');
         });
       });
 
@@ -209,10 +214,58 @@ function createUpdateManager({ getMainWindow, log }) {
     return state;
   }
 
+  async function promptForDownloadedUpdate(info) {
+    if (downloadPromptShownForVersion === info.version) {
+      return;
+    }
+
+    const mainWindow = getMainWindow();
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return;
+    }
+
+    downloadPromptShownForVersion = info.version;
+    const result = await dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: '更新已下载',
+      message: `ImagineThis ${info.version} 已准备好`,
+      detail: '可以现在重启完成安装，也可以选择退出应用时自动安装。',
+      buttons: ['立即重启安装', '退出应用时安装', '稍后'],
+      defaultId: 0,
+      cancelId: 2,
+      noLink: true,
+    });
+
+    if (result.response === 0) {
+      restartToInstall();
+      return;
+    }
+
+    if (result.response === 1) {
+      installOnQuit();
+    }
+  }
+
+  function installOnQuit() {
+    if (autoUpdater && state.status === 'downloaded') {
+      autoUpdater.autoInstallOnAppQuit = true;
+      updateState({
+        installMode: 'on-quit',
+        message: '更新将在退出应用时自动安装，下次启动即为新版本。',
+      });
+      return true;
+    }
+
+    return false;
+  }
+
   function restartToInstall() {
     if (autoUpdater && state.status === 'downloaded') {
       autoUpdater.quitAndInstall(false, true);
+      return true;
     }
+
+    return false;
   }
 
   function getStatus() {
@@ -230,6 +283,7 @@ function createUpdateManager({ getMainWindow, log }) {
     initialize,
     checkForUpdates,
     restartToInstall,
+    installOnQuit,
     getStatus,
     dispose,
   };

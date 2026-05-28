@@ -944,6 +944,9 @@ ipcMain.handle('updates:check', async () => {
 });
 
 ipcMain.handle('updates:restart-and-install', async () => {
-  updateManager?.restartToInstall();
-  return true;
+  return updateManager?.restartToInstall() ?? false;
+});
+
+ipcMain.handle('updates:install-on-quit', async () => {
+  return updateManager?.installOnQuit() ?? false;
 });

@@ -22,6 +22,7 @@ interface DesktopUpdateContextValue {
   refreshStatus: () => Promise<DesktopUpdateState | null>;
   checkForUpdates: () => Promise<DesktopUpdateState | null>;
   restartToUpdate: () => Promise<void>;
+  installOnQuit: () => Promise<void>;
 }
 
 const DesktopUpdateContext = createContext<DesktopUpdateContextValue | null>(null);
@@ -82,7 +83,7 @@ export function DesktopUpdateProvider({ children }: { children: ReactNode }) {
     if (state.status === 'downloaded') {
       toast({
         title: '更新已下载',
-        description: '新版本已经准备好，可在设置页重启完成安装。',
+        description: '新版本已经准备好，可以立即重启安装，也可以退出应用时安装。',
       });
       return;
     }
@@ -123,6 +124,16 @@ export function DesktopUpdateProvider({ children }: { children: ReactNode }) {
           return;
         }
         await updatesApi.restartAndInstall();
+      },
+      installOnQuit: async () => {
+        if (!updatesApi) {
+          return;
+        }
+        const nextState = await updatesApi.installOnQuit();
+        if (nextState) {
+          const refreshedState = await updatesApi.getStatus();
+          setState(refreshedState);
+        }
       },
     };
   }, [desktop, state]);

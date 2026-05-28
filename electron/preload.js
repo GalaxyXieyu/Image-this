@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('electron', {
     getStatus: () => ipcRenderer.invoke('updates:get-status'),
     check: () => ipcRenderer.invoke('updates:check'),
     restartAndInstall: () => ipcRenderer.invoke('updates:restart-and-install'),
+    installOnQuit: () => ipcRenderer.invoke('updates:install-on-quit'),
     subscribe: (callback) => {
       const listener = (_event, payload) => callback(payload);
       ipcRenderer.on('desktop-update-status', listener);

@@ -33,9 +33,10 @@ function getStatusHint(status: string, message: string) {
 
 export function DesktopUpdateCard() {
   const { toast } = useToast();
-  const { isDesktop, state, checkForUpdates, restartToUpdate } = useDesktopUpdates();
+  const { isDesktop, state, checkForUpdates, restartToUpdate, installOnQuit } = useDesktopUpdates();
   const [checking, setChecking] = useState(false);
   const [installing, setInstalling] = useState(false);
+  const [schedulingInstall, setSchedulingInstall] = useState(false);
 
   if (!isDesktop || !state) {
     return null;
@@ -46,6 +47,7 @@ export function DesktopUpdateCard() {
   const statusHint = getStatusHint(state.status, state.message);
   const canCheck = state.status !== 'checking' && state.status !== 'unsupported';
   const canRestart = state.status === 'downloaded';
+  const canInstallOnQuit = state.status === 'downloaded' && state.installMode !== 'on-quit';
 
   const handleCheck = async () => {
     setChecking(true);
@@ -94,6 +96,19 @@ export function DesktopUpdateCard() {
       await restartToUpdate();
     } finally {
       setInstalling(false);
+    }
+  };
+
+  const handleInstallOnQuit = async () => {
+    setSchedulingInstall(true);
+    try {
+      await installOnQuit();
+      toast({
+        title: '已安排退出时安装',
+        description: '关闭应用后会自动安装更新，下次启动就是新版本。',
+      });
+    } finally {
+      setSchedulingInstall(false);
     }
   };
 
@@ -153,6 +168,12 @@ export function DesktopUpdateCard() {
             </div>
           ) : null}
 
+          {state.installMode === 'on-quit' ? (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+              更新已安排在退出应用时安装。关闭 ImagineThis 后会自动完成安装，下次启动即为新版本。
+            </div>
+          ) : null}
+
           <div className="flex flex-wrap gap-3">
             <Button
               type="button"
@@ -173,6 +194,17 @@ export function DesktopUpdateCard() {
             >
               <Download className="h-4 w-4" />
               {installing ? '准备重启...' : '立即重启更新'}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleInstallOnQuit}
+              disabled={!canInstallOnQuit || schedulingInstall}
+              className="gap-2"
+            >
+              <Download className="h-4 w-4" />
+              {schedulingInstall ? '正在安排...' : '退出时安装'}
             </Button>
           </div>
         </CardContent>
