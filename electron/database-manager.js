@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { DatabaseSync } = require('node:sqlite');
-const { getPrismaDir, getUserDataPaths } = require('./app-runtime');
+const { ensureExternalUserDataMigrated, getPrismaDir, getUserDataPaths } = require('./app-runtime');
 
 const REQUIRED_TABLES = [
   'users',
@@ -43,6 +43,7 @@ const USER_COLUMN_PATCHES = [
     sql: `ALTER TABLE "users" ADD COLUMN "taskConcurrency" INTEGER NOT NULL DEFAULT 2`,
   },
 ];
+const MAX_DATABASE_BACKUPS_PER_PREFIX = 5;
 
 function ensureDirectory(dirPath) {
   if (!fs.existsSync(dirPath)) {
@@ -158,6 +159,70 @@ function backupDatabase(dbPath, backupDir, prefix) {
   return backupPath;
 }
 
+function pruneDatabaseBackups(backupDir, prefix, log) {
+  if (!fs.existsSync(backupDir)) {
+    return;
+  }
+
+  const backupFiles = fs
+    .readdirSync(backupDir)
+    .filter((name) => name.startsWith(`${prefix}-`) && name.endsWith('.db'))
+    .map((name) => {
+      const filePath = path.join(backupDir, name);
+      return {
+        filePath,
+        mtimeMs: fs.statSync(filePath).mtimeMs,
+      };
+    })
+    .sort((left, right) => right.mtimeMs - left.mtimeMs);
+
+  for (const backup of backupFiles.slice(MAX_DATABASE_BACKUPS_PER_PREFIX)) {
+    fs.rmSync(backup.filePath, { force: true });
+    log(`Pruned old database backup: ${backup.filePath}`);
+  }
+}
+
+function getPendingSqlMigrations(app, database, log) {
+  ensureMigrationTable(database);
+  const migrationFiles = getMigrationFiles(app);
+  if (migrationFiles.length === 0) {
+    return [];
+  }
+
+  const appliedRows = database.prepare('SELECT name FROM desktop_migrations').all();
+  const appliedNames = new Set(appliedRows.map((row) => row.name));
+
+  if (appliedNames.size === 0 && hasRequiredDatabaseSchema(database)) {
+    const baseline = migrationFiles[0];
+    const baselineSql = fs.readFileSync(baseline.filePath, 'utf8');
+    markMigrationApplied(database, baseline.name, baselineSql);
+    appliedNames.add(baseline.name);
+    log(`Marked existing database baseline as applied: ${baseline.name}`);
+  }
+
+  const pendingMigrations = [];
+  for (const migration of migrationFiles) {
+    if (appliedNames.has(migration.name)) {
+      continue;
+    }
+
+    const migrationSql = fs.readFileSync(migration.filePath, 'utf8');
+    if (isMigrationAlreadySatisfied(database, migrationSql)) {
+      markMigrationApplied(database, migration.name, migrationSql);
+      appliedNames.add(migration.name);
+      log(`Marked already-satisfied desktop migration as applied: ${migration.name}`);
+      continue;
+    }
+
+    pendingMigrations.push({
+      ...migration,
+      sql: migrationSql,
+    });
+  }
+
+  return pendingMigrations;
+}
+
 function toSqliteBoolean(value) {
   return value ? 1 : 0;
 }
@@ -201,42 +266,24 @@ function runSqlMigrations(app, dbPath, log) {
   const database = new DatabaseSync(dbPath);
 
   try {
-    ensureMigrationTable(database);
     const migrationFiles = getMigrationFiles(app);
     if (migrationFiles.length === 0) {
       log('No SQL migrations found, skipping desktop migration step');
       return;
     }
 
-    const appliedRows = database.prepare('SELECT name FROM desktop_migrations').all();
-    const appliedNames = new Set(appliedRows.map((row) => row.name));
-
-    if (appliedNames.size === 0 && hasRequiredDatabaseSchema(database)) {
-      const baseline = migrationFiles[0];
-      const baselineSql = fs.readFileSync(baseline.filePath, 'utf8');
-      markMigrationApplied(database, baseline.name, baselineSql);
-      appliedNames.add(baseline.name);
-      log(`Marked existing database baseline as applied: ${baseline.name}`);
+    const pendingMigrations = getPendingSqlMigrations(app, database, log);
+    if (pendingMigrations.length === 0) {
+      log('No pending SQL migrations found, skipping desktop migration step');
+      return;
     }
 
-    for (const migration of migrationFiles) {
-      if (appliedNames.has(migration.name)) {
-        continue;
-      }
-
-      const migrationSql = fs.readFileSync(migration.filePath, 'utf8');
-      if (isMigrationAlreadySatisfied(database, migrationSql)) {
-        markMigrationApplied(database, migration.name, migrationSql);
-        appliedNames.add(migration.name);
-        log(`Marked already-satisfied desktop migration as applied: ${migration.name}`);
-        continue;
-      }
-
+    for (const migration of pendingMigrations) {
       log(`Applying desktop migration: ${migration.name}`);
       database.exec('BEGIN');
       try {
-        database.exec(migrationSql);
-        markMigrationApplied(database, migration.name, migrationSql);
+        database.exec(migration.sql);
+        markMigrationApplied(database, migration.name, migration.sql);
         database.exec('COMMIT');
       } catch (error) {
         database.exec('ROLLBACK');
@@ -437,11 +484,30 @@ function applyDesktopPragmas(dbPath, log) {
   }
 }
 
+function hasPendingSqlMigrations(app, dbPath, log) {
+  const database = new DatabaseSync(dbPath);
+
+  try {
+    return getPendingSqlMigrations(app, database, log).length > 0;
+  } finally {
+    database.close();
+  }
+}
+
 async function ensureDesktopDatabaseReady(app, log) {
+  const migrationResult = ensureExternalUserDataMigrated(app, log);
+  if (migrationResult.reason === 'external-user-data-not-writable') {
+    log(`Using legacy AppData path because external data path is not writable: ${migrationResult.userDataPath}`, 'WARN');
+  } else if (migrationResult.reason === 'already-migrated') {
+    log(`Using external user data path: ${migrationResult.userDataPath}`);
+  }
+
   const { dataDir, configDir, dbPath, backupDir } = getUserDataPaths(app);
   ensureDirectory(dataDir);
   ensureDirectory(configDir);
   ensureDirectory(backupDir);
+  pruneDatabaseBackups(backupDir, 'pre-migration', log);
+  pruneDatabaseBackups(backupDir, 'corrupted', log);
 
   log(`Initializing database at: ${dbPath}`);
 
@@ -455,9 +521,11 @@ async function ensureDesktopDatabaseReady(app, log) {
   if (!fs.existsSync(dbPath)) {
     log('Database does not exist, restoring from template...');
     restoreDatabaseFromTemplate(app, dbPath, log);
-  } else {
+  } else if (hasPendingSqlMigrations(app, dbPath, log)) {
     const migrationBackup = backupDatabase(dbPath, backupDir, 'pre-migration');
     log(`Created pre-migration backup: ${migrationBackup}`);
+  } else {
+    log('Database is already up to date, skipping pre-migration backup');
   }
 
   runSqlMigrations(app, dbPath, log);
@@ -470,5 +538,6 @@ async function ensureDesktopDatabaseReady(app, log) {
 
 module.exports = {
   ensureDesktopDatabaseReady,
+  getLegacyUserDataPath,
   getUserDataPaths,
 };

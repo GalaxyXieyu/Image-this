@@ -7,6 +7,10 @@ import os from 'os';
  * 在 Electron 环境中使用用户数据目录，在 Web 环境中使用 public/uploads
  */
 function getDefaultUploadDir(): string {
+  if (process.env.IMAGINE_THIS_USER_DATA_PATH) {
+    return path.join(process.env.IMAGINE_THIS_USER_DATA_PATH, 'uploads');
+  }
+
   // 检查是否在 Electron 环境中（通过环境变量或路径判断）
   const cwd = process.cwd();
   const isElectronPackaged = cwd.includes('app.asar') || 

@@ -5,7 +5,7 @@ const net = require('net');
 const os = require('os');
 const path = require('path');
 const { fork } = require('child_process');
-const { ensureDesktopDatabaseReady, getUserDataPaths } = require('./database-manager');
+const { ensureDesktopDatabaseReady, getLegacyUserDataPath, getUserDataPaths } = require('./database-manager');
 const { getStandaloneDir } = require('./app-runtime');
 const { createUpdateManager } = require('./update-manager');
 
@@ -501,6 +501,7 @@ async function resolveServerPort() {
 
 function getServerEnv() {
   const { userDataPath, dbPath } = getUserDataPaths(app);
+  const legacyUserDataPath = getLegacyUserDataPath(app);
 
   return {
     ...process.env,
@@ -510,6 +511,7 @@ function getServerEnv() {
     DATABASE_URL: `file:${dbPath}`,
     IMAGINE_THIS_DESKTOP: 'true',
     IMAGINE_THIS_USER_DATA_PATH: userDataPath,
+    IMAGINE_THIS_LEGACY_USER_DATA_PATH: legacyUserDataPath,
     NEXTAUTH_URL: `http://localhost:${serverPort}`,
     NEXTAUTH_SECRET: 'electron-app-secret-key-min-32-characters-long',
   };

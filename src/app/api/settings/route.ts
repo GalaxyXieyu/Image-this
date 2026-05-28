@@ -7,6 +7,51 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getUserConfig, normalizeTaskConcurrency, saveUserConfig, UserConfig } from '@/lib/user-config';
+import fs from 'fs';
+import path from 'path';
+
+const DATA_ROOT_POINTER_FILE = 'data-root.json';
+
+function writeDesktopDataRootPointer(dataRoot?: string) {
+  const userDataPath = process.env.IMAGINE_THIS_LEGACY_USER_DATA_PATH || process.env.IMAGINE_THIS_USER_DATA_PATH;
+  if (process.env.IMAGINE_THIS_DESKTOP !== 'true' || !userDataPath) {
+    return false;
+  }
+
+  const pointerPath = path.join(userDataPath, DATA_ROOT_POINTER_FILE);
+  fs.mkdirSync(path.dirname(pointerPath), { recursive: true });
+
+  if (!dataRoot?.trim()) {
+    if (fs.existsSync(pointerPath)) {
+      fs.rmSync(pointerPath, { force: true });
+      return true;
+    }
+    return false;
+  }
+
+  const nextDataRoot = path.resolve(dataRoot.trim());
+  if (fs.existsSync(pointerPath)) {
+    try {
+      const current = JSON.parse(fs.readFileSync(pointerPath, 'utf8'));
+      if (current?.dataRoot === nextDataRoot) {
+        return false;
+      }
+    } catch {
+      // 重写损坏的指针文件
+    }
+  }
+
+  fs.writeFileSync(
+    pointerPath,
+    JSON.stringify({
+      dataRoot: nextDataRoot,
+      updatedAt: new Date().toISOString(),
+    }, null, 2),
+    'utf8'
+  );
+
+  return true;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -81,10 +126,13 @@ export async function POST(request: NextRequest) {
         error: '用户不存在，请重新登录'
       }, { status: 404 });
     }
+
+    const dataRootChanged = writeDesktopDataRootPointer(userConfig.localStorage?.savePath);
     
     return NextResponse.json({ 
       success: true,
-      message: '配置已保存'
+      message: dataRootChanged ? '配置已保存，数据目录将在重启应用后生效' : '配置已保存',
+      requiresRestart: dataRootChanged
     });
     
   } catch (error) {

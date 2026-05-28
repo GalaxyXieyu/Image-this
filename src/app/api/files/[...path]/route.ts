@@ -8,6 +8,13 @@ import { authOptions } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
+function getDefaultDesktopFileRoots() {
+  return [
+    process.env.IMAGINE_THIS_USER_DATA_PATH || '',
+    path.join(os.homedir(), 'ImagineThis'),
+  ].filter((item, index, list) => item && list.indexOf(item) === index);
+}
+
 /**
  * 文件服务 API
  * 用于在 Electron 环境中提供本地文件访问
@@ -28,6 +35,7 @@ export async function GET(
     
     // 确定基础目录
     let basePath: string;
+    let fallbackBasePaths: string[] = [];
     const cwd = process.cwd();
     const isElectronPackaged = cwd.includes('app.asar') || 
                                 cwd.includes('AppData') || 
@@ -47,7 +55,9 @@ export async function GET(
           
           if (firstPart === 'uploads' && !userConfig.localStorage?.savePath) {
             // 默认 uploads 目录
-            basePath = path.join(os.homedir(), 'ImagineThis');
+            const defaultRoots = getDefaultDesktopFileRoots();
+            basePath = defaultRoots[0] || path.join(os.homedir(), 'ImagineThis');
+            fallbackBasePaths = defaultRoots.slice(1);
           } else if (userConfig.localStorage?.savePath) {
             // 用户配置的自定义路径
             let userBasePath: string;
@@ -72,22 +82,28 @@ export async function GET(
             }
           } else {
             // 使用默认路径
-            basePath = path.join(os.homedir(), 'ImagineThis');
+            const defaultRoots = getDefaultDesktopFileRoots();
+            basePath = defaultRoots[0] || path.join(os.homedir(), 'ImagineThis');
+            fallbackBasePaths = defaultRoots.slice(1);
           }
         } else {
           // 未登录用户，使用默认路径
-          basePath = path.join(os.homedir(), 'ImagineThis');
+          const defaultRoots = getDefaultDesktopFileRoots();
+          basePath = defaultRoots[0] || path.join(os.homedir(), 'ImagineThis');
+          fallbackBasePaths = defaultRoots.slice(1);
         }
       } catch (error) {
         console.error('获取用户配置失败，使用默认路径:', error);
-        basePath = path.join(os.homedir(), 'ImagineThis');
+        const defaultRoots = getDefaultDesktopFileRoots();
+        basePath = defaultRoots[0] || path.join(os.homedir(), 'ImagineThis');
+        fallbackBasePaths = defaultRoots.slice(1);
       }
     } else {
       // Web 环境：使用 public 目录
       basePath = path.join(process.cwd(), 'public');
     }
     
-    const filePath = path.join(basePath, relativePath);
+    let filePath = path.join(basePath, relativePath);
     
     // 安全检查：确保文件在基础目录内
     const resolvedPath = path.resolve(filePath);
@@ -96,8 +112,37 @@ export async function GET(
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
     
-    // 读取文件
-    const fileBuffer = await fs.readFile(filePath);
+    // 读取文件。默认数据目录变更后，旧图可能还在历史 ~/ImagineThis 目录，允许只读回退。
+    let fileBuffer: Buffer | null = null;
+    try {
+      fileBuffer = await fs.readFile(filePath);
+    } catch (readError) {
+      let fallbackFilePath: string | null = null;
+      for (const fallbackBasePath of fallbackBasePaths) {
+        const candidate = path.join(fallbackBasePath, relativePath);
+        const resolvedCandidate = path.resolve(candidate);
+        const resolvedFallbackBase = path.resolve(fallbackBasePath);
+        if (!resolvedCandidate.startsWith(resolvedFallbackBase)) {
+          continue;
+        }
+        try {
+          fileBuffer = await fs.readFile(candidate);
+          fallbackFilePath = candidate;
+          break;
+        } catch {
+          // 继续尝试下一个回退目录
+        }
+      }
+
+      if (!fallbackFilePath) {
+        throw readError;
+      }
+      filePath = fallbackFilePath;
+    }
+
+    if (!fileBuffer) {
+      return NextResponse.json({ error: 'File not found' }, { status: 404 });
+    }
     
     // 确定 MIME 类型
     const ext = path.extname(filePath).toLowerCase();
@@ -111,7 +156,7 @@ export async function GET(
     };
     const contentType = mimeTypes[ext] || 'application/octet-stream';
     
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(new Uint8Array(fileBuffer), {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=31536000',

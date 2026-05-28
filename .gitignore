@@ -229,3 +229,8 @@ dist-electron/
 .tmp-smoke/
 .tmp-smoke-login/
 .tools/
+
+# Local recovery and batch image outputs
+toapis-downloads/
+volcengine-outpaint/
+recovered-assets/
