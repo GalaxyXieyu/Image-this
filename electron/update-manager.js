@@ -261,7 +261,7 @@ function createUpdateManager({ getMainWindow, log }) {
 
   function restartToInstall() {
     if (autoUpdater && state.status === 'downloaded') {
-      autoUpdater.quitAndInstall(false, true);
+      autoUpdater.quitAndInstall(true, true);
       return true;
     }
 
