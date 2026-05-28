@@ -24,7 +24,6 @@ let serverPort = DEFAULT_PORT;
 const WORKER_SCHEDULER_INTERVAL_MS = 8000;
 const SERVER_SHUTDOWN_TIMEOUT_MS = 5000;
 
-const LEGACY_LOG_DIR = path.join(os.homedir(), 'ImagineThis', 'logs');
 const DESKTOP_SETTINGS_FILE = 'desktop-settings.json';
 const MAX_LOG_READ_BYTES = 256 * 1024;
 let currentLogDir = null;
@@ -68,13 +67,22 @@ function writeDesktopSettings(settings) {
 }
 
 function getDefaultLogDir() {
-  return LEGACY_LOG_DIR;
+  const { userDataPath } = getUserDataPaths(app);
+  return path.join(userDataPath, 'logs');
+}
+
+function getLegacyDefaultLogDir() {
+  return path.join(os.homedir(), 'ImagineThis', 'logs');
 }
 
 function resolveLogDir() {
   const settings = readDesktopSettings();
   if (typeof settings.logDirectory === 'string' && settings.logDirectory.trim()) {
-    return path.resolve(settings.logDirectory.trim());
+    const configuredLogDir = path.resolve(settings.logDirectory.trim());
+    if (configuredLogDir === path.resolve(getLegacyDefaultLogDir())) {
+      return getDefaultLogDir();
+    }
+    return configuredLogDir;
   }
   return getDefaultLogDir();
 }
@@ -146,10 +154,14 @@ function readLogTail(fileName, maxBytes = MAX_LOG_READ_BYTES) {
 
 function getLogInfo() {
   const settings = readDesktopSettings();
+  const configuredLogDir = typeof settings.logDirectory === 'string'
+    ? path.resolve(settings.logDirectory.trim())
+    : '';
+  const isLegacyDefaultOverride = configuredLogDir === path.resolve(getLegacyDefaultLogDir());
   return {
     directory: currentLogDir || resolveLogDir(),
     defaultDirectory: getDefaultLogDir(),
-    isCustom: Boolean(settings.logDirectory),
+    isCustom: Boolean(settings.logDirectory) && !isLegacyDefaultOverride,
     appLogFile: currentLogFile ? path.basename(currentLogFile) : null,
     errorLogFile: currentErrorLogFile ? path.basename(currentErrorLogFile) : null,
   };

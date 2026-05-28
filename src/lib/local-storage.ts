@@ -294,7 +294,7 @@ export async function checkImageExists(
           filePath = path.join(uploadDir, filename);
         } else {
           // 默认 Electron 路径
-          filePath = path.join(os.homedir(), 'ImagineThis', relativePath);
+          filePath = path.join(process.env.IMAGINE_THIS_USER_DATA_PATH || path.join(os.homedir(), 'ImagineThis'), relativePath);
         }
       } else {
         // Web 环境：/api/files/uploads/xxx.jpg -> public/uploads/xxx.jpg
