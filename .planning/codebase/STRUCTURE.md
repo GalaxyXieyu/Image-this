@@ -133,10 +133,9 @@ Located in `prisma/schema.prisma`:
 - `docs/nextjs-guide.md`
 
 **Operations:**
-- `DEPLOYMENT.md`
-- `DEPLOYMENT_NOTES.md`
 - `docs/DATABASE-REPAIR.md`
 - `docs/windows-code-signing.md`
+- `docs/desktop-release-pipeline.md`
 
 **Planning:**
 - `.planning/codebase/*.md`

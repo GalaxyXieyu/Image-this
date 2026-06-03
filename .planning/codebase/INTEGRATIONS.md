@@ -82,9 +82,9 @@
 
 ## Deployment/Infrastructure
 
-**Docker / Nginx**
-- Files：`Dockerfile`、`docker-compose.production.yml`、`nginx/**`。
-- Role：Web/服务端部署能力存在，但当前产品重心仍偏桌面端。
+**Nginx**
+- Files：`nginx/**`。
+- Role：Web/服务端部署辅助配置，当前 CI 主链路为 standalone + PM2。
 
 **Redis**
 - File：`redis/redis.conf`。
