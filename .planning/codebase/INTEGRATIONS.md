@@ -1,96 +1,115 @@
 # External Integrations
 
-**Analysis Date:** 2026-05-26
+**Analysis Date:** 2026-06-03
 
-## APIs & External Services
+## AI Providers
 
-**AI Image/Video Providers:**
-- GPT 图像处理链路 - 背景替换等能力
-  - Integration method: 通过 `src/lib/image-processor/providers/gpt.ts` 和相关 service 走 HTTP 调用
-  - Auth: 用户配置中的 `gptApiUrl`、`gptApiKey`、`gptModelName`
-- Gemini - 图像处理与生成
-  - Integration method: `src/lib/image-processor/providers/gemini.ts`
-  - Auth: `geminiApiKey`、`geminiBaseUrl`、`geminiModelName`
-- 火山引擎 / 即梦 / Qwen - 图像扩图、高清化、视频生成等
-  - Integration method: `src/lib/image-processor/providers/*` 与 `src/app/api/*/service.ts`
-  - Auth: AccessKey/SecretKey、Ark API Key 等用户侧配置
+**Gemini**
+- Purpose：背景替换、图像理解、质量审核等。
+- Integration：`src/lib/image-processor/providers/gemini.ts`、`src/lib/image-processor/service.ts`、`src/app/api/quality-review/route.ts`。
+- Credentials：`geminiApiKey`、`geminiBaseUrl`、`geminiModelName`，按用户存储。
 
-**External APIs:**
-- GitHub Release - Windows 桌面更新元信息相关逻辑
-  - Integration method: `src/lib/github-release-broker.ts`
-- Superbed 图床
-  - Integration method: `src/lib/superbed-upload.ts`
-  - Auth: `superbedToken`
+**GPT / GPT-4o Compatible API**
+- Purpose：背景替换、图像理解等。
+- Integration：`src/lib/image-processor/providers/gpt.ts`。
+- Credentials：`gptApiUrl`、`gptApiKey`、`gptModelName`，按用户存储。
 
-## Data Storage
+**Qwen**
+- Purpose：背景替换/扩图相关备选能力。
+- Integration：`src/lib/image-processor/providers/qwen.ts`、`src/app/api/qwen/route.ts`。
+- Credentials：当前复用 GPT API Key 相关配置。
 
-**Databases:**
-- SQLite - 主数据存储
-  - Connection: `DATABASE_URL=file:...`
-  - Client: Prisma ORM
-  - Migrations: `prisma/schema.prisma` + `prisma/migrations`，桌面端另有 `electron/database-manager.js` 做模板库和迁移修复
+**Volcengine**
+- Purpose：智能扩图、画质增强、部分视觉能力。
+- Integration：`src/lib/image-processor/providers/volcengine.ts`、`src/app/api/volcengine/**/route.ts`、Volcengine 签名工具。
+- Credentials：`volcengineAccessKey`、`volcengineSecretKey`，按用户存储。
 
-**File Storage:**
-- 本地文件系统 - 图片、视频、上传结果默认走本地目录
-  - Implementation: `src/lib/local-storage.ts`, `src/lib/storage.ts`
-  - Access path: Web 形态使用 `/uploads/*`，Electron 形态通过 `/api/files/*`
+**Jimeng / Ark**
+- Purpose：背景替换、图生视频。
+- Integration：`src/lib/image-processor/providers/jimeng.ts`、`src/app/api/jimeng/**/route.ts`、`src/app/api/jimeng-video/**/route.ts`。
+- Credentials：`arkApiKey` 或 Legacy AccessKey/SecretKey，按用户存储。
+- Note：Legacy 链路可能依赖图床配置。
 
-**Caching:**
-- 无显式 Redis / 内存缓存基础设施
-- 当前主要依赖数据库与本地文件系统直读直写
+## File/Image Hosting
+
+**Local Storage**
+- Purpose：默认保存上传素材、处理结果、视频文件。
+- Implementation：`src/lib/local-storage.ts`、`src/lib/storage.ts`、`src/app/api/files/[...path]/route.ts`。
+- Access：Electron/本地环境下通过本地路径和文件 API 转换为前端可访问 URL。
+
+**Superbed**
+- Purpose：外部图床，用于部分 provider 需要公网图片 URL 的场景。
+- Implementation：`src/lib/superbed-upload.ts`。
+- Credentials：`superbedToken`，按用户存储。
+
+**MinIO**
+- Purpose：依赖已存在，当前文档和代码定位为可选存储能力。
+- Risk：不是当前主链路，使用前需要确认配置与调用路径。
+
+## Database
+
+**SQLite**
+- Purpose：主业务数据库，尤其适合桌面端本地运行。
+- ORM：Prisma。
+- Schema：`prisma/schema.prisma`。
+- Runtime：Electron 启动阶段负责准备/修复桌面数据库。
+
+**Prisma Client**
+- Purpose：API routes、worker、配置读取、任务状态写入。
+- Packaging：桌面构建需要确保 Prisma runtime 和 binary target 可用。
 
 ## Authentication & Identity
 
-**Auth Provider:**
-- NextAuth + Prisma Adapter
-  - Implementation: `src/lib/auth.ts`
-  - Token storage: JWT session strategy
-  - Session management: `getServerSession()` 在 API routes 中广泛使用
+**NextAuth**
+- Purpose：登录、注册、session、API 鉴权边界。
+- Implementation：`src/lib/auth.ts`、`src/app/api/auth/**`。
+- Strategy：JWT session strategy。
 
-**OAuth Integrations:**
-- Google OAuth
-- GitHub OAuth
-  - Credentials: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`
+**Credentials Login**
+- Purpose：本地/桌面优先的邮箱密码登录。
+- Storage：密码 hash 存在用户表。
 
-## Monitoring & Observability
+**OAuth**
+- Google / GitHub OAuth 变量存在于文档与环境配置范畴。
+- 当前核心业务不依赖 OAuth 作为唯一登录方式。
 
-**Error Tracking:**
-- 无外部错误追踪平台
-- 主要依赖 `console.*`、Electron 主进程日志文件和 API 路由日志
+## Desktop Updates
 
-**Logs:**
-- Electron 主进程把日志同步写到 `~/ImagineThis/logs`
-  - Implementation: `electron/main.js`
-- Next 子进程 stdout/stderr 被主进程接管并写盘
+**GitHub Release / Update Metadata**
+- Purpose：Windows 桌面自动更新元信息和安装包资源访问。
+- Implementation：`src/lib/github-release-broker.ts`、`src/lib/desktop-updates.ts`、`src/app/api/desktop-updates/windows/**`、`electron/update-manager.js`。
+- Runtime：Electron updater 消费更新配置。
 
-## CI/CD & Deployment
+## Deployment/Infrastructure
 
-**Hosting:**
-- 主要是本地桌面打包分发，不是云部署主导
+**Docker / Nginx**
+- Files：`Dockerfile`、`docker-compose.production.yml`、`nginx/**`。
+- Role：Web/服务端部署能力存在，但当前产品重心仍偏桌面端。
 
-**CI Pipeline:**
-- 仓库内未见成熟 CI 工作流文件
-- 构建依赖本地脚本：`scripts/build-windows.mjs`, `scripts/build-mac.mjs`, `scripts/verify-build.js`
+**Redis**
+- File：`redis/redis.conf`。
+- Role：配置存在，但当前任务队列主链路仍是 SQLite，不是 Redis 队列。
 
-## Environment Configuration
+## Observability
 
-**Development:**
-- 依赖 `.env.production` / 本地环境变量 / 数据库存储的用户配置
-- 机密可走桌面 secret store：`src/lib/desktop-secret-store.ts`
+**Electron Logs**
+- Purpose：主进程、Next 子进程、启动失败排障。
+- Location：桌面用户数据/日志目录。
+- Implementation：`electron/main.js`。
 
-**Production:**
-- Windows 桌面包内嵌 `.env.production`
-- Electron 主进程在启动时注入 `DATABASE_URL`, `NEXTAUTH_URL`, `IMAGINE_THIS_DESKTOP` 等变量
+**API Logs**
+- Purpose：任务、provider、配置、错误排障。
+- Current Pattern：大量 `console.log` / `console.error`。
 
-## Webhooks & Callbacks
+**External Monitoring**
+- 当前未接入 Sentry、Datadog 等外部错误追踪平台。
 
-**Incoming:**
-- 当前未见典型第三方 webhook 接收链路
+## Integration Risks
 
-**Outgoing:**
-- 外部 AI provider 请求
-- GitHub Release / 更新元数据读取
+- AI provider 密钥和模型配置按用户维度变化，调用失败通常需要同时检查用户配置、provider adapter 和 worker 输入。
+- 桌面打包对 Prisma、sharp、Next standalone、环境变量和资源路径耦合较强。
+- 部分 provider 需要可访问图片 URL，本地路径、图床 URL、base64 之间的转换是高风险边界。
+- Redis、Docker、MinIO 等能力存在配置或依赖，但不是所有都处于主业务活跃路径。
 
 ---
-*Integration audit: 2026-05-26*
-*Update when adding/removing external services*
+*Update when adding/removing providers, storage targets, auth methods, or deployment paths.*

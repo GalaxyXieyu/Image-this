@@ -1,138 +1,166 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-05-26
+**Analysis Date:** 2026-06-03
 
 ## Directory Layout
 
 ```text
 Image-this/
-├── electron/                 # Electron 主进程、数据库准备、预加载、更新
-├── prisma/                   # Prisma schema、迁移、模板数据库
-├── public/                   # 静态资源、图标
-├── scripts/                  # 构建、打包、验证、部署脚本
+├── .github/workflows/          # Docker / Windows 构建工作流
+├── .planning/                  # 项目映射、阶段计划、验证记录
+├── docs/                       # 产品、设计、数据库修复、部署和截图文档
+├── electron/                   # Electron 主进程、数据库、预加载、自动更新
+├── nginx/                      # 生产反代配置
+├── prisma/                     # Prisma schema、迁移锁、SQLite 模板库
+├── public/                     # 静态图标和资源
+├── redis/                      # Redis 配置，占位/部署相关
+├── scripts/                    # 构建、打包、验证、部署、截图脚本
 ├── src/
-│   ├── app/                  # Next.js App Router 页面与 API routes
-│   ├── components/           # UI 组件、工作区组件、导航组件
-│   ├── features/             # 局部特性抽象（工作区 hooks 等）
-│   ├── hooks/                # 通用 React hooks
-│   ├── lib/                  # 核心业务逻辑、存储、auth、provider 适配
-│   ├── providers/            # React provider
-│   ├── stores/               # Zustand store
-│   └── types/                # 全局类型
-├── .planning/                # GSD 项目状态、roadmap、phase 文档
-├── next.config.ts            # Next.js 配置
-└── package.json              # 依赖、脚本、Electron build 配置
+│   ├── app/                    # Next.js App Router 页面与 API routes
+│   ├── components/             # UI、导航、工作区、模板、设置等组件
+│   ├── features/               # 特性级 hooks/lib，目前集中在 workspace
+│   ├── hooks/                  # 通用前端 hooks 和任务轮询 hooks
+│   ├── lib/                    # 核心业务、存储、auth、provider、桌面辅助
+│   ├── providers/              # React provider
+│   ├── stores/                 # Zustand store
+│   └── types/                  # 全局类型
+├── next.config.ts              # Next.js 配置
+├── package.json                # npm scripts、依赖、Electron build 配置
+└── README.md                   # 项目说明
 ```
 
-## Directory Purposes
+## App Routes
 
-**electron/**
-- Purpose: 桌面运行时入口和本地环境准备
-- Contains: `main.js`, `preload.js`, `database-manager.js`, `update-manager.js`
-- Key files: `electron/main.js` - 启动链路中枢
-- Subdirectories: 无明显嵌套层次
+**Primary Pages:**
+- `/`：首页，产品入口和功能导航。
+- `/workspace/scene`：场景图生成工作区。
+- `/combo`：组合式工作流页面。
+- `/tools`：智能工具箱。
+- `/templates`：模板库。
+- `/tasks`：任务中心。
+- `/results`：结果管理。
+- `/settings`：用户设置。
+- `/auth/login`、`/auth/register`：认证页面。
 
-**prisma/**
-- Purpose: 数据模型和桌面端模板库
-- Contains: `schema.prisma`, `migrations/`, `app.db`
-- Key files: `prisma/schema.prisma`
-- Subdirectories: `migrations/`
+**Global Layout:**
+- `src/app/layout.tsx`：全局字体、Auth provider、桌面更新 provider、悬浮任务按钮、toast。
 
-**scripts/**
-- Purpose: 打包、构建、清理与验证
-- Contains: `build-windows.mjs`, `build-mac.mjs`, `verify-build.js`, `run-next-build.mjs`
-- Key files: `scripts/build-windows.mjs`
-- Subdirectories: 无
+## API Route Groups
 
-**src/app/**
-- Purpose: Next.js 页面、布局、API routes
-- Contains: `page.tsx`, `workspace/page.tsx`, `api/**/route.ts`
-- Key files: `src/app/workspace/page.tsx`, `src/app/api/tasks/route.ts`, `src/app/api/tasks/worker/route.ts`
-- Subdirectories: `api/`, `auth/`, 多个页面目录
+**Auth:**
+- `src/app/api/auth/[...nextauth]/route.ts`
+- `src/app/api/auth/register/route.ts`
 
-**src/lib/**
-- Purpose: 应用核心逻辑和集成层
-- Contains: auth、storage、provider、image-processor、desktop helpers
-- Key files: `src/lib/prisma.ts`, `src/lib/storage.ts`, `src/lib/user-config.ts`, `src/lib/image-processor/service.ts`
-- Subdirectories: `image-processor/`
+**Task Queue:**
+- `src/app/api/tasks/route.ts`
+- `src/app/api/tasks/[id]/route.ts`
+- `src/app/api/tasks/worker/route.ts`
+- `src/app/api/tasks/status/route.ts`
+- `src/app/api/tasks/recent/route.ts`
+- `src/app/api/tasks/retry/route.ts`
+- `src/app/api/tasks/recover/route.ts`
+- `src/app/api/tasks/cron/route.ts`
 
-## Key File Locations
+**Image Processing:**
+- `src/app/api/images-process/background-replace/route.ts`
+- `src/app/api/images-process/enhance/route.ts`
+- `src/app/api/images-process/outpaint/route.ts`
+- `src/app/api/images-process/watermark/route.ts`
+- `src/app/api/images-process/workflow/one-click/route.ts`
+- `src/app/api/watermark/route.ts`
 
-**Entry Points:**
-- `electron/main.js`: Electron 桌面入口
-- `src/app/layout.tsx`: Next.js 根布局
-- `src/app/workspace/page.tsx`: 核心工作区页面
+**Providers:**
+- `src/app/api/volcengine/**/route.ts`
+- `src/app/api/jimeng/**/route.ts`
+- `src/app/api/jimeng-video/**/route.ts`
+- `src/app/api/qwen/route.ts`
+- `src/app/api/models/route.ts`
 
-**Configuration:**
-- `package.json`: scripts、依赖、Electron build
-- `next.config.ts`: Next standalone 与 serverExternalPackages
-- `prisma/schema.prisma`: 数据模型与索引
+**Data Management:**
+- `src/app/api/images/**/route.ts`
+- `src/app/api/projects/**/route.ts`
+- `src/app/api/prompt-templates/**/route.ts`
+- `src/app/api/input-assets/route.ts`
+- `src/app/api/settings/route.ts`
+- `src/app/api/files/[...path]/route.ts`
 
-**Core Logic:**
-- `src/app/api/tasks/route.ts`: 任务创建和任务列表查询
-- `src/app/api/tasks/worker/route.ts`: 队列消费逻辑
-- `src/lib/storage.ts`: 存储抽象
-- `src/lib/local-storage.ts`: 本地文件系统访问
+**Desktop/Infra:**
+- `src/app/api/health/route.ts`
+- `src/app/api/desktop-updates/windows/**/route.ts`
 
-**Testing:**
-- `scripts/test-video-api.ts`: 零散脚本式测试
-- `playwright` 作为依赖存在，但未形成固定测试目录
+## Core Module Locations
 
-**Documentation:**
-- `AGENTS.md`: 项目级代理规则
-- `.planning/`: GSD 分析、roadmap、phase 文档
+**Image Processor:**
+- `src/lib/image-processor/factory.ts`：provider 注册和获取。
+- `src/lib/image-processor/service.ts`：统一图像处理服务。
+- `src/lib/image-processor/providers/*.ts`：Gemini、GPT、Qwen、Jimeng、Volcengine adapter。
+- `src/lib/image-processor/types.ts`：共享类型。
+- `src/lib/image-processor/utils/*`：签名、图片转换、API client、锁等工具。
 
-## Naming Conventions
+**Storage:**
+- `src/lib/storage.ts`：存储入口。
+- `src/lib/local-storage.ts`：本地文件存储。
+- `src/lib/superbed-upload.ts`：Superbed 图床。
+- `src/lib/image-url.ts`：前端 URL 标准化。
 
-**Files:**
-- React 组件多为 `PascalCase.tsx`
-- hooks 和大多数模块文件多为 `kebab-case.ts` 或 `camelCase` 风格混合
-- API 路由统一采用 `route.ts`
+**Auth/Config:**
+- `src/lib/auth.ts`：NextAuth 配置。
+- `src/lib/user-config.ts`：用户 provider 和运行时配置读取。
+- `src/lib/config-helper.ts`：配置辅助。
+- `src/lib/desktop-secret-store.ts`：桌面端 secret store。
 
-**Directories:**
-- Next.js 页面目录按路由语义组织
-- `lib/` 按业务/基础设施职责拆分
+**Workbench/UI:**
+- `src/components/workbench/*`：工作台类组件。
+- `src/components/workspace/*`：旧/通用工作区组件。
+- `src/features/workspace/*`：工作区特性抽象。
+- `src/stores/useWorkspaceTabStore.ts`：工作区标签状态。
 
-**Special Patterns:**
-- `src/app/api/**/route.ts` 表示 API 边界
-- `service.ts` 常作为业务逻辑实现文件
-- `page.tsx` 表示页面入口
+## Database Models
+
+Located in `prisma/schema.prisma`:
+- `User`：用户、认证信息、provider 凭据、图床配置、任务并发配置。
+- `TaskQueue`：异步任务、状态、进度、重试、输入输出。
+- `ProcessedImage`：图片处理结果和质量审核。
+- `PromptTemplate`：提示词模板。
+- `Project`：项目分组。
+- NextAuth 标准模型：`Account`、`Session`、`VerificationToken`。
+
+## Documentation Locations
+
+**Product/Design:**
+- `docs/ai-studio-2-prd.md`
+- `docs/ai-studio-design.md`
+- `docs/nextjs-guide.md`
+
+**Operations:**
+- `DEPLOYMENT.md`
+- `DEPLOYMENT_NOTES.md`
+- `docs/DATABASE-REPAIR.md`
+- `docs/windows-code-signing.md`
+
+**Planning:**
+- `.planning/codebase/*.md`
+- `.planning/phases/**`
+- `.planning/PROJECT.md`
 
 ## Where to Add New Code
 
+**New Product Page:**
+- `src/app/<route>/page.tsx`
+- shared UI in `src/components/<domain>/`
+
+**New API:**
+- `src/app/api/<domain>/route.ts`
+- shared logic in `src/lib/` or `src/app/api/<domain>/service.ts`
+
+**New AI Provider Capability:**
+- provider adapter in `src/lib/image-processor/providers/`
+- shared service in `src/lib/image-processor/service.ts`
+- route or worker dispatch entry depending on whether it is sync or queued
+
 **New Desktop Runtime Logic:**
-- Primary code: `electron/`
-- Verification or packaging: `scripts/`
-
-**New API Endpoint:**
-- Definition: `src/app/api/<feature>/route.ts`
-- Shared logic: `src/lib/` 或 `src/app/api/<feature>/service.ts`
-
-**New Workspace/Task Feature:**
-- UI: `src/components/workspace/` 或 `src/app/workspace/page.tsx`
-- State/hooks: `src/hooks/` 或 `src/features/workspace/hooks/`
-
-**Utilities:**
-- Shared helpers: `src/lib/`
-- Types: `src/types/`
-
-## Special Directories
-
-**.next/**
-- Purpose: Next build 输出
-- Source: 构建自动生成
-- Committed: No
-
-**dist-electron/**
-- Purpose: Electron 打包产物
-- Source: `electron-builder`
-- Committed: No
-
-**.planning/**
-- Purpose: GSD 项目上下文、状态和执行计划
-- Source: 人工分析与后续 workflow 生成
-- Committed: 视团队约定，当前建议保留
+- `electron/` for runtime behavior
+- `scripts/` for build/packaging validation
 
 ---
-*Structure analysis: 2026-05-26*
-*Update when directory structure changes*
+*Update when route structure, module ownership, or major directories change.*

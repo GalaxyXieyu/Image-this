@@ -1,76 +1,99 @@
 # Technology Stack
 
-**Analysis Date:** 2026-05-26
+**Analysis Date:** 2026-06-03
 
 ## Languages
 
 **Primary:**
-- TypeScript - 应用代码、Next.js 路由、React 组件、部分脚本
+- TypeScript：Next.js 页面、API routes、React 组件、业务模块、部分脚本。
 
 **Secondary:**
-- JavaScript / CommonJS - Electron 主进程与部分构建脚本
-- PowerShell / Shell / Batch - Windows 更新发布与跨平台清理构建脚本
+- JavaScript / CommonJS：Electron 主进程、打包后处理、图标生成等脚本。
+- PowerShell / Shell / Batch：Windows 发布、跨平台清理和部署脚本。
 
 ## Runtime
 
 **Environment:**
-- Node.js 20-23 之间，`package.json` 约束为 `>=20 <24`
-- 浏览器渲染运行时由 Electron 承载，生产环境通过 Electron 启动内嵌 Next standalone 服务
+- Node.js：`>=20 <24`。
+- Web 开发服务：Next.js 运行在 `34123` 端口。
+- 桌面端：Electron 启动本地 Next standalone 服务，再加载本地页面。
 
 **Package Manager:**
-- npm
-- Lockfile: `package-lock.json` 已存在
+- npm。
+- Lockfile：`package-lock.json`。
 
 ## Frameworks
 
 **Core:**
-- Next.js 15.3.4 - Web UI、API routes、桌面端内嵌服务
-- React 19 - 前端组件和页面
-- Electron 39 - 桌面壳、子进程启动、IPC、自动更新
+- Next.js `15.3.4`：App Router、API Routes、standalone 输出。
+- React `19`：页面和客户端交互。
+- Electron `39.x`：桌面壳、窗口管理、自动更新、本地服务启动。
+- Prisma `5.22`：SQLite 数据层。
 
-**Testing:**
-- Playwright - 截图与端到端脚本能力已安装，但仓库内未形成完整测试体系
+**UI:**
+- Tailwind CSS 3.x。
+- shadcn/ui + Radix UI。
+- lucide-react / Tabler Icons。
+- Motion。
+- React Konva / Konva：水印画布类交互。
 
-**Build/Dev:**
-- TypeScript 5
-- Prisma 5.22
-- electron-builder 26
+**State/Form:**
+- Zustand：工作区状态。
+- React Hook Form + Zod：表单与校验。
+
+**Testing/Verification:**
+- Playwright 已安装，主要用于截图和潜在 E2E。
+- 当前没有完整测试目录，验证更多依赖 lint、构建脚本和人工 smoke。
 
 ## Key Dependencies
 
-**Critical:**
-- `@prisma/client` / `prisma` - SQLite 数据访问与 schema 管理
-- `next-auth` - 用户认证、session 与桌面端本地登录流程
-- `sharp` - 图片处理相关原生依赖，Windows 打包单独处理
-- `electron-updater` - Windows 安装版自动更新
-- `zustand` - 工作区状态管理
+**Business Critical:**
+- `@prisma/client`：用户、任务、图片、模板、项目数据。
+- `next-auth`：登录、会话、API 鉴权边界。
+- `sharp`：图片处理和桌面打包原生依赖。
+- `electron-updater`：桌面端自动更新。
+- `axios` / `node-fetch` / `fetch`：外部 AI 与图床调用。
 
-**Infrastructure:**
-- `bcryptjs` - 密码认证
-- `axios` / `node-fetch` / 原生 `fetch` - 外部 API 调用
-- `react-hook-form` / `zod` - 表单和参数校验
+**Platform Critical:**
+- `electron-builder`：Windows/macOS/Linux 打包。
+- `concurrently`、`wait-on`：桌面开发联动启动。
+- `dotenv`：构建和运行时环境变量。
 
 ## Configuration
 
 **Environment:**
-- 使用 `.env.production` 与 Electron 主进程注入的环境变量
-- 关键配置包括 `DATABASE_URL`、`NEXTAUTH_URL`、`NEXTAUTH_SECRET`、各 AI provider 的 API 凭据
+- `.env.example` / `.env.production.example` 提供环境模板。
+- 桌面端由 Electron 注入 `DATABASE_URL`、`NEXTAUTH_URL`、`IMAGINE_THIS_DESKTOP` 等运行时变量。
+- AI provider 凭据以用户维度存储在数据库中。
 
 **Build:**
-- `next.config.ts` - standalone 输出与服务端外部包配置
-- `package.json` 中的 `build` 段 - Electron 打包目标、文件过滤、Windows/macOS 配置
-- `scripts/build-windows.mjs` - Windows 构建、Prisma/sharp/runtime 组装
+- `next.config.ts`：standalone 输出、远程图片规则、server external packages。
+- `package.json` 的 `build` 段：Electron 产物、平台目标、文件打包规则。
+- `scripts/build-windows.mjs` / `scripts/build-mac.mjs`：桌面平台构建入口。
+- `scripts/run-next-build.mjs`：Next 构建入口包装。
 
-## Platform Requirements
+## Common Commands
+
+```bash
+npm run dev
+npm run electron:dev
+npm run build
+npm run build:windows
+npm run build:mac
+npm run lint
+npx prisma db push
+npx prisma generate
+```
+
+## Platform Profile
 
 **Development:**
-- macOS / Linux / Windows 均可开发
-- 桌面场景下需要 Node、npm、本地 SQLite 文件访问能力
+- Web 和 Electron 都围绕本地 `34123` 服务运行。
+- SQLite 默认适合单机、桌面、本地轻量使用。
 
 **Production:**
-- 当前重点交付是 Electron 桌面应用，尤其是 Windows 安装包与 Portable 包
-- Next.js 以 standalone 子进程方式嵌入桌面应用，而不是独立云部署
+- 重点交付形态是 Electron 桌面端。
+- Web 部署能力存在，但当前架构和文档重心偏桌面运行时。
 
 ---
-*Stack analysis: 2026-05-26*
-*Update after major dependency changes*
+*Update when major dependencies, runtime, or build targets change.*

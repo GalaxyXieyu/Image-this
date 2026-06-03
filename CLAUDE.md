@@ -4,7 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Imagine This** is a full-stack AI image processing platform built with Next.js 15 (App Router), supporting both web and desktop (Electron) deployments. It integrates multiple AI providers (Gemini, GPT-4o, Volcengine, Jimeng, Qwen) for image processing tasks including background replacement, outpainting, upscaling, watermarking, and video generation.
+**Imagine This** is a desktop-first full-stack AI product visual workbench built with Next.js 15 (App Router), React 19, Prisma/SQLite, and Electron. The product direction has evolved from a generic AI image toolbox into an e-commerce visual production platform: users upload product assets, generate scene/listing visuals, run background/outpaint/upscale/watermark/video tasks, and manage async results through a local task queue.
+
+Current active product surfaces:
+- `/` - product landing and entry navigation
+- `/workspace/scene` - main scene image generation workflow
+- `/combo` - configurable multi-step workflow builder
+- `/tools` - AI image utility toolbox
+- `/tasks` - task center and progress visibility
+- `/results` - generated asset management
+- `/templates` - prompt/template library
+- `/settings` - provider credentials and runtime settings
 
 ## Common Commands
 
@@ -44,30 +54,43 @@ npm run screenshots:readme  # Generate README screenshots with Playwright
 src/
 ├── app/                    # Next.js App Router pages and API routes
 │   ├── api/
+│   │   ├── auth/           # NextAuth and registration
 │   │   ├── images-process/ # Core image processing endpoints
-│   │   ├── tasks/          # Task queue management (cron, recover, retry, worker)
+│   │   ├── tasks/          # Task queue management (status, recent, retry, recover, worker)
 │   │   ├── volcengine/     # Volcengine AI service
 │   │   ├── jimeng/         # Jimeng AI image generation
-│   │   ├── jimeng-video/   # Jimeng video generation (ti2v)
-│   │   ├── quality-review/ # AI quality review (Gemini-based)
+│   │   ├── jimeng-video/   # Jimeng image-to-video generation
+│   │   ├── quality-review/ # AI quality review
+│   │   ├── input-assets/   # Uploaded/reference asset registration
 │   │   ├── models/         # Available AI models listing
-│   │   └── files/          # File serving (local uploads)
-│   └── workspace/          # Main workspace UI
+│   │   └── files/          # Local file serving
+│   ├── workspace/scene/    # Main product scene generation workflow
+│   ├── combo/              # Multi-step workflow builder
+│   ├── tools/              # AI utility toolbox
+│   ├── tasks/              # Task center
+│   ├── results/            # Generated result management
+│   ├── templates/          # Prompt/template library
+│   └── settings/           # Provider/runtime settings
 ├── lib/
 │   └── image-processor/    # AI provider abstraction layer
 │       ├── providers/      # Gemini, GPT, Qwen, Jimeng, Volcengine
 │       ├── factory.ts      # Provider factory pattern
+│       ├── service.ts      # Unified processing service
 │       ├── types.ts        # Shared types and interfaces
-│       └── utils/          # API client, image converter, signatures
+│       └── utils/          # API client, image converter, signatures, provider helpers
+├── components/
+│   ├── ui/                 # shadcn/ui components
+│   ├── workbench/          # New product workbench components
+│   └── workspace/          # Existing/legacy workspace components
+├── features/               # Feature-level workspace hooks/libs
+├── hooks/                  # Reusable React hooks and task polling
 ├── stores/                 # Zustand stores
-│   └── useWorkspaceTabStore.ts  # Workspace tab state management
-└── components/
-    ├── ui/                 # shadcn/ui components
-    └── workspace/          # Workspace-specific components
+└── types/                  # Shared TypeScript declarations
 
-electron/                   # Electron main process
+electron/                   # Electron main process, database preparation, updates
 prisma/
-└── schema.prisma          # Database schema (SQLite)
+└── schema.prisma           # Database schema (SQLite)
+.planning/codebase/         # Current codebase map and risk documents
 ```
 
 ### Image Processing Architecture
@@ -85,15 +108,46 @@ Async processing via `TaskQueue` model:
 - Progress tracking with `currentStep`, `totalSteps`, `completedSteps`
 - Built-in retry mechanism with `retryCount` and `maxRetries`
 
-### Workspace Tabs
+### Active Product Architecture
 
-Six processing modes managed by `useWorkspaceTabStore`:
-- `one-click`: Combined workflow (background + outpaint + enhance + watermark)
-- `background`: Background replacement
-- `expansion`: Image outpainting
-- `upscaling`: Image enhancement/upscaling
-- `watermark`: Watermark overlay (text or logo, draggable/resizeable)
-- `video`: Image-to-video generation (Jimeng ti2v)
+The current product should be treated as an **e-commerce AI visual production workbench**, not only a generic image-processing tab UI.
+
+Primary workflow:
+1. User uploads or references product assets
+2. User chooses a scene/template/workflow
+3. Frontend creates one or more `TaskQueue` records
+4. Worker processes tasks through the configured AI provider or local image pipeline
+5. Results are persisted as files and database records
+6. UI shows progress through task polling and result management pages
+
+Current route priorities:
+- Main product creation: `/workspace/scene`
+- Multi-step workflow composition: `/combo`
+- Utility functions: `/tools`
+- Progress visibility: `/tasks`
+- Output management: `/results`
+
+### Development Requirements
+
+When making changes in this repository:
+- Keep using Next.js App Router conventions.
+- Prefer Server Components unless the UI needs browser state, upload, drag/drop, polling, canvas, or direct interaction.
+- Keep API routes as the boundary for Prisma, filesystem, provider credentials, and external AI calls.
+- Keep provider-specific behavior inside `src/lib/image-processor/providers/` or the unified image processor service.
+- Do not put secrets, API keys, tokens, or full base64 payloads in logs.
+- Avoid storing large image/video/base64 payloads in `TaskQueue.inputData` or `TaskQueue.outputData`; prefer asset references, file paths, and result records.
+- When adding task types, update frontend creation, worker dispatch, database comments/docs, and status/result rendering together.
+- Treat `/api/tasks/status` as the preferred lightweight polling path where possible.
+- Desktop behavior matters: changes must consider Electron startup, local SQLite, local file URLs, and packaged runtime paths.
+- If editing current product flow, check `.planning/codebase/` first for the latest architecture map and known concerns.
+
+### Known Architecture Risks To Respect
+
+- Worker lifecycle currently depends on `/api/tasks/worker` being triggered; it is not a true always-on background worker.
+- `src/app/api/tasks/worker/route.ts` is high-risk because it mixes scheduling, execution, provider dispatch, persistence, and retry logic.
+- Task type names can drift between frontend pages and worker dispatch. Keep them centralized or manually synchronized.
+- Large task payloads can slow SQLite and task polling, especially in Windows desktop builds.
+- The product has both older image-toolbox surfaces and newer e-commerce visual workbench surfaces. Prefer the newer workbench direction unless explicitly maintaining legacy behavior.
 
 ## Database
 

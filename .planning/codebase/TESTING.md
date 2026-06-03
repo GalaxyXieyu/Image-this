@@ -1,87 +1,129 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-05-26
+**Analysis Date:** 2026-06-03
 
-## Test Framework
+## Current Test Posture
 
-**Runner:**
-- Playwright 已安装，但当前仓库未形成固定 E2E 套件目录
-- 零散脚本测试存在，如 `scripts/test-video-api.ts`
+当前仓库更偏“构建验证 + 脚本验证 + 人工 smoke”，还没有稳定的单元测试、集成测试或 E2E 测试目录。
 
-**Assertion Library:**
-- 当前无统一测试断言框架落地证据
+## Available Commands
 
-**Run Commands:**
 ```bash
-npm run lint                              # 当前最稳定的静态检查入口
-node scripts/verify-build.js              # 验证 Windows 打包产物
-node scripts/test-video-api.ts            # 零散接口测试脚本
+npm run lint
+npm run build
+npm run build:windows
+npm run build:mac
+npm run screenshots:readme
+node scripts/verify-build.js
 ```
 
-## Test File Organization
+## Installed Tooling
 
-**Location:**
-- 没有标准 `tests/` 或 `__tests__/` 结构
-- 现有验证主要混在 `scripts/` 里
+**Playwright**
+- 已安装。
+- 当前主要用于 README 截图生成脚本。
+- 还没有形成固定 `tests/` 或 `e2e/` 套件。
 
-**Naming:**
-- 偏脚本命名，不是标准单元测试命名
+**ESLint**
+- 依赖存在，脚本为 `npm run lint`。
+- 注意：当前 `package.json` 中脚本是 `next lint`，而 Next.js 15 以后该命令可用性需要实际验证。
+- `next.config.ts` 中 `ignoreDuringBuilds: true`，说明 build 不强制阻断 lint。
 
-## Test Structure
+**TypeScript**
+- 类型检查由 Next build 和编辑器共同承担。
+- 当前没有单独 `tsc --noEmit` 脚本。
 
-**Suite Organization:**
-- 当前更像人工验证脚本与构建后检查，而不是系统化测试金字塔
+## Verification Scripts
 
-**Patterns:**
-- 构建验证：检查打包产物目录、关键文件存在
-- 功能验证：通过页面轮询、日志和脚本手工确认
+**Build/Packaging:**
+- `scripts/run-next-build.mjs`：Next build 包装入口。
+- `scripts/build-windows.mjs`：Windows 打包主路径。
+- `scripts/build-mac.mjs`：macOS 打包主路径。
+- `scripts/verify-build.js`：打包产物完整性检查。
 
-## Mocking
+**Screenshots:**
+- `scripts/generate-readme-screenshots.mjs`：通过 Playwright 生成 README 截图。
 
-**Framework:**
-- 未见统一 mocking 方案
+**Manual/Ad-hoc:**
+- `scripts/test-video-api.ts`：视频 API 脚本式验证。
+- `scripts/manual-test-volcengine-enhance.mjs`：火山高清化手工验证。
 
-**What to Mock:**
-- 后续若补测试，外部 AI provider、文件系统写入、Prisma 查询都应优先 mock 或替换为测试隔离层
-
-## Fixtures and Factories
-
-**Test Data:**
-- 当前未见明确 fixture/factory 层
-
-## Coverage
-
-**Requirements:**
-- 当前没有覆盖率门槛
-
-**Configuration:**
-- 无显式 coverage 配置
-
-## Test Types
+## What Is Not Yet Standardized
 
 **Unit Tests:**
-- 当前缺失，是明显测试债务
+- 没有 Vitest/Jest 配置。
+- 没有稳定的 `*.test.ts` / `*.spec.ts` 结构。
 
 **Integration Tests:**
-- worker、task route、storage、desktop runtime 这类高风险路径缺少集成测试
+- 任务队列、worker、provider adapter、storage、Prisma 查询没有系统化测试。
 
 **E2E Tests:**
-- Playwright 依赖已安装，但桌面端与关键用户流程尚未沉淀成固定套件
+- Playwright 存在，但没有产品主流程测试套件。
+- 桌面端 Electron smoke 没有固定自动化脚本。
 
-## Common Patterns
+**Fixtures/Mocks:**
+- 没有统一 fixture/factory。
+- 外部 AI provider、图床、文件系统、SQLite 测试隔离都还没成体系。
 
-**Build Verification:**
-- `scripts/verify-build.js` 用于检查 Windows 打包后的 runtime 文件完整性
+## High-Value Test Targets
 
-**Manual Runtime Verification:**
-- 通过 Electron 启动日志、`/api/health`、任务队列页面和历史页观察结果
+**Task Queue:**
+- 创建任务。
+- 批量创建任务。
+- 状态轮询。
+- worker 领取任务。
+- 失败重试。
+- 取消/删除任务。
 
-## Test Gaps
+**Storage Boundary:**
+- 上传素材保存。
+- 本地文件 URL 转换。
+- `/api/files/[...path]` 访问。
+- 结果图片和视频路径回填。
 
-- `/api/tasks` 与 `/api/tasks/worker` 的负载、返回体积和状态推进没有自动化验证
-- Electron 主进程启动、子进程恢复、窗口关闭后的任务连续性没有回归测试
-- Windows 专项性能优化缺少基线测试和指标采集脚本
+**Provider Boundary:**
+- 用户未配置密钥时的错误提示。
+- provider 参数映射。
+- provider 返回体标准化。
+- 图床 URL 与 base64 转换。
+
+**Desktop Runtime:**
+- 数据库准备。
+- Next standalone 子进程启动。
+- `/api/health` 探活。
+- 更新元信息读取。
+- 打包后 Prisma/sharp 可用性。
+
+**Product Flow:**
+- 注册/登录。
+- 配置 provider。
+- 上传图片。
+- 创建任务。
+- 任务进度展示。
+- 结果查看和重试。
+
+## Suggested Test Architecture
+
+**Near-Term:**
+- 增加 API/worker 的最小集成测试。
+- 增加 storage URL 转换和任务输出标准化的单元测试。
+- 增加 Playwright smoke：登录页、首页、任务中心、设置页、场景工作区可打开。
+
+**Mid-Term:**
+- provider adapter 使用 mock 响应测试。
+- SQLite 使用临时测试库。
+- Electron 打包后启动 smoke。
+
+**Long-Term:**
+- 固定 CI 中的 lint、typecheck、unit、integration、build smoke。
+- 建立 Windows 桌面升级和数据保留回归测试。
+
+## Current Risk from Test Gaps
+
+- worker 文件复杂但无自动化保护，改动容易引入任务状态回归。
+- 桌面打包链路长，资源缺失常到运行时才暴露。
+- provider 配置和本地文件 URL 是跨边界问题，人工测试覆盖不稳定。
+- 轮询接口和任务 payload 变更可能影响多个页面，但没有契约测试。
 
 ---
-*Testing analysis: 2026-05-26*
-*Update when test patterns change*
+*Update when formal test framework, test folders, CI gates, or verification scripts change.*
