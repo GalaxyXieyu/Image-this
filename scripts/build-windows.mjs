@@ -5,7 +5,7 @@
  * 可在 Mac/Linux 上构建 Windows 应用
  */
 
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import { existsSync, copyFileSync, cpSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, unlinkSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -106,9 +106,7 @@ function removeFilesByPredicate(dirPath, predicate) {
 
 function hasWine64() {
   try {
-    import('child_process').then(({ execSync }) => {
-      execSync('which wine64', { stdio: 'ignore' });
-    });
+    execSync('which wine64', { stdio: 'ignore' });
     return true;
   } catch {
     return false;
