@@ -32,6 +32,19 @@ const JIMENG_KNOWN_MODELS = [
   { id: 'doubao-seedream-5-0-260128', name: 'doubao-seedream-5-0-260128' },
 ];
 
+const GEMINI_FALLBACK_MODELS = [
+  'gemini-3-pro-image-preview-official',
+  'gemini-2.5-flash-image-official',
+  'gemini-3.1-pro',
+  'gemini-3.1-flash-image-preview-official',
+  'gemini-3-pro-image-preview',
+  'gemini-3.5-thinking',
+  'gemini-3.5-flash',
+  'gemini-2.5-flash-image-preview',
+  'gemini-3.1-flash-image-preview',
+  'gemini-3-pro-image-preview-4K',
+];
+
 function mapModelProviderLabel(provider: string) {
   switch (provider) {
     case 'gpt':
@@ -159,7 +172,8 @@ export async function POST(request: NextRequest) {
     if (isOpenAICompatible) {
       models = await fetchOpenAIModels(baseUrl, apiKey, provider);
     } else if (provider === 'gemini') {
-      models = await fetchGeminiModels(baseUrl, apiKey);
+      const remoteModels = await fetchGeminiModels(baseUrl, apiKey);
+      models = Array.from(new Set([...remoteModels, ...GEMINI_FALLBACK_MODELS]));
     } else if (provider === 'jimeng') {
       models = JIMENG_KNOWN_MODELS.map(m => m.id);
     } else {

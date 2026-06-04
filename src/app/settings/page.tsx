@@ -128,51 +128,60 @@ function SearchableModelSelect({
   );
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
+    <div className="relative flex-1">
+      <div className="flex gap-2">
+        <Input
           id={id}
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder || '选择或输入模型...'}
           disabled={disabled}
-        >
-          {value || placeholder || '选择模型...'}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="p-0" style={{ width: 'var(--radix-popover-trigger-width)' }}>
-        <div className="flex items-center border-b px-3">
-          <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="搜索模型..."
-            className="h-9 border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-          />
-        </div>
-        <div className="max-h-60 overflow-y-auto py-1">
-          {filtered.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-gray-500">无匹配模型</div>
-          ) : (
-            filtered.map((option) => (
-              <div
-                key={option}
-                onClick={() => {
-                  onChange(option);
-                  setOpen(false);
-                  setSearch('');
-                }}
-                className={`cursor-pointer px-3 py-2 text-sm hover:bg-gray-100 ${value === option ? 'bg-gray-100 font-medium' : ''}`}
-              >
-                {option}
-              </div>
-            ))
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
+          className="flex-1"
+        />
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              disabled={disabled}
+              className="shrink-0"
+            >
+              <ChevronsUpDown className="h-4 w-4 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="p-0 w-80" align="end">
+            <div className="flex items-center border-b px-3">
+              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="搜索模型..."
+                className="h-9 border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+              />
+            </div>
+            <div className="max-h-60 overflow-y-auto py-1">
+              {filtered.length === 0 ? (
+                <div className="px-3 py-2 text-sm text-gray-500">无匹配模型</div>
+              ) : (
+                filtered.map((option) => (
+                  <div
+                    key={option}
+                    onClick={() => {
+                      onChange(option);
+                      setOpen(false);
+                      setSearch('');
+                    }}
+                    className={`cursor-pointer px-3 py-2 text-sm hover:bg-gray-100 ${value === option ? 'bg-gray-100 font-medium' : ''}`}
+                  >
+                    {option}
+                  </div>
+                ))
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+    </div>
   );
 }
 
