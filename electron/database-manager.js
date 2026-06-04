@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { DatabaseSync } = require('node:sqlite');
-const { ensureExternalUserDataMigrated, getPrismaDir, getUserDataPaths } = require('./app-runtime');
+const { ensureExternalUserDataMigrated, getPrismaDir, getUserDataPaths, getLegacyUserDataPath } = require('./app-runtime');
 
 const REQUIRED_TABLES = [
   'users',
