@@ -104,6 +104,17 @@ function removeFilesByPredicate(dirPath, predicate) {
   return removedCount;
 }
 
+function hasWine64() {
+  try {
+    import('child_process').then(({ execSync }) => {
+      execSync('which wine64', { stdio: 'ignore' });
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function patchWindowsExecutableIcon() {
   const iconPath = join(projectRoot, 'build', 'icon.ico');
   const packageJson = JSON.parse(readFileSync(join(projectRoot, 'package.json'), 'utf8'));
@@ -117,6 +128,11 @@ async function patchWindowsExecutableIcon() {
   ].filter((targetPath, index, allPaths) => existsSync(targetPath) && allPaths.indexOf(targetPath) === index);
 
   if (!existsSync(iconPath) || targets.length === 0) {
+    return;
+  }
+
+  if (process.platform === 'darwin' && !hasWine64()) {
+    log('🪄 Skipping Windows executable icon patch on macOS without wine64.', 'yellow');
     return;
   }
 
