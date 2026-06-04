@@ -17,7 +17,6 @@ const targets = [
   'dist-electron',
   'node_modules/.cache',
   'node_modules/.prisma',
-  'node_modules/@prisma/client',
 ];
 
 function log(message) {
