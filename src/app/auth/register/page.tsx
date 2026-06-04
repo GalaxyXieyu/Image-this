@@ -62,7 +62,7 @@ export default function RegisterPage() {
         });
 
         if (result?.ok) {
-          router.push('/workspace');
+          router.push('/workspace/scene');
         }
       }
     } catch {
@@ -75,7 +75,7 @@ export default function RegisterPage() {
   const handleSocialLogin = async (provider: 'google' | 'github') => {
     setIsLoading(true);
     try {
-      await signIn(provider, { callbackUrl: '/workspace' });
+      await signIn(provider, { callbackUrl: '/workspace/scene' });
     } catch {
       setError('社交登录失败，请稍后重试');
       setIsLoading(false);

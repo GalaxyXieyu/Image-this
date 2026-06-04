@@ -17,9 +17,8 @@ Image-this/
 ├── scripts/                    # 构建、打包、验证、部署、截图脚本
 ├── src/
 │   ├── app/                    # Next.js App Router 页面与 API routes
-│   ├── components/             # UI、导航、工作区、模板、设置等组件
-│   ├── features/               # 特性级 hooks/lib，目前集中在 workspace
-│   ├── hooks/                  # 通用前端 hooks 和任务轮询 hooks
+│   ├── components/             # UI、工作台、模板、设置等组件
+│   ├── hooks/                  # 可复用前端 hooks
 │   ├── lib/                    # 核心业务、存储、auth、provider、桌面辅助
 │   ├── providers/              # React provider
 │   ├── stores/                 # Zustand store
@@ -110,10 +109,9 @@ Image-this/
 - `src/lib/desktop-secret-store.ts`：桌面端 secret store。
 
 **Workbench/UI:**
-- `src/components/workbench/*`：工作台类组件。
-- `src/components/workspace/*`：旧/通用工作区组件。
-- `src/features/workspace/*`：工作区特性抽象。
-- `src/stores/useWorkspaceTabStore.ts`：工作区标签状态。
+- `src/components/workbench/*`：商品视觉工作台 shell、导航、画布、步骤和操作区组件。
+- `src/components/templates/*`：模板库列表、侧栏、卡片和详情组件。
+- `src/hooks/workbench/*`：新工作流任务轮询等工作台 hooks。
 
 ## Database Models
 

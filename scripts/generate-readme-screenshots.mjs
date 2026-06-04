@@ -21,20 +21,13 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function escapeRegExp(input) {
-  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-async function waitForWorkspaceReady(page, timeoutMs = 60_000) {
-  // workspace 页面加载成功后，侧边栏会出现“一键增强”等入口按钮
-  const workspaceTab = page.getByRole('button', { name: /^一键增强/ }).first();
-
+async function waitForProductWorkspaceReady(page, timeoutMs = 60_000) {
   await Promise.race([
-    page.waitForURL('**/workspace', { timeout: timeoutMs }),
-    workspaceTab.waitFor({ timeout: timeoutMs }),
+    page.waitForURL('**/workspace/scene', { timeout: timeoutMs }),
+    page.getByText('产品基础信息').first().waitFor({ timeout: timeoutMs }),
   ]);
 
-  await workspaceTab.waitFor({ timeout: timeoutMs });
+  await page.getByText('产品基础信息').first().waitFor({ timeout: timeoutMs });
 }
 
 async function waitForHttpOk(url, timeoutMs = 60_000, shouldAbortEarly) {
@@ -131,7 +124,7 @@ async function signInWithCredentialsApi(page, email, password) {
   form.set('csrfToken', csrfToken);
   form.set('email', email);
   form.set('password', password);
-  form.set('callbackUrl', `${BASE_URL}/workspace`);
+  form.set('callbackUrl', `${BASE_URL}/workspace/scene`);
   form.set('json', 'true');
 
   const signInRes = await page.request.post(`${BASE_URL}/api/auth/callback/credentials`, {
@@ -166,8 +159,8 @@ async function loginOrRegister(page, email, password) {
     }
   }
 
-  await page.goto(`${BASE_URL}/workspace`, { waitUntil: 'domcontentloaded' });
-  await waitForWorkspaceReady(page, 60_000);
+  await page.goto(`${BASE_URL}/workspace/scene`, { waitUntil: 'domcontentloaded' });
+  await waitForProductWorkspaceReady(page, 60_000);
 }
 
 async function main() {
@@ -184,51 +177,42 @@ async function main() {
     });
     const page = await context.newPage();
 
-    // 1) 首页（未登录态）
+    // 1) 首页
     await page.goto(`${BASE_URL}/`, { waitUntil: 'domcontentloaded' });
     await screenshotFullPage(page, '01-homepage.png', {
-      mustHaveTexts: ['强大的功能特性', 'AI 图像处理', '登录', '欢迎回来'],
+      mustHaveTexts: ['AI 商品视觉工作台', '让每件商品都有一套专业视觉'],
       mustNotHaveTexts: ['加载中...', 'missing required error components', 'ChunkLoadError'],
       timeoutMs: 60_000,
     });
 
-    // 2) 注册并自动登录，进入工作区
+    // 2) 注册并自动登录，进入商品视觉工作台
     await loginOrRegister(page, SCREENSHOT_EMAIL, SCREENSHOT_PASSWORD);
-    await waitUntilReady(page, { mustHaveTexts: ['功能模块', '一键增强'], timeoutMs: 60_000 });
+    await screenshotFullPage(page, '02-scene-workspace.png', {
+      mustHaveTexts: ['产品基础信息', '选择风格模板', '生成与调整'],
+      mustNotHaveTexts: ['加载中...'],
+      timeoutMs: 60_000,
+    });
 
-    const workspaceShots = [
-      { tabName: '一键增强', file: 'workspace-01-oneclick.png' },
-      { tabName: '背景替换', file: 'workspace-02-background-replace.png' },
-      { tabName: '图像扩展', file: 'workspace-03-outpaint.png' },
-      { tabName: '图像高清化', file: 'workspace-04-enhance.png' },
-      { tabName: '叠加水印', file: 'workspace-05-watermark.png' },
-    ];
+    // 3) 智能工具集合页
+    await page.goto(`${BASE_URL}/tools`, { waitUntil: 'domcontentloaded' });
+    await screenshotFullPage(page, '03-tools.png', {
+      mustHaveTexts: ['素材精修工具', 'AI换背景', '高清放大'],
+      mustNotHaveTexts: ['加载中...'],
+      timeoutMs: 45_000,
+    });
 
-    for (const { tabName, file } of workspaceShots) {
-      // 避免 Playwright strict mode：例如“`一键增强`”会同时匹配侧边栏 tab 与“开始一键增强”按钮
-      const tabButton = page
-        .getByRole('button', { name: new RegExp(`^${escapeRegExp(tabName)}`) })
-        .first();
-      await tabButton.click();
-      await screenshotFullPage(page, file, {
-        mustHaveTexts: [tabName],
-        mustNotHaveTexts: ['加载中...'],
-        timeoutMs: 45_000,
-      });
-    }
-
-    // 3) 任务中心
-    await page.goto(`${BASE_URL}/history`, { waitUntil: 'domcontentloaded' });
+    // 4) 任务中心
+    await page.goto(`${BASE_URL}/tasks`, { waitUntil: 'domcontentloaded' });
     await screenshotFullPage(page, '04-task-center.png', {
       mustHaveTexts: ['任务中心'],
       mustNotHaveTexts: ['加载中...'],
       timeoutMs: 45_000,
     });
 
-    // 4) 图片库
-    await page.goto(`${BASE_URL}/gallery`, { waitUntil: 'domcontentloaded' });
-    await screenshotFullPage(page, '05-gallery.png', {
-      mustHaveTexts: ['图片管理', '图片分类'],
+    // 5) 结果管理
+    await page.goto(`${BASE_URL}/results`, { waitUntil: 'domcontentloaded' });
+    await screenshotFullPage(page, '05-results.png', {
+      mustHaveTexts: ['结果管理'],
       mustNotHaveTexts: ['加载中...'],
       timeoutMs: 45_000,
     });

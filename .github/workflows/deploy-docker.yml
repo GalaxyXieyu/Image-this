@@ -63,7 +63,7 @@ jobs:
 
           rsync -a .next/standalone/ .deploy-bundle/
           rsync -a prisma .deploy-bundle/prisma
-          rsync -a ecosystem.production.config.js .deploy-bundle/ecosystem.production.config.js
+          rsync -a config/ecosystem.production.config.js .deploy-bundle/ecosystem.production.config.js
           rsync -a package.json .deploy-bundle/package.json
 
           rm -rf .deploy-bundle/node_modules

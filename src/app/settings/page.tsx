@@ -449,7 +449,7 @@ export default function SettingsPage() {
       type="button"
       onClick={handleSave}
       disabled={isSaving}
-      className="min-w-[132px] bg-orange-500 hover:bg-orange-600"
+      className="min-w-[132px] bg-primary hover:bg-primary/90 text-primary-foreground"
     >
       {isSaving ? (
         <>
@@ -1360,7 +1360,7 @@ export default function SettingsPage() {
                 <Button 
                   onClick={handleSave} 
                   disabled={isSaving}
-                  className="min-w-[120px] bg-orange-500 hover:bg-orange-600"
+                  className="min-w-[120px] bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
                   {isSaving ? (
                     <>

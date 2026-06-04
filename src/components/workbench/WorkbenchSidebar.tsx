@@ -40,17 +40,17 @@ const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
   {
     title: "智能工具箱",
     items: [
-      { label: "AI换背景", href: "/tools/background", icon: Droplets },
-      { label: "智能扩图", href: "/tools/outpaint", icon: Expand },
-      { label: "高清化", href: "/tools/upscale", icon: Zap },
-      { label: "加水印", href: "/tools/watermark", icon: Image },
-      { label: "视频生成", href: "/tools/video", icon: Video },
+      { label: "AI换背景", href: "/tools", icon: Droplets },
+      { label: "智能扩图", href: "/tools", icon: Expand },
+      { label: "高清化", href: "/tools", icon: Zap },
+      { label: "加水印", href: "/tools", icon: Image },
+      { label: "视频生成", href: "/tools", icon: Video },
     ],
   },
   {
     title: "管理",
     items: [
-      { label: "历史记录", href: "/history", icon: History },
+      { label: "任务中心", href: "/tasks", icon: History },
       { label: "设置", href: "/settings", icon: Settings },
     ],
   },

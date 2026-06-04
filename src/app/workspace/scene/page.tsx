@@ -24,7 +24,6 @@ import {
   Image as ImageIcon,
   Wand2,
   ShoppingBag,
-  Loader2,
 } from "lucide-react";
 
 type Step = 1 | 2 | 3;
@@ -444,7 +443,6 @@ function GenerateAdjustStep({
 }) {
   const [generating, setGenerating] = useState(false);
   const [results, setResults] = useState<{ id: string; name: string; status: string }[]>([]);
-  const [taskId, setTaskId] = useState<string | null>(null);
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -457,7 +455,6 @@ function GenerateAdjustStep({
         }),
         totalSteps: 4,
       });
-      setTaskId(res.task.id);
       setResults([
         { id: "1", name: "简约自然风格", status: "pending" },
         { id: "2", name: "生活场景风格", status: "pending" },

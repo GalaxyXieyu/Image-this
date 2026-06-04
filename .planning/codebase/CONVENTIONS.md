@@ -24,16 +24,17 @@
 
 **Preferred Placement:**
 - 页面交互：`src/app/<route>/page.tsx`。
-- 可复用 UI：`src/components/<domain>/`。
+- 商品视觉工作台 UI：`src/components/workbench/`。
+- 模板库 UI：`src/components/templates/`。
+- 工作台相关 hooks：`src/hooks/workbench/`。
 - API 边界：`src/app/api/<domain>/route.ts`。
 - 业务共享逻辑：`src/lib/`。
 - provider 能力：`src/lib/image-processor/`。
-- 工作区特性抽象：`src/features/workspace/` 或 `src/hooks/`。
 
 **Current Reality:**
 - 部分页面文件偏长，页面内同时包含导航、mock 数据、状态和展示。
 - `src/app/api/tasks/worker/route.ts` 是高复杂度文件，混合了调度、并发、执行、持久化和重试。
-- `src/components/workspace` 与 `src/components/workbench` 并存，需要按新功能具体归属判断。
+- 旧 `workspace` UI 目录、旧 `features/workspace` 抽象和旧工作区标签 store 已移除；新工作区相关代码应继续收敛到 `workbench`、`templates`、`hooks/workbench` 和具体页面。
 
 ## Style
 

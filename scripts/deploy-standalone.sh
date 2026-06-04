@@ -178,7 +178,7 @@ restart_service() {
       pm2 delete "$APP_NAME" >/dev/null 2>&1 || true
     fi
 
-    pm2 start ecosystem.production.config.js --only "$APP_NAME" --update-env
+    pm2 start config/ecosystem.production.config.js --only "$APP_NAME" --update-env
     pm2 save >/dev/null
     pm2 describe "$APP_NAME"
   )
@@ -235,7 +235,7 @@ rollback() {
       if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
         pm2 delete "$APP_NAME" >/dev/null 2>&1 || true
       fi
-      pm2 start ecosystem.production.config.js --only "$APP_NAME" --update-env || true
+      pm2 start config/ecosystem.production.config.js --only "$APP_NAME" --update-env || true
       pm2 save >/dev/null || true
       pm2 describe "$APP_NAME" || true
     )

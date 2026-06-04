@@ -38,7 +38,7 @@ const CATEGORY_ITEMS: { key: PresetCategory; icon: React.ElementType }[] = [
 
 const FUNCTION_NAV_ITEMS: { label: string; href: string; icon: React.ElementType }[] = [
   { label: "场景图生成", href: "/workspace/scene", icon: Wand2 },
-  { label: "白底图", href: "/tools/background", icon: Image },
+  { label: "白底图", href: "/tools", icon: Image },
   { label: "上架图", href: "/templates?category=listing", icon: FileImage },
   { label: "海报设计", href: "/templates?category=poster", icon: FileImage },
 ];

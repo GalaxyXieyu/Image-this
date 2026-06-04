@@ -3,16 +3,12 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { apiGet, apiDelete } from "@/lib/api-client";
 import { useTaskPolling } from "@/lib/use-task-polling";
 import {
   RefreshCw,
-  MoreHorizontal,
-  Play,
-  Pause,
   RotateCcw,
   Trash2,
   Image as ImageIcon,
@@ -60,13 +56,6 @@ function formatDate(dateStr: string | Date): string {
   const d = new Date(dateStr);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
-
-const TABS = [
-  { id: "all", label: "全部" },
-  { id: "running", label: "进行中" },
-  { id: "completed", label: "已完成" },
-  { id: "failed", label: "失败" },
-];
 
 function TopNav() {
   return (

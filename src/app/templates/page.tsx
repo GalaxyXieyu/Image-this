@@ -150,13 +150,13 @@ function TemplatesPageInner() {
           break;
         case "tool":
           if (preset.toolType) {
-            targetUrl = `/tools/${preset.toolType}?preset=${preset.id}`;
+            targetUrl = `/tools?preset=${preset.id}&tool=${preset.toolType}`;
           } else {
             targetUrl = `/workspace/scene?preset=${preset.id}`;
           }
           break;
         case "combo":
-          targetUrl = `/workbench?preset=${preset.id}`;
+          targetUrl = `/combo?preset=${preset.id}`;
           break;
         default:
           targetUrl = `/workspace/scene?preset=${preset.id}`;

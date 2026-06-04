@@ -169,7 +169,7 @@ export function DesktopUpdateCard() {
               type="button"
               onClick={handleRestart}
               disabled={!canRestart || installing}
-              className="gap-2 bg-orange-500 hover:bg-orange-600"
+              className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               <Download className="h-4 w-4" />
               {installing ? '准备重启...' : '立即重启更新'}

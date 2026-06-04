@@ -36,7 +36,7 @@ export default function LoginPage() {
         setError('邮箱或密码错误');
       } else {
         // 登录成功，重定向到主页
-        router.push('/workspace');
+        router.push('/workspace/scene');
         router.refresh();
       }
     } catch {
@@ -49,7 +49,7 @@ export default function LoginPage() {
   const handleSocialLogin = async (provider: 'google' | 'github') => {
     setIsLoading(true);
     try {
-      await signIn(provider, { callbackUrl: '/workspace' });
+      await signIn(provider, { callbackUrl: '/workspace/scene' });
     } catch {
       setError('社交登录失败，请稍后重试');
       setIsLoading(false);

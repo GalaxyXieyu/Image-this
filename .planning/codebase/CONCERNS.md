@@ -26,15 +26,15 @@
 
 ## Product/Architecture Drift
 
-**旧工作区与新商品视觉工作台并存**
-- Evidence：README 和历史规划仍描述“一键增强/背景/扩图/高清/水印/视频”的旧工作区模式；当前页面入口已经出现 `/workspace/scene`、`/combo`、`/tools` 等新电商视觉工作台形态。
-- Risk：需求、README、规划和实际页面不完全一致，后续开发容易接错入口。
-- Suggested Fix：明确当前产品主线：旧 AI 工具箱是基础能力，新场景工作区是商品视觉生产主路径。
+**旧工作区入口已下线，维护口径需继续收敛**
+- Evidence：当前保留的产品入口是 `/workspace/scene`、`/combo`、`/tools`、`/tasks`、`/results`、`/templates`；旧 `/workspace`、`/workbench`、`/history`、`/gallery` 与独立工具子路由已从运行入口和旧 UI 模块中移除。
+- Risk：历史阶段文档仍可能提到旧路由和旧组件，不能作为当前产品结构依据。
+- Suggested Fix：后续新增入口只挂到商品视觉工作台主线；历史文档只作为迁移记录，不反向驱动实现。
 
-**组件归属分裂**
-- Evidence：`components/workspace`、`components/workbench`、`features/workspace` 同时存在。
-- Risk：新组件放置不一致，状态和样式重复。
-- Suggested Fix：按“产品工作台”和“通用工具能力”重新划边界。
+**工具能力与商品视觉工作流命名仍需统一**
+- Evidence：`/tools` 作为集合页保留背景、抠图、扩图、高清等基础能力；worker/API 仍使用历史任务类型命名。
+- Risk：前端文案、任务类型、worker 分发和结果分类之间继续漂移。
+- Suggested Fix：建立统一任务类型字典，让工具集合、组合工作流、任务中心和结果管理共享同一套命名。
 
 ## Known Functional Risks
 
@@ -98,7 +98,7 @@
 1. 统一任务类型与任务状态字典。
 2. 拆分 worker，先把“分发/执行/持久化/重试”分开。
 3. 给任务状态轮询建立轻量契约。
-4. 明确新旧工作区的产品边界和路由入口。
+4. 收敛商品视觉工作台入口、工具集合、任务中心和结果管理的命名边界。
 5. 为 provider 配置做健康检查。
 6. 建立最小测试保护：任务、storage、provider mock、桌面 smoke。
 

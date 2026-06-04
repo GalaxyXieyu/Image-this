@@ -1,6 +1,6 @@
 const config = {
   plugins: {
-    tailwindcss: {},
+    tailwindcss: { config: './config/tailwind.config.js' },
     autoprefixer: {},
   },
 };

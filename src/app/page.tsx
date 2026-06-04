@@ -6,14 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import {
   ShoppingBag,
   Scan,
-  Image,
+  Image as ImageIcon,
   Palette,
   Wrench,
   Users,
   Zap,
   Store,
   CheckCircle,
-  ArrowRight,
 } from "lucide-react";
 
 function TopNav() {
@@ -99,10 +98,10 @@ function HeroSection() {
 
 function TrustBar() {
   const items = [
-    { icon: Users, value: "10万+", label: "电商卖家信赖" },
-    { icon: Zap, value: "5000万+", label: "素材已生成" },
-    { icon: Store, value: "6 大平台", label: "全平台适配" },
-    { icon: CheckCircle, value: "99.5%", label: "生成成功率" },
+    { icon: Users, value: "商品工作台", label: "围绕上架素材生产" },
+    { icon: Zap, value: "多工具链路", label: "换背景、扩图、高清化" },
+    { icon: Store, value: "多平台场景", label: "覆盖主流电商渠道" },
+    { icon: CheckCircle, value: "任务可追踪", label: "进度与结果集中管理" },
   ];
 
   return (
@@ -131,7 +130,7 @@ function QuickActions() {
   const actions = [
     { icon: ShoppingBag, title: "上架图生成", desc: "多平台适配" },
     { icon: Scan, title: "白底图", desc: "智能抠图" },
-    { icon: Image, title: "场景图", desc: "AI 合成场景" },
+    { icon: ImageIcon, title: "场景图", desc: "AI 合成场景" },
     { icon: Palette, title: "海报设计", desc: "营销海报" },
     { icon: Wrench, title: "智能工具箱", desc: "换背景/水印/组合" },
   ];
@@ -147,7 +146,7 @@ function QuickActions() {
               : action.title === "场景图"
               ? "/workspace/scene"
               : action.title === "白底图"
-              ? "/tools/background"
+              ? "/tools"
               : action.title === "上架图生成"
               ? "/templates?category=listing"
               : "/templates"
@@ -200,7 +199,7 @@ function CaseStudies() {
             className="rounded-xl border border-border bg-card overflow-hidden hover:shadow-md transition-shadow"
           >
             <div className="h-40 bg-muted flex flex-col items-center justify-center gap-2">
-              <Image className="w-8 h-8 text-muted-foreground" />
+              <ImageIcon className="w-8 h-8 text-muted-foreground" />
               <span className="text-xs text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
                 场景图预览
               </span>

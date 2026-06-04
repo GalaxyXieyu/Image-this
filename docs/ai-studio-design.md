@@ -777,34 +777,34 @@ AiStudioWorkspace
 
 ---
 
-## 10. 与现有代码集成
+## 10. 与当前商品视觉工作台集成
 
-### 10.1 复用的现有模块
+### 10.1 保留的当前模块
 
-| 现有模块 | 复用方式 |
+| 当前模块 | 集成方式 |
 |---------|---------|
-| `TaskQueue` + `TaskProcessor` | 新增 `AI_STUDIO_GENERATION` 任务类型 |
-| `useTaskPolling` | 直接复用，轮询 `AI_STUDIO_GENERATION` 任务 |
-| `ImageProcessorFactory` / `providers/*` | Provider Router 内部调用 |
-| `/api/images-process/outpaint` | Pipeline Executor 中作为 addon 调用 |
-| `/api/images-process/enhance` | Pipeline Executor 中作为 addon 调用 |
-| `/api/images-process/watermark` | Pipeline Executor 中作为 addon 调用 |
-| `uploadBase64Image` (storage) | Pipeline Executor 最后一步上传结果 |
-| `useToast` | 各组件复用 |
+| `TaskQueue` + 任务 worker | 承接异步生成、进度、重试和结果落库 |
+| `ImageProcessorFactory` / `providers/*` | 作为 AI provider 能力入口 |
+| `/api/images-process/outpaint` | 作为扩图能力入口 |
+| `/api/images-process/enhance` | 作为高清化能力入口 |
+| `/api/images-process/watermark` | 作为水印能力入口 |
+| `uploadBase64Image` / storage | 保存生成结果和本地文件引用 |
+| `useToast` | 统一用户反馈 |
 
-### 10.2 不修改的现有模块
+### 10.2 不再延续的旧产品面
 
-- `WorkspaceSidebar` 及现有 6 个 Tabs
-- `useWorkspaceTabStore`
-- `useImageUpload`（可以复用，也可以为 AI Studio 写专门的单图上传 hook）
+旧 tab 工作区、旧历史页、旧图库页和独立工具子页不再作为当前产品入口。新增能力统一进入商品视觉工作台主线：场景工作区、组合工作流、工具集合页、任务中心、结果管理和模板库。
 
-### 10.3 新增路由
+### 10.3 当前路由
 
 | 路由 | 页面 | 说明 |
 |------|------|------|
-| `/ai-studio` | `app/ai-studio/page.tsx` | AI Studio 工作台主页面 |
-| `/tasks` | `app/tasks/page.tsx` | 任务中心汇总页 |
-| `/api/ai-studio/analyze` | `app/api/ai-studio/analyze/route.ts` | 商品图分析接口 |
+| `/workspace/scene` | 商品场景工作区 | 商品信息、风格模板、生成与调整 |
+| `/combo` | 组合工作流 | 多步骤视觉生产链路 |
+| `/tools` | 工具集合页 | 背景、抠图、扩图、高清等基础能力 |
+| `/tasks` | 任务中心 | 异步任务状态与进度 |
+| `/results` | 结果管理 | 生成资产集中管理 |
+| `/templates` | 模板库 | 商品视觉模板与预设 |
 
 ---
 

@@ -107,7 +107,7 @@ export default function ToolboxPage() {
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { upload, uploading } = useUpload();
-  const { process: processImage, processing, result, error: processError, reset } = useImageProcess();
+  const { process: processImage, processing, error: processError, reset } = useImageProcess();
   const { toast } = useToast();
 
   const handleFileSelect = useCallback(
@@ -191,13 +191,13 @@ export default function ToolboxPage() {
             className="text-xl font-semibold text-foreground"
             style={{ fontFamily: "Inter, sans-serif" }}
           >
-            智能工具箱
+            素材精修工具
           </h1>
           <p
             className="text-sm text-muted-foreground mt-0.5"
             style={{ fontFamily: "Geist, sans-serif" }}
           >
-            选择工具类型，上传图片开始处理
+            选择图片处理能力，快速完成商品素材精修
           </p>
         </div>
         <div className="flex items-center gap-3">
