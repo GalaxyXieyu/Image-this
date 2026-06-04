@@ -218,7 +218,9 @@ export async function POST(request: NextRequest) {
 
     let models: string[] = [];
 
-    if (provider === 'gpt' || provider === 'openai') {
+    const isOpenAICompatible = provider === 'gpt' || provider === 'openai' || baseUrl.includes('toapis.com');
+
+    if (isOpenAICompatible) {
       models = await fetchOpenAIModels(baseUrl, apiKey, provider);
     } else if (provider === 'gemini') {
       models = await fetchGeminiModels(baseUrl, apiKey);
