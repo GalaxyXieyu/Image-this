@@ -1,20 +1,30 @@
 const path = require('path');
-const { rcedit } = require('rcedit');
+const fs = require('fs');
+const ResEdit = require('resedit');
 const {
   collectSignableFiles,
   hasWindowsSigningConfig,
   signFiles,
 } = require('./windows-signing-utils.cjs');
 
-const { execSync } = require('child_process');
+function patchExeIcon(exePath, iconPath) {
+  const exeData = fs.readFileSync(exePath);
+  const exe = ResEdit.NtExecutable.from(exeData);
+  const res = ResEdit.NtExecutableResource.from(exe);
 
-function hasWine64() {
-  try {
-    execSync('which wine64', { stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
+  const iconFile = ResEdit.Data.IconFile.from(fs.readFileSync(iconPath));
+  const iconGroups = ResEdit.Resource.IconGroupEntry.fromEntries(res.entries);
+  const iconGroupId = iconGroups.length > 0 ? iconGroups[0].id : 1;
+
+  ResEdit.Resource.IconGroupEntry.replaceIconsForResource(
+    res.entries,
+    iconGroupId,
+    1033,
+    iconFile.icons.map((item) => item.data)
+  );
+
+  res.outputResource(exe);
+  fs.writeFileSync(exePath, Buffer.from(exe.generate()));
 }
 
 module.exports = async function afterPack(context) {
@@ -22,21 +32,15 @@ module.exports = async function afterPack(context) {
     return;
   }
 
-  const isMac = process.platform === 'darwin';
-  const hasWine = hasWine64();
+  const iconPath = path.join(context.packager.projectDir, 'build', 'icon.ico');
+  const productFilename =
+    context.packager.appInfo.productFilename || context.packager.appInfo.productName || 'ImagineThis';
+  const mainExecutablePath = path.join(context.appOutDir, `${productFilename}.exe`);
 
-  if (isMac && !hasWine) {
-    console.log('[afterPack] Skipping rcedit on macOS without wine64. Windows icon is set via electron-builder config.');
-  } else {
-    const iconPath = path.join(context.packager.projectDir, 'build', 'icon.ico');
-    const productFilename =
-      context.packager.appInfo.productFilename || context.packager.appInfo.productName || 'ImagineThis';
-    const mainExecutablePath = path.join(context.appOutDir, `${productFilename}.exe`);
-
+  if (fs.existsSync(iconPath) && fs.existsSync(mainExecutablePath)) {
     console.log(`[afterPack] Updating Windows executable icon: ${mainExecutablePath}`);
-    await rcedit(mainExecutablePath, {
-      icon: iconPath,
-    });
+    patchExeIcon(mainExecutablePath, iconPath);
+    console.log('[afterPack] Icon patched successfully with resedit.');
   }
 
   if (!hasWindowsSigningConfig(process.env)) {

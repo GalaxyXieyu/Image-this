@@ -6,12 +6,12 @@
  */
 
 import { spawn, execSync } from 'child_process';
-import { existsSync, copyFileSync, cpSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, unlinkSync } from 'fs';
+import { existsSync, copyFileSync, cpSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, unlinkSync, writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { createRequire } from 'module';
 import readline from 'readline';
-import { rcedit } from 'rcedit';
+import * as ResEdit from 'resedit';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -104,13 +104,26 @@ function removeFilesByPredicate(dirPath, predicate) {
   return removedCount;
 }
 
-function hasWine64() {
-  try {
-    execSync('which wine64', { stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
+function patchExeIcon(exePath, iconPath) {
+  const exeData = readFileSync(exePath);
+  const exe = ResEdit.NtExecutable.from(exeData);
+  const res = ResEdit.NtExecutableResource.from(exe);
+
+  const iconFile = ResEdit.Data.IconFile.from(readFileSync(iconPath));
+  const iconGroups = ResEdit.Resource.IconGroupEntry.fromEntries(res.entries);
+  const iconGroupId = iconGroups.length > 0 ? iconGroups[0].id : 1;
+
+  ResEdit.Resource.IconGroupEntry.replaceIconsForResource(
+    res.entries,
+    iconGroupId,
+    1033,
+    iconFile.icons.map((item) => item.data)
+  );
+
+  res.outputResource(exe);
+  const newData = Buffer.from(exe.generate());
+  unlinkSync(exePath);
+  writeFileSync(exePath, newData);
 }
 
 async function patchWindowsExecutableIcon() {
@@ -129,17 +142,10 @@ async function patchWindowsExecutableIcon() {
     return;
   }
 
-  if (process.platform === 'darwin' && !hasWine64()) {
-    log('🪄 Skipping Windows executable icon patch on macOS without wine64.', 'yellow');
-    return;
-  }
-
   log('🪄 写入 Windows 可执行文件图标...', 'yellow');
 
   for (const targetPath of targets) {
-    await rcedit(targetPath, {
-      icon: iconPath,
-    });
+    patchExeIcon(targetPath, iconPath);
     log(`✅ 已修正图标: ${targetPath}`, 'green');
   }
 }
