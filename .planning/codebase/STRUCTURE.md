@@ -126,14 +126,15 @@ Located in `prisma/schema.prisma`:
 ## Documentation Locations
 
 **Product/Design:**
-- `docs/ai-studio-2-prd.md`
-- `docs/ai-studio-design.md`
-- `docs/nextjs-guide.md`
+- `docs/ai-studio-2-prd.md`：当前产品定义、页面关系、业务规则和阶段验收口径。
+- `docs/brand-ui-spec.md`：品牌视觉、UI token、Logo/IP 使用边界。
+- `docs/brands/**`：品牌 SVG 资产。
 
 **Operations:**
-- `docs/DATABASE-REPAIR.md`
-- `docs/windows-code-signing.md`
-- `docs/desktop-release-pipeline.md`
+- `docs/desktop-operations.md`：桌面发布、Windows 签名、SQLite 数据库修复。
+
+**Screenshots:**
+- `docs/screenshots/**`：README 和产品展示截图。
 
 **Planning:**
 - `.planning/codebase/*.md`
