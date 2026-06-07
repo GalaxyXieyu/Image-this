@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
   APP_ROOT: /root/data/Image-this
@@ -24,6 +28,24 @@ jobs:
       url: http://image.bojie.store
 
     steps:
+      - name: Validate required secrets
+        run: |
+          missing=()
+          if [ -z "${{ secrets.SERVER_HOST }}" ]; then
+            missing+=("SERVER_HOST")
+          fi
+          if [ -z "${{ secrets.SERVER_USER }}" ]; then
+            missing+=("SERVER_USER")
+          fi
+          if [ -z "${{ secrets.SERVER_SSH_KEY }}" ]; then
+            missing+=("SERVER_SSH_KEY")
+          fi
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::Missing required secrets: ${missing[*]}"
+            exit 1
+          fi
+          echo "All required secrets are present."
+
       - name: Checkout code
         uses: actions/checkout@v5
 
@@ -32,6 +54,15 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+
+      - name: Restore Next.js build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            .next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**.[jt]s', '**.[jt]sx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
 
       - name: Install dependencies
         run: npm ci
@@ -45,14 +76,14 @@ jobs:
           cat > .env.production <<'EOF'
           DATABASE_URL=file:./data/app.db
           NEXTAUTH_URL=http://image.bojie.store
-          NEXTAUTH_SECRET=build-only-secret-with-32-characters
+          NEXTAUTH_SECRET=build-only-placeholder-do-not-use-in-production
           EOF
 
       - name: Build standalone bundle
         env:
           DATABASE_URL: file:./data/app.db
           NEXTAUTH_URL: http://image.bojie.store
-          NEXTAUTH_SECRET: build-only-secret-with-32-characters
+          NEXTAUTH_SECRET: build-only-placeholder-do-not-use-in-production
         run: npm run build
 
       - name: Package deployment bundle
@@ -138,23 +169,28 @@ jobs:
           curl -f ${{ env.APP_DOMAIN }}/api/health
           echo "Deployment verification successful!"
 
-      - name: Notify deployment success
-        if: success()
+      - name: Write deployment summary
+        if: always()
         run: |
-          echo "=========================================="
-          echo "   🎉 Deployment Successful!"
-          echo "=========================================="
-          echo "Service URL: ${{ env.APP_DOMAIN }}"
-          echo "Health Check: ${{ env.APP_DOMAIN }}/api/health"
-          echo "Commit: ${{ github.sha }}"
-          echo "Author: ${{ github.actor }}"
-
-      - name: Notify deployment failure
-        if: failure()
-        run: |
-          echo "=========================================="
-          echo "   ❌ Deployment Failed"
-          echo "=========================================="
-          echo "Please check the logs above for details."
-          echo "Commit: ${{ github.sha }}"
-          echo "Author: ${{ github.actor }}"
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "## Deployment Successful :white_check_mark:" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Item | Value |" >> "$GITHUB_STEP_SUMMARY"
+            echo "|------|-------|" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Environment | Production |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Service URL | ${{ env.APP_DOMAIN }} |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Health Check | ${{ env.APP_DOMAIN }}/api/health |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Commit | ${{ github.sha }} |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Author | ${{ github.actor }} |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Port | ${{ env.PORT }} |" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## Deployment Failed :x:" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Item | Value |" >> "$GITHUB_STEP_SUMMARY"
+            echo "|------|-------|" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Environment | Production |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Commit | ${{ github.sha }} |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Author | ${{ github.actor }} |" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Check the workflow logs for details." >> "$GITHUB_STEP_SUMMARY"
+          fi
