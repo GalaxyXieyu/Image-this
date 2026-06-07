@@ -18,6 +18,7 @@ import {
   Image as ImageIcon,
   CheckSquare,
   Loader2,
+  Wand2,
 } from "lucide-react";
 
 function ImageThumbnail({ src, alt, className }: { src?: string | null; alt: string; className?: string }) {
@@ -236,10 +237,10 @@ export default function ResultsPage() {
       <TopNav />
 
       {/* Header */}
-      <div className="px-8 py-6 flex items-center justify-between shrink-0">
+      <div className="px-6 py-4 flex items-center justify-between shrink-0 border-b border-border">
         <div>
           <h1
-            className="text-xl font-semibold text-foreground"
+            className="text-lg font-semibold text-foreground"
             style={{ fontFamily: "Inter, sans-serif" }}
           >
             结果管理
@@ -332,8 +333,8 @@ export default function ResultsPage() {
 
         {/* Main area */}
         <main className="flex-1 flex flex-col overflow-hidden">
-          {/* Bulk actions bar */}
-          <div className="px-6 py-3 border-b border-border flex items-center justify-between shrink-0">
+          {/* Bulk actions bar — subdued */}
+          <div className="px-6 py-2.5 border-b border-border flex items-center justify-between shrink-0 bg-secondary/50">
             <div className="flex items-center gap-4">
               <button
                 onClick={toggleSelectAll}
@@ -357,6 +358,7 @@ export default function ResultsPage() {
                 variant="outline"
                 size="sm"
                 disabled={selectedIds.size === 0}
+                className="bg-background"
               >
                 <Download className="w-4 h-4 mr-1.5" />
                 批量下载
@@ -365,7 +367,7 @@ export default function ResultsPage() {
                 variant="outline"
                 size="sm"
                 disabled={selectedIds.size === 0}
-                className="text-destructive hover:text-destructive"
+                className="text-destructive hover:text-destructive bg-background"
                 onClick={handleBulkDelete}
               >
                 <Trash2 className="w-4 h-4 mr-1.5" />
@@ -375,7 +377,7 @@ export default function ResultsPage() {
           </div>
 
           {/* Results grid */}
-          <div className="flex-1 overflow-auto p-6">
+          <div className="flex-1 overflow-auto p-4">
             {loading && (
               <div className="flex items-center justify-center h-64">
                 <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -394,17 +396,22 @@ export default function ResultsPage() {
             {!loading && !error && (
               <>
                 {viewMode === "grid" ? (
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-4 gap-3">
                     {filteredResults.map((item) => (
                       <div
                         key={item.id}
-                        className="group rounded-xl border border-border bg-card overflow-hidden hover:shadow-sm transition-shadow"
+                        className={cn(
+                          "group rounded-lg border bg-card overflow-hidden transition-all duration-200",
+                          selectedIds.has(item.id)
+                            ? "ring-2 ring-primary border-primary"
+                            : "border-border hover:border-primary/40"
+                        )}
                       >
-                        {/* Image thumbnail */}
+                        {/* Image thumbnail — dominant */}
                         <div className="relative aspect-[4/3] bg-muted flex items-center justify-center overflow-hidden">
                           <ImageThumbnail src={item.thumbnail || item.processedUrl} alt={item.name} className="w-10 h-10" />
                           {/* Checkbox overlay */}
-                          <div className="absolute top-3 left-3">
+                          <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Checkbox
                               checked={selectedIds.has(item.id)}
                               onCheckedChange={() => toggleSelect(item.id)}
@@ -422,25 +429,20 @@ export default function ResultsPage() {
                             </Button>
                           </div>
                         </div>
-                        {/* Card info */}
-                        <div className="p-3">
+                        {/* Card info — minimal */}
+                        <div className="px-3 py-2">
                           <h3
                             className="text-sm font-medium text-foreground truncate"
                             style={{ fontFamily: "Inter, sans-serif" }}
                           >
                             {item.name}
                           </h3>
-                          <div className="flex items-center justify-between mt-1">
-                            <p
-                              className="text-xs text-muted-foreground"
-                              style={{ fontFamily: "Geist, sans-serif" }}
-                            >
-                              {item.createdAt}
-                            </p>
-                            <button className="text-muted-foreground hover:text-foreground transition-colors">
-                              <MoreHorizontal className="w-4 h-4" />
-                            </button>
-                          </div>
+                          <p
+                            className="text-xs text-muted-foreground mt-0.5"
+                            style={{ fontFamily: "Geist, sans-serif" }}
+                          >
+                            {item.createdAt}
+                          </p>
                         </div>
                       </div>
                     ))}
@@ -450,13 +452,18 @@ export default function ResultsPage() {
                     {filteredResults.map((item) => (
                       <div
                         key={item.id}
-                        className="flex items-center gap-4 p-3 rounded-xl border border-border bg-card hover:shadow-sm transition-shadow"
+                        className={cn(
+                          "flex items-center gap-4 p-3 rounded-lg border bg-card transition-all duration-200",
+                          selectedIds.has(item.id)
+                            ? "ring-2 ring-primary border-primary"
+                            : "border-border hover:border-primary/40"
+                        )}
                       >
                         <Checkbox
                           checked={selectedIds.has(item.id)}
                           onCheckedChange={() => toggleSelect(item.id)}
                         />
-                        <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center shrink-0 overflow-hidden">
+                        <div className="w-14 h-14 rounded-md bg-muted flex items-center justify-center shrink-0 overflow-hidden">
                           <ImageThumbnail src={item.thumbnail || item.processedUrl} alt={item.name} className="w-5 h-5" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -473,15 +480,12 @@ export default function ResultsPage() {
                             {item.createdAt}
                           </p>
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Button variant="ghost" size="sm">
                             <Download className="w-4 h-4" />
                           </Button>
                           <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive">
                             <Trash2 className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="w-4 h-4" />
                           </Button>
                         </div>
                       </div>
@@ -490,14 +494,20 @@ export default function ResultsPage() {
                 )}
 
                 {filteredResults.length === 0 && (
-                  <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                    <ImageIcon className="w-12 h-12 mb-4 opacity-50" />
+                  <div className="flex flex-col items-center justify-center h-96 text-muted-foreground">
+                    <ImageIcon className="w-12 h-12 mb-4 opacity-40" />
                     <p
-                      className="text-sm"
+                      className="text-sm mb-4"
                       style={{ fontFamily: "Geist, sans-serif" }}
                     >
-                      暂无结果
+                      暂无结果，去生成一张吧
                     </p>
+                    <Button asChild>
+                      <Link href="/workspace/scene">
+                        <Wand2 className="w-4 h-4 mr-2" />
+                        开始生成
+                      </Link>
+                    </Button>
                   </div>
                 )}
               </>
