@@ -18,12 +18,12 @@ import {
 function TopNav() {
   return (
     <header className="h-16 border-b border-border px-8 flex items-center justify-between shrink-0">
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-primary" />
+      <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+        <img src="/brands/logo-icon.png" alt="ImageThis" className="w-8 h-8" />
         <span className="text-base font-semibold text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
-          AI 商品视觉工作台
+          ImageThis
         </span>
-      </div>
+      </Link>
       <nav className="flex items-center gap-6">
         <Link href="/" className="text-sm text-foreground font-medium" style={{ fontFamily: "Geist, sans-serif" }}>
           首页
@@ -51,10 +51,10 @@ function TopNav() {
 
 function HeroSection() {
   return (
-    <section className="flex flex-col items-center gap-6 pt-16 pb-8">
+    <section className="flex flex-col items-center gap-6 pt-16 pb-8 bg-brand-gradient-light rounded-2xl mx-4 mt-4">
       <Badge
         variant="secondary"
-        className="px-4 py-1.5 rounded-full text-sm font-normal bg-muted text-foreground"
+        className="px-4 py-1.5 rounded-full text-sm font-normal bg-white/60 text-foreground backdrop-blur-sm"
         style={{ fontFamily: "Geist, sans-serif" }}
       >
         AI 驱动的电商视觉引擎
@@ -74,8 +74,8 @@ function HeroSection() {
       <div className="flex items-center gap-4 mt-2">
         <Button
           asChild
-          variant="brand"
-          className="h-12 px-6 rounded-full"
+          variant="gradient"
+          className="h-12 px-6 rounded-full shadow-sm"
           style={{ fontFamily: "Inter, sans-serif" }}
         >
           <Link href="/workspace/scene">
@@ -85,7 +85,7 @@ function HeroSection() {
         <Button
           asChild
           variant="outline"
-          className="h-12 px-6 rounded-full border-border bg-background hover:bg-muted"
+          className="h-12 px-6 rounded-full border-border bg-white/60 backdrop-blur-sm hover:bg-white"
           style={{ fontFamily: "Inter, sans-serif" }}
         >
           <Link href="/tools">

@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img" aria-labelledby="title desc">
+  <title id="title">ImageThis LUMO empty state illustration draft</title>
+  <desc id="desc">A controlled brand illustration draft that reuses the official LUMO IP SVG and adds a blue-violet AI workspace scene.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F8FAFC"/>
+      <stop offset="0.42" stop-color="#EEF5FF"/>
+      <stop offset="1" stop-color="#F5F0FF"/>
+    </linearGradient>
+    <linearGradient id="brandGlow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2563FF"/>
+      <stop offset="1" stop-color="#7C3AED"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="24" stdDeviation="28" flood-color="#1E293B" flood-opacity="0.14"/>
+    </filter>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="24" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.15 0 0 0 0 0.39 0 0 0 0 1 0 0 0 0.32 0"/>
+    </filter>
+    <clipPath id="screenClip">
+      <rect x="430" y="182" width="640" height="420" rx="36"/>
+    </clipPath>
+  </defs>
+
+  <rect width="1440" height="900" fill="url(#bg)"/>
+
+  <circle cx="1110" cy="190" r="170" fill="#DBEAFE" opacity="0.58" filter="url(#glow)"/>
+  <circle cx="392" cy="695" r="210" fill="#EDE9FE" opacity="0.64" filter="url(#glow)"/>
+  <circle cx="722" cy="438" r="270" fill="#DBEAFE" opacity="0.34" filter="url(#glow)"/>
+
+  <g opacity="0.45" stroke="#CBD5E1" stroke-width="1">
+    <path d="M190 190H360"/>
+    <path d="M1020 690H1214"/>
+    <path d="M1092 138H1238"/>
+    <path d="M244 704H340"/>
+    <circle cx="366" cy="190" r="4" fill="#CBD5E1" stroke="none"/>
+    <circle cx="1014" cy="690" r="4" fill="#CBD5E1" stroke="none"/>
+    <circle cx="1244" cy="138" r="4" fill="#CBD5E1" stroke="none"/>
+    <circle cx="238" cy="704" r="4" fill="#CBD5E1" stroke="none"/>
+  </g>
+
+  <g filter="url(#softShadow)">
+    <rect x="390" y="148" width="720" height="520" rx="44" fill="#FFFFFF"/>
+    <rect x="410" y="168" width="680" height="480" rx="34" fill="#F8FAFC" stroke="#E2E8F0"/>
+    <rect x="430" y="182" width="640" height="420" rx="36" fill="#FFFFFF"/>
+    <g clip-path="url(#screenClip)">
+      <rect x="430" y="182" width="640" height="420" fill="#FFFFFF"/>
+      <path d="M430 182H1070V260H430Z" fill="#F8FAFC"/>
+      <circle cx="486" cy="221" r="12" fill="#2563FF" opacity="0.92"/>
+      <rect x="512" y="211" width="154" height="20" rx="10" fill="#CBD5E1"/>
+      <rect x="920" y="208" width="88" height="28" rx="14" fill="#DBEAFE"/>
+      <rect x="460" y="308" width="196" height="158" rx="26" fill="#F1F5F9" stroke="#E2E8F0"/>
+      <rect x="488" y="334" width="140" height="18" rx="9" fill="#CBD5E1"/>
+      <rect x="488" y="372" width="92" height="72" rx="18" fill="#DBEAFE"/>
+      <path d="M514 410L540 384L574 444H500Z" fill="#2563FF" opacity="0.72"/>
+      <rect x="700" y="308" width="280" height="36" rx="18" fill="#EEF2FF"/>
+      <rect x="700" y="374" width="250" height="18" rx="9" fill="#CBD5E1"/>
+      <rect x="700" y="414" width="204" height="18" rx="9" fill="#E2E8F0"/>
+      <rect x="700" y="466" width="178" height="46" rx="23" fill="url(#brandGlow)"/>
+      <circle cx="962" cy="492" r="68" fill="#EDE9FE" opacity="0.72"/>
+      <path d="M944 492L960 476L984 520H926Z" fill="#7C3AED" opacity="0.72"/>
+    </g>
+  </g>
+
+  <g transform="translate(725 408)">
+    <ellipse cx="210" cy="258" rx="210" ry="40" fill="#0F172A" opacity="0.08"/>
+    <circle cx="214" cy="94" r="132" fill="#DBEAFE" opacity="0.68" filter="url(#glow)"/>
+    <image href="../icon/ip2.svg" x="0" y="0" width="420" height="320" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+
+  <g transform="translate(230 560)" filter="url(#softShadow)">
+    <rect width="310" height="146" rx="30" fill="#FFFFFF" stroke="#E2E8F0"/>
+    <rect x="28" y="28" width="54" height="54" rx="18" fill="#DBEAFE"/>
+    <path d="M45 56L55 46L70 74H36Z" fill="#2563FF" opacity="0.82"/>
+    <rect x="106" y="34" width="150" height="16" rx="8" fill="#CBD5E1"/>
+    <rect x="106" y="66" width="214" height="12" rx="6" fill="#E2E8F0"/>
+    <rect x="106" y="92" width="168" height="12" rx="6" fill="#E2E8F0"/>
+  </g>
+
+  <g transform="translate(1014 320)" filter="url(#softShadow)">
+    <rect width="236" height="118" rx="26" fill="#FFFFFF" stroke="#E2E8F0"/>
+    <rect x="24" y="24" width="92" height="26" rx="13" fill="#EDE9FE"/>
+    <rect x="24" y="68" width="170" height="14" rx="7" fill="#CBD5E1"/>
+    <circle cx="196" cy="37" r="15" fill="#7C3AED" opacity="0.84"/>
+  </g>
+
+  <g font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" text-anchor="middle">
+    <text x="720" y="760" fill="#0F172A" font-size="34" font-weight="760">LUMO 帮你准备第一张商品场景图</text>
+    <text x="720" y="802" fill="#64748B" font-size="18" font-weight="500">上传商品图，选择模板，生成可上架的专业视觉资产。</text>
+  </g>
+</svg>

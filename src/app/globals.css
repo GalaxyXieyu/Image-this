@@ -11,6 +11,25 @@
 @tailwind components;
 @tailwind utilities;
 
+/* === Brand gradient utilities === */
+@layer utilities {
+  .bg-brand-gradient {
+    background: linear-gradient(135deg, #2563FF 0%, #7C3AED 100%);
+  }
+  .bg-brand-gradient-light {
+    background: linear-gradient(135deg, #DBEAFE 0%, #EDE9FE 50%, #FFFFFF 100%);
+  }
+  .bg-brand-gradient-dark {
+    background: linear-gradient(135deg, #020617 0%, #1E1B4B 50%, #2563FF 100%);
+  }
+  .text-brand-gradient {
+    background: linear-gradient(135deg, #2563FF 0%, #7C3AED 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
