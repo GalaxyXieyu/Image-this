@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: In progress
-stopped_at: "Completed Phase 5: Workflow API and Worker Contract Refactor"
-last_updated: "2026-06-07T15:00:00.000Z"
+stopped_at: "Completed Phase 6: Old Frontend Removal and Regression Hardening"
+last_updated: "2026-06-08T01:00:00.000Z"
 progress:
   total_phases: 6
   completed_phases: 6
   total_plans: 12
-  completed_plans: 11
+  completed_plans: 12
 ---
 
 # Project State
