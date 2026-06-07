@@ -20,6 +20,14 @@ import {
   Loader2,
 } from "lucide-react";
 
+function ImageThumbnail({ src, alt, className }: { src?: string | null; alt: string; className?: string }) {
+  const [error, setError] = useState(false);
+  if (!src || error) {
+    return <ImageIcon className={cn("text-muted-foreground/50", className)} />;
+  }
+  return <img src={src} alt={alt} className="w-full h-full object-cover" onError={() => setError(true)} />;
+}
+
 interface BackendImage {
   id: string;
   filename: string;
@@ -48,9 +56,14 @@ interface ResultImage {
 function mapProcessType(type: string): string {
   const map: Record<string, string> = {
     BACKGROUND_REMOVAL: "scene",
+    BACKGROUND_REPLACE: "scene",
+    IMAGE_UPSCALING: "main",
     UPSCALE: "main",
+    IMAGE_OUTPAINTING: "detail",
+    IMAGE_EXPANSION: "detail",
     OUTPAINT: "detail",
     WATERMARK: "marketing",
+    ONE_CLICK_WORKFLOW: "poster",
     ONE_CLICK: "poster",
     VIDEO_GENERATION: "other",
   };
@@ -77,7 +90,7 @@ function TopNav() {
   return (
     <header className="h-16 border-b border-border px-8 flex items-center justify-between shrink-0">
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-[#0066FF]" />
+        <div className="w-8 h-8 rounded-lg bg-primary" />
         <span
           className="text-base font-semibold text-foreground"
           style={{ fontFamily: "Inter, sans-serif" }}
@@ -143,6 +156,7 @@ export default function ResultsPage() {
       const params = new URLSearchParams();
       params.append("limit", "50");
       params.append("status", "COMPLETED");
+      params.append("includeFullSize", "true");
       if (searchQuery.trim()) {
         params.append("search", searchQuery.trim());
       }
@@ -386,9 +400,9 @@ export default function ResultsPage() {
                         key={item.id}
                         className="group rounded-xl border border-border bg-card overflow-hidden hover:shadow-sm transition-shadow"
                       >
-                        {/* Image placeholder */}
-                        <div className="relative aspect-[4/3] bg-muted flex items-center justify-center">
-                          <ImageIcon className="w-10 h-10 text-muted-foreground/50" />
+                        {/* Image thumbnail */}
+                        <div className="relative aspect-[4/3] bg-muted flex items-center justify-center overflow-hidden">
+                          <ImageThumbnail src={item.thumbnail || item.processedUrl} alt={item.name} className="w-10 h-10" />
                           {/* Checkbox overlay */}
                           <div className="absolute top-3 left-3">
                             <Checkbox
@@ -442,8 +456,8 @@ export default function ResultsPage() {
                           checked={selectedIds.has(item.id)}
                           onCheckedChange={() => toggleSelect(item.id)}
                         />
-                        <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                          <ImageIcon className="w-5 h-5 text-muted-foreground" />
+                        <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center shrink-0 overflow-hidden">
+                          <ImageThumbnail src={item.thumbnail || item.processedUrl} alt={item.name} className="w-5 h-5" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3
