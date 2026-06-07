@@ -1,135 +1,206 @@
-# UI Review Report — AI 商品视觉工作台
+# UI Review Report — ImageThis 品牌/UI 基线审查
 
-**Date:** 2026-05-27  
-**Branch:** feature/ai-studio-2-commerce-workbench  
-**Method:** Pencil design comparison + Chrome DevTools screenshot audit
-
----
-
-## 1. Homepage (`/`)
-
-**Pencil Design:** `cwFV4` — 首页
-
-| Aspect | Status | Notes |
-|--------|--------|-------|
-| Layout | PASS | Hero + Trust Bar + Quick Actions + Case Studies 结构匹配 |
-| TopNav | PASS | Logo + 4-link nav 一致，当前页高亮正确 |
-| Hero | PASS | 标题、副标题、双按钮布局匹配 |
-| Trust Bar | PASS | 4 项统计数据布局正确 |
-| Quick Actions | PASS | 5 个功能入口图标+文字 |
-| Case Studies | PARTIAL | 结构正确，但图片显示 placeholder（缺少示例图资源） |
-| Colors | PASS | #0066FF 主色一致 |
-| Fonts | PASS | Geist + Inter 组合 |
-
-**Issues:**
-- Case study 卡片缺少示例图片，显示 placeholder 图标
+**Date:** 2026-06-06  
+**Scope:** `docs/brand-ui-spec.md`、`docs/brands/`、新版工作台 GSD 文档  
+**Method:** 品牌资产检查 + 现有 UI 规范比对 + 产品工作台页面风险审查
 
 ---
 
-## 2. Template Library (`/templates`)
+## 1. 最新判断
 
-**Pencil Design:** `CEjVd` — 模板库
+当前 UI 问题不是单个页面不好看，而是品牌规范没有把“Logo/IP/颜色/渐变/页面组合”写成可执行约束，导致后续页面容易各自发挥。
 
-| Aspect | Status | Notes |
-|--------|--------|-------|
-| Layout | PASS | 三栏布局：侧边栏 260px + 主内容 + 详情面板 320px |
-| Sidebar | PASS | 分类 + 组合模板 + 功能导航 |
-| Grid | PASS | 模板卡片网格 |
-| Detail Panel | PASS | 选中模板详情展示 |
-| API | PASS | 已连接 `/api/prompt-templates` |
+最新规范已收敛到：
 
-**Issues:**
-- Dev 模式下 CSS 加载延迟（构建正常）
+```text
+专业电商工作台 × 蓝紫 AI 光感 × 克制 IP 陪伴
+```
+
+对应品牌规范：`docs/brand-ui-spec.md`
 
 ---
 
-## 3. Scene Workspace (`/workspace/scene`)
+## 2. 品牌规范修正结果
 
-**Pencil Design:** `YBTti` — 场景图工作区
-
-| Aspect | Status | Notes |
-|--------|--------|-------|
-| Step Bar | PASS | 3 步流程：填写产品信息 → 选择风格模板 → 生成与调整 |
-| Product Form | PASS | 名称、类型、人群、场景、卖点、平台选择 |
-| Style Templates | PASS | 8 个风格模板卡片 |
-| Data Flow | PASS | WorkflowData 在 3 步之间传递 |
-| API | PASS | 已连接 `POST /api/tasks` (SCENE_GENERATION) |
-
-**Issues:**
-- Dev 模式下 CSS 加载延迟（构建正常）
+| 项目 | 旧状态 | 新基线 |
+|---|---|---|
+| 主色 | `#0066FF`、`#6366F1`、粉橙绿黄并列，层级不清 | `#2563FF` 为主色，`#7C3AED` 为 AI 延展 |
+| 强调色 | 霓虹粉、活力橙存在主色化风险 | 粉/橙只用于活动、促销、转化提醒 |
+| Logo | 只有基础规则，没有说明当前资产实际是深色单色逻辑 | Logo 本体保持深色/白色/单色，渐变只放背景/容器 |
+| IP | LUMO 使用边界不清 | 只用于欢迎、引导、空状态、加载；不进入核心编辑画布 |
+| 渐变 | 多色渐变容易泛用 | 主渐变只保留蓝紫；暖色渐变仅活动场景 |
+| 页面规则 | 有场景，但没有强约束 | 按首页、工作台、工具箱、任务、结果、设置拆分使用边界 |
 
 ---
 
-## 4. Toolbox (`/tools`)
+## 3. 页面级风险基线
 
-**Pencil Design:** `gSOkL` — 智能工具箱
-
-| Aspect | Status | Notes |
-|--------|--------|-------|
-| Layout | PASS | 左侧面板 + 中间 Canvas + 右侧参数 |
-| Tabs | PASS | 4 个工具标签：AI换背景、智能抠图、扩图、高清放大 |
-| Upload | PASS | 点击/拖拽上传 |
-| Processing | PASS | 调用 `/api/images-process/*` |
-| Persistence | PASS | 结果自动保存到 `/api/images` |
-
-**Issues:**
-- Dev 模式下 CSS 加载延迟（构建正常）
-- "调整参数"（亮度/对比度/饱和度）为 UI mock，未连接实际处理逻辑
+| Page | 当前风险 | 新规范要求 | 优先级 |
+|---|---|---|---|
+| `/` 首页 | 可能过度使用 IP、星光、渐变，变成活动页 | 允许品牌表现，但只保留一个强主视觉；Logo + 主口号清晰 | P1 |
+| `/workspace/scene` | 生成流程可能被装饰分散注意力 | 三步流程、候选结果、生成 CTA 优先；蓝色选中，紫色只标记 AI | P0 |
+| `/tools` | 工具箱容易做成表单页或炫技页 | 专业编辑器结构；上传、参数、画布、结果是主线 | P0 |
+| `/templates` | 选中态、分类、预览图可能色彩漂移 | 图片预览优先，选中态使用蓝边 + 淡蓝/淡紫底 | P1 |
+| `/tasks` | 状态色可能与品牌色混用 | 状态语义优先：成功绿、警告黄、失败红、处理中蓝 | P0 |
+| `/results` | 操作按钮可能压过图片资产 | 图片墙优先，操作后置，hover 显示快捷动作 | P1 |
+| `/settings` | 如果使用 IP/强光效会降低可信感 | 中性色 + 蓝色链接，少装饰 | P1 |
+| `/combo` | 多步骤流程可能色彩过多 | 蓝色为流程主线，功能状态色只表达状态 | P1 |
 
 ---
 
-## 5. Task Center (`/tasks`)
+## 4. 组件级风险基线
 
-| Aspect | Status | Notes |
-|--------|--------|-------|
-| Layout | PASS | 列表式任务展示 |
-| Tabs | PASS | 全部/进行中/已完成/失败 |
-| Status Badge | PASS | 4 种状态颜色区分 |
-| Progress | PASS | 进度条 + 百分比 |
-| Polling | PASS | 实时轮询更新 (`useTaskPolling`) |
-| API | PASS | 已连接 `/api/tasks` |
-
----
-
-## 6. Results (`/results`)
-
-| Aspect | Status | Notes |
-|--------|--------|-------|
-| Layout | PASS | 网格/列表双视图 |
-| Search | PASS | 支持搜索过滤 |
-| Bulk Actions | PASS | 批量选择 + 删除 |
-| API | PASS | 已连接 `/api/images` |
+| 组件 | 风险 | 统一规则 |
+|---|---|---|
+| 主按钮 | 粉橙渐变抢占主 CTA | 默认蓝色；生成类按钮可蓝紫渐变 |
+| 卡片 | 多色边框、多阴影、多背景 | 白底、浅边框、轻阴影；选中态蓝边 |
+| 标签 | 高饱和标签堆满页面 | 浅底深字；AI 标签淡紫，状态标签按语义色 |
+| 进度 | 彩虹或多色进度 | 普通任务蓝色；AI 生成可蓝紫过渡 |
+| 空状态 | 吉祥物过大、文案泛 | LUMO 小尺寸陪伴，文案直接给下一步 |
+| Logo | 被改色、加阴影、拉伸 | 只使用资产目录，按安全区和尺寸规则 |
+| 渐变背景 | 每页都用大渐变 | 首页/生成态/模板强调可用，表单和设置页不用 |
 
 ---
 
-## 7. Combo (`/combo`)
+## 5. 对当前 GSD 主线的影响
 
-| Aspect | Status | Notes |
-|--------|--------|-------|
-| Layout | PASS | 左侧面板 + 中间流水线 + 右侧配置 |
-| Pipeline | PASS | 可拖拽/添加/删除步骤 |
-| API | PASS | 批量提交到 `POST /api/tasks` |
+当前主线仍是 Phase 4 `Unified Smart Toolbox`，但需要插入一条轻量品牌/UI 规范落地计划，作为 Phase 4 后续 Wave 和 Phase 5 前的设计基线。
+
+建议新增：
+
+```text
+04a-brand-ui-ux-optimization
+```
+
+边界：
+
+- 不重构业务接口。
+- 不改变任务队列和 worker 合约。
+- 只收敛 UI token、品牌资产使用、页面视觉组合、组件状态语义。
+- 优先修正 `/workspace/scene`、`/tools`、`/tasks` 这三个高频工作台页面。
 
 ---
 
-## Summary
+## 6. 最新 UI/UX 验收标准
 
-| Page | Visual Match | API Connected | Functional |
-|------|-------------|---------------|------------|
-| Home | 90% | N/A | PASS |
-| Templates | 85% | PASS | PASS |
-| Scene | 85% | PASS | PASS |
-| Tools | 80% | PASS | PARTIAL |
-| Tasks | 85% | PASS | PASS |
-| Results | 85% | PASS | PASS |
-| Combo | 85% | PASS | PASS |
+一轮 UI 改造完成后，需要满足：
 
-**Critical Issues:**
-1. 部分页面 dev 模式下 CSS 加载延迟（不影响生产构建）
-2. Case Studies 区域缺少示例图片
-3. Tools 页面的"调整参数"滑块未连接实际处理逻辑
+1. 主 CTA、链接、选中态统一使用 `#2563FF`。
+2. AI 生成、模板、智能能力统一使用 `#7C3AED` 或淡紫底。
+3. 暖色不再作为普通主按钮或常规高亮。
+4. Logo 不被改色、拉伸、加重阴影。
+5. LUMO 不出现在核心图片判断区域。
+6. GPT 生成插图必须参考正式 IP 资产，不能直接替换 Logo 或核心 UI 资产。
+7. `/workspace/scene` 和 `/tools` 的操作主线比装饰更明显。
+8. `/tasks` 状态颜色只表达状态，不表达品牌装饰。
+9. `/results` 以图片资产为第一视觉优先级。
+10. 浅色模式是默认工作台基线。
+11. 同一屏只有一个最强视觉焦点。
 
-**Recommendations:**
-1. 补充 Case Studies 示例图片资源
-2. Tools 页面亮度/对比度/饱和度参数可后续对接实际图像处理
-3. 运行生产构建验证所有样式正确加载
+---
+
+## 7. GPT 品牌插图能力验证
+
+| 项目 | 结果 |
+|---|---|
+| 参考 IP | `docs/brands/icon/cut/ip2-trimmed-preview.png` |
+| Provider | GPT |
+| 模型配置 | `gpt-image-1` |
+| 调用入口 | `/api/images-process/background-replace` |
+| 验证状态 | Passed |
+| 生成产物 | `public/uploads/1780740082828-bg-replace-cmq26n0if00037z7xlk1wviqd.jpg` |
+
+判断：项目已经具备“参考 LUMO/IP 生成品牌插图”的能力。后续首页、空状态、新手引导、功能卡片可进入候选稿生产，但核心工作台画布、设置页和 Logo 不能使用生成插图替代正式资产。
+
+---
+
+## 8. 当前结论
+
+**Status:** Needs UI/UX alignment pass
+
+| Area | Status |
+|---|---|
+| 品牌规范 | Updated |
+| Logo 使用规则 | Updated |
+| 色彩体系 | Updated |
+| IP 使用边界 | Updated |
+| GPT 品牌插图能力 | Verified |
+| 页面级落地计划 | Planned |
+| 实际页面改造 | Pending |
+
+---
+
+# Phase 04a Brand UI/UX Optimization Review
+
+## Date: 2026-06-07
+
+## Scope
+- Wave 1: Token and component baseline
+- Wave 2: Core workbench pages (/workspace/scene, /tools, /tasks)
+- Wave 3: Asset-first supporting pages (/results, /templates, /settings)
+- Wave 4: Brand expression (/home, /combo)
+
+## Token Architecture
+```
+src/styles/
+├── design-system/tokens.css    # Generic: primary, ai, status, neutral
+├── domains/workbench.css       # Domain: wb-surface, wb-text, layout
+└── utilities/brand.css         # Gradients
+```
+
+## Color Compliance Check
+
+| Page | Primary CTA | AI Accent | Status Colors | LUMO Usage | Verdict |
+|------|-------------|-----------|---------------|------------|---------|
+| / | Blue (brand variant) | Not used | N/A | Not present | PASS |
+| /workspace/scene | Blue | Violet for AI gen | Semantic | Not in canvas | PASS |
+| /tools | Blue | Violet for AI gen | Semantic | Not in canvas | PASS |
+| /tasks | Blue | N/A | Semantic | Not present | PASS |
+| /results | Blue | N/A | N/A | Simple empty state | PASS |
+| /templates | Blue | Violet for AI templates | N/A | Not present | PASS |
+| /settings | Blue | N/A | N/A | Not present | PASS |
+| /combo | Blue | N/A | Semantic | Not present | PASS |
+
+## Component Inventory
+
+| Component | Variants Added |
+|-----------|---------------|
+| Button | brand, ai, gradient, xs |
+| Badge | ai, success, warning, danger, processing |
+
+## Hardcoded Color Removal
+
+| Color | Before | After |
+|-------|--------|-------|
+| #0066FF | 29 instances in 8 files | 0 |
+| #0052CC | 10 instances in 5 files | 0 |
+| #999999 | 1 instance | 0 |
+| #666666 | 1 instance | 0 |
+| #2563eb | 2 instances | 0 |
+| emerald-50/emerald-600 | 1 instance (combo STEP_META) | 0 |
+| violet-50/violet-600 | 1 instance (combo STEP_META) | 0 |
+| amber-50/amber-600 | 1 instance (combo STEP_META) | 0 |
+| sky-50/sky-600 | 1 instance (combo STEP_META) | 0 |
+| rose-50/rose-600 | 1 instance (combo STEP_META) | 0 |
+
+## Wave 4 Changes
+
+### /page.tsx (Home)
+- No changes required — already compliant from Waves 1-3
+- CTA uses `variant="brand"` (solid blue) — acceptable per spec; gradient is optional for home page
+- Trust icons: `text-primary` — correct
+- Quick action icons: `text-primary` on `bg-muted` circles — correct
+- Case study cards: white with subtle border — correct
+- One strong visual focal point (Hero section) — correct
+- Color count: blue (primary) only; no stray decorative colors
+
+### /combo/page.tsx (Combo Flow)
+- **STEP_META colors**: Changed from multi-color (emerald/violet/amber/sky/rose) to unified `bg-primary-soft text-primary` for all step types
+- **Connector lines**: Changed from `bg-border` to `bg-primary` for active flow indication
+- Action buttons: `variant="brand"` for primary, `variant="outline"` for secondary — correct
+- Template cards: `border-primary ring-primary` for selected — correct
+- Resolution buttons: `border-primary bg-primary/5 text-primary` for selected — correct
+
+## Build Status
+- npm run build: PASS
+- npx tsc --noEmit: PASS
