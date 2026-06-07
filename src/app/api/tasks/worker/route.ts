@@ -4,6 +4,7 @@ import { uploadBase64Image } from '@/lib/storage';
 import { addWatermarkToImage } from '@/lib/watermark';
 import { getUserConfig, normalizeTaskConcurrency } from '@/lib/user-config';
 import { resolveHandler } from '@/lib/workbench/worker-handlers';
+import '@/lib/workbench/handlers/background-replace'; // registers handler on import
 import { validateTaskInput } from '@/lib/workbench/input-validation';
 import fs from 'fs/promises';
 
@@ -262,7 +263,8 @@ class TaskProcessor {
               });
             },
           },
-          validatedInput
+          validatedInput,
+          parsedInput
         );
       } else {
         // Legacy switch path (contract v1 or no registered handler)

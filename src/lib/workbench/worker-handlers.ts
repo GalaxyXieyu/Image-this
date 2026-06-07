@@ -59,8 +59,11 @@ export interface WorkflowHandler<
   /** Validate and narrow raw parsed input to the expected shape */
   validateInput(raw: unknown): TInput;
 
-  /** Execute the workflow — call providers, process images, etc. */
-  execute(ctx: WorkerContext, input: TInput): Promise<TResult>;
+  /**
+   * Execute the workflow — call providers, process images, etc.
+   * @param rawInput - Full parsed inputData (includes assets, config, etc.)
+   */
+  execute(ctx: WorkerContext, input: TInput, rawInput: Record<string, unknown>): Promise<TResult>;
 
   /** Normalize handler result into a plain object for JSON serialization */
   normalizeResult(result: TResult): Record<string, unknown>;
