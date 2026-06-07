@@ -59,27 +59,27 @@ function parseLogLines(content: string): ParsedLogLine[] {
 function getLogLevelClass(level?: string) {
   switch (level) {
     case 'ERROR':
-      return 'border-red-200 bg-red-50 text-red-700';
+      return 'border-destructive/20 bg-destructive/10 text-destructive';
     case 'WARN':
-      return 'border-amber-200 bg-amber-50 text-amber-700';
+      return 'border-warning/20 bg-warning/10 text-warning';
     case 'INFO':
-      return 'border-sky-200 bg-sky-50 text-sky-700';
+      return 'border-primary/20 bg-primary/10 text-primary';
     default:
-      return 'border-slate-200 bg-slate-50 text-slate-600';
+      return 'border-border bg-secondary text-muted-foreground';
   }
 }
 
 function getLogRowClass(line: ParsedLogLine) {
   if (line.level === 'ERROR') {
-    return 'border-red-100 bg-red-50/70';
+    return 'border-destructive/10 bg-destructive/5';
   }
   if (line.level === 'WARN') {
-    return 'border-amber-100 bg-amber-50/70';
+    return 'border-warning/10 bg-warning/5';
   }
   if (line.kind === 'stack') {
-    return 'border-slate-100 bg-slate-50/80';
+    return 'border-border bg-secondary/50';
   }
-  return 'border-slate-100 bg-white';
+  return 'border-border bg-card';
 }
 
 function getLogStats(lines: ParsedLogLine[]) {
@@ -213,7 +213,7 @@ export function LogDiagnosticsCard() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <CardTitle className="flex items-center">
-                <FileSearch className="w-5 h-5 mr-2 text-amber-600" />
+                <FileSearch className="w-5 h-5 mr-2 text-primary" />
                 日志诊断
               </CardTitle>
               <CardDescription className="mt-1">
@@ -233,9 +233,9 @@ export function LogDiagnosticsCard() {
           </div>
         </CardHeader>
         <CardContent className="space-y-5">
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-xs font-medium text-slate-500 mb-1">当前日志目录</div>
-            <div className="font-mono text-sm text-slate-800 break-all">
+          <div className="rounded-xl border border-border bg-secondary/50 p-4">
+            <div className="text-xs font-medium text-muted-foreground mb-1">当前日志目录</div>
+            <div className="font-mono text-sm text-foreground break-all">
               {logInfo?.directory || '仅桌面版可用'}
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -267,7 +267,7 @@ export function LogDiagnosticsCard() {
             />
           </div>
 
-          <div className="text-xs text-slate-500">
+          <div className="text-xs text-muted-foreground">
             日志内容会在读取时做基础脱敏，并且只读取文件末尾片段，避免大日志卡住界面。
           </div>
         </CardContent>
@@ -286,35 +286,35 @@ function LogFileList({
   onSelect: (fileName: string) => void;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
-      <div className="px-4 py-3 bg-slate-50 border-b">
-        <div className="text-sm font-semibold text-slate-800">日志文件</div>
-        <div className="text-xs text-slate-500 mt-0.5">选择一个文件查看末尾片段</div>
+    <div className="rounded-xl border border-border overflow-hidden bg-card">
+      <div className="px-4 py-3 bg-secondary/50 border-b">
+        <div className="text-sm font-semibold text-foreground">日志文件</div>
+        <div className="text-xs text-muted-foreground mt-0.5">选择一个文件查看末尾片段</div>
       </div>
       <div className="max-h-[560px] overflow-y-auto">
         {files.length === 0 ? (
-          <div className="p-4 text-sm text-slate-500">暂无日志文件</div>
+          <div className="p-4 text-sm text-muted-foreground">暂无日志文件</div>
         ) : (
           files.map((file) => (
             <button
               key={file.name}
               type="button"
               onClick={() => onSelect(file.name)}
-              className={`w-full text-left px-4 py-3 border-b last:border-b-0 transition-colors hover:bg-amber-50 ${
+              className={`w-full text-left px-4 py-3 border-b last:border-b-0 transition-colors hover:bg-primary/5 ${
                 selectedFile === file.name
-                  ? 'bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200'
-                  : 'text-slate-700'
+                  ? 'bg-primary/5 text-primary ring-1 ring-inset ring-primary/20'
+                  : 'text-foreground'
               }`}
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-semibold truncate">{file.name}</div>
                 {file.name.startsWith('error-') && (
-                  <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-700">
+                  <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive">
                     error
                   </span>
                 )}
               </div>
-              <div className="mt-1 text-xs text-slate-500">
+              <div className="mt-1 text-xs text-muted-foreground">
                 {(file.sizeBytes / 1024).toFixed(1)} KB · {new Date(file.modifiedAt).toLocaleString('zh-CN')}
               </div>
             </button>
@@ -341,29 +341,29 @@ function LogContentViewer({
   onCopy: () => void;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-sm">
-      <div className="border-b bg-slate-50 px-4 py-3">
+    <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
+      <div className="border-b bg-secondary/50 px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-sm font-semibold text-slate-800 truncate">
+            <div className="text-sm font-semibold text-foreground truncate">
               {fileName || '未选择日志'}
             </div>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <span>{lines.length} 行</span>
-              <span className="h-1 w-1 rounded-full bg-slate-300" />
+              <span className="h-1 w-1 rounded-full bg-muted-foreground/30" />
               <span>{(content.length / 1024).toFixed(1)} KB 已读取</span>
               {stats.errors > 0 && (
-                <span className="rounded-full bg-red-100 px-2 py-0.5 font-medium text-red-700">
+                <span className="rounded-full bg-destructive/10 px-2 py-0.5 font-medium text-destructive">
                   {stats.errors} error
                 </span>
               )}
               {stats.warnings > 0 && (
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-700">
+                <span className="rounded-full bg-warning/10 px-2 py-0.5 font-medium text-warning">
                   {stats.warnings} warn
                 </span>
               )}
               {stats.stackLines > 0 && (
-                <span className="rounded-full bg-slate-200 px-2 py-0.5 font-medium text-slate-600">
+                <span className="rounded-full bg-secondary px-2 py-0.5 font-medium text-muted-foreground">
                   {stats.stackLines} stack
                 </span>
               )}
@@ -382,13 +382,13 @@ function LogContentViewer({
           </Button>
         </div>
       </div>
-      <div className="h-[560px] overflow-auto bg-slate-100/70 p-3">
+      <div className="h-[560px] overflow-auto bg-secondary/30 p-3">
         {isLoading ? (
-          <div className="flex h-full items-center justify-center text-sm text-slate-500">
+          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
             正在读取日志...
           </div>
         ) : lines.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-sm text-slate-500">
+          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
             暂无日志内容
           </div>
         ) : (
@@ -406,7 +406,7 @@ function LogContentViewer({
 function LogLineRow({ line }: { line: ParsedLogLine }) {
   return (
     <div className={`grid grid-cols-[44px_minmax(0,1fr)] gap-3 rounded-lg border px-3 py-2 ${getLogRowClass(line)}`}>
-      <div className="select-none pt-0.5 text-right font-mono text-[11px] text-slate-400">
+      <div className="select-none pt-0.5 text-right font-mono text-[11px] text-muted-foreground/60">
         {line.lineNumber}
       </div>
       <div className="min-w-0">
@@ -418,7 +418,7 @@ function LogLineRow({ line }: { line: ParsedLogLine }) {
               </span>
             )}
             {line.timestamp && (
-              <span className="font-mono text-[11px] text-slate-500">
+              <span className="font-mono text-[11px] text-muted-foreground">
                 {line.timestamp.replace('T', ' ').replace('Z', '')}
               </span>
             )}
@@ -427,10 +427,10 @@ function LogLineRow({ line }: { line: ParsedLogLine }) {
         <div
           className={`whitespace-pre-wrap break-words font-mono text-[12px] leading-6 ${
             line.kind === 'stack'
-              ? 'pl-3 text-slate-600'
+              ? 'pl-3 text-muted-foreground'
               : line.level === 'ERROR'
-                ? 'text-red-950'
-                : 'text-slate-800'
+                ? 'text-destructive/90'
+                : 'text-foreground'
           }`}
         >
           {line.kind === 'blank' ? '\u00a0' : line.message}

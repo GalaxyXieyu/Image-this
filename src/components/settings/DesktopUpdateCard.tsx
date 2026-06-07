@@ -102,7 +102,7 @@ export function DesktopUpdateCard() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-xl">
-            <RotateCw className="h-5 w-5 text-blue-600" />
+            <RotateCw className="h-5 w-5 text-primary" />
             应用更新
           </CardTitle>
           <CardDescription>
@@ -111,30 +111,30 @@ export function DesktopUpdateCard() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-2">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <div className="text-xs uppercase tracking-wide text-slate-500">当前版本</div>
-              <div className="mt-1 text-base font-semibold text-slate-900">{state.currentVersion}</div>
+            <div className="rounded-lg border border-border bg-secondary/50 p-3">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">当前版本</div>
+              <div className="mt-1 text-base font-semibold text-foreground">{state.currentVersion}</div>
             </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <div className="text-xs uppercase tracking-wide text-slate-500">更新状态</div>
-              <div className="mt-1 text-base font-semibold text-slate-900">{statusLabel}</div>
+            <div className="rounded-lg border border-border bg-secondary/50 p-3">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">更新状态</div>
+              <div className="mt-1 text-base font-semibold text-foreground">{statusLabel}</div>
             </div>
           </div>
 
           {state.targetVersion ? (
-            <div className="text-sm text-slate-600">
-              目标版本：<span className="font-medium text-slate-900">{state.targetVersion}</span>
+            <div className="text-sm text-muted-foreground">
+              目标版本：<span className="font-medium text-foreground">{state.targetVersion}</span>
             </div>
           ) : null}
 
-          <div className="rounded-lg border border-slate-200 p-3">
-            <div className="flex items-start justify-between gap-4 text-sm text-slate-600">
+          <div className="rounded-lg border border-border p-3">
+            <div className="flex items-start justify-between gap-4 text-sm text-muted-foreground">
               <span>{statusHint}</span>
               <span className="shrink-0">{progressValue}%</span>
             </div>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary">
               <div
-                className="h-full rounded-full bg-blue-600 transition-all"
+                className="h-full rounded-full bg-primary transition-all"
                 style={{ width: `${progressValue}%` }}
               />
             </div>
