@@ -6,7 +6,7 @@ export default function NotFound() {
       <h2 style={{ fontSize: 20, margin: 0 }}>页面不存在</h2>
       <p style={{ marginTop: 8, color: '#555' }}>你访问的页面未找到。</p>
       <p style={{ marginTop: 12 }}>
-        <Link href="/" style={{ color: '#2563eb', textDecoration: 'none' }}>
+        <Link href="/" className="text-primary hover:underline">
           返回首页
         </Link>
       </p>
