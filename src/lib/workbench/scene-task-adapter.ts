@@ -18,6 +18,17 @@ export interface LegacySceneTaskRequest {
   totalSteps: number;
 }
 
+/** Typed workflow task request for POST /api/workflow/tasks (contract v2) */
+export interface SceneWorkflowTaskRequest {
+  workflowType: 'scene_generation';
+  parameters: BackgroundReplaceParams;
+  inputAssets: InputAssetRef[];
+  priority: number;
+  projectId?: string;
+  selectedPresetId?: string;
+  batchMode?: boolean;
+}
+
 function joinText(parts: Array<string | undefined>) {
   return parts.map((part) => part?.trim()).filter(Boolean).join('，');
 }
@@ -53,6 +64,10 @@ export function buildSceneWorkflowDraft(input: SceneTaskDraftInput): SceneWorkfl
   };
 }
 
+/**
+ * Build a legacy task request (contract v1) for POST /api/tasks.
+ * Kept for backward compatibility.
+ */
 export function buildSceneLegacyTaskRequest(input: SceneTaskDraftInput, candidateIndex = 0): LegacySceneTaskRequest {
   const [fallbackInputAsset, fallbackReferenceAsset] = input.inputAssets;
   const inputAsset = input.inputAsset ?? fallbackInputAsset;
@@ -111,6 +126,44 @@ export function buildSceneLegacyTaskRequest(input: SceneTaskDraftInput, candidat
 export function buildSceneLegacyTaskRequests(input: SceneTaskDraftInput): LegacySceneTaskRequest[] {
   const count = Math.max(1, input.parameters.candidateCount || 1);
   return Array.from({ length: count }, (_, index) => buildSceneLegacyTaskRequest(input, index));
+}
+
+/**
+ * Build a typed workflow task request (contract v2) for POST /api/workflow/tasks.
+ */
+export function buildSceneWorkflowTaskRequest(input: SceneTaskDraftInput): SceneWorkflowTaskRequest {
+  const [fallbackInputAsset, fallbackReferenceAsset] = input.inputAssets;
+  const inputAsset = input.inputAsset ?? fallbackInputAsset;
+  const referenceAsset = input.referenceAsset ?? fallbackReferenceAsset;
+
+  if (!inputAsset) {
+    throw new Error('请先上传商品图');
+  }
+
+  if (!referenceAsset) {
+    throw new Error('请先上传至少一张参考图');
+  }
+
+  const parameters: BackgroundReplaceParams = {
+    prompt: buildScenePrompt(input),
+    referenceAsset,
+    aiModel: input.parameters.aiModel,
+    outputResolution: input.parameters.outputResolution,
+  };
+
+  return {
+    workflowType: 'scene_generation',
+    parameters,
+    inputAssets: [inputAsset, referenceAsset],
+    priority: 2,
+    selectedPresetId: input.selectedPresetId,
+    batchMode: input.batchMode,
+  };
+}
+
+export function buildSceneWorkflowTaskRequests(input: SceneTaskDraftInput): SceneWorkflowTaskRequest[] {
+  const count = Math.max(1, input.parameters.candidateCount || 1);
+  return Array.from({ length: count }, () => buildSceneWorkflowTaskRequest(input));
 }
 
 export function appendInputAsset(assets: InputAssetRef[], role: 'input' | 'reference', asset: InputAssetRef) {

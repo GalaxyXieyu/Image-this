@@ -27,6 +27,17 @@ export interface LegacyToolTaskRequest {
   totalSteps: number;
 }
 
+/** Typed workflow task request for POST /api/workflow/tasks (contract v2) */
+export interface ToolWorkflowTaskRequest {
+  workflowType: ToolType;
+  parameters: ToolParameters;
+  inputAssets: InputAssetRef[];
+  priority: number;
+  projectId?: string;
+  selectedPresetId?: string;
+  batchMode?: boolean;
+}
+
 export const TOOL_TYPE_LABELS: Record<ToolType, string> = {
   background_replace: 'AI换背景',
   watermark: '加水印',
@@ -77,6 +88,10 @@ export function buildDefaultToolParameters(toolType: ToolType): ToolParameters {
   }
 }
 
+/**
+ * Build a legacy task request (contract v1) for POST /api/tasks.
+ * Kept for backward compatibility.
+ */
 export function buildToolLegacyTaskRequest(input: ToolTaskDraftInput): LegacyToolTaskRequest {
   const parameters = mergeAssetParameters(input);
   const workflowRequest: CreateWorkflowTaskRequest = {
@@ -103,6 +118,21 @@ export function buildToolLegacyTaskRequest(input: ToolTaskDraftInput): LegacyToo
       },
     }),
     totalSteps: 1,
+  };
+}
+
+/**
+ * Build a typed workflow task request (contract v2) for POST /api/workflow/tasks.
+ */
+export function buildToolWorkflowTaskRequest(input: ToolTaskDraftInput): ToolWorkflowTaskRequest {
+  const parameters = mergeAssetParameters(input);
+  return {
+    workflowType: input.toolType,
+    parameters,
+    inputAssets: [input.inputAsset],
+    priority: 2,
+    selectedPresetId: input.selectedPresetId,
+    batchMode: input.batchMode ?? false,
   };
 }
 

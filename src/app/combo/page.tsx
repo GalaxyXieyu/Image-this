@@ -186,12 +186,13 @@ export default function ComboPage() {
   const [autoRetry, setAutoRetry] = useState(true);
   const [executing, setExecuting] = useState(false);
 
+  // Use legacy task type names that the worker recognizes
   const typeToApiType: Record<StepType, string> = {
-    scene: "SCENE_GENERATION",
+    scene: "BACKGROUND_REMOVAL",
     background: "BACKGROUND_REMOVAL",
-    upscale: "UPSCALE",
+    upscale: "IMAGE_UPSCALING",
     watermark: "WATERMARK",
-    outpaint: "OUTPAINT",
+    outpaint: "IMAGE_EXPANSION",
   };
 
   const handleExecute = async () => {
