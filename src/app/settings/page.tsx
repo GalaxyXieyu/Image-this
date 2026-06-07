@@ -234,68 +234,68 @@ export default function SettingsPage() {
     jimeng: false,
   });
   const menuItems = [
-    { 
-      id: 'models' as SettingSection, 
-      label: 'AI模型配置', 
+    {
+      id: 'models' as SettingSection,
+      label: 'AI模型配置',
       subtitle: '文生图、图生图、扩图',
-      icon: Cpu, 
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50',
-      borderColor: 'border-blue-500'
+      icon: Cpu,
+      color: 'text-primary',
+      bgColor: 'bg-primary/10',
+      borderColor: 'border-primary'
     },
     {
       id: 'imagehosting' as SettingSection,
       label: '图床服务',
       subtitle: '图片存储和访问',
       icon: Image,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50',
-      borderColor: 'border-blue-500'
+      color: 'text-primary',
+      bgColor: 'bg-primary/10',
+      borderColor: 'border-primary'
     },
     {
       id: 'prompts' as SettingSection,
       label: '提示词模板',
       subtitle: '管理 AI 提示词',
       icon: FileText,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50',
-      borderColor: 'border-blue-500'
+      color: 'text-primary',
+      bgColor: 'bg-primary/10',
+      borderColor: 'border-primary'
     },
     {
       id: 'runtime' as SettingSection,
       label: '后台任务',
       subtitle: '并发与队列',
       icon: SlidersHorizontal,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50',
-      borderColor: 'border-blue-500'
+      color: 'text-primary',
+      bgColor: 'bg-primary/10',
+      borderColor: 'border-primary'
     },
     {
       id: 'logs' as SettingSection,
       label: '日志诊断',
       subtitle: '查看与定位问题',
       icon: FileSearch,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50',
-      borderColor: 'border-blue-500'
+      color: 'text-primary',
+      bgColor: 'bg-primary/10',
+      borderColor: 'border-primary'
     },
     {
       id: 'profile' as SettingSection,
       label: '用户信息',
       subtitle: '查看账户信息',
       icon: User,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50',
-      borderColor: 'border-blue-500'
+      color: 'text-primary',
+      bgColor: 'bg-primary/10',
+      borderColor: 'border-primary'
     },
     {
       id: 'updates' as SettingSection,
       label: '应用更新',
       subtitle: '检查和安装新版本',
       icon: RefreshCw,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50',
-      borderColor: 'border-blue-500'
+      color: 'text-primary',
+      bgColor: 'bg-primary/10',
+      borderColor: 'border-primary'
     },
   ];
 
@@ -364,7 +364,7 @@ export default function SettingsPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-muted-foreground">加载中...</p>
         </div>
       </div>
@@ -742,7 +742,7 @@ export default function SettingsPage() {
             <Card>
               <CardHeader className="flex flex-row items-start justify-between space-y-0">
                 <CardTitle className="flex items-center">
-                  <Key className="w-5 h-5 mr-2 text-blue-600" />
+                  <Key className="w-5 h-5 mr-2 text-primary" />
                   GPT API
                 </CardTitle>
                 {renderInlineSaveButton()}
@@ -802,7 +802,7 @@ export default function SettingsPage() {
             <Card>
               <CardHeader className="flex flex-row items-start justify-between space-y-0">
                 <CardTitle className="flex items-center">
-                  <Sparkles className="w-5 h-5 mr-2 text-purple-600" />
+                  <Sparkles className="w-5 h-5 mr-2 text-primary" />
                   Google Gemini
                 </CardTitle>
                 {renderInlineSaveButton()}
@@ -863,7 +863,7 @@ export default function SettingsPage() {
             <Card>
               <CardHeader className="flex flex-row items-start justify-between space-y-0">
                 <CardTitle className="flex items-center">
-                  <Sparkles className="w-5 h-5 mr-2 text-blue-600" />
+                  <Sparkles className="w-5 h-5 mr-2 text-primary" />
                   即梦
                 </CardTitle>
                 {renderInlineSaveButton()}
@@ -952,7 +952,7 @@ export default function SettingsPage() {
             <Card>
               <CardHeader className="flex flex-row items-start justify-between space-y-0">
                 <CardTitle className="flex items-center">
-                  <Image className="w-5 h-5 mr-2 text-green-600" />
+                  <Image className="w-5 h-5 mr-2 text-primary" />
                   图床服务
                 </CardTitle>
                 {renderInlineSaveButton()}
@@ -971,7 +971,7 @@ export default function SettingsPage() {
                     onChange={(e) => handleInputChange('superbedToken', e.target.value)}
                   />
                   <div className="text-xs text-muted-foreground mt-1">
-                    访问 <a href="https://superbed.cn/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">superbed.cn</a> 获取 API Token
+                    访问 <a href="https://superbed.cn/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">superbed.cn</a> 获取 API Token
                   </div>
                 </div>
               </CardContent>
@@ -982,7 +982,7 @@ export default function SettingsPage() {
               <CardHeader className="flex flex-row items-start justify-between space-y-0">
                 <CardTitle className="flex items-center">
                   <div className="flex items-center">
-                    <HardDrive className="w-5 h-5 mr-2 text-blue-600" />
+                    <HardDrive className="w-5 h-5 mr-2 text-primary" />
                     本地存储配置
                   </div>
                 </CardTitle>
@@ -1044,7 +1044,7 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle className="flex items-center gap-2">
-                      <FileText className="w-5 h-5 text-indigo-600" />
+                      <FileText className="w-5 h-5 text-primary" />
                       提示词模板管理
                     </CardTitle>
                     <CardDescription className="mt-1">
@@ -1080,7 +1080,7 @@ export default function SettingsPage() {
             {/* 模板列表 */}
             {isLoadingTemplates ? (
               <div className="text-center py-12">
-                <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                 <p className="text-muted-foreground">加载中...</p>
               </div>
             ) : filteredTemplates.length > 0 ? (
@@ -1091,18 +1091,18 @@ export default function SettingsPage() {
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <CardTitle className="text-lg flex items-center gap-2">
-                            <FileText className="w-5 h-5 text-indigo-600" />
+                            <FileText className="w-5 h-5 text-primary" />
                             {template.name}
                           </CardTitle>
                           <CardDescription className="mt-1">
                             {CATEGORY_LABELS[template.category]}
                             {template.isSystem && (
-                              <span className="ml-2 text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
+                              <span className="ml-2 text-xs px-2 py-0.5 bg-primary/10 text-primary rounded">
                                 系统
                               </span>
                             )}
                             {template.isDefault && (
-                              <span className="ml-2 text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded">
+                              <span className="ml-2 text-xs px-2 py-0.5 bg-secondary text-secondary-foreground rounded">
                                 默认
                               </span>
                             )}
@@ -1150,7 +1150,7 @@ export default function SettingsPage() {
                           size="sm"
                           onClick={() => openDeleteDialog(template)}
                           disabled={template.isSystem}
-                          className="gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          className="gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
                         >
                           <Trash2 className="w-4 h-4" />
                           删除
@@ -1182,7 +1182,7 @@ export default function SettingsPage() {
               <CardHeader className="flex flex-row items-start justify-between space-y-0">
                 <div>
                   <CardTitle className="flex items-center">
-                    <SlidersHorizontal className="w-5 h-5 mr-2 text-orange-600" />
+                    <SlidersHorizontal className="w-5 h-5 mr-2 text-primary" />
                     后台任务并发
                   </CardTitle>
                   <CardDescription className="mt-1">
