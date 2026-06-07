@@ -5,6 +5,11 @@ import { addWatermarkToImage } from '@/lib/watermark';
 import { getUserConfig, normalizeTaskConcurrency } from '@/lib/user-config';
 import { resolveHandler } from '@/lib/workbench/worker-handlers';
 import '@/lib/workbench/handlers/background-replace'; // registers handler on import
+import '@/lib/workbench/handlers/outpaint';
+import '@/lib/workbench/handlers/upscale';
+import '@/lib/workbench/handlers/watermark';
+import '@/lib/workbench/handlers/one-click';
+import '@/lib/workbench/handlers/video-generation';
 import { validateTaskInput } from '@/lib/workbench/input-validation';
 import fs from 'fs/promises';
 
