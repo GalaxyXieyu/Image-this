@@ -19,7 +19,7 @@ function TopNav() {
   return (
     <header className="h-16 border-b border-border px-8 flex items-center justify-between shrink-0">
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-[#0066FF]" />
+        <div className="w-8 h-8 rounded-lg bg-primary" />
         <span className="text-base font-semibold text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
           AI 商品视觉工作台
         </span>
@@ -74,7 +74,8 @@ function HeroSection() {
       <div className="flex items-center gap-4 mt-2">
         <Button
           asChild
-          className="h-12 px-6 rounded-full bg-[#0066FF] hover:bg-[#0052CC] text-white"
+          variant="brand"
+          className="h-12 px-6 rounded-full"
           style={{ fontFamily: "Inter, sans-serif" }}
         >
           <Link href="/workspace/scene">
@@ -108,7 +109,7 @@ function TrustBar() {
     <section className="flex items-center justify-center gap-12 py-8">
       {items.map((item, i) => (
         <div key={i} className="flex items-center gap-3">
-          <item.icon className="w-6 h-6 text-[#0066FF]" />
+          <item.icon className="w-6 h-6 text-primary" />
           <div className="flex flex-col">
             <span className="text-xl font-semibold text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
               {item.value}
@@ -154,7 +155,7 @@ function QuickActions() {
           className="flex flex-col items-center gap-2 w-[140px] group"
         >
           <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center group-hover:bg-muted/80 transition-colors">
-            <action.icon className="w-6 h-6 text-[#0066FF]" />
+            <action.icon className="w-6 h-6 text-primary" />
           </div>
           <span className="text-sm font-medium text-foreground text-center" style={{ fontFamily: "Inter, sans-serif" }}>
             {action.title}
