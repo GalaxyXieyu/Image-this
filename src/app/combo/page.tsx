@@ -84,11 +84,11 @@ interface WorkflowStep {
 }
 
 const STEP_META: Record<StepType, { icon: React.ElementType; color: string }> = {
-  scene: { icon: ImageIcon, color: "bg-emerald-50 text-emerald-600" },
-  background: { icon: Wand2, color: "bg-violet-50 text-violet-600" },
-  upscale: { icon: ZoomIn, color: "bg-amber-50 text-amber-600" },
-  watermark: { icon: Droplets, color: "bg-sky-50 text-sky-600" },
-  outpaint: { icon: Expand, color: "bg-rose-50 text-rose-600" },
+  scene: { icon: ImageIcon, color: "bg-primary-soft text-primary" },
+  background: { icon: Wand2, color: "bg-primary-soft text-primary" },
+  upscale: { icon: ZoomIn, color: "bg-primary-soft text-primary" },
+  watermark: { icon: Droplets, color: "bg-primary-soft text-primary" },
+  outpaint: { icon: Expand, color: "bg-primary-soft text-primary" },
 };
 
 const INITIAL_STEPS: WorkflowStep[] = [
@@ -443,7 +443,7 @@ export default function ComboPage() {
 
                     {/* Connector line */}
                     {index < steps.length - 1 && (
-                      <div className="absolute -bottom-3 left-6 w-px h-3 bg-border" />
+                      <div className="absolute -bottom-3 left-6 w-px h-3 bg-primary" />
                     )}
                   </div>
                 );
