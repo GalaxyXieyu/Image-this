@@ -124,7 +124,7 @@ export default function FloatingTaskButton() {
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
           <Button 
-            className="h-14 w-14 rounded-full shadow-lg bg-[#0066FF] hover:bg-[#0052CC] text-white relative"
+            className="h-14 w-14 rounded-full shadow-lg bg-primary hover:bg-primary-hover text-white relative"
             size="icon"
           >
             <ListTodo className="w-6 h-6" />
@@ -218,7 +218,7 @@ export default function FloatingTaskButton() {
                       {/* 任务信息 */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <TaskIcon className="w-3.5 h-3.5 text-[#0066FF] flex-shrink-0" />
+                          <TaskIcon className="w-3.5 h-3.5 text-primary flex-shrink-0" />
                           <span className="text-sm font-medium text-gray-900 truncate">
                             {displayName}
                           </span>
@@ -233,7 +233,7 @@ export default function FloatingTaskButton() {
                           <div className="mt-1 flex items-center gap-1.5">
                             <div className="flex-1 bg-gray-200 rounded-full h-1">
                               <div 
-                                className="bg-[#0066FF] h-1 rounded-full transition-all duration-300"
+                                className="bg-primary h-1 rounded-full transition-all duration-300"
                                 style={{ width: `${Math.max(task.progress, 5)}%` }}
                               />
                             </div>
@@ -250,7 +250,8 @@ export default function FloatingTaskButton() {
             {/* 底部操作 */}
             <div className="pt-2 border-t flex gap-2">
               <Button 
-                className="flex-1 bg-[#0066FF] hover:bg-[#0052CC]"
+                variant="brand"
+                className="flex-1"
                 size="sm"
                 onClick={() => {
                   window.location.href = '/tasks';
