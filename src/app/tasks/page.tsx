@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { apiGet, apiDelete } from "@/lib/api-client";
 import { useTaskPolling } from "@/lib/use-task-polling";
@@ -57,7 +58,7 @@ function TopNav() {
     >
       <div className="flex items-center gap-3"
       >
-        <div className="w-8 h-8 rounded-lg bg-[#0066FF]" />
+        <div className="w-8 h-8 rounded-lg bg-primary" />
         <span
           className="text-base font-semibold text-foreground"
           style={{ fontFamily: "Inter, sans-serif" }}
@@ -108,11 +109,11 @@ function TopNav() {
 }
 
 function StatusBadge({ status }: { status: TaskStatus }) {
-  const variants: Record<TaskStatus, string> = {
-    pending: "bg-muted text-muted-foreground",
-    running: "bg-blue-50 text-blue-600 border-blue-200",
-    completed: "bg-green-50 text-green-600 border-green-200",
-    failed: "bg-red-50 text-red-600 border-red-200",
+  const variantMap: Record<TaskStatus, "warning" | "processing" | "success" | "danger"> = {
+    pending: "warning",
+    running: "processing",
+    completed: "success",
+    failed: "danger",
   };
 
   const labels: Record<TaskStatus, string> = {
@@ -123,15 +124,9 @@ function StatusBadge({ status }: { status: TaskStatus }) {
   };
 
   return (
-    <span
-      className={cn(
-        "px-2.5 py-1 rounded-full text-xs font-medium border",
-        variants[status]
-      )}
-      style={{ fontFamily: "Geist, sans-serif" }}
-    >
+    <Badge variant={variantMap[status]} style={{ fontFamily: "Geist, sans-serif" }}>
       {labels[status]}
-    </span>
+    </Badge>
   );
 }
 
@@ -271,7 +266,7 @@ export default function TasksPage() {
         </div>
         <div className="flex items-center gap-3">
           {isPolling && (
-            <div className="flex items-center gap-1.5 text-xs text-blue-600">
+            <div className="flex items-center gap-1.5 text-xs text-processing">
               <Radio className="w-3.5 h-3.5 animate-pulse" />
               实时更新中
             </div>
