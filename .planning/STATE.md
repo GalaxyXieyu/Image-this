@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: In progress
-stopped_at: "Completed 04a-03 Wave 3: Asset-First Supporting Pages"
-last_updated: "2026-06-07T01:50:44Z"
+stopped_at: "Completed 04a-04 Wave 4: Brand Expression and Screenshot Review"
+last_updated: "2026-06-07T02:00:40.700Z"
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 11
-  completed_plans: 10
+  completed_plans: 9
 ---
 
 # Project State
@@ -48,6 +48,9 @@ Plan: 04-01 Wave 1 completed; Wave 2 ready
 - [2026-06-06]: 已验证 GPT 图片能力可参考 `docs/brands/icon/cut/ip2-trimmed-preview.png` 生成 LUMO/IP 品牌插图候选稿；调用入口为 `/api/images-process/background-replace`，生成产物为 `public/uploads/1780740082828-bg-replace-cmq26n0if00037z7xlk1wviqd.jpg`。该能力进入 Phase 04a 首页、空状态、新手引导插图候选流程，但不能替代正式 Logo 或核心 UI 控件资产。
 - [Phase 04a]: Tailwind v3 @theme blocks in imported CSS files work when entry file has @tailwind directives before @imports
 - [Phase 04a]: Tailwind config must define colors in theme.extend.colors for JIT class generation even when CSS custom properties exist
+- [Phase 04a]: Home page CTA kept as variant=brand (solid blue) rather than gradient — already professional and clean
+- [Phase 04a]: Combo step icons unified to bg-primary-soft + text-primary — removed multi-color decorative array
+- [Phase 04a]: Combo connector lines changed to bg-primary for active flow indication
 
 ### Active Canonical References
 
@@ -117,6 +120,6 @@ The following phase folders remain useful for regression and engineering context
 
 ## Session Continuity
 
-Last session: 2026-06-07T01:50:44Z
-Stopped at: Completed 04a-03 Wave 3: Asset-First Supporting Pages
+Last session: 2026-06-07T02:00:40.698Z
+Stopped at: Completed 04a-04 Wave 4: Brand Expression and Screenshot Review
 Resume file: None
