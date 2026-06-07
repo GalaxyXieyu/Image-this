@@ -123,7 +123,7 @@ function TopNav() {
   return (
     <header className="h-16 border-b border-border px-8 flex items-center justify-between shrink-0">
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-[#0066FF]" />
+        <div className="w-8 h-8 rounded-lg bg-primary" />
         <span
           className="text-base font-semibold text-foreground"
           style={{ fontFamily: "Inter, sans-serif" }}
@@ -366,7 +366,7 @@ export default function ComboPage() {
                     className="group relative rounded-xl border border-border bg-card p-4 hover:shadow-sm transition-shadow"
                   >
                     {/* Order badge */}
-                    <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-[#0066FF] text-white flex items-center justify-center text-xs font-bold shadow-sm">
+                    <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold shadow-sm">
                       {step.order}
                     </div>
 
@@ -616,7 +616,8 @@ export default function ComboPage() {
                 保存为常用模板
               </Button>
               <Button
-                className="w-full bg-[#0066FF] hover:bg-[#0052CC] text-white"
+                variant="brand"
+                className="w-full"
                 style={{ fontFamily: "Inter, sans-serif" }}
                 onClick={handleExecute}
                 disabled={executing || steps.length === 0}
