@@ -90,15 +90,15 @@ const CATEGORY_LABELS: Record<string, string> = {
 function TopNav() {
   return (
     <header className="h-16 border-b border-border px-8 flex items-center justify-between shrink-0">
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-primary" />
+      <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+        <img src="/brands/logo-icon.png" alt="ImageThis" className="w-8 h-8" />
         <span
           className="text-base font-semibold text-foreground"
           style={{ fontFamily: "Inter, sans-serif" }}
         >
-          AI 商品视觉工作台
+          ImageThis
         </span>
-      </div>
+      </Link>
       <nav className="flex items-center gap-6">
         <Link
           href="/"
@@ -494,20 +494,28 @@ export default function ResultsPage() {
                 )}
 
                 {filteredResults.length === 0 && (
-                  <div className="flex flex-col items-center justify-center h-96 text-muted-foreground">
-                    <ImageIcon className="w-12 h-12 mb-4 opacity-40" />
-                    <p
-                      className="text-sm mb-4"
-                      style={{ fontFamily: "Geist, sans-serif" }}
-                    >
-                      暂无结果，去生成一张吧
+                  <div className="flex flex-col items-center justify-center h-96 text-muted-foreground gap-4">
+                    <img src="/brands/split/ip1-star.png" alt="暂无结果" className="w-28 h-28 opacity-50" draggable={false} />
+                    <p className="text-base font-medium text-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
+                      暂无结果
                     </p>
-                    <Button asChild>
-                      <Link href="/workspace/scene">
-                        <Wand2 className="w-4 h-4 mr-2" />
-                        开始生成
-                      </Link>
-                    </Button>
+                    <p className="text-sm text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
+                      去工作台生成你的第一张商品图吧
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <Button variant="brand" asChild>
+                        <Link href="/workspace/scene">
+                          <Wand2 className="w-4 h-4 mr-2" />
+                          场景生成
+                        </Link>
+                      </Button>
+                      <Button variant="outline" asChild>
+                        <Link href="/tools">
+                          <ImageIcon className="w-4 h-4 mr-2" />
+                          工具箱
+                        </Link>
+                      </Button>
+                    </div>
                   </div>
                 )}
               </>

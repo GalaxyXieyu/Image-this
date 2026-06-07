@@ -87,12 +87,12 @@ const EMPTY_RUN_STATE: ToolRunState = {
 function TopNav() {
   return (
     <header className="h-16 border-b border-border px-8 flex items-center justify-between shrink-0">
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-primary" />
+      <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+        <img src="/brands/logo-icon.png" alt="ImageThis" className="w-8 h-8" />
         <span className="text-base font-semibold text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
-          AI 商品视觉工作台
+          ImageThis
         </span>
-      </div>
+      </Link>
       <nav className="flex items-center gap-6">
         <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors" style={{ fontFamily: "Geist, sans-serif" }}>
           首页
@@ -135,11 +135,16 @@ function getStatusClassName(status: ToolTaskStatus) {
   return "bg-muted text-muted-foreground";
 }
 
-function createInitialDraft(presetId?: string): ToolDraftState {
+function createInitialDraft(presetId?: string, toolParam?: string): ToolDraftState {
   const preset = presetId ? getPresetById(presetId) : undefined;
   if (preset?.type === "tool") {
     const toolType = normalizePresetToolType(preset.toolType ?? (preset.params as { toolType?: string }).toolType);
     const presetParams = (preset.params as { parameters?: Partial<ToolParameters> }).parameters;
+
+    // Extract asset references from preset params if present
+    const presetReferenceAsset = (presetParams as BackgroundReplaceParams | undefined)?.referenceAsset;
+    const presetWatermarkLogoAsset = (presetParams as WatermarkParams | undefined)?.watermarkLogoAsset;
+
     return {
       toolType,
       parameters: {
@@ -150,6 +155,18 @@ function createInitialDraft(presetId?: string): ToolDraftState {
       selectedPresetId: preset.id,
       activePresetName: preset.name,
       activePresetDescription: preset.description,
+      referenceAsset: presetReferenceAsset,
+      watermarkLogoAsset: presetWatermarkLogoAsset,
+    };
+  }
+
+  // If no preset but tool param is provided, initialize that tool
+  if (toolParam) {
+    const toolType = normalizePresetToolType(toolParam);
+    return {
+      toolType,
+      parameters: buildDefaultToolParameters(toolType),
+      batchMode: false,
     };
   }
 
@@ -175,12 +192,13 @@ function downloadImage(url?: string | null) {
 function ToolboxPageInner() {
   const searchParams = useSearchParams();
   const presetId = searchParams.get("preset") ?? undefined;
+  const toolParam = searchParams.get("tool") ?? undefined;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const referenceInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const { upload, uploading } = useUpload();
   const { toast } = useToast();
-  const [draft, setDraft] = useState<ToolDraftState>(() => createInitialDraft(presetId));
+  const [draft, setDraft] = useState<ToolDraftState>(() => createInitialDraft(presetId, toolParam));
   const appliedPresetRef = useRef<string | undefined>(presetId);
   const [runState, setRunState] = useState<ToolRunState>(EMPTY_RUN_STATE);
   const [creatingTask, setCreatingTask] = useState(false);
@@ -198,16 +216,16 @@ function ToolboxPageInner() {
     if (appliedPresetRef.current === presetId) return;
     appliedPresetRef.current = presetId;
     setDraft((prev) => {
-      const initialized = createInitialDraft(presetId);
+      const initialized = createInitialDraft(presetId, toolParam);
       return {
         ...initialized,
         inputAsset: prev.inputAsset,
-        referenceAsset: prev.referenceAsset,
-        watermarkLogoAsset: prev.watermarkLogoAsset,
+        referenceAsset: prev.referenceAsset ?? initialized.referenceAsset,
+        watermarkLogoAsset: prev.watermarkLogoAsset ?? initialized.watermarkLogoAsset,
       };
     });
     setRunState(EMPTY_RUN_STATE);
-  }, [presetId]);
+  }, [presetId, toolParam]);
 
   useEffect(() => {
     if (!runState.taskId || tasks.length === 0) return;
@@ -412,10 +430,13 @@ function ToolboxPageInner() {
 
         <main className="flex-1 bg-muted flex items-center justify-center p-8 overflow-auto">
           {!resultPreviewUrl ? (
-            <div className="text-center">
-              <ImageIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <div className="text-center flex flex-col items-center gap-4">
+              <img src="/brands/split/ip1-think.png" alt="上传引导" className="w-28 h-28 opacity-50" draggable={false} />
               <p className="text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
                 请先上传图片
+              </p>
+              <p className="text-xs text-muted-foreground/70">
+                支持 JPG、PNG 格式，建议 1024×1024 以上
               </p>
             </div>
           ) : (
@@ -463,13 +484,16 @@ function ToolboxPageInner() {
                     </div>
                   )}
                   {pollingError && <p className="text-xs text-destructive">状态刷新失败：{pollingError}</p>}
+                  {runState.status === "completed" && runState.processedImageId && (
+                    <p className="text-[11px] text-green-600">结果已保存到结果管理</p>
+                  )}
                 </div>
               )}
             </section>
 
             <div className="pt-2 space-y-3">
               <Button
-                variant="brand"
+                variant="gradient"
                 className="w-full"
                 disabled={!draft.inputAsset || creatingTask || uploading}
                 onClick={handleCreateTask}
@@ -489,7 +513,9 @@ function ToolboxPageInner() {
                 </Link>
               </Button>
               <Button variant="outline" className="w-full" asChild style={{ fontFamily: "Geist, sans-serif" }}>
-                <Link href="/results">打开结果管理</Link>
+                <Link href="/results">
+                  {runState.status === "completed" ? "查看结果管理" : "打开结果管理"}
+                </Link>
               </Button>
             </div>
           </div>
