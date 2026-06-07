@@ -80,23 +80,48 @@ class TaskProcessor {
   private isProcessing = false;
 
   private buildPersistedResult(taskType: string, result: any): PersistedTaskResult {
-    switch (taskType) {
-      case 'VIDEO_GENERATION':
-        return {
-          videoUrl: result.videoUrl,
-          jimengTaskId: result.jimengTaskId,
-          prompt: result.prompt,
-          frames: result.frames,
-          aspectRatio: result.aspectRatio,
-        };
-      default:
-        return {
-          processedImageId: result.processedImageId || result.id || null,
-          processedImageUrl: result.processedImageUrl || result.processedUrl || result.imageUrl || null,
-          usedModel: result.usedModel || null,
-          prompt: result.prompt || null,
-        };
+    // 白名单：只允许已知的轻量字段进入 outputData，绝不允许 base64/imageData 入库
+    const allowedFields = new Set([
+      'processedImageId', 'processedImageUrl', 'usedModel', 'prompt',
+      'videoUrl', 'jimengTaskId', 'frames', 'aspectRatio',
+      'expandRatio', 'upscaleFactor', 'watermarkText', 'watermarkOpacity',
+      'watermarkPosition', 'watermarkType', 'outputResolution', 'processSteps',
+    ]);
+
+    const raw: Record<string, unknown> =
+      taskType === 'VIDEO_GENERATION'
+        ? {
+            videoUrl: result.videoUrl,
+            jimengTaskId: result.jimengTaskId,
+            prompt: result.prompt,
+            frames: result.frames,
+            aspectRatio: result.aspectRatio,
+          }
+        : {
+            processedImageId: result.processedImageId || result.id || null,
+            processedImageUrl: result.processedImageUrl || result.processedUrl || result.imageUrl || null,
+            usedModel: result.usedModel || null,
+            prompt: result.prompt || null,
+          };
+
+    const cleaned: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(raw)) {
+      if (!allowedFields.has(key)) {
+        console.warn(`[Worker] buildPersistedResult 丢弃非白名单字段: ${key}`);
+        continue;
+      }
+      if (typeof value === 'string' && value.length > 10_000) {
+        console.warn(`[Worker] buildPersistedResult 丢弃超长字符串字段: ${key} (长度 ${value.length})，疑似 base64`);
+        continue;
+      }
+      if (key === 'imageData') {
+        console.warn('[Worker] buildPersistedResult 拒绝将 imageData (base64) 写入 outputData');
+        continue;
+      }
+      cleaned[key] = value;
     }
+
+    return cleaned as PersistedTaskResult;
   }
 
   private async getConfiguredConcurrencyLimit(requestedMaxTasks?: number) {
@@ -556,10 +581,9 @@ class TaskProcessor {
       return {
         processedImageId: result.id,
         processedImageUrl: result.processedUrl,
-        imageData: result.imageData,
         processSteps: result.processSteps,
-        settings: { 
-          xScale, yScale, upscaleFactor, 
+        settings: {
+          xScale, yScale, upscaleFactor,
           enableBackgroundReplace, enableOutpaint, enableUpscale,
           enableWatermark, watermarkType, outputResolution
         }
@@ -587,7 +611,9 @@ class TaskProcessor {
 
     // 兼容旧数据：如果没有 provider，从 aiModel 推断
     const provider = explicitProvider || (aiModel.startsWith('gpt') ? 'gpt' : aiModel.startsWith('gemini') ? 'gemini' : aiModel.startsWith('jimeng') || aiModel.startsWith('seedream') ? 'jimeng' : aiModel);
-    const modelName = explicitModelName || aiModel;
+    // 如果 aiModel 只是 provider 简称（如 'gemini'/'gpt'/'jimeng'），modelName 用 undefined，让 service 从用户配置读取真实的 modelName
+    const isProviderAlias = ['gemini', 'gpt', 'jimeng', 'seedream'].includes(aiModel);
+    const modelName = explicitModelName || (isProviderAlias ? undefined : aiModel);
 
     const originalImageUrlForRecord = getAssetClientUrl(inputData.inputAsset)
       || await persistRecordUrl(inputData.imageUrl, `input-bg-replace-${task.id}.jpg`, task.userId);
@@ -654,7 +680,6 @@ class TaskProcessor {
         result = {
           id: processedImage.id,
           processedUrl: processedUrl,
-          imageData: gptResult.imageData,
           imageSize: gptResult.imageSize
         };
         console.log('[Worker] GPT 处理成功，已保存到数据库');
@@ -700,7 +725,6 @@ class TaskProcessor {
         result = {
           id: processedImage.id,
           processedUrl: processedUrl,
-          imageData: resultImageUrl || '',
           imageSize: resultImageUrl?.length || 0
         };
         console.log('[Worker] Gemini 处理成功，已保存到数据库');
@@ -746,7 +770,6 @@ class TaskProcessor {
         result = {
           id: processedImage.id,
           processedUrl: processedUrl,
-          imageData: jimengResult.imageData,
           imageSize: jimengResult.imageSize
         };
         console.log('[Worker] Jimeng 处理成功，已保存到数据库');
@@ -759,7 +782,6 @@ class TaskProcessor {
       return {
         processedImageId: result.id,
         processedImageUrl: result.processedUrl,
-        imageData: result.imageData,
         prompt: prompt || customPrompt || '',
         usedModel: attemptModel,
       };
@@ -846,7 +868,6 @@ class TaskProcessor {
       return {
         processedImageId: processedImage.id,
         processedImageUrl: processedUrl,
-        imageData: result.imageData,
         expandRatio: result.metadata?.expandRatio || { top, bottom, left, right }
       };
 
@@ -914,7 +935,6 @@ class TaskProcessor {
       return {
         processedImageId: processedImage.id,
         processedImageUrl: processedUrl,
-        imageData: result.imageData,
         upscaleFactor
       };
 

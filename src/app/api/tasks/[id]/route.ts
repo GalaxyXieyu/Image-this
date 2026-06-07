@@ -3,6 +3,29 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { deleteImage } from '@/lib/storage';
+import { adaptLegacyTaskToSummary } from '@/lib/workbench/api-contract';
+import { normalizeImageUrlForClient } from '@/lib/image-url';
+
+function sanitizeOutputData(raw: string): string {
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const cleaned: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (key === 'imageData') {
+        console.warn('[Task PATCH] 过滤 outputData 中的 imageData (base64)');
+        continue;
+      }
+      if (typeof value === 'string' && value.length > 10_000) {
+        console.warn(`[Task PATCH] 过滤 outputData 中超长字段: ${key} (长度 ${value.length})`);
+        continue;
+      }
+      cleaned[key] = value;
+    }
+    return JSON.stringify(cleaned);
+  } catch {
+    return raw;
+  }
+}
 
 // 获取单个任务详情
 export async function GET(
@@ -44,9 +67,22 @@ export async function GET(
       return NextResponse.json({ error: '任务不存在' }, { status: 404 });
     }
 
+    const summary = adaptLegacyTaskToSummary(task);
+
     return NextResponse.json({
       success: true,
-      task
+      task: {
+        ...summary,
+        project: task.project ?? null,
+        processedImage: task.processedImage
+          ? {
+              ...task.processedImage,
+              originalUrl: normalizeImageUrlForClient(task.processedImage.originalUrl),
+              processedUrl: normalizeImageUrlForClient(task.processedImage.processedUrl),
+              thumbnailUrl: normalizeImageUrlForClient(task.processedImage.thumbnailUrl),
+            }
+          : null,
+      },
     });
 
   } catch (error) {
@@ -123,7 +159,7 @@ export async function PATCH(
     }
 
     if (outputData) {
-      updateData.outputData = outputData;
+      updateData.outputData = sanitizeOutputData(outputData);
     }
 
     if (errorMessage) {

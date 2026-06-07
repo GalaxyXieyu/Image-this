@@ -598,6 +598,32 @@ const imageProcessPresets: TemplatePreset[] = [
     createdAt: "2025-01-01T00:00:00Z",
     updatedAt: "2025-05-10T00:00:00Z",
   },
+  {
+    id: "ip-outpaint",
+    name: "智能扩图",
+    description: "向外延展画面边界，适合横版详情图和营销图适配",
+    category: "image-process",
+    type: "tool",
+    toolType: "outpaint",
+    usageCount: 196,
+    version: "1.0",
+    tags: ["扩图", "比例适配", "详情图"],
+    isSystem: true,
+    isDefault: false,
+    params: {
+      toolType: "outpaint",
+      parameters: {
+        xScale: 1.5,
+        yScale: 1.5,
+        prompt: "自然延展画面边缘，保持商品主体稳定，适合电商详情图",
+        aiModel: "volcengine",
+        outputResolution: "1024x1024",
+      },
+      batchMode: true,
+    },
+    createdAt: "2025-01-08T00:00:00Z",
+    updatedAt: "2025-05-12T00:00:00Z",
+  },
 ];
 
 // ---------------------------------------------------------------------------

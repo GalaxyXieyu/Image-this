@@ -130,7 +130,11 @@ export function normalizePresetToolType(toolType?: string | null): ToolType {
   if (toolType === 'upscale') return 'upscale';
   if (toolType === 'outpaint') return 'outpaint';
   if (toolType === 'video') return 'video_generation';
-  if (toolType === 'background_replace' || toolType === 'one_click' || toolType === 'video_generation') {
+  if (
+    toolType === 'background_replace' ||
+    toolType === 'one_click' ||
+    toolType === 'video_generation'
+  ) {
     return toolType;
   }
   return 'background_replace';

@@ -39,6 +39,49 @@ function normalizeTaskInputData(rawInputData: string): string {
   }
 }
 
+async function sanitizeTaskInputDataAsync(rawInputData: string, userId: string): Promise<string> {
+  try {
+    const parsed = JSON.parse(rawInputData) as Record<string, unknown>;
+    let modified = false;
+
+    const checkAndUpload = async (value: unknown, filenameHint: string): Promise<string | undefined> => {
+      if (typeof value !== 'string' || !value.startsWith('data:')) {
+        return undefined;
+      }
+      const { uploadBase64Image } = await import('@/lib/storage');
+      const uploadedUrl = await uploadBase64Image(value, filenameHint, userId);
+      console.warn(`[sanitizeTaskInputData] data URL 已转本地文件: ${uploadedUrl}`);
+      return uploadedUrl;
+    };
+
+    if (typeof parsed.imageUrl === 'string' && parsed.imageUrl.startsWith('data:')) {
+      const url = await checkAndUpload(parsed.imageUrl, `task-input-${Date.now()}.jpg`);
+      if (url) {
+        parsed.imageUrl = url;
+        modified = true;
+      }
+    }
+
+    for (const assetKey of ['inputAsset', 'referenceAsset', 'watermarkLogoAsset'] as const) {
+      const asset = parsed[assetKey];
+      if (asset && typeof asset === 'object') {
+        const a = asset as Record<string, unknown>;
+        if (typeof a.clientUrl === 'string' && a.clientUrl.startsWith('data:')) {
+          const url = await checkAndUpload(a.clientUrl, `task-asset-${Date.now()}.jpg`);
+          if (url) {
+            a.clientUrl = url;
+            modified = true;
+          }
+        }
+      }
+    }
+
+    return modified ? JSON.stringify(parsed) : rawInputData;
+  } catch {
+    return rawInputData;
+  }
+}
+
 function getClientUrlFromAsset(asset: unknown): string | null {
   if (!asset || typeof asset !== 'object') {
     return null;
@@ -136,23 +179,25 @@ export async function POST(request: NextRequest) {
     // 检查是否是批量任务请求
     if (Array.isArray(body)) {
       // 批量创建任务
-      const taskPromises = body.map(task => {
-        const { 
-          type, 
-          inputData, 
-          priority = 1, 
+      const taskPromises = body.map(async (task) => {
+        const {
+          type,
+          inputData,
+          priority = 1,
           projectId,
-          totalSteps = 1 
+          totalSteps = 1
         } = task;
 
         if (!type || !inputData) {
           throw new Error('缺少必要参数：type, inputData');
         }
 
+        const sanitizedInputData = await sanitizeTaskInputDataAsync(inputData, session.user.id);
+
         return prisma.taskQueue.create({
           data: {
             type,
-            inputData: normalizeTaskInputData(inputData),
+            inputData: normalizeTaskInputData(sanitizedInputData),
             priority,
             totalSteps,
             userId: session.user.id,
@@ -195,11 +240,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const sanitizedInputData = await sanitizeTaskInputDataAsync(inputData, session.user.id);
+
     // 创建任务
     const task = await prisma.taskQueue.create({
       data: {
         type,
-        inputData: normalizeTaskInputData(inputData),
+        inputData: normalizeTaskInputData(sanitizedInputData),
         priority,
         totalSteps,
         userId: session.user.id,
