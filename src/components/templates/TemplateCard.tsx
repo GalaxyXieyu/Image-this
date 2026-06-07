@@ -74,30 +74,30 @@ export function TemplateCard({
           {preset.description || "暂无描述"}
         </p>
 
-        {/* Footer row: usage count (11px #999) + version badge (11px #0066FF) */}
+        {/* Footer row: usage count (11px slate-400) + version badge (11px primary) */}
         <div className="flex items-center justify-between mt-auto">
           <span
-            className="text-[11px] text-[#999999]"
+            className="text-[11px] text-slate-400"
             style={{ fontFamily: "Geist, sans-serif" }}
           >
             使用 {preset.usageCount} 次
           </span>
           <span
-            className="text-[11px] font-medium text-[#0066FF]"
+            className="text-[11px] font-medium text-primary"
             style={{ fontFamily: "Geist, sans-serif" }}
           >
             v{preset.version}
           </span>
         </div>
 
-        {/* Action row: "使用模板" (12px, #0066FF) + "编辑" (12px, #666) */}
+        {/* Action row: "使用模板" (12px, primary) + "编辑" (12px, slate-500) */}
         <div className="flex items-center gap-3 mt-1">
           <button
             onClick={(e) => {
               e.stopPropagation();
               onUse?.();
             }}
-            className="text-[12px] font-medium text-[#0066FF] hover:underline"
+            className="text-[12px] font-medium text-primary hover:underline"
             style={{ fontFamily: "Geist, sans-serif" }}
           >
             使用模板
@@ -107,7 +107,7 @@ export function TemplateCard({
               e.stopPropagation();
               onEdit?.();
             }}
-            className="text-[12px] text-[#666666] hover:text-foreground transition-colors"
+            className="text-[12px] text-slate-500 hover:text-foreground transition-colors"
             style={{ fontFamily: "Geist, sans-serif" }}
           >
             编辑
