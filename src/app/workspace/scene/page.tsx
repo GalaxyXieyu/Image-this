@@ -64,11 +64,12 @@ function getCandidateStatusLabel(status: CandidateStatus) {
   return labels[status];
 }
 
-function getCandidateStatusClassName(status: CandidateStatus) {
-  if (status === "completed") return "bg-green-50 text-green-600 border-green-200";
-  if (status === "failed" || status === "cancelled") return "bg-red-50 text-red-600 border-red-200";
-  if (status === "processing") return "bg-blue-50 text-blue-600 border-blue-200";
-  return "bg-muted text-muted-foreground";
+function getCandidateStatusVariant(status: CandidateStatus): "success" | "danger" | "processing" | "warning" | "default" {
+  if (status === "completed") return "success";
+  if (status === "failed" || status === "cancelled") return "danger";
+  if (status === "processing") return "processing";
+  if (status === "pending") return "warning";
+  return "default";
 }
 
 function isTerminalCandidateStatus(status: CandidateStatus) {
@@ -203,7 +204,7 @@ function TopNav() {
   return (
     <header className="h-16 border-b border-border px-8 flex items-center justify-between shrink-0">
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-[#0066FF]" />
+        <div className="w-8 h-8 rounded-lg bg-primary" />
         <span
           className="text-base font-semibold text-foreground"
           style={{ fontFamily: "Inter, sans-serif" }}
@@ -308,7 +309,7 @@ function ProductInfoStep({
             <section className="rounded-xl border border-primary/20 bg-primary/5 p-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <Badge className="bg-[#0066FF] text-white">已载入模板</Badge>
+                  <Badge variant="processing">已载入模板</Badge>
                   <h2
                     className="mt-3 text-base font-semibold text-foreground"
                     style={{ fontFamily: "Inter, sans-serif" }}
@@ -535,7 +536,7 @@ function ProductInfoStep({
         </Button>
         <Button
           onClick={onNext}
-          className="bg-[#0066FF] hover:bg-[#0052CC] text-white"
+          variant="brand"
           style={{ fontFamily: "Inter, sans-serif" }}
         >
           下一步：选择风格模板
@@ -648,7 +649,7 @@ function StyleTemplateStep({
         <Button
           onClick={onNext}
           disabled={selected.length === 0}
-          className="bg-[#0066FF] hover:bg-[#0052CC] text-white"
+          variant="brand"
           style={{ fontFamily: "Inter, sans-serif" }}
         >
           下一步：生成并调整
@@ -924,7 +925,7 @@ function GenerateAdjustStep({
               <Button
                 onClick={handleGenerate}
                 disabled={generating || !workflowData.inputAsset || !workflowData.referenceAsset}
-                className="bg-[#0066FF] hover:bg-[#0052CC] text-white"
+                variant="brand"
                 style={{ fontFamily: "Inter, sans-serif" }}
               >
                 <Wand2 className="w-4 h-4 mr-2" />
@@ -983,7 +984,7 @@ function GenerateAdjustStep({
                         <h3 className="text-sm font-medium text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
                           {result.name}
                         </h3>
-                        <Badge variant="secondary" className={getCandidateStatusClassName(result.status)}>
+                        <Badge variant={getCandidateStatusVariant(result.status)}>
                           {getCandidateStatusLabel(result.status)}
                         </Badge>
                       </div>
@@ -1010,7 +1011,7 @@ function GenerateAdjustStep({
                       {result.status === "processing" && (
                         <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
                           <div
-                            className="h-full rounded-full bg-[#0066FF] transition-all"
+                            className="h-full rounded-full bg-primary transition-all"
                             style={{ width: `${Math.max(0, Math.min(100, result.progress))}%` }}
                           />
                         </div>
@@ -1020,13 +1021,14 @@ function GenerateAdjustStep({
                           <Link href="/tasks">查看任务</Link>
                         </Button>
                         {result.savedImageId ? (
-                          <Button size="sm" className="flex-1 bg-[#0066FF] hover:bg-[#0052CC] text-white" style={{ fontFamily: "Geist, sans-serif" }} asChild>
+                          <Button size="sm" variant="brand" className="flex-1" style={{ fontFamily: "Geist, sans-serif" }} asChild>
                             <Link href="/results">查看结果</Link>
                           </Button>
                         ) : (
                           <Button
                             size="sm"
-                            className="flex-1 bg-[#0066FF] hover:bg-[#0052CC] text-white"
+                            variant="brand"
+                            className="flex-1"
                             style={{ fontFamily: "Geist, sans-serif" }}
                             onClick={() => handleSaveResult(result)}
                             disabled={

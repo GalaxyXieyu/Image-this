@@ -16,7 +16,8 @@ module.exports = {
   			foreground: 'hsl(var(--foreground))',
   			primary: {
   				DEFAULT: 'hsl(var(--primary))',
-  				foreground: 'hsl(var(--primary-foreground))'
+  				foreground: 'hsl(var(--primary-foreground))',
+  				hover: '#1D4ED8'
   			},
   			secondary: {
   				DEFAULT: 'hsl(var(--secondary))',
@@ -48,6 +49,33 @@ module.exports = {
   				'3': 'hsl(var(--chart-3))',
   				'4': 'hsl(var(--chart-4))',
   				'5': 'hsl(var(--chart-5))'
+  			},
+  			ai: {
+  				DEFAULT: '#7C3AED',
+  				foreground: '#FFFFFF',
+  				hover: '#6D28D9',
+  				soft: '#EDE9FE',
+  				light: '#DDD6FE'
+  			},
+  			success: {
+  				DEFAULT: '#10B981',
+  				foreground: '#FFFFFF',
+  				soft: '#D1FAE5'
+  			},
+  			warning: {
+  				DEFAULT: '#FBBF24',
+  				foreground: '#0F172A',
+  				soft: '#FEF3C7'
+  			},
+  			danger: {
+  				DEFAULT: '#EF4444',
+  				foreground: '#FFFFFF',
+  				soft: '#FEE2E2'
+  			},
+  			processing: {
+  				DEFAULT: '#2563FF',
+  				foreground: '#FFFFFF',
+  				soft: '#DBEAFE'
   			}
   		},
   		borderRadius: {
