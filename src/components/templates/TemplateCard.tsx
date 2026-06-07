@@ -77,7 +77,7 @@ export function TemplateCard({
         {/* Footer row: usage count (11px slate-400) + version badge (11px primary) */}
         <div className="flex items-center justify-between mt-auto">
           <span
-            className="text-[11px] text-slate-400"
+            className="text-[11px] text-muted-foreground"
             style={{ fontFamily: "Geist, sans-serif" }}
           >
             使用 {preset.usageCount} 次
@@ -107,7 +107,7 @@ export function TemplateCard({
               e.stopPropagation();
               onEdit?.();
             }}
-            className="text-[12px] text-slate-500 hover:text-foreground transition-colors"
+            className="text-[12px] text-muted-foreground hover:text-foreground transition-colors"
             style={{ fontFamily: "Geist, sans-serif" }}
           >
             编辑
