@@ -9,7 +9,7 @@
 - [x] **Phase 1: Product Visual Workbench Foundation** - 建立新版 app shell、路由、设计 token、workflow state 和 typed API contract 基础 (completed 2026-05-27)
 - [x] **Phase 2: Template Library and Preset Model** - 实现模板库页面、预设数据模型和模板到工作流的入口 (completed 2026-05-27)
 - [x] **Phase 3: Scene Image Guided Workflow** - 实现场景图商品信息、候选生成、结果调整三步流程 (completed 2026-06-06)
-- [ ] **Phase 4: Unified Smart Toolbox** - 用统一编辑器 shell 重建 AI 换背景、加水印、高清化、扩图等工具
+- [x] **Phase 4: Unified Smart Toolbox** - 用统一编辑器 shell 重建 AI 换背景、加水印、高清化、扩图等工具 (completed 2026-06-07)
 - [x] **Phase 04a: Brand UI/UX Optimization** - 按最新品牌规范收敛 Logo/IP、颜色、组件状态和核心页面视觉层级 (completed 2026-06-07)
 - [ ] **Phase 5: Workflow API and Worker Contract Refactor** - 将任务提交、worker dispatch、结果 payload 规范化为 typed workflow contract
 - [ ] **Phase 6: Old Frontend Removal and Regression Hardening** - 删除旧 workspace、补回归验证、检查 Electron/Windows 基线
@@ -98,7 +98,7 @@ Plans:
 
 Plans:
 
-- [ ] 04-01: Unified smart toolbox
+- [x] 04-01: Unified smart toolbox
 
 ### Phase 5: Workflow API and Worker Contract Refactor
 
@@ -136,22 +136,22 @@ Plans:
 
 ## Historical Baseline
 
-以下已合入 main 的 GSD phase 保留为工程基线和回归参考，不再代表当前执行主线：
+以下已合入 main 的 GSD phase 已完成归档，工程上下文保留在 git 历史记录中：
 
-- `01-desktop-runtime-performance`
-- `02-task-input-asset-references`
-- `03-app-log-observability`
+- `01-desktop-runtime-performance` (已删除)
+- `02-task-input-asset-references` (已删除)
+- `03-app-log-observability` (已删除)
 
 ## Progress
 
-**Current focus:** Phase 4 - Unified Smart Toolbox
+**Current focus:** Phase 5 - Workflow API and Worker Contract Refactor
 
 | Phase | Plans Complete | Status |
 |-------|----------------|--------|
 | 1. Product Visual Workbench Foundation | 1/1 | Complete |
 | 2. Template Library and Preset Model | 1/1 | Complete |
 | 3. Scene Image Guided Workflow | 1/1 | Complete |
-| 4. Unified Smart Toolbox | 0/1 | In progress |
+| 4. Unified Smart Toolbox | 1/1 | Complete |
 | 5. Workflow API and Worker Contract Refactor | 0/TBD | Pending |
 | 6. Old Frontend Removal and Regression Hardening | 0/TBD | Pending |
 
