@@ -176,12 +176,17 @@ model TaskQueue {
   outputData       String?       // 输出结果 JSON字符串
   errorMessage     String?       // 错误信息
   
+  // 契约版本与类型标识（Phase 5 新增，向下兼容）
+  contractVersion  Int           @default(1) // 1 = legacy loose JSON, 2 = typed workflow contract
+  workflowType     String?                    // normalized workflow type (scene_generation, background_replace, etc.)
+  handlerName      String?                    // worker handler registry key
+
   // 时间戳
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   startedAt        DateTime?     // 开始处理时间
   completedAt      DateTime?     // 完成时间
-  
+
   // 关联
   userId           String
   projectId        String?

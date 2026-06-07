@@ -185,7 +185,10 @@ export async function POST(request: NextRequest) {
           inputData,
           priority = 1,
           projectId,
-          totalSteps = 1
+          totalSteps = 1,
+          contractVersion,
+          workflowType,
+          handlerName,
         } = task;
 
         if (!type || !inputData) {
@@ -202,7 +205,10 @@ export async function POST(request: NextRequest) {
             totalSteps,
             userId: session.user.id,
             projectId,
-            currentStep: '任务已创建，等待处理'
+            currentStep: '任务已创建，等待处理',
+            contractVersion: typeof contractVersion === 'number' ? contractVersion : 1,
+            workflowType: typeof workflowType === 'string' ? workflowType : null,
+            handlerName: typeof handlerName === 'string' ? handlerName : null,
           }
         });
       });
@@ -225,12 +231,15 @@ export async function POST(request: NextRequest) {
       });
     } else {
       // 单个任务创建 (保持原有逻辑)
-    const { 
-      type, 
-      inputData, 
-      priority = 1, 
+    const {
+      type,
+      inputData,
+      priority = 1,
       projectId,
-      totalSteps = 1 
+      totalSteps = 1,
+      contractVersion,
+      workflowType,
+      handlerName,
     } = body;
 
     if (!type || !inputData) {
@@ -251,7 +260,10 @@ export async function POST(request: NextRequest) {
         totalSteps,
         userId: session.user.id,
         projectId,
-        currentStep: '任务已创建，等待处理'
+        currentStep: '任务已创建，等待处理',
+        contractVersion: typeof contractVersion === 'number' ? contractVersion : 1,
+        workflowType: typeof workflowType === 'string' ? workflowType : null,
+        handlerName: typeof handlerName === 'string' ? handlerName : null,
       }
     });
 

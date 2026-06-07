@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { uploadBase64Image } from '@/lib/storage';
 import { addWatermarkToImage } from '@/lib/watermark';
 import { getUserConfig, normalizeTaskConcurrency } from '@/lib/user-config';
+import { resolveHandler } from '@/lib/workbench/worker-handlers';
+import { validateTaskInput } from '@/lib/workbench/input-validation';
 import fs from 'fs/promises';
 
 type TaskAssetRef = {
@@ -28,6 +30,9 @@ type QueueTaskForProcessing = {
   userId: string;
   retryCount?: number;
   maxRetries?: number;
+  contractVersion?: number;
+  workflowType?: string | null;
+  handlerName?: string | null;
 };
 
 type PersistedTaskResult = {
@@ -181,6 +186,9 @@ class TaskProcessor {
         userId: true,
         retryCount: true,
         maxRetries: true,
+        contractVersion: true,
+        workflowType: true,
+        handlerName: true,
       },
     });
 
@@ -235,31 +243,56 @@ class TaskProcessor {
       }
 
       // 根据任务类型处理
+      // Phase 5: Try typed handler registry first, fall back to legacy switch
       let result;
-      switch (task.type) {
-        case 'ONE_CLICK_WORKFLOW':
-          result = await this.processOneClickWorkflow(task);
-          break;
-        case 'BACKGROUND_REMOVAL':
-          result = await this.processBackgroundRemoval(task);
-          break;
-        case 'IMAGE_EXPANSION':
-          result = await this.processImageExpansion(task);
-          break;
-        case 'IMAGE_UPSCALING':
-          result = await this.processImageUpscaling(task);
-          break;
-        case 'WATERMARK':
-          result = await this.processWatermark(task);
-          break;
-        case 'VIDEO_GENERATION':
-          result = await this.processVideoGeneration(task);
-          break;
-        default:
-          throw new Error(`不支持的任务类型: ${task.type}`);
+      const handler = resolveHandler(task.handlerName, task.workflowType, task.type);
+
+      if (handler && (task.contractVersion ?? 1) >= 2) {
+        // Typed handler path (contract v2+)
+        const parsedInput = JSON.parse(task.inputData) as Record<string, unknown>;
+        const validatedInput = handler.validateInput(parsedInput.parameters ?? parsedInput);
+        result = await handler.execute(
+          {
+            task,
+            userId: task.userId,
+            updateProgress: async (step, progress, completedSteps) => {
+              await prisma.taskQueue.update({
+                where: { id: task.id },
+                data: { currentStep: step, progress, completedSteps },
+              });
+            },
+          },
+          validatedInput
+        );
+      } else {
+        // Legacy switch path (contract v1 or no registered handler)
+        switch (task.type) {
+          case 'ONE_CLICK_WORKFLOW':
+            result = await this.processOneClickWorkflow(task);
+            break;
+          case 'BACKGROUND_REMOVAL':
+            result = await this.processBackgroundRemoval(task);
+            break;
+          case 'IMAGE_EXPANSION':
+            result = await this.processImageExpansion(task);
+            break;
+          case 'IMAGE_UPSCALING':
+            result = await this.processImageUpscaling(task);
+            break;
+          case 'WATERMARK':
+            result = await this.processWatermark(task);
+            break;
+          case 'VIDEO_GENERATION':
+            result = await this.processVideoGeneration(task);
+            break;
+          default:
+            throw new Error(`不支持的任务类型: ${task.type}`);
+        }
       }
 
-      const persistedResult = this.buildPersistedResult(task.type, result);
+      const persistedResult = handler && (task.contractVersion ?? 1) >= 2
+        ? handler.normalizeResult(result)
+        : this.buildPersistedResult(task.type, result);
 
       // 更新任务为完成状态，并关联处理结果
       await prisma.taskQueue.update({
