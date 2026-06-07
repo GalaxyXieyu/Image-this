@@ -112,6 +112,11 @@ export function resolveHandler(
   workflowType: string | null | undefined,
   legacyType: string
 ): WorkflowHandler<any, any> | undefined {
+  // Workflow type aliases (scene_generation uses same logic as background_replace)
+  const WORKFLOW_TYPE_ALIASES: Record<string, string> = {
+    scene_generation: 'background_replace',
+  };
+
   if (handlerName) {
     const byName = getHandler(handlerName);
     if (byName) return byName;
@@ -119,6 +124,11 @@ export function resolveHandler(
   if (workflowType) {
     const byWorkflow = getHandler(workflowType);
     if (byWorkflow) return byWorkflow;
+    const aliased = WORKFLOW_TYPE_ALIASES[workflowType];
+    if (aliased) {
+      const byAlias = getHandler(aliased);
+      if (byAlias) return byAlias;
+    }
   }
   return getHandler(legacyType);
 }

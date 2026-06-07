@@ -256,21 +256,49 @@ class TaskProcessor {
       if (handler && (task.contractVersion ?? 1) >= 2) {
         // Typed handler path (contract v2+)
         const parsedInput = JSON.parse(task.inputData) as Record<string, unknown>;
+
+        // Inject user config (mirrors legacy processSingleTask)
+        const userConfig = await getUserConfig(task.userId);
+        parsedInput.volcengineConfig = userConfig.volcengine;
+        parsedInput.imagehostingConfig = userConfig.imagehosting;
+
         const validatedInput = handler.validateInput(parsedInput.parameters ?? parsedInput);
-        result = await handler.execute(
-          {
-            task,
-            userId: task.userId,
-            updateProgress: async (step, progress, completedSteps) => {
-              await prisma.taskQueue.update({
-                where: { id: task.id },
-                data: { currentStep: step, progress, completedSteps },
-              });
+
+        // Add timeout wrapper (10 min)
+        const taskTimeout = 10 * 60 * 1000;
+        let timeoutHandle: NodeJS.Timeout;
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timeoutHandle = setTimeout(async () => {
+            const currentTask = await prisma.taskQueue.findUnique({
+              where: { id: task.id },
+              select: { currentStep: true, progress: true },
+            });
+            const stepInfo = currentTask
+              ? `当前步骤: ${currentTask.currentStep}, 进度: ${currentTask.progress}%`
+              : '未知步骤';
+            reject(new Error(`任务处理超时（10分钟）- ${stepInfo}`));
+          }, taskTimeout);
+        });
+
+        result = await Promise.race([
+          handler.execute(
+            {
+              task,
+              userId: task.userId,
+              updateProgress: async (step, progress, completedSteps) => {
+                await prisma.taskQueue.update({
+                  where: { id: task.id },
+                  data: { currentStep: step, progress, completedSteps },
+                });
+              },
             },
-          },
-          validatedInput,
-          parsedInput
-        );
+            validatedInput,
+            parsedInput
+          ),
+          timeoutPromise,
+        ]);
+
+        clearTimeout(timeoutHandle!);
       } else {
         // Legacy switch path (contract v1 or no registered handler)
         switch (task.type) {

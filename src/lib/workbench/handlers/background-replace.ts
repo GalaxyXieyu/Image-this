@@ -243,15 +243,16 @@ async function processWithGPT(
 
   const gptResult = await gptService(imageUrl, referenceImageUrl, prompt, userId, modelName);
 
+  const gptFilename = `gpt-bg-replace-${Date.now()}.jpg`;
   const processedUrl = await uploadBase64Image(
     gptResult.imageData,
-    `gpt-bg-replace-${Date.now()}.jpg`,
+    gptFilename,
     userId
   );
 
   const processedImage = await prisma.processedImage.create({
     data: {
-      filename: `gpt-bg-replace-${Date.now()}.jpg`,
+      filename: gptFilename,
       originalUrl: originalImageUrlForRecord,
       processedUrl,
       processType: 'BACKGROUND_REMOVAL',
@@ -289,15 +290,16 @@ async function processWithGemini(
 
   const resultImageUrl = await geminiService(imageUrl, referenceImageUrl, prompt, userId, modelName);
 
+  const geminiFilename = `gemini-bg-replace-${Date.now()}.jpg`;
   const processedUrl = await uploadBase64Image(
     resultImageUrl || '',
-    `gemini-bg-replace-${Date.now()}.jpg`,
+    geminiFilename,
     userId
   );
 
   const processedImage = await prisma.processedImage.create({
     data: {
-      filename: `gemini-bg-replace-${Date.now()}.jpg`,
+      filename: geminiFilename,
       originalUrl: originalImageUrlForRecord,
       processedUrl,
       processType: 'BACKGROUND_REMOVAL',
@@ -335,15 +337,16 @@ async function processWithJimeng(
 
   const jimengResult = await jimengService(imageUrl, referenceImageUrl, prompt, userId, modelName);
 
+  const jimengFilename = `jimeng-bg-replace-${Date.now()}.jpg`;
   const processedUrl = await uploadBase64Image(
     jimengResult.imageData,
-    `jimeng-bg-replace-${Date.now()}.jpg`,
+    jimengFilename,
     userId
   );
 
   const processedImage = await prisma.processedImage.create({
     data: {
-      filename: `jimeng-bg-replace-${Date.now()}.jpg`,
+      filename: jimengFilename,
       originalUrl: originalImageUrlForRecord,
       processedUrl,
       processType: 'BACKGROUND_REMOVAL',

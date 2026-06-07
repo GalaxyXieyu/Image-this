@@ -128,6 +128,10 @@ async function createBatchTasks(
     return NextResponse.json({ error: '缺少必要参数：items' }, { status: 400 });
   }
 
+  if (items.length > 50) {
+    return NextResponse.json({ error: '批量创建最多 50 个任务' }, { status: 400 });
+  }
+
   const handler = getHandlerByWorkflowType(workflowType);
   if (!handler) {
     return NextResponse.json(
