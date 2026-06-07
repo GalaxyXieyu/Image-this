@@ -88,7 +88,7 @@ function TopNav() {
   return (
     <header className="h-16 border-b border-border px-8 flex items-center justify-between shrink-0">
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-[#0066FF]" />
+        <div className="w-8 h-8 rounded-lg bg-primary" />
         <span className="text-base font-semibold text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
           AI 商品视觉工作台
         </span>
@@ -139,10 +139,13 @@ function createInitialDraft(presetId?: string): ToolDraftState {
   const preset = presetId ? getPresetById(presetId) : undefined;
   if (preset?.type === "tool") {
     const toolType = normalizePresetToolType(preset.toolType ?? (preset.params as { toolType?: string }).toolType);
-    const presetParams = (preset.params as { parameters?: ToolParameters }).parameters;
+    const presetParams = (preset.params as { parameters?: Partial<ToolParameters> }).parameters;
     return {
       toolType,
-      parameters: presetParams ?? buildDefaultToolParameters(toolType),
+      parameters: {
+        ...buildDefaultToolParameters(toolType),
+        ...presetParams,
+      } as ToolParameters,
       batchMode: Boolean((preset.params as { batchMode?: boolean }).batchMode),
       selectedPresetId: preset.id,
       activePresetName: preset.name,
@@ -178,6 +181,7 @@ function ToolboxPageInner() {
   const { upload, uploading } = useUpload();
   const { toast } = useToast();
   const [draft, setDraft] = useState<ToolDraftState>(() => createInitialDraft(presetId));
+  const appliedPresetRef = useRef<string | undefined>(presetId);
   const [runState, setRunState] = useState<ToolRunState>(EMPTY_RUN_STATE);
   const [creatingTask, setCreatingTask] = useState(false);
   const { tasks, isPolling, startPolling, error: pollingError } = useWorkflowTaskPolling({
@@ -191,6 +195,8 @@ function ToolboxPageInner() {
   );
 
   useEffect(() => {
+    if (appliedPresetRef.current === presetId) return;
+    appliedPresetRef.current = presetId;
     setDraft((prev) => {
       const initialized = createInitialDraft(presetId);
       return {
@@ -446,7 +452,7 @@ function ToolboxPageInner() {
                   {runState.currentStep && <p className="text-xs text-muted-foreground">{runState.currentStep}</p>}
                   {(runState.status === "processing" || runState.status === "pending" || runState.status === "queued") && (
                     <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                      <div className="h-full rounded-full bg-[#0066FF] transition-all" style={{ width: `${Math.max(0, Math.min(100, runState.progress))}%` }} />
+                      <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.max(0, Math.min(100, runState.progress))}%` }} />
                     </div>
                   )}
                   {runState.usedModel && <p className="text-[11px] text-muted-foreground/70">模型：{runState.usedModel}</p>}
@@ -463,7 +469,8 @@ function ToolboxPageInner() {
 
             <div className="pt-2 space-y-3">
               <Button
-                className="w-full bg-[#0066FF] hover:bg-[#0052CC] text-white"
+                variant="brand"
+                className="w-full"
                 disabled={!draft.inputAsset || creatingTask || uploading}
                 onClick={handleCreateTask}
                 style={{ fontFamily: "Inter, sans-serif" }}
@@ -495,6 +502,29 @@ function ToolboxPageInner() {
 type UpdateToolParameters = React.Dispatch<Partial<ToolParameters>>;
 type UploadToolAsset = React.Dispatch<{ role: "input" | "reference" | "logo"; file?: File }>;
 
+function ModelAndResolutionFields({
+  aiModel,
+  outputResolution,
+  onChange,
+}: {
+  aiModel?: string;
+  outputResolution?: string;
+  onChange: (patch: { aiModel?: string; outputResolution?: string }) => void;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <div className="space-y-2">
+        <Label>模型</Label>
+        <Input value={aiModel ?? ""} onChange={(event) => onChange({ aiModel: event.target.value })} placeholder="volcengine / gemini" />
+      </div>
+      <div className="space-y-2">
+        <Label>输出尺寸</Label>
+        <Input value={outputResolution ?? ""} onChange={(event) => onChange({ outputResolution: event.target.value })} placeholder="1024x1024" />
+      </div>
+    </div>
+  );
+}
+
 function ToolParameterPanel({
   draft,
   updateParameters,
@@ -513,6 +543,20 @@ function ToolParameterPanel({
     return (
       <div className="space-y-4">
         <div className="space-y-2">
+          <Label>水印类型</Label>
+          <div className="grid grid-cols-2 gap-2">
+            {(["text", "logo"] as WatermarkParams["watermarkType"][]).map((type) => (
+              <button
+                key={type}
+                className={cn("rounded-lg border px-3 py-2 text-sm", params.watermarkType === type ? "border-primary bg-primary/5 text-primary" : "border-border")}
+                onClick={() => updateParameters({ watermarkType: type } as Partial<WatermarkParams>)}
+              >
+                {type === "text" ? "文字" : "Logo"}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-2">
           <Label>水印文字</Label>
           <Input value={params.watermarkText} onChange={(event) => updateParameters({ watermarkText: event.target.value } as Partial<WatermarkParams>)} />
         </div>
@@ -520,21 +564,33 @@ function ToolParameterPanel({
           <Label>透明度：{Math.round(params.watermarkOpacity * 100)}%</Label>
           <Slider value={[params.watermarkOpacity * 100]} min={5} max={100} step={5} onValueChange={([value]) => updateParameters({ watermarkOpacity: value / 100 } as Partial<WatermarkParams>)} />
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          {(["bottom-right", "bottom-left", "top-right", "top-left", "center"] as WatermarkParams["watermarkPosition"][]).map((position) => (
-            <button
-              key={position}
-              className={cn("rounded-lg border px-3 py-2 text-xs", params.watermarkPosition === position ? "border-primary bg-primary/5 text-primary" : "border-border")}
-              onClick={() => updateParameters({ watermarkPosition: position } as Partial<WatermarkParams>)}
-            >
-              {position}
-            </button>
-          ))}
+        <div className="space-y-2">
+          <Label>水印位置</Label>
+          <div className="grid grid-cols-2 gap-2">
+            {(["bottom-right", "bottom-left", "top-right", "top-left", "center"] as WatermarkParams["watermarkPosition"][]).map((position) => (
+              <button
+                key={position}
+                className={cn("rounded-lg border px-3 py-2 text-xs", params.watermarkPosition === position ? "border-primary bg-primary/5 text-primary" : "border-border")}
+                onClick={() => updateParameters({ watermarkPosition: position } as Partial<WatermarkParams>)}
+              >
+                {position}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label>输出尺寸</Label>
+          <Input value={params.outputResolution} onChange={(event) => updateParameters({ outputResolution: event.target.value } as Partial<WatermarkParams>)} placeholder="1024x1024" />
         </div>
         <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => onUploadAsset({ role: "logo", file: event.target.files?.[0] })} />
         <Button variant="outline" size="sm" className="w-full" onClick={() => logoInputRef.current?.click()}>
           上传 Logo 水印（可选）
         </Button>
+        {draft.watermarkLogoAsset && (
+          <p className="text-xs text-muted-foreground truncate">
+            Logo：{draft.watermarkLogoAsset.originalFilename}
+          </p>
+        )}
       </div>
     );
   }
@@ -557,6 +613,11 @@ function ToolParameterPanel({
             ))}
           </div>
         </div>
+        <ModelAndResolutionFields
+          aiModel={params.aiModel}
+          outputResolution={params.outputResolution}
+          onChange={(patch) => updateParameters(patch as Partial<UpscaleParams>)}
+        />
       </div>
     );
   }
@@ -577,6 +638,11 @@ function ToolParameterPanel({
           <Label>纵向扩展：{params.yScale.toFixed(1)}x</Label>
           <Slider value={[params.yScale]} min={1} max={3} step={0.1} onValueChange={([value]) => updateParameters({ yScale: value } as Partial<OutpaintParams>)} />
         </div>
+        <ModelAndResolutionFields
+          aiModel={params.aiModel}
+          outputResolution={params.outputResolution}
+          onChange={(patch) => updateParameters(patch as Partial<OutpaintParams>)}
+        />
       </div>
     );
   }
@@ -588,12 +654,19 @@ function ToolParameterPanel({
         <Label>背景提示词</Label>
         <Textarea value={params.prompt} onChange={(event) => updateParameters({ prompt: event.target.value } as Partial<BackgroundReplaceParams>)} rows={4} />
       </div>
+      <ModelAndResolutionFields
+        aiModel={params.aiModel}
+        outputResolution={params.outputResolution}
+        onChange={(patch) => updateParameters(patch as Partial<BackgroundReplaceParams>)}
+      />
       <input ref={referenceInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => onUploadAsset({ role: "reference", file: event.target.files?.[0] })} />
       <Button variant="outline" size="sm" className="w-full" onClick={() => referenceInputRef.current?.click()}>
         上传参考背景（可选）
       </Button>
       {draft.referenceAsset && (
-        <p className="text-xs text-muted-foreground truncate">参考图：{draft.referenceAsset.originalFilename}</p>
+        <p className="text-xs text-muted-foreground truncate">
+          参考图：{draft.referenceAsset.originalFilename}
+        </p>
       )}
     </div>
   );
