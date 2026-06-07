@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.0
-milestone_name: AI Product Visual Workbench Rebuild
+milestone_name: milestone
 status: In progress
-stopped_at: Completed Phase 4 Wave 1 toolbox shell and task-based execution
-last_updated: "2026-06-06T00:00:00.000Z"
+stopped_at: Completed 04a-01-PLAN.md
+last_updated: "2026-06-07T01:27:46.220Z"
 progress:
-  total_phases: 6
-  completed_phases: 3
-  total_plans: 10
+  total_phases: 7
+  completed_phases: 5
+  total_plans: 11
   completed_plans: 9
 ---
 
@@ -45,6 +45,9 @@ Plan: 04-01 Wave 1 completed; Wave 2 ready
 - [2026-06-05]: Phase 3 Wave 3 已接入轻量 `/api/tasks/status` 轮询，候选卡片状态来自真实任务摘要；真实 provider 端到端结果仍需手动 smoke 验证后才能进入业务验收。
 - [2026-06-06]: Phase 3 Wave 4 已完成候选结果保存到 `/results` 的最小闭环；`npm run build` 通过。真实 provider smoke 与 Electron/Windows 回归留作发布前/Phase 6 验证。
 - [2026-06-06]: Phase 4 Wave 1 已把 `/tools` 改为统一工具箱工作台骨架，支持 background/watermark/upscale/outpaint 通过 typed adapter 创建真实 `/api/tasks` 任务，并使用 `/api/tasks/status` 轮询状态；直接同步处理接口保留兼容。
+- [2026-06-06]: 已验证 GPT 图片能力可参考 `docs/brands/icon/cut/ip2-trimmed-preview.png` 生成 LUMO/IP 品牌插图候选稿；调用入口为 `/api/images-process/background-replace`，生成产物为 `public/uploads/1780740082828-bg-replace-cmq26n0if00037z7xlk1wviqd.jpg`。该能力进入 Phase 04a 首页、空状态、新手引导插图候选流程，但不能替代正式 Logo 或核心 UI 控件资产。
+- [Phase 04a]: Tailwind v3 @theme blocks in imported CSS files work when entry file has @tailwind directives before @imports
+- [Phase 04a]: Tailwind config must define colors in theme.extend.colors for JIT class generation even when CSS custom properties exist
 
 ### Active Canonical References
 
@@ -114,6 +117,6 @@ The following phase folders remain useful for regression and engineering context
 
 ## Session Continuity
 
-Last session: 2026-06-06T00:00:00.000Z
-Stopped at: Completed Phase 4 Wave 1 toolbox shell and task-based execution
-Resume file: `.planning/phases/04-unified-smart-toolbox/04-01-PLAN.md`
+Last session: 2026-06-07T01:27:46.218Z
+Stopped at: Completed 04a-01-PLAN.md
+Resume file: None

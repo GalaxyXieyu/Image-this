@@ -10,6 +10,7 @@
 - [x] **Phase 2: Template Library and Preset Model** - 实现模板库页面、预设数据模型和模板到工作流的入口 (completed 2026-05-27)
 - [x] **Phase 3: Scene Image Guided Workflow** - 实现场景图商品信息、候选生成、结果调整三步流程 (completed 2026-06-06)
 - [ ] **Phase 4: Unified Smart Toolbox** - 用统一编辑器 shell 重建 AI 换背景、加水印、高清化、扩图等工具
+- [x] **Phase 04a: Brand UI/UX Optimization** - 按最新品牌规范收敛 Logo/IP、颜色、组件状态和核心页面视觉层级 (completed 2026-06-07)
 - [ ] **Phase 5: Workflow API and Worker Contract Refactor** - 将任务提交、worker dispatch、结果 payload 规范化为 typed workflow contract
 - [ ] **Phase 6: Old Frontend Removal and Regression Hardening** - 删除旧 workspace、补回归验证、检查 Electron/Windows 基线
 
