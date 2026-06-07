@@ -6,6 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ListTodo, Clock, Loader, CheckCircle, XCircle, Wand2, Image as ImageIcon, Expand, Zap, ImagePlus, Video } from 'lucide-react';
+import { getWorkflowTypeLabel, normalizeTaskStatus } from '@/lib/workbench/task-compat';
 
 interface QueueStats {
   pending: number;
@@ -18,6 +19,7 @@ interface QueueStats {
 interface Task {
   id: string;
   type: string;
+  workflowType?: string;
   status: string;
   progress: number;
   currentStep: string;
@@ -29,22 +31,32 @@ interface Task {
 
 // 任务类型映射
 const taskTypeMap: Record<string, string> = {
-  'ONE_CLICK_WORKFLOW': '一键增强',
-  'BACKGROUND_REMOVAL': '背景替换',
-  'IMAGE_EXPANSION': '图像扩展',
-  'IMAGE_UPSCALING': '图像高清化',
-  'GPT_GENERATION': '图像生成',
-  'VIDEO_GENERATION': '视频生成'
+  ONE_CLICK_WORKFLOW: '一键处理',
+  BACKGROUND_REMOVAL: '背景替换',
+  IMAGE_EXPANSION: '智能扩图',
+  IMAGE_UPSCALING: '高清放大',
+  GPT_GENERATION: '图像生成',
+  VIDEO_GENERATION: '视频生成',
+  SCENE_GENERATION: '场景图生成',
 };
+
+function getTaskDisplayName(task: Task): string {
+  return task.workflowType ? getWorkflowTypeLabel(task.workflowType) : taskTypeMap[task.type] || getWorkflowTypeLabel(task.type);
+}
+
+function isTaskStatus(task: Task, status: string): boolean {
+  return normalizeTaskStatus(task.status) === normalizeTaskStatus(status);
+}
 
 // 任务类型图标
 const taskTypeIcons: Record<string, React.ElementType> = {
-  'ONE_CLICK_WORKFLOW': Wand2,
-  'BACKGROUND_REMOVAL': ImageIcon,
-  'IMAGE_EXPANSION': Expand,
-  'IMAGE_UPSCALING': Zap,
-  'GPT_GENERATION': ImageIcon,
-  'VIDEO_GENERATION': Video
+  SCENE_GENERATION: Wand2,
+  ONE_CLICK_WORKFLOW: Wand2,
+  BACKGROUND_REMOVAL: ImageIcon,
+  IMAGE_EXPANSION: Expand,
+  IMAGE_UPSCALING: Zap,
+  GPT_GENERATION: ImageIcon,
+  VIDEO_GENERATION: Video,
 };
 
 export default function FloatingTaskButton() {
@@ -157,10 +169,11 @@ export default function FloatingTaskButton() {
               ) : (
                 tasks.map((task) => {
                   const TaskIcon = taskTypeIcons[task.type] || ListTodo;
+                  const displayName = getTaskDisplayName(task);
                   const originalUrl = task.originalImageUrl || null;
                   const resultUrl = task.resultImageUrl || null;
                   const videoUrl = task.videoUrl || null;
-                  const isVideoTask = task.type === 'VIDEO_GENERATION';
+                  const isVideoTask = task.workflowType === 'video_generation' || task.type === 'VIDEO_GENERATION';
                   const displayUrl = isVideoTask ? (videoUrl || originalUrl) : (resultUrl || originalUrl);
 
                   return (
@@ -180,22 +193,22 @@ export default function FloatingTaskButton() {
                           </div>
                         )}
                         {/* 状态指示器 */}
-                        {task.status === 'PROCESSING' && (
+                        {isTaskStatus(task, 'processing') && (
                           <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
                             <Loader className="w-4 h-4 text-blue-600 animate-spin" />
                           </div>
                         )}
-                        {task.status === 'COMPLETED' && (
+                        {isTaskStatus(task, 'completed') && (
                           <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-tl-md flex items-center justify-center">
                             <CheckCircle className="w-3 h-3 text-white" />
                           </div>
                         )}
-                        {task.status === 'FAILED' && (
+                        {isTaskStatus(task, 'failed') && (
                           <div className="absolute bottom-0 right-0 w-4 h-4 bg-red-500 rounded-tl-md flex items-center justify-center">
                             <XCircle className="w-3 h-3 text-white" />
                           </div>
                         )}
-                        {task.status === 'PENDING' && (
+                        {isTaskStatus(task, 'pending') && (
                           <div className="absolute bottom-0 right-0 w-4 h-4 bg-yellow-500 rounded-tl-md flex items-center justify-center">
                             <Clock className="w-3 h-3 text-white" />
                           </div>
@@ -207,16 +220,16 @@ export default function FloatingTaskButton() {
                         <div className="flex items-center gap-1.5">
                           <TaskIcon className="w-3.5 h-3.5 text-[#0066FF] flex-shrink-0" />
                           <span className="text-sm font-medium text-gray-900 truncate">
-                            {taskTypeMap[task.type] || task.type}
+                            {displayName}
                           </span>
                         </div>
                         <p className="text-xs text-gray-500 truncate mt-0.5">
-                          {task.status === 'PROCESSING' ? task.currentStep : 
-                           task.status === 'COMPLETED' ? '已完成' :
-                           task.status === 'FAILED' ? '处理失败' :
-                           task.status === 'PENDING' ? '等待处理' : task.currentStep}
+                          {isTaskStatus(task, 'processing') ? task.currentStep : 
+                           isTaskStatus(task, 'completed') ? '已完成' :
+                           isTaskStatus(task, 'failed') ? '处理失败' :
+                           isTaskStatus(task, 'pending') ? '等待处理' : task.currentStep}
                         </p>
-                        {task.status === 'PROCESSING' && task.progress > 0 && (
+                        {isTaskStatus(task, 'processing') && task.progress > 0 && (
                           <div className="mt-1 flex items-center gap-1.5">
                             <div className="flex-1 bg-gray-200 rounded-full h-1">
                               <div 

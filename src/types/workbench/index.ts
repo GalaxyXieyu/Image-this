@@ -330,6 +330,7 @@ export interface WorkflowTaskSummary {
   originalImageUrl?: string | null;
   resultImageUrl?: string | null;
   videoUrl?: string | null;
+  usedModel?: string | null;
   batchGroupId?: string;
   projectId?: string;
   processedImageId?: string;

@@ -41,6 +41,9 @@ export interface OneClickWorkflowParams {
   userId: string;
   volcengineConfig?: { accessKey: string; secretKey: string };
   imagehostingConfig?: { superbedToken: string };
+  originalImageUrlForRecord?: string;
+  referenceImageUrlForRecord?: string;
+  watermarkLogoUrlForRecord?: string;
 }
 
 export interface OneClickWorkflowResult {
@@ -100,7 +103,10 @@ export async function executeOneClickWorkflow(
     videoSeed = -1,
     userId,
     volcengineConfig,
-    imagehostingConfig
+    imagehostingConfig,
+    originalImageUrlForRecord,
+    referenceImageUrlForRecord,
+    watermarkLogoUrlForRecord
   } = params;
 
   // 参数验证
@@ -118,7 +124,7 @@ export async function executeOneClickWorkflow(
   const processedImage = await prisma.processedImage.create({
     data: {
       filename: `one-click-${Date.now()}.jpg`,
-      originalUrl: imageUrl,
+      originalUrl: originalImageUrlForRecord || imageUrl,
       processType: 'ONE_CLICK_WORKFLOW',
       status: 'PROCESSING',
       userId: userId,
@@ -138,7 +144,8 @@ export async function executeOneClickWorkflow(
         watermarkType,
         outputResolution,
         aiModel,
-        referenceImageUrl,
+        referenceImageUrl: referenceImageUrlForRecord || referenceImageUrl,
+        watermarkLogoUrl: watermarkLogoUrlForRecord || watermarkLogoUrl,
         isWorkflowFinal: true
       })
     }

@@ -7,33 +7,39 @@ import { ImageProcessorFactory } from './factory';
 import { ImageProvider, ProcessResult } from './types';
 import { getUserConfig } from '@/lib/user-config';
 
+type ProviderOverrides = {
+  gpt?: { modelName?: string };
+  gemini?: { modelName?: string };
+  jimeng?: { modelName?: string };
+};
+
 /**
  * 初始化指定的 Provider
  */
-async function initializeProvider(userId: string, provider: ImageProvider) {
+async function initializeProvider(userId: string, provider: ImageProvider, overrides?: ProviderOverrides) {
   const userConfig = await getUserConfig(userId);
-  
+
   console.log(`[initializeProvider] 初始化 ${provider}，图床配置:`, userConfig.imagehosting ? '已配置' : '未配置');
-  
+
   // 检查配置是否存在
   if (provider === ImageProvider.VOLCENGINE || provider === ImageProvider.JIMENG) {
     if (!userConfig.volcengine?.accessKey || !userConfig.volcengine?.secretKey) {
       throw new Error('火山引擎配置未设置，请在设置页面配置火山引擎 AccessKey 和 SecretKey');
     }
   }
-  
+
   if (provider === ImageProvider.GPT || provider === ImageProvider.QWEN) {
     if (!userConfig.gpt?.apiKey) {
       throw new Error('GPT 配置未设置，请在设置页面配置 GPT API Key');
     }
   }
-  
+
   if (provider === ImageProvider.GEMINI) {
     if (!userConfig.gemini?.apiKey) {
       throw new Error('Gemini 配置未设置，请在设置页面配置 Gemini API Key');
     }
   }
-  
+
   if (provider === ImageProvider.JIMENG) {
     const hasArk = !!userConfig.jimeng?.arkApiKey;
     const hasLegacy = !!(userConfig.jimeng?.accessKey && userConfig.jimeng?.secretKey);
@@ -55,13 +61,13 @@ async function initializeProvider(userId: string, provider: ImageProvider) {
       enabled: provider === ImageProvider.GPT && !!userConfig.gpt,
       apiUrl: userConfig.gpt?.apiUrl || 'https://yunwu.ai',
       apiKey: userConfig.gpt?.apiKey || '',
-      modelName: userConfig.gpt?.modelName || undefined
+      modelName: overrides?.gpt?.modelName ?? userConfig.gpt?.modelName ?? undefined
     },
     gemini: {
       enabled: provider === ImageProvider.GEMINI && !!userConfig.gemini,
       apiKey: userConfig.gemini?.apiKey || '',
       baseUrl: userConfig.gemini?.baseUrl || 'https://toapis.com',
-      modelName: userConfig.gemini?.modelName || 'gemini-3.1-flash-image-preview'
+      modelName: overrides?.gemini?.modelName ?? userConfig.gemini?.modelName ?? 'gemini-3.1-flash-image-preview'
     },
     qwen: {
       enabled: provider === ImageProvider.QWEN && !!userConfig.gpt, // Qwen 使用 GPT 配置
@@ -71,13 +77,13 @@ async function initializeProvider(userId: string, provider: ImageProvider) {
       enabled: provider === ImageProvider.JIMENG && !!userConfig.jimeng,
       arkApiKey: userConfig.jimeng?.arkApiKey || '',
       baseUrl: userConfig.jimeng?.baseUrl || undefined,
-      modelName: userConfig.jimeng?.modelName || undefined,
+      modelName: overrides?.jimeng?.modelName ?? userConfig.jimeng?.modelName ?? undefined,
       accessKey: userConfig.jimeng?.accessKey || '',
       secretKey: userConfig.jimeng?.secretKey || '',
       imagehostingConfig: userConfig.imagehosting
     }
   };
-  
+
   ImageProcessorFactory.initialize(providerConfig);
   return ImageProcessorFactory.getProcessor(provider);
 }
@@ -91,16 +97,17 @@ export async function processWithGemini(
   originalImageUrl: string,
   referenceImageUrl: string,
   prompt: string,
-  userId: string
+  userId: string,
+  modelName?: string
 ): Promise<string | null> {
-  const processor = await initializeProvider(userId, ImageProvider.GEMINI);
-  
+  const processor = await initializeProvider(userId, ImageProvider.GEMINI, modelName ? { gemini: { modelName } } : undefined);
+
   const result = await processor.backgroundReplace!(userId, {
     originalImageUrl,
     referenceImageUrl,
     prompt
   });
-  
+
   return result.imageData;
 }
 
@@ -113,10 +120,11 @@ export async function processWithGPT(
   originalImageUrl: string,
   referenceImageUrl: string,
   prompt: string,
-  userId: string
+  userId: string,
+  modelName?: string
 ): Promise<ProcessResult> {
-  const processor = await initializeProvider(userId, ImageProvider.GPT);
-  
+  const processor = await initializeProvider(userId, ImageProvider.GPT, modelName ? { gpt: { modelName } } : undefined);
+
   return await processor.backgroundReplace!(userId, {
     originalImageUrl,
     referenceImageUrl,
@@ -133,11 +141,12 @@ export async function processWithJimeng(
   originalImageUrl: string,
   referenceImageUrl: string,
   prompt: string,
-  userId: string
+  userId: string,
+  modelName?: string
 ): Promise<ProcessResult> {
   const userConfig = await getUserConfig(userId);
-  const processor = await initializeProvider(userId, ImageProvider.JIMENG);
-  
+  const processor = await initializeProvider(userId, ImageProvider.JIMENG, modelName ? { jimeng: { modelName } } : undefined);
+
   return await processor.backgroundReplace!(userId, {
     originalImageUrl,
     referenceImageUrl,

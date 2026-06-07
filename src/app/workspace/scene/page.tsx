@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,6 +18,14 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { apiPost } from "@/lib/api-client";
+import { useUpload } from "@/lib/use-upload";
+import { useWorkflowTaskPolling } from "@/hooks/workbench/useWorkflowTaskPolling";
+import { mapProviderErrorMessage } from "@/lib/provider-error-utils";
+import { useToast } from "@/components/ui/use-toast";
+import { getPresetById } from "@/lib/workbench/presets";
+import { buildSceneLegacyTaskRequests } from "@/lib/workbench/scene-task-adapter";
+import { getSceneGenerationModels } from "@/lib/ai-models";
+import type { InputAssetRef, SceneWorkflowDraft, TemplatePreset, WorkflowTaskStatus } from "@/types/workbench";
 import {
   ArrowLeft,
   ArrowRight,
@@ -28,6 +37,44 @@ import {
 
 type Step = 1 | 2 | 3;
 
+type CandidateStatus = WorkflowTaskStatus | "queued";
+
+interface SceneCandidateResult {
+  id: string;
+  taskId?: string;
+  savedImageId?: string;
+  name: string;
+  status: CandidateStatus;
+  progress: number;
+  currentStep?: string;
+  resultImageUrl?: string | null;
+  errorMessage?: string;
+  usedModel?: string | null;
+}
+
+function getCandidateStatusLabel(status: CandidateStatus) {
+  const labels: Record<CandidateStatus, string> = {
+    queued: "已入队",
+    pending: "等待中",
+    processing: "处理中",
+    completed: "已完成",
+    failed: "失败",
+    cancelled: "已取消",
+  };
+  return labels[status];
+}
+
+function getCandidateStatusClassName(status: CandidateStatus) {
+  if (status === "completed") return "bg-green-50 text-green-600 border-green-200";
+  if (status === "failed" || status === "cancelled") return "bg-red-50 text-red-600 border-red-200";
+  if (status === "processing") return "bg-blue-50 text-blue-600 border-blue-200";
+  return "bg-muted text-muted-foreground";
+}
+
+function isTerminalCandidateStatus(status: CandidateStatus) {
+  return status === "completed" || status === "failed" || status === "cancelled";
+}
+
 interface WorkflowData {
   productName: string;
   productType: string;
@@ -36,6 +83,77 @@ interface WorkflowData {
   sellingPoints: string;
   platforms: string[];
   selectedTemplates: string[];
+  selectedPresetId?: string;
+  activePresetName?: string;
+  activePresetDescription?: string;
+  stylePreference?: string;
+  inputAsset?: InputAssetRef;
+  referenceAsset?: InputAssetRef;
+  aiModel: string;
+  outputResolution: string;
+  candidateCount: number;
+  batchMode: boolean;
+}
+
+const EMPTY_WORKFLOW_DATA: WorkflowData = {
+  productName: "",
+  productType: "",
+  targetAudience: "",
+  usageScene: "",
+  sellingPoints: "",
+  platforms: [],
+  selectedTemplates: [],
+  aiModel: "gemini-3.1-flash-image-preview",
+  outputResolution: "1024x1024",
+  candidateCount: 4,
+  batchMode: false,
+};
+
+function isSceneDraftParams(
+  params: TemplatePreset["params"]
+): params is Partial<SceneWorkflowDraft> {
+  return "productInfo" in params || "selectedPresetId" in params;
+}
+
+function mapPlatformToSelection(platform?: string): string[] {
+  if (!platform) return [];
+  if (platform === "tmall") return ["taobao"];
+  if (["taobao", "jd", "pdd", "douyin"].includes(platform)) return [platform];
+  return [];
+}
+
+function mapSelectionToTargetPlatform(platform?: string): SceneWorkflowDraft["productInfo"]["targetPlatform"] {
+  if (!platform) return undefined;
+  if (["taobao", "jd", "pdd", "douyin"].includes(platform)) {
+    return platform as SceneWorkflowDraft["productInfo"]["targetPlatform"];
+  }
+  return "other";
+}
+
+function createWorkflowDataFromPreset(preset?: TemplatePreset): WorkflowData {
+  if (!preset || !isSceneDraftParams(preset.params)) {
+    return EMPTY_WORKFLOW_DATA;
+  }
+
+  const productInfo = preset.params.productInfo;
+  const parameters = preset.params.parameters;
+
+  return {
+    ...EMPTY_WORKFLOW_DATA,
+    productName: productInfo?.name ?? "",
+    productType: productInfo?.category ?? "",
+    usageScene: productInfo?.stylePreference ?? "",
+    platforms: mapPlatformToSelection(productInfo?.targetPlatform),
+    selectedTemplates: productInfo?.stylePreference ? [preset.id] : [],
+    selectedPresetId: preset.id,
+    activePresetName: preset.name,
+    activePresetDescription: preset.description,
+    stylePreference: productInfo?.stylePreference,
+    aiModel: parameters?.aiModel ?? EMPTY_WORKFLOW_DATA.aiModel,
+    outputResolution: parameters?.outputResolution ?? EMPTY_WORKFLOW_DATA.outputResolution,
+    candidateCount: parameters?.candidateCount ?? EMPTY_WORKFLOW_DATA.candidateCount,
+    batchMode: preset.params.batchMode ?? EMPTY_WORKFLOW_DATA.batchMode,
+  };
 }
 
 function StepBar({ currentStep }: { currentStep: Step }) {
@@ -152,10 +270,68 @@ function ProductInfoStep({
   workflowData: WorkflowData;
   setWorkflowData: React.Dispatch<React.SetStateAction<WorkflowData>>;
 }) {
+  const inputFileRef = useRef<HTMLInputElement>(null);
+  const referenceFileRef = useRef<HTMLInputElement>(null);
+  const { upload, uploading } = useUpload();
+  const { toast } = useToast();
+
+  const handleUploadAsset = async (role: "input" | "reference", file?: File) => {
+    if (!file) return;
+
+    try {
+      const response = await upload(role === "input" ? { input: file } : { reference: file });
+      const asset = role === "input" ? response.inputAsset : response.referenceAsset;
+      if (!asset) return;
+
+      setWorkflowData((prev) => ({
+        ...prev,
+        [role === "input" ? "inputAsset" : "referenceAsset"]: asset,
+      }));
+      toast({
+        title: role === "input" ? "商品图已上传" : "参考图已上传",
+        description: asset.originalFilename,
+      });
+    } catch (error) {
+      toast({
+        title: "上传失败",
+        description: error instanceof Error ? error.message : "请稍后重试",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-auto p-8">
         <div className="max-w-4xl mx-auto space-y-8">
+          {workflowData.activePresetName && (
+            <section className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <Badge className="bg-[#0066FF] text-white">已载入模板</Badge>
+                  <h2
+                    className="mt-3 text-base font-semibold text-foreground"
+                    style={{ fontFamily: "Inter, sans-serif" }}
+                  >
+                    {workflowData.activePresetName}
+                  </h2>
+                  {workflowData.activePresetDescription && (
+                    <p
+                      className="mt-1 text-sm text-muted-foreground"
+                      style={{ fontFamily: "Geist, sans-serif" }}
+                    >
+                      {workflowData.activePresetDescription}
+                    </p>
+                  )}
+                </div>
+                <div className="text-right text-xs text-muted-foreground">
+                  <p>模型：{workflowData.aiModel}</p>
+                  <p>尺寸：{workflowData.outputResolution}</p>
+                  <p>候选：{workflowData.candidateCount} 张</p>
+                </div>
+              </div>
+            </section>
+          )}
           <section className="space-y-4">
             <h2
               className="text-lg font-semibold text-foreground"
@@ -287,19 +463,60 @@ function ProductInfoStep({
               className="text-lg font-semibold text-foreground"
               style={{ fontFamily: "Inter, sans-serif" }}
             >
-              参考图上传
+              素材上传
             </h2>
-            <div className="border-2 border-dashed border-border rounded-xl p-12 flex flex-col items-center justify-center gap-4 hover:border-muted-foreground transition-colors cursor-pointer">
-              <ImageIcon className="w-10 h-10 text-muted-foreground" />
-              <div className="text-center">
-                <p className="text-sm text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
-                  点击或拖拽上传图片
-                </p>
-                <p className="text-xs text-muted-foreground mt-1" style={{ fontFamily: "Geist, sans-serif" }}>
-                  支持 PNG、JPG，单张不超过 10MB
-                </p>
-              </div>
+            <div className="grid grid-cols-2 gap-4">
+              <input
+                ref={inputFileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(event) => handleUploadAsset("input", event.target.files?.[0])}
+              />
+              <button
+                type="button"
+                className="border-2 border-dashed border-border rounded-xl p-8 flex flex-col items-center justify-center gap-3 hover:border-muted-foreground transition-colors"
+                onClick={() => inputFileRef.current?.click()}
+                disabled={uploading}
+              >
+                <ImageIcon className="w-10 h-10 text-muted-foreground" />
+                <div className="text-center">
+                  <p className="text-sm text-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
+                    {workflowData.inputAsset?.originalFilename ?? "上传商品图"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1" style={{ fontFamily: "Geist, sans-serif" }}>
+                    商品主体图，生成时会保持主体稳定
+                  </p>
+                </div>
+              </button>
+
+              <input
+                ref={referenceFileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(event) => handleUploadAsset("reference", event.target.files?.[0])}
+              />
+              <button
+                type="button"
+                className="border-2 border-dashed border-border rounded-xl p-8 flex flex-col items-center justify-center gap-3 hover:border-muted-foreground transition-colors"
+                onClick={() => referenceFileRef.current?.click()}
+                disabled={uploading}
+              >
+                <ImageIcon className="w-10 h-10 text-muted-foreground" />
+                <div className="text-center">
+                  <p className="text-sm text-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
+                    {workflowData.referenceAsset?.originalFilename ?? "上传场景参考图"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1" style={{ fontFamily: "Geist, sans-serif" }}>
+                    用于参考背景、构图、光线和氛围
+                  </p>
+                </div>
+              </button>
             </div>
+            <p className="text-xs text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
+              支持 PNG、JPG；素材会先登记为 input asset，任务只携带轻量引用。
+            </p>
           </section>
         </div>
       </div>
@@ -341,6 +558,14 @@ function StyleTemplateStep({
   setWorkflowData: React.Dispatch<React.SetStateAction<WorkflowData>>;
 }) {
   const templates = [
+    workflowData.selectedPresetId && workflowData.activePresetName
+      ? {
+          id: workflowData.selectedPresetId,
+          name: workflowData.activePresetName,
+          desc: workflowData.activePresetDescription ?? "来自模板库的场景预设",
+          icon: ShoppingBag,
+        }
+      : null,
     { id: "elegant", name: "简约自然", desc: "适合美妆护肤", icon: ShoppingBag },
     { id: "lifestyle", name: "生活场景", desc: "适合家居日用", icon: ShoppingBag },
     { id: "minimal", name: "极简商务", desc: "适合3C数码", icon: ShoppingBag },
@@ -349,7 +574,7 @@ function StyleTemplateStep({
     { id: "luxury", name: "奢华高端", desc: "适合珠宝配饰", icon: ShoppingBag },
     { id: "tech", name: "科技感", desc: "适合数码产品", icon: ShoppingBag },
     { id: "festival", name: "节日氛围", desc: "适合节日促销", icon: ShoppingBag },
-  ];
+  ].filter((template): template is { id: string; name: string; desc: string; icon: typeof ShoppingBag } => Boolean(template));
 
   const selected = workflowData.selectedTemplates;
 
@@ -437,45 +662,175 @@ function StyleTemplateStep({
 function GenerateAdjustStep({
   onBack,
   workflowData,
+  setWorkflowData,
 }: {
   onBack: () => void;
   workflowData: WorkflowData;
+  setWorkflowData: React.Dispatch<React.SetStateAction<WorkflowData>>;
 }) {
   const [generating, setGenerating] = useState(false);
-  const [results, setResults] = useState<{ id: string; name: string; status: string }[]>([]);
+  const [results, setResults] = useState<SceneCandidateResult[]>([]);
+  const { toast } = useToast();
+  const { tasks: polledTasks, isPolling, startPolling, error: pollingError } = useWorkflowTaskPolling({
+    interval: 3000,
+    autoStart: false,
+  });
+
+  useEffect(() => {
+    if (polledTasks.length === 0) return;
+    setResults((prev) =>
+      prev.map((result) => {
+        if (!result.taskId) return result;
+        const task = polledTasks.find((item) => item.id === result.taskId);
+        if (!task) return result;
+        return {
+          ...result,
+          status: task.status,
+          progress: task.progress,
+          currentStep: task.currentStep,
+          resultImageUrl: task.resultImageUrl,
+          errorMessage: task.errorMessage ? mapProviderErrorMessage(task.errorMessage) : undefined,
+          usedModel: task.usedModel,
+        };
+      })
+    );
+  }, [polledTasks]);
+
+  const completedCount = results.filter((result) => result.status === "completed").length;
+  const failedCount = results.filter((result) => result.status === "failed" || result.status === "cancelled").length;
+  const activeCount = results.filter((result) => !isTerminalCandidateStatus(result.status)).length;
+  const [savingCandidateId, setSavingCandidateId] = useState<string | null>(null);
+
+  const handleSaveResult = async (result: SceneCandidateResult) => {
+    if (result.status !== "completed" || !result.resultImageUrl) {
+      toast({
+        title: "暂时不能保存",
+        description: "只有已完成且有结果图的候选可以保存。",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (result.savedImageId) {
+      toast({
+        title: "结果已保存",
+        description: "这个候选已经在结果管理中。",
+      });
+      return;
+    }
+
+    setSavingCandidateId(result.id);
+    try {
+      const originalUrl = workflowData.inputAsset?.clientUrl ?? result.resultImageUrl;
+      const response = await apiPost<{
+        success: boolean;
+        image: { id: string };
+      }>("/api/images", {
+        filename: `${workflowData.productName || "场景图"}-${result.name}.png`,
+        originalUrl,
+        processedUrl: result.resultImageUrl,
+        thumbnailUrl: result.resultImageUrl,
+        processType: "BACKGROUND_REMOVAL",
+        status: "COMPLETED",
+        metadata: JSON.stringify({
+          workflowType: "scene_generation",
+          taskId: result.taskId,
+          candidateId: result.id,
+          selectedPresetId: workflowData.selectedPresetId,
+          presetName: workflowData.activePresetName,
+          productName: workflowData.productName,
+          productType: workflowData.productType,
+          targetAudience: workflowData.targetAudience,
+          usageScene: workflowData.usageScene,
+          sellingPoints: workflowData.sellingPoints,
+          platforms: workflowData.platforms,
+          selectedTemplates: workflowData.selectedTemplates,
+          aiModel: workflowData.aiModel,
+          usedModel: result.usedModel,
+          outputResolution: workflowData.outputResolution,
+          savedAt: new Date().toISOString(),
+        }),
+      });
+
+      setResults((prev) =>
+        prev.map((item) =>
+          item.id === result.id ? { ...item, savedImageId: response.image.id } : item
+        )
+      );
+      toast({
+        title: "已保存到结果管理",
+        description: "可以在结果管理中查看和下载这张场景图。",
+      });
+    } catch (error) {
+      toast({
+        title: "保存失败",
+        description: error instanceof Error ? error.message : "请稍后重试",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingCandidateId(null);
+    }
+  };
 
   const handleGenerate = async () => {
     setGenerating(true);
     try {
-      const res = await apiPost<{ success: boolean; task: { id: string } }>("/api/tasks", {
-        type: "SCENE_GENERATION",
-        inputData: JSON.stringify({
-          ...workflowData,
-          count: 4,
-        }),
-        totalSteps: 4,
+      const taskRequests = buildSceneLegacyTaskRequests({
+        productInfo: {
+          name: workflowData.productName,
+          category: workflowData.productType,
+          description: workflowData.targetAudience,
+          targetPlatform: mapSelectionToTargetPlatform(workflowData.platforms[0]),
+          stylePreference: workflowData.stylePreference || workflowData.usageScene,
+        },
+        inputAssets: [workflowData.inputAsset, workflowData.referenceAsset].filter(
+          (asset): asset is InputAssetRef => Boolean(asset)
+        ),
+        inputAsset: workflowData.inputAsset,
+        referenceAsset: workflowData.referenceAsset,
+        selectedPresetId: workflowData.selectedPresetId,
+        styleTemplateIds: workflowData.selectedTemplates,
+        stylePreference: workflowData.stylePreference || workflowData.usageScene,
+        sellingPoints: workflowData.sellingPoints,
+        batchMode: workflowData.batchMode,
+        parameters: {
+          aiModel: workflowData.aiModel,
+          outputResolution: workflowData.outputResolution,
+          candidateCount: workflowData.candidateCount,
+        },
       });
-      setResults([
-        { id: "1", name: "简约自然风格", status: "pending" },
-        { id: "2", name: "生活场景风格", status: "pending" },
-        { id: "3", name: "极简商务风格", status: "pending" },
-        { id: "4", name: "温馨居家风格", status: "pending" },
-      ]);
-      // Poll for completion
-      const poll = setInterval(async () => {
-        const statusRes = await fetch(`/api/tasks/${res.task.id}`, { credentials: "same-origin" });
-        if (statusRes.ok) {
-          const data = await statusRes.json();
-          if (data.task?.status === "COMPLETED" || data.task?.status === "FAILED") {
-            clearInterval(poll);
-            setResults((prev) => prev.map((r) => ({ ...r, status: "done" })));
-            setGenerating(false);
-          }
-        }
-      }, 3000);
-      // Auto-clear after 30s to avoid hanging
-      setTimeout(() => { clearInterval(poll); setGenerating(false); }, 30000);
-    } catch {
+
+      const response = await apiPost<{
+        success: boolean;
+        tasks?: Array<{ id: string }>;
+        task?: { id: string };
+      }>("/api/tasks", taskRequests.length === 1 ? taskRequests[0] : taskRequests);
+
+      const tasks = response.tasks ?? (response.task ? [response.task] : []);
+      const createdTaskIds = tasks.map((task) => task.id);
+      setResults(
+        tasks.map((task, index) => ({
+          id: String(index + 1),
+          taskId: task.id,
+          name: `${workflowData.activePresetName ?? "场景图"}候选 ${index + 1}`,
+          status: "queued",
+          progress: 0,
+        }))
+      );
+      if (createdTaskIds.length > 0) {
+        startPolling(createdTaskIds);
+      }
+      toast({
+        title: "生成任务已创建",
+        description: `已创建 ${tasks.length} 个场景图任务，可在任务中心查看进度。`,
+      });
+    } catch (error) {
+      toast({
+        title: "创建任务失败",
+        description: error instanceof Error ? error.message : "请检查素材和模型配置后重试",
+        variant: "destructive",
+      });
+    } finally {
       setGenerating(false);
     }
   };
@@ -491,10 +846,84 @@ function GenerateAdjustStep({
                 准备生成
               </h2>
               <p className="text-sm text-muted-foreground mt-2 mb-6" style={{ fontFamily: "Geist, sans-serif" }}>
-                点击开始生成，AI 将为你创建多套场景图
+                点击开始生成，AI 将创建真实任务并进入任务中心队列
               </p>
+
+              <div className="w-full max-w-xl space-y-4 mb-6">
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">AI 模型</Label>
+                    <Select
+                      value={workflowData.aiModel}
+                      onValueChange={(value) =>
+                        setWorkflowData((prev) => ({ ...prev, aiModel: value }))
+                      }
+                    >
+                      <SelectTrigger className="text-sm">
+                        <SelectValue placeholder="选择模型" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {getSceneGenerationModels().map((m) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.label}
+                            {m.priority === 'primary' && (
+                              <span className="ml-1.5 text-[10px] text-green-600">推荐</span>
+                            )}
+                            {m.priority === 'fallback' && (
+                              <span className="ml-1.5 text-[10px] text-amber-600">兜底</span>
+                            )}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">输出尺寸</Label>
+                    <Select
+                      value={workflowData.outputResolution}
+                      onValueChange={(value) =>
+                        setWorkflowData((prev) => ({ ...prev, outputResolution: value }))
+                      }
+                    >
+                      <SelectTrigger className="text-sm">
+                        <SelectValue placeholder="选择尺寸" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="800x800">800 × 800</SelectItem>
+                        <SelectItem value="1024x1024">1024 × 1024</SelectItem>
+                        <SelectItem value="1200x600">1200 × 600</SelectItem>
+                        <SelectItem value="1080x1440">1080 × 1440</SelectItem>
+                        <SelectItem value="1080x1920">1080 × 1920</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">候选数量</Label>
+                    <Select
+                      value={String(workflowData.candidateCount)}
+                      onValueChange={(value) =>
+                        setWorkflowData((prev) => ({
+                          ...prev,
+                          candidateCount: Number(value),
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="text-sm">
+                        <SelectValue placeholder="选择数量" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1, 2, 3, 4, 5, 6].map((n) => (
+                          <SelectItem key={n} value={String(n)}>{n} 张</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
               <Button
                 onClick={handleGenerate}
+                disabled={generating || !workflowData.inputAsset || !workflowData.referenceAsset}
                 className="bg-[#0066FF] hover:bg-[#0052CC] text-white"
                 style={{ fontFamily: "Inter, sans-serif" }}
               >
@@ -510,8 +939,17 @@ function GenerateAdjustStep({
                     生成结果
                   </h2>
                   <p className="text-sm text-muted-foreground mt-1" style={{ fontFamily: "Geist, sans-serif" }}>
-                    {generating ? "正在生成中，请稍候..." : "生成完成，选择喜欢的图片保存或调整"}
+                    {generating
+                      ? "正在创建任务，请稍候..."
+                      : isPolling || activeCount > 0
+                        ? `正在跟踪 ${activeCount} 个候选任务，已完成 ${completedCount} 个，失败 ${failedCount} 个`
+                        : `候选任务已结束，已完成 ${completedCount} 个，失败 ${failedCount} 个`}
                   </p>
+                  {pollingError && (
+                    <p className="text-xs text-destructive mt-1" style={{ fontFamily: "Geist, sans-serif" }}>
+                      状态刷新失败：{pollingError}
+                    </p>
+                  )}
                 </div>
                 {!generating && (
                   <Button variant="outline" onClick={handleGenerate} style={{ fontFamily: "Inter, sans-serif" }}>
@@ -524,24 +962,82 @@ function GenerateAdjustStep({
               <div className="grid grid-cols-4 gap-5">
                 {results.map((result) => (
                   <div key={result.id} className="flex flex-col rounded-xl border border-border overflow-hidden">
-                    <div className="h-40 bg-muted flex items-center justify-center">
-                      {result.status === "pending" ? (
-                        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    <div className="h-40 bg-muted flex items-center justify-center overflow-hidden">
+                      {result.resultImageUrl ? (
+                        <img src={result.resultImageUrl} alt={result.name} className="h-full w-full object-cover" />
+                      ) : result.status === "processing" ? (
+                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                          <Wand2 className="w-8 h-8 animate-pulse" />
+                          <span className="text-xs">{Math.max(0, result.progress)}%</span>
+                        </div>
+                      ) : result.status === "failed" || result.status === "cancelled" ? (
+                        <div className="px-4 text-center text-xs text-destructive">
+                          {result.errorMessage ?? "任务处理失败"}
+                        </div>
                       ) : (
                         <ImageIcon className="w-8 h-8 text-muted-foreground" />
                       )}
                     </div>
                     <div className="p-4">
-                      <h3 className="text-sm font-medium text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
-                        {result.name}
-                      </h3>
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="text-sm font-medium text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
+                          {result.name}
+                        </h3>
+                        <Badge variant="secondary" className={getCandidateStatusClassName(result.status)}>
+                          {getCandidateStatusLabel(result.status)}
+                        </Badge>
+                      </div>
+                      {result.currentStep && (
+                        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
+                          {result.currentStep}
+                        </p>
+                      )}
+                      {result.taskId && (
+                        <p className="mt-1 truncate text-xs text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
+                          任务 ID：{result.taskId}
+                        </p>
+                      )}
+                      {(result.status === "completed" || result.status === "failed") && result.usedModel && (
+                        <p className="mt-1 truncate text-[11px] text-muted-foreground/70" style={{ fontFamily: "Geist, sans-serif" }}>
+                          模型：{result.usedModel}
+                        </p>
+                      )}
+                      {result.savedImageId && (
+                        <p className="mt-1 truncate text-[11px] text-green-600" style={{ fontFamily: "Geist, sans-serif" }}>
+                          已保存到结果管理
+                        </p>
+                      )}
+                      {result.status === "processing" && (
+                        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
+                          <div
+                            className="h-full rounded-full bg-[#0066FF] transition-all"
+                            style={{ width: `${Math.max(0, Math.min(100, result.progress))}%` }}
+                          />
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 mt-3">
-                        <Button size="sm" variant="outline" className="flex-1" style={{ fontFamily: "Geist, sans-serif" }}>
-                          预览
+                        <Button size="sm" variant="outline" className="flex-1" style={{ fontFamily: "Geist, sans-serif" }} asChild>
+                          <Link href="/tasks">查看任务</Link>
                         </Button>
-                        <Button size="sm" className="flex-1 bg-[#0066FF] hover:bg-[#0052CC] text-white" style={{ fontFamily: "Geist, sans-serif" }}>
-                          保存
-                        </Button>
+                        {result.savedImageId ? (
+                          <Button size="sm" className="flex-1 bg-[#0066FF] hover:bg-[#0052CC] text-white" style={{ fontFamily: "Geist, sans-serif" }} asChild>
+                            <Link href="/results">查看结果</Link>
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            className="flex-1 bg-[#0066FF] hover:bg-[#0052CC] text-white"
+                            style={{ fontFamily: "Geist, sans-serif" }}
+                            onClick={() => handleSaveResult(result)}
+                            disabled={
+                              result.status !== "completed"
+                              || !result.resultImageUrl
+                              || savingCandidateId === result.id
+                            }
+                          >
+                            {savingCandidateId === result.id ? "保存中..." : "保存结果"}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -565,17 +1061,17 @@ function GenerateAdjustStep({
   );
 }
 
-export default function SceneWorkspacePage() {
+function SceneWorkspacePageInner() {
+  const searchParams = useSearchParams();
+  const presetId = searchParams.get("preset") ?? undefined;
+  const activePreset = useMemo(
+    () => (presetId ? getPresetById(presetId) : undefined),
+    [presetId]
+  );
   const [step, setStep] = useState<Step>(1);
-  const [workflowData, setWorkflowData] = useState<WorkflowData>({
-    productName: "",
-    productType: "",
-    targetAudience: "",
-    usageScene: "",
-    sellingPoints: "",
-    platforms: [],
-    selectedTemplates: [],
-  });
+  const [workflowData, setWorkflowData] = useState<WorkflowData>(() =>
+    createWorkflowDataFromPreset(activePreset)
+  );
 
   return (
     <div className="h-screen flex flex-col bg-background">
@@ -600,8 +1096,17 @@ export default function SceneWorkspacePage() {
         <GenerateAdjustStep
           onBack={() => setStep(2)}
           workflowData={workflowData}
+          setWorkflowData={setWorkflowData}
         />
       )}
     </div>
+  );
+}
+
+export default function SceneWorkspacePage() {
+  return (
+    <Suspense fallback={<div className="h-screen bg-background" />}>
+      <SceneWorkspacePageInner />
+    </Suspense>
   );
 }

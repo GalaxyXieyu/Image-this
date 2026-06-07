@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { apiGet, apiDelete } from "@/lib/api-client";
 import { useTaskPolling } from "@/lib/use-task-polling";
+import { getWorkflowTypeLabel, normalizeTaskStatus } from "@/lib/workbench/task-compat";
 import {
   RefreshCw,
   RotateCcw,
@@ -27,29 +28,22 @@ interface Task {
   completed: number;
   createdAt: string;
   type: string;
+  usedModel?: string | null;
 }
 
 function mapBackendStatus(status: string): TaskStatus {
-  switch (status) {
-    case "PENDING": return "pending";
-    case "PROCESSING": return "running";
-    case "COMPLETED": return "completed";
-    case "FAILED": return "failed";
+  switch (normalizeTaskStatus(status)) {
+    case "pending": return "pending";
+    case "processing": return "running";
+    case "completed": return "completed";
+    case "failed": return "failed";
+    case "cancelled": return "failed";
     default: return "pending";
   }
 }
 
 function mapTaskType(type: string): string {
-  const map: Record<string, string> = {
-    BACKGROUND_REMOVAL: "AI换背景",
-    UPSCALE: "高清放大",
-    OUTPAINT: "扩图",
-    WATERMARK: "加水印",
-    VIDEO_GENERATION: "视频生成",
-    ONE_CLICK: "一键处理",
-    SCENE_GENERATION: "场景图生成",
-  };
-  return map[type] || type;
+  return getWorkflowTypeLabel(type);
 }
 
 function formatDate(dateStr: string | Date): string {
@@ -144,6 +138,7 @@ function StatusBadge({ status }: { status: TaskStatus }) {
 interface BackendTask {
   id: string;
   type: string;
+  workflowType?: string;
   status: string;
   progress: number;
   currentStep: string;
@@ -151,6 +146,7 @@ interface BackendTask {
   completedSteps: number;
   errorMessage: string | null;
   createdAt: string;
+  usedModel?: string | null;
 }
 
 interface TasksApiResponse {
@@ -185,13 +181,14 @@ export default function TasksPage() {
       const data = await apiGet<TasksApiResponse>(`/api/tasks?${params.toString()}`);
       const mapped = data.tasks.map((t) => ({
         id: t.id,
-        name: `${mapTaskType(t.type)} - ${t.currentStep || "处理中"}`,
+        name: `${mapTaskType(t.workflowType ?? t.type)} - ${t.currentStep || "处理中"}`,
         status: mapBackendStatus(t.status),
         progress: t.progress ?? 0,
         total: t.totalSteps ?? 1,
         completed: t.completedSteps ?? 0,
         createdAt: formatDate(t.createdAt),
         type: t.type,
+        usedModel: t.usedModel,
       }));
       setTasks(mapped);
       setStats({
@@ -235,7 +232,8 @@ export default function TasksPage() {
           ...task,
           status: mapBackendStatus(polled.status),
           progress: polled.progress ?? 0,
-          name: `${mapTaskType(polled.type)} - ${polled.currentStep || "处理中"}`,
+          name: `${mapTaskType(polled.workflowType ?? polled.type)} - ${polled.currentStep || "处理中"}`,
+          usedModel: polled.usedModel,
         };
       });
       return updated;
@@ -350,6 +348,11 @@ export default function TasksPage() {
                     <p className="text-xs text-muted-foreground mt-0.5" style={{ fontFamily: "Geist, sans-serif" }}>
                       {task.createdAt} · {task.completed}/{task.total} 张
                     </p>
+                    {(task.status === "completed" || task.status === "failed") && task.usedModel && (
+                      <p className="text-[11px] text-muted-foreground/70 mt-0.5" style={{ fontFamily: "Geist, sans-serif" }}>
+                        模型: {task.usedModel}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <StatusBadge status={task.status} />

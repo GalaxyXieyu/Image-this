@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.0
-milestone_name: milestone
-status: Ready to plan
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-05-27T07:19:53.632Z"
+milestone_name: AI Product Visual Workbench Rebuild
+status: In progress
+stopped_at: Completed Phase 4 Wave 1 toolbox shell and task-based execution
+last_updated: "2026-06-06T00:00:00.000Z"
 progress:
   total_phases: 6
-  completed_phases: 4
-  total_plans: 9
-  completed_plans: 8
+  completed_phases: 3
+  total_plans: 10
+  completed_plans: 9
 ---
 
 # Project State
@@ -20,12 +20,12 @@ See: `.planning/PROJECT.md` (updated 2026-05-27)
 
 **Core value:** 电商卖家和运营可以用一个稳定、清晰、批量友好的 AI 工作台，快速产出商品主图、场景图、背景图、水印图、高清图和视频素材。
 
-**Current focus:** Phase 2 — Template Library and Preset Model
+**Current focus:** Phase 4 — Unified Smart Toolbox
 
 ## Current Position
 
-Phase: 2 of 6 (in progress)
-Plan: 02-01 complete
+Phase: 4 of 6 (in progress)
+Plan: 04-01 Wave 1 completed; Wave 2 ready
 
 ## Accumulated Context
 
@@ -38,6 +38,13 @@ Plan: 02-01 complete
 - [2026-05-27]: 先做 foundation，再做模板库、场景图工作流、智能工具箱、API/worker 收敛和旧前端删除。
 - [2026-05-27]: 模板库使用静态 seed 数据，DB 迁移推迟到 Phase 5+。
 - [2026-05-27]: VideoParams 加入 ToolParameters union 以支持视频预设。
+- [2026-06-05]: Phase 3 聚焦把 `/workspace/scene` 从三步 UI 原型推进为真实任务闭环；完整 worker/API contract 重构保留到 Phase 5。
+- [2026-06-05]: 在执行 Wave 2 前，需要选择性合入 `main` 分支中和模型调用、模型列表获取、provider 配置兼容相关的调整，避免 scene task adapter 绑定过期模型契约。
+- [2026-06-05]: 已执行 Phase 3 Checkpoint 0，选择性合入 `/api/models` 模型发现行为、Gemini fallback 模型列表、OpenAI-compatible `toapis.com` 兼容，以及 worker 结果记录 URL 稳定化；未做整支 `main` merge。
+- [2026-06-05]: 已为新旧任务类型、workflowType 和状态名建立兼容名称边界；scene generation 在当前阶段继续通过 legacy `BACKGROUND_REMOVAL` worker 分支入队，但 UI、轮询和任务中心按 `scene_generation` 业务语义展示。
+- [2026-06-05]: Phase 3 Wave 3 已接入轻量 `/api/tasks/status` 轮询，候选卡片状态来自真实任务摘要；真实 provider 端到端结果仍需手动 smoke 验证后才能进入业务验收。
+- [2026-06-06]: Phase 3 Wave 4 已完成候选结果保存到 `/results` 的最小闭环；`npm run build` 通过。真实 provider smoke 与 Electron/Windows 回归留作发布前/Phase 6 验证。
+- [2026-06-06]: Phase 4 Wave 1 已把 `/tools` 改为统一工具箱工作台骨架，支持 background/watermark/upscale/outpaint 通过 typed adapter 创建真实 `/api/tasks` 任务，并使用 `/api/tasks/status` 轮询状态；直接同步处理接口保留兼容。
 
 ### Active Canonical References
 
@@ -46,12 +53,28 @@ Plan: 02-01 complete
 - `.planning/ROADMAP.md`
 - `.planning/phases/01-product-visual-workbench-rebuild/01-CONTEXT.md`
 - `.planning/phases/01-product-visual-workbench-rebuild/01-01-PLAN.md`
+- `.planning/phases/01-product-visual-workbench-rebuild/01-01-SUMMARY.md`
 - `.planning/phases/02-template-library-preset-model/02-CONTEXT.md`
 - `.planning/phases/02-template-library-preset-model/02-01-PLAN.md`
 - `.planning/phases/02-template-library-preset-model/02-01-SUMMARY.md`
+- `.planning/phases/02-template-library-preset-model/02-VERIFICATION.md`
+- `.planning/phases/03-scene-image-guided-workflow/03-CONTEXT.md`
+- `.planning/phases/03-scene-image-guided-workflow/03-01-PLAN.md`
+- `.planning/phases/03-scene-image-guided-workflow/03-01-SUMMARY.md`
+- `.planning/phases/03-scene-image-guided-workflow/03-VERIFICATION.md`
+- `.planning/phases/04-unified-smart-toolbox/04-CONTEXT.md`
+- `.planning/phases/04-unified-smart-toolbox/04-01-PLAN.md`
 - `/Users/galaxyxieyu/Documents/image-this.pen`
-- `src/app/workspace/page.tsx`
+- `src/app/workspace/scene/page.tsx`
+- `src/app/tools/page.tsx`
+- `src/app/templates/page.tsx`
+- `src/lib/workbench/presets.ts`
+- `src/lib/workbench/api-contract.ts`
+- `src/lib/workbench/tool-task-adapter.ts`
+- `src/lib/workbench/task-compat.ts`
+- `src/hooks/workbench/useWorkflowTaskPolling.ts`
 - `src/app/api/tasks/route.ts`
+- `src/app/api/tasks/status/route.ts`
 - `src/app/api/tasks/worker/route.ts`
 - `prisma/schema.prisma`
 
@@ -66,18 +89,31 @@ The following phase folders remain useful for regression and engineering context
 ### Pending Todos
 
 - [x] Execute Phase 1 foundation plan.
-- [x] Plan Phase 2: Template Library and Preset Model.
+- [x] Plan and execute Phase 2: Template Library and Preset Model.
+- [x] Create Phase 3 context and first execution plan.
+- [x] Execute Phase 3 Wave 1: scene draft and preset initialization.
+- [x] Execute Phase 3 Checkpoint 0: selectively sync model-call/model-list changes from `main`.
+- [x] Execute Phase 3 Wave 2: input assets and task submission adapter.
+- [x] Execute Phase 3 Wave 3: lightweight polling and candidate result state.
+- [x] Execute Phase 3 Wave 4: result save, integration checks, and phase closeout.
+- [x] Create Phase 4 context and first execution plan.
+- [x] Execute Phase 4 Wave 1: toolbox shell and task-based execution.
+- [ ] Execute Phase 4 Wave 2: tool preset initialization and parameter coverage.
+- [ ] Execute Phase 4 Wave 3: result save semantics and phase closeout.
 - [ ] Decide whether to archive or renumber historical phase folders after the rebuild branch stabilizes.
-- [ ] Validate Windows/Electron baseline after first UI foundation changes.
+- [ ] Validate Windows/Electron baseline after scene workflow implementation.
 
 ### Blockers/Concerns
 
 - `src/app/workspace/page.tsx` is large and behavior-heavy; deletion should wait until replacement flows exist (Phase 6).
-- Existing task queue still stores JSON strings; typed workflow contracts need adapters before worker internals are changed (Phase 5).
-- Pencil design has strong visual direction but not final backend data contracts; Phase 1 has defined foundation contracts, Phase 2-4 will flesh them out.
+- Existing task queue still stores JSON strings; Phase 4 uses adapter boundaries, while full typed worker/API refactor remains Phase 5.
+- `/tools` now creates real compatibility tasks for background replace, watermark, upscale, and outpaint, and uses lightweight status polling for task/result visibility; provider-backed completion still depends on local credentials and worker runtime.
+- `src/app/api/tasks/worker/route.ts` is high-risk because it mixes scheduling, execution, provider dispatch, persistence, and retry behavior.
+- Worker lifecycle currently depends on `/api/tasks/worker` being triggered; do not assume a true always-on background worker.
+- `npm run build` passed on 2026-06-06 after Phase 4 Wave 1. Remaining warnings are dependency freshness notices and existing `<img>` lint performance warnings in preview surfaces.
 
 ## Session Continuity
 
-Last session: 2026-05-27T07:19:53.629Z
-Stopped at: Completed 02-01-PLAN.md
-Resume file: None
+Last session: 2026-06-06T00:00:00.000Z
+Stopped at: Completed Phase 4 Wave 1 toolbox shell and task-based execution
+Resume file: `.planning/phases/04-unified-smart-toolbox/04-01-PLAN.md`

@@ -7,15 +7,10 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { Dispatch } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { mapProviderErrorMessage } from '@/lib/provider-error-utils';
 import type { WorkflowTaskSummary, WorkflowTaskStatus } from '@/types/workbench';
-
-interface PollingTask {
-  id: string;
-  originalName?: string;
-  workflowType: string;
-}
 
 interface UseWorkflowTaskPollingOptions {
   /** Initial task IDs to poll */
@@ -25,11 +20,11 @@ interface UseWorkflowTaskPollingOptions {
   /** Auto-start polling when taskIds change */
   autoStart?: boolean;
   /** Called when any task completes */
-  onTaskComplete?: (task: WorkflowTaskSummary) => void;
+  onTaskComplete?: Dispatch<WorkflowTaskSummary>;
   /** Called when any task fails */
-  onTaskFail?: (task: WorkflowTaskSummary) => void;
+  onTaskFail?: Dispatch<WorkflowTaskSummary>;
   /** Called when task status changes (any change) */
-  onStatusChange?: (tasks: WorkflowTaskSummary[]) => void;
+  onStatusChange?: Dispatch<WorkflowTaskSummary[]>;
   /** Called when all tracked tasks reach a terminal state */
   onAllComplete?: () => void;
 }
@@ -40,13 +35,13 @@ interface UseWorkflowTaskPollingReturn {
   /** Whether polling is active */
   isPolling: boolean;
   /** Start polling for the given task IDs */
-  startPolling: (ids: string[]) => void;
+  startPolling: Dispatch<string[]>;
   /** Stop polling */
   stopPolling: () => void;
   /** Add tasks to the polling set */
-  addTasks: (ids: string[]) => void;
+  addTasks: Dispatch<string[]>;
   /** Remove tasks from the polling set */
-  removeTasks: (ids: string[]) => void;
+  removeTasks: Dispatch<string[]>;
   /** Manually refresh task statuses once */
   refresh: () => Promise<void>;
   /** Latest error message if polling failed */
@@ -84,12 +79,6 @@ export function useWorkflowTaskPolling(
     callbacksRef.current = { onTaskComplete, onTaskFail, onStatusChange, onAllComplete };
   }, [onTaskComplete, onTaskFail, onStatusChange, onAllComplete]);
 
-  // Keep tasks ref up to date
-  const tasksRef = useRef(tasks);
-  useEffect(() => {
-    tasksRef.current = tasks;
-  }, [tasks]);
-
   const getProcessTypeName = useCallback((type: string): string => {
     const map: Record<string, string> = {
       scene_generation: '场景图生成',
@@ -119,6 +108,14 @@ export function useWorkflowTaskPolling(
     return data.tasks ?? [];
   }, []);
 
+  const stopPollingInternal = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    setIsPolling(false);
+  }, []);
+
   const pollOnce = useCallback(async () => {
     try {
       const updatedTasks = await fetchTaskStatuses();
@@ -128,8 +125,6 @@ export function useWorkflowTaskPolling(
       const newMap = new Map<string, WorkflowTaskSummary>();
       const callbacks = callbacksRef.current;
 
-      let hasNewCompleted = false;
-      let hasNewFailed = false;
       let hasStatusChange = false;
 
       for (const task of updatedTasks) {
@@ -150,7 +145,6 @@ export function useWorkflowTaskPolling(
           // -> COMPLETED
           if (task.status === 'completed' && !processedResultIdsRef.current.has(task.id)) {
             processedResultIdsRef.current.add(task.id);
-            hasNewCompleted = true;
             callbacks.onTaskComplete?.(task);
             toast({
               title: '任务完成',
@@ -160,7 +154,6 @@ export function useWorkflowTaskPolling(
 
           // -> FAILED
           if (task.status === 'failed') {
-            hasNewFailed = true;
             callbacks.onTaskFail?.(task);
             const errorMessage = mapProviderErrorMessage(task.errorMessage || '未知错误');
             toast({
@@ -192,15 +185,7 @@ export function useWorkflowTaskPolling(
       setError(message);
       console.warn('Workflow task polling error:', message);
     }
-  }, [fetchTaskStatuses, getProcessTypeName, toast]);
-
-  const stopPollingInternal = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    setIsPolling(false);
-  }, []);
+  }, [fetchTaskStatuses, getProcessTypeName, stopPollingInternal, toast]);
 
   const startPolling = useCallback(
     (ids: string[]) => {

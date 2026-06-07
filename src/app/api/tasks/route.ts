@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { deleteImage } from '@/lib/storage';
 import { normalizeImageUrlForClient } from '@/lib/image-url';
+import { inferWorkflowTypeFromTask } from '@/lib/workbench/task-compat';
 
 type TaskInputData = {
   inputAsset?: unknown;
@@ -96,6 +97,32 @@ function extractVideoUrl(taskType: string, outputData?: string | null): string |
   }
 }
 
+function extractUsedModel(outputData?: string | null): string | null {
+  if (!outputData) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(outputData) as Record<string, unknown>;
+    return (parsed.usedModel as string) || (parsed.modelName as string) || null;
+  } catch {
+    return null;
+  }
+}
+
+function triggerWorkerAfterTaskCreation(request: NextRequest, taskCount: number) {
+  const workerUrl = new URL('/api/tasks/worker', request.url);
+  const maxTasks = Math.max(1, taskCount);
+
+  void fetch(workerUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ batch: true, maxTasks }),
+  }).catch((error) => {
+    console.error('[任务创建] 自动触发 worker 失败:', error);
+  });
+}
+
 // 创建新任务
 export async function POST(request: NextRequest) {
   try {
@@ -137,6 +164,7 @@ export async function POST(request: NextRequest) {
 
       // 使用Promise.all并行创建所有任务
       const createdTasks = await Promise.all(taskPromises);
+      triggerWorkerAfterTaskCreation(request, createdTasks.length);
       
       // 返回创建的任务ID列表
       return NextResponse.json({
@@ -179,6 +207,8 @@ export async function POST(request: NextRequest) {
         currentStep: '任务已创建，等待处理'
       }
     });
+
+    triggerWorkerAfterTaskCreation(request, 1);
 
     return NextResponse.json({
       success: true,
@@ -316,6 +346,7 @@ export async function GET(request: NextRequest) {
       return {
         id: task.id,
         type: task.type,
+        workflowType: inferWorkflowTypeFromTask(task.type, task.inputData),
         status: task.status,
         priority: task.priority,
         progress: task.progress,
@@ -333,6 +364,7 @@ export async function GET(request: NextRequest) {
         originalImageUrl,
         resultImageUrl,
         videoUrl: extractVideoUrl(task.type, task.outputData),
+        usedModel: extractUsedModel(task.outputData),
         project: task.project,
         processedImage: task.processedImage
           ? {

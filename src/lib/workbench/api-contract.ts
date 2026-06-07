@@ -17,6 +17,7 @@ import type {
   BatchGroup,
 } from '@/types/workbench';
 import { WORKFLOW_TO_LEGACY_TYPE, buildLegacyInputData } from '@/types/workbench';
+import { inferWorkflowTypeFromTask, normalizeTaskStatus } from '@/lib/workbench/task-compat';
 
 // ---------------------------------------------------------------------------
 // Task Creation
@@ -180,9 +181,11 @@ export interface WorkflowTaskSummary {
   originalImageUrl?: string | null;
   resultImageUrl?: string | null;
   videoUrl?: string | null;
+  usedModel?: string | null;
   batchGroupId?: string;
   projectId?: string;
   processedImageId?: string;
+  originalName?: string;
   createdAt: string;
   startedAt?: string;
   completedAt?: string;
@@ -234,9 +237,7 @@ export function adaptLegacyTaskToSummary(task: {
   startedAt?: Date | string | null;
   completedAt?: Date | string | null;
 }): WorkflowTaskSummary {
-  // Lazy-import to avoid circular dependency at module load time
-  const { legacyTypeToWorkflowType } = require('@/types/workbench');
-  const workflowType = legacyTypeToWorkflowType(task.type);
+  const workflowType = inferWorkflowTypeFromTask(task.type, task.inputData);
 
   let originalImageUrl: string | null = null;
   let resultImageUrl: string | null = null;
@@ -268,10 +269,20 @@ export function adaptLegacyTaskToSummary(task: {
     // ignore parse errors
   }
 
+  let usedModel: string | null = null;
+  try {
+    if (task.outputData) {
+      const parsed = JSON.parse(task.outputData) as Record<string, unknown>;
+      usedModel = (parsed.usedModel as string) ?? (parsed.modelName as string) ?? null;
+    }
+  } catch {
+    // ignore parse errors
+  }
+
   return {
     id: task.id,
     workflowType,
-    status: task.status.toLowerCase() as WorkflowTaskStatus,
+    status: normalizeTaskStatus(task.status),
     progress: task.progress,
     currentStep: task.currentStep ?? '',
     totalSteps: task.totalSteps,
@@ -280,6 +291,7 @@ export function adaptLegacyTaskToSummary(task: {
     originalImageUrl,
     resultImageUrl,
     videoUrl,
+    usedModel,
     projectId: task.projectId ?? undefined,
     processedImageId: task.processedImageId ?? undefined,
     createdAt:

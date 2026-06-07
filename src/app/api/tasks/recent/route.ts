@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { normalizeImageUrlForClient } from '@/lib/image-url';
+import { inferWorkflowTypeFromTask } from '@/lib/workbench/task-compat';
 
 export async function GET() {
   try {
@@ -41,6 +42,7 @@ export async function GET() {
     const normalizedTasks = tasks.map((task) => ({
       id: task.id,
       type: task.type,
+      workflowType: inferWorkflowTypeFromTask(task.type, task.inputData),
       status: task.status,
       progress: task.progress,
       currentStep: task.currentStep,
@@ -81,6 +83,15 @@ export async function GET() {
         try {
           const outputData = JSON.parse(task.outputData);
           return normalizeImageUrlForClient(outputData.videoUrl || null);
+        } catch {
+          return null;
+        }
+      })(),
+      usedModel: (() => {
+        if (!task.outputData) return null;
+        try {
+          const outputData = JSON.parse(task.outputData);
+          return outputData.usedModel || outputData.modelName || null;
         } catch {
           return null;
         }

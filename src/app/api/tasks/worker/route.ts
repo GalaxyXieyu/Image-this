@@ -30,6 +30,17 @@ type QueueTaskForProcessing = {
   maxRetries?: number;
 };
 
+type PersistedTaskResult = {
+  processedImageId?: string | null;
+  processedImageUrl?: string | null;
+  usedModel?: string | null;
+  prompt?: string | null;
+  videoUrl?: string;
+  jimengTaskId?: string;
+  frames?: unknown;
+  aspectRatio?: string;
+};
+
 async function readAssetAsDataUrl(asset?: TaskAssetRef): Promise<string | null> {
   if (!asset?.filePath) {
     return null;
@@ -44,6 +55,22 @@ async function resolveTaskInputData(rawInputData: string): Promise<ParsedTaskInp
   return JSON.parse(rawInputData) as ParsedTaskInput;
 }
 
+function getAssetClientUrl(asset?: TaskAssetRef): string {
+  return asset?.clientUrl || '';
+}
+
+async function persistRecordUrl(source: string | undefined, filename: string, userId: string): Promise<string> {
+  if (!source) {
+    return '';
+  }
+
+  if (source.startsWith('data:')) {
+    return uploadBase64Image(source, filename, userId);
+  }
+
+  return source;
+}
+
 // 告诉 Next.js 这是一个动态路由，不要在构建时预渲染
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -52,7 +79,7 @@ export const runtime = 'nodejs';
 class TaskProcessor {
   private isProcessing = false;
 
-  private buildPersistedResult(taskType: string, result: any) {
+  private buildPersistedResult(taskType: string, result: any): PersistedTaskResult {
     switch (taskType) {
       case 'VIDEO_GENERATION':
         return {
@@ -66,6 +93,8 @@ class TaskProcessor {
         return {
           processedImageId: result.processedImageId || result.id || null,
           processedImageUrl: result.processedImageUrl || result.processedUrl || result.imageUrl || null,
+          usedModel: result.usedModel || null,
+          prompt: result.prompt || null,
         };
     }
   }
@@ -464,6 +493,12 @@ class TaskProcessor {
     const imageUrl = (await readAssetAsDataUrl(inputData.inputAsset)) || inputData.imageUrl;
     const referenceImageUrl = (await readAssetAsDataUrl(inputData.referenceAsset)) || inputData.referenceImageUrl;
     const watermarkLogoUrl = (await readAssetAsDataUrl(inputData.watermarkLogoAsset)) || inputData.watermarkLogoUrl;
+    const originalImageUrlForRecord = getAssetClientUrl(inputData.inputAsset)
+      || await persistRecordUrl(inputData.imageUrl, `input-one-click-${task.id}.jpg`, task.userId);
+    const referenceImageUrlForRecord = getAssetClientUrl(inputData.referenceAsset)
+      || await persistRecordUrl(inputData.referenceImageUrl, `reference-one-click-${task.id}.jpg`, task.userId);
+    const watermarkLogoUrlForRecord = getAssetClientUrl(inputData.watermarkLogoAsset)
+      || await persistRecordUrl(inputData.watermarkLogoUrl, `logo-one-click-${task.id}.png`, task.userId);
     const { 
       xScale = 2.0, 
       yScale = 2.0, 
@@ -510,7 +545,10 @@ class TaskProcessor {
         outpaintPrompt,
         userId: task.userId,
         volcengineConfig,
-        imagehostingConfig
+        imagehostingConfig,
+        originalImageUrlForRecord,
+        referenceImageUrlForRecord,
+        watermarkLogoUrlForRecord
       });
       
       await this.updateTaskProgress(task.id, 'Step 3/3: 处理完成', 100, 3);
@@ -537,23 +575,44 @@ class TaskProcessor {
     const inputData = await resolveTaskInputData(task.inputData);
     const imageUrl = (await readAssetAsDataUrl(inputData.inputAsset)) || inputData.imageUrl;
     const referenceImageUrl = (await readAssetAsDataUrl(inputData.referenceAsset)) || inputData.referenceImageUrl;
-    const { customPrompt, aiModel = 'gemini', volcengineConfig, imagehostingConfig } = inputData;
+    const {
+      customPrompt,
+      aiModel = 'gemini',
+      provider: explicitProvider,
+      modelName: explicitModelName,
+      fallbackModels,
+      volcengineConfig,
+      imagehostingConfig
+    } = inputData;
 
-    await this.updateTaskProgress(task.id, `使用 ${aiModel} 生成图像中...`, 30, 1);
-    
-    try {
-      // 构建提示词：如果有自定义提示词就用，否则使用默认的背景替换提示词
-      let prompt = customPrompt || '保持第一张图的产品主体完全不变，仅替换第二张图的背景为类似参考场景的风格（要完全把第二张图的产品去掉），不要有同时出现的情况，保持第一张产品的形状、材质、特征比例、摆放角度及数量完全一致，专业摄影，高质量，4K分辨率';
+    // 兼容旧数据：如果没有 provider，从 aiModel 推断
+    const provider = explicitProvider || (aiModel.startsWith('gpt') ? 'gpt' : aiModel.startsWith('gemini') ? 'gemini' : aiModel.startsWith('jimeng') || aiModel.startsWith('seedream') ? 'jimeng' : aiModel);
+    const modelName = explicitModelName || aiModel;
 
-      const referenceImages = [imageUrl];
-      if (referenceImageUrl) {
-        referenceImages.push(referenceImageUrl);
-      }
-      
-      let result;
-      
-      // 根据选择的 AI 模型调用不同的服务
-      if (aiModel === 'gpt') {
+    const originalImageUrlForRecord = getAssetClientUrl(inputData.inputAsset)
+      || await persistRecordUrl(inputData.imageUrl, `input-bg-replace-${task.id}.jpg`, task.userId);
+    const referenceImageUrlForRecord = getAssetClientUrl(inputData.referenceAsset)
+      || await persistRecordUrl(inputData.referenceImageUrl, `reference-bg-replace-${task.id}.jpg`, task.userId);
+
+    await this.updateTaskProgress(task.id, `使用 ${modelName} 生成图像中...`, 30, 1);
+
+    let lastError: Error | undefined;
+    const attemptModels = [modelName, ...(fallbackModels || [])];
+
+    for (const attemptModel of attemptModels) {
+      try {
+        // 构建提示词：如果有自定义提示词就用，否则使用默认的背景替换提示词
+        let prompt = customPrompt || '保持第一张图的产品主体完全不变，仅替换第二张图的背景为类似参考场景的风格（要完全把第二张图的产品去掉），不要有同时出现的情况，保持第一张产品的形状、材质、特征比例、摆放角度及数量完全一致，专业摄影，高质量，4K分辨率';
+
+        const referenceImages = [imageUrl];
+        if (referenceImageUrl) {
+          referenceImages.push(referenceImageUrl);
+        }
+
+        let result;
+
+        // 根据选择的 AI 模型调用不同的服务
+        if (provider === 'gpt') {
         console.log('[Worker] 使用 GPT 模型');
         const { processWithGPT } = await import('@/lib/image-processor/service');
         const { uploadBase64Image } = await import('@/lib/storage');
@@ -563,7 +622,8 @@ class TaskProcessor {
           imageUrl,
           referenceImageUrl || imageUrl,
           prompt,
-          task.userId
+          task.userId,
+          attemptModel
         );
         
         // 保存到本地存储（使用用户配置的保存路径）
@@ -576,7 +636,7 @@ class TaskProcessor {
         const processedImage = await prisma.processedImage.create({
           data: {
             filename: `gpt-bg-replace-${Date.now()}.jpg`,
-            originalUrl: imageUrl,
+            originalUrl: originalImageUrlForRecord,
             processedUrl: processedUrl,
             processType: 'BACKGROUND_REMOVAL',
             status: 'COMPLETED',
@@ -584,7 +644,7 @@ class TaskProcessor {
             metadata: JSON.stringify({
               provider: 'gpt',
               prompt,
-              referenceImageUrl,
+              referenceImageUrl: referenceImageUrlForRecord,
               processingCompletedAt: new Date().toISOString()
             }),
             userId: task.userId
@@ -598,17 +658,18 @@ class TaskProcessor {
           imageSize: gptResult.imageSize
         };
         console.log('[Worker] GPT 处理成功，已保存到数据库');
-      } else if (aiModel === 'gemini') {
-        console.log('[Worker] 使用 Gemini 模型');
+      } else if (provider === 'gemini') {
+        console.log(`[Worker] 使用 Gemini 模型: ${attemptModel}`);
         const { processWithGemini } = await import('@/lib/image-processor/service');
         const { uploadBase64Image } = await import('@/lib/storage');
         const { prisma } = await import('@/lib/prisma');
-        
+
         const resultImageUrl = await processWithGemini(
           imageUrl,
           referenceImageUrl || imageUrl,
           prompt,
-          task.userId
+          task.userId,
+          attemptModel
         );
         
         // 保存到本地存储（使用用户配置的保存路径）
@@ -621,7 +682,7 @@ class TaskProcessor {
         const processedImage = await prisma.processedImage.create({
           data: {
             filename: `gemini-bg-replace-${Date.now()}.jpg`,
-            originalUrl: imageUrl,
+            originalUrl: originalImageUrlForRecord,
             processedUrl: processedUrl,
             processType: 'BACKGROUND_REMOVAL',
             status: 'COMPLETED',
@@ -629,7 +690,7 @@ class TaskProcessor {
             metadata: JSON.stringify({
               provider: 'gemini',
               prompt,
-              referenceImageUrl,
+              referenceImageUrl: referenceImageUrlForRecord,
               processingCompletedAt: new Date().toISOString()
             }),
             userId: task.userId
@@ -643,17 +704,18 @@ class TaskProcessor {
           imageSize: resultImageUrl?.length || 0
         };
         console.log('[Worker] Gemini 处理成功，已保存到数据库');
-      } else if (aiModel === 'jimeng') {
-        console.log('[Worker] 使用 Jimeng 模型');
+      } else if (provider === 'jimeng') {
+        console.log(`[Worker] 使用 Jimeng 模型: ${attemptModel}`);
         const { processWithJimeng } = await import('@/lib/image-processor/service');
         const { uploadBase64Image } = await import('@/lib/storage');
         const { prisma } = await import('@/lib/prisma');
-        
+
         const jimengResult = await processWithJimeng(
           imageUrl,
           referenceImageUrl || imageUrl,
           prompt,
-          task.userId
+          task.userId,
+          attemptModel
         );
         
         // 保存到本地存储（使用用户配置的保存路径）
@@ -666,7 +728,7 @@ class TaskProcessor {
         const processedImage = await prisma.processedImage.create({
           data: {
             filename: `jimeng-bg-replace-${Date.now()}.jpg`,
-            originalUrl: imageUrl,
+            originalUrl: originalImageUrlForRecord,
             processedUrl: processedUrl,
             processType: 'BACKGROUND_REMOVAL',
             status: 'COMPLETED',
@@ -674,7 +736,7 @@ class TaskProcessor {
             metadata: JSON.stringify({
               provider: 'jimeng',
               prompt,
-              referenceImageUrl,
+              referenceImageUrl: referenceImageUrlForRecord,
               processingCompletedAt: new Date().toISOString()
             }),
             userId: task.userId
@@ -692,26 +754,40 @@ class TaskProcessor {
         throw new Error(`不支持的 AI 模型: ${aiModel}，请使用 gpt、gemini 或 jimeng`);
       }
       
-      await this.updateTaskProgress(task.id, '图像生成完成', 100, 1);
-      
+      await this.updateTaskProgress(task.id, `图像生成完成（${attemptModel}）`, 100, 1);
+
       return {
         processedImageId: result.id,
         processedImageUrl: result.processedUrl,
         imageData: result.imageData,
-        prompt: prompt || customPrompt || ''
+        prompt: prompt || customPrompt || '',
+        usedModel: attemptModel,
       };
 
     } catch (error) {
-      console.error(`[背景替换] 处理失败:`, error);
-      await this.updateTaskProgress(task.id, '图像生成失败', 0, 0);
-      throw error;
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.error(`[背景替换] 模型 ${attemptModel} 处理失败:`, lastError.message);
+      await this.updateTaskProgress(task.id, `${attemptModel} 生成失败，尝试兜底...`, 0, 0);
+      continue;
     }
   }
+
+  // 所有模型都失败
+  if (lastError) {
+    console.error(`[背景替换] 所有模型处理失败`);
+    await this.updateTaskProgress(task.id, '图像生成失败', 0, 0);
+    throw lastError;
+  }
+
+  throw new Error('背景替换未返回结果');
+}
 
   private async processImageExpansion(task: { id: string; inputData: string; userId: string }) {
     const inputData = await resolveTaskInputData(task.inputData);
     const imageUrl = (await readAssetAsDataUrl(inputData.inputAsset)) || inputData.imageUrl;
     const { xScale = 2.0, yScale = 2.0, prompt = '扩展图像，保持产品主体和风格完全一致，自然延伸背景', volcengineConfig, imagehostingConfig } = inputData;
+    const originalImageUrlForRecord = getAssetClientUrl(inputData.inputAsset)
+      || await persistRecordUrl(inputData.imageUrl, `input-outpaint-${task.id}.jpg`, task.userId);
     
     await this.updateTaskProgress(task.id, '图像扩展处理中...', 50, 1);
     
@@ -751,7 +827,7 @@ class TaskProcessor {
       const processedImage = await prisma.processedImage.create({
         data: {
           filename: `outpaint-${Date.now()}.jpg`,
-          originalUrl: imageUrl,
+          originalUrl: originalImageUrlForRecord,
           processedUrl: processedUrl,
           processType: 'IMAGE_OUTPAINTING',
           status: 'COMPLETED',
@@ -785,6 +861,8 @@ class TaskProcessor {
     const inputData = await resolveTaskInputData(task.inputData);
     const imageUrl = (await readAssetAsDataUrl(inputData.inputAsset)) || inputData.imageUrl;
     const { upscaleFactor = 2, aiModel = 'volcengine', volcengineConfig, imagehostingConfig } = inputData;
+    const originalImageUrlForRecord = getAssetClientUrl(inputData.inputAsset)
+      || await persistRecordUrl(inputData.imageUrl, `input-upscale-${task.id}.jpg`, task.userId);
     
     await this.updateTaskProgress(task.id, '智能画质增强中...', 50, 1);
     
@@ -817,7 +895,7 @@ class TaskProcessor {
       const processedImage = await prisma.processedImage.create({
         data: {
           filename: `enhance-${Date.now()}.jpg`,
-          originalUrl: imageUrl,
+          originalUrl: originalImageUrlForRecord,
           processedUrl: processedUrl,
           processType: 'IMAGE_UPSCALING',
           status: 'COMPLETED',
@@ -851,6 +929,10 @@ class TaskProcessor {
     const inputData = await resolveTaskInputData(task.inputData);
     const imageUrl = (await readAssetAsDataUrl(inputData.inputAsset)) || inputData.imageUrl;
     const watermarkLogoUrl = (await readAssetAsDataUrl(inputData.watermarkLogoAsset)) || inputData.watermarkLogoUrl;
+    const originalImageUrlForRecord = getAssetClientUrl(inputData.inputAsset)
+      || await persistRecordUrl(inputData.imageUrl, `input-watermark-${task.id}.png`, task.userId);
+    const watermarkLogoUrlForRecord = getAssetClientUrl(inputData.watermarkLogoAsset)
+      || await persistRecordUrl(inputData.watermarkLogoUrl, `logo-watermark-${task.id}.png`, task.userId);
     const {
       watermarkText = 'Watermark',
       watermarkOpacity = 0.3,
@@ -873,7 +955,7 @@ class TaskProcessor {
       const processedImage = await prisma.processedImage.create({
         data: {
           filename: `watermark-${Date.now()}.png`,
-          originalUrl: imageUrl,
+          originalUrl: originalImageUrlForRecord,
           processType: 'WATERMARK',
           status: 'PROCESSING',
           userId: task.userId,
@@ -882,7 +964,7 @@ class TaskProcessor {
             watermarkOpacity,
             watermarkPosition,
             watermarkType,
-            watermarkLogoUrl,
+            watermarkLogoUrl: watermarkLogoUrlForRecord,
             outputResolution,
           })
         }
@@ -1012,7 +1094,6 @@ class TaskProcessor {
         currentStep,
         progress,
         completedSteps,
-        updatedAt: new Date()
       }
     });
   }

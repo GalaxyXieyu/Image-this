@@ -1,16 +1,38 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { useUpload } from "@/lib/use-upload";
-import { useImageProcess } from "@/lib/use-image-process";
 import { apiPost } from "@/lib/api-client";
+import { useUpload } from "@/lib/use-upload";
 import { useToast } from "@/components/ui/use-toast";
+import { useWorkflowTaskPolling } from "@/hooks/workbench/useWorkflowTaskPolling";
+import { mapProviderErrorMessage } from "@/lib/provider-error-utils";
+import { getPresetById } from "@/lib/workbench/presets";
+import {
+  buildDefaultToolParameters,
+  buildToolLegacyTaskRequest,
+  normalizePresetToolType,
+  TOOL_TYPE_LABELS,
+} from "@/lib/workbench/tool-task-adapter";
+import type {
+  BackgroundReplaceParams,
+  InputAssetRef,
+  OutpaintParams,
+  ToolParameters,
+  ToolType,
+  UpscaleParams,
+  WatermarkParams,
+  WorkflowTaskSummary,
+} from "@/types/workbench";
 import {
   Image as ImageIcon,
   Wand2,
@@ -20,62 +42,71 @@ import {
   Download,
   Sparkles,
   Loader2,
-  X,
+  Droplets,
+  ListTodo,
+  AlertCircle,
 } from "lucide-react";
 
-const TOOL_TABS = [
-  { id: "background", label: "AI换背景", icon: Wand2 },
-  { id: "remove-bg", label: "智能抠图", icon: ImageIcon },
-  { id: "outpaint", label: "扩图", icon: Expand },
-  { id: "upscale", label: "高清放大", icon: ZoomIn },
+const SUPPORTED_TOOLS: Array<{ id: ToolType; label: string; description: string; icon: typeof Wand2 }> = [
+  { id: "background_replace", label: "AI换背景", description: "生成电商场景或白底背景", icon: Wand2 },
+  { id: "watermark", label: "加水印", description: "添加文字或 Logo 水印", icon: Droplets },
+  { id: "upscale", label: "高清放大", description: "提升图片清晰度和尺寸", icon: ZoomIn },
+  { id: "outpaint", label: "智能扩图", description: "向外延展画面边界", icon: Expand },
 ];
+
+type ToolTaskStatus = "idle" | "queued" | WorkflowTaskSummary["status"];
+
+interface ToolDraftState {
+  toolType: ToolType;
+  inputAsset?: InputAssetRef;
+  referenceAsset?: InputAssetRef;
+  watermarkLogoAsset?: InputAssetRef;
+  parameters: ToolParameters;
+  batchMode: boolean;
+  selectedPresetId?: string;
+  activePresetName?: string;
+  activePresetDescription?: string;
+}
+
+interface ToolRunState {
+  taskId?: string;
+  status: ToolTaskStatus;
+  progress: number;
+  currentStep?: string;
+  resultImageUrl?: string | null;
+  errorMessage?: string;
+  usedModel?: string | null;
+  processedImageId?: string;
+}
+
+const EMPTY_RUN_STATE: ToolRunState = {
+  status: "idle",
+  progress: 0,
+};
 
 function TopNav() {
   return (
     <header className="h-16 border-b border-border px-8 flex items-center justify-between shrink-0">
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 rounded-lg bg-[#0066FF]" />
-        <span
-          className="text-base font-semibold text-foreground"
-          style={{ fontFamily: "Inter, sans-serif" }}
-        >
+        <span className="text-base font-semibold text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
           AI 商品视觉工作台
         </span>
       </div>
       <nav className="flex items-center gap-6">
-        <Link
-          href="/"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          style={{ fontFamily: "Geist, sans-serif" }}
-        >
+        <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors" style={{ fontFamily: "Geist, sans-serif" }}>
           首页
         </Link>
-        <Link
-          href="/templates"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          style={{ fontFamily: "Geist, sans-serif" }}
-        >
+        <Link href="/templates" className="text-sm text-muted-foreground hover:text-foreground transition-colors" style={{ fontFamily: "Geist, sans-serif" }}>
           模板库
         </Link>
-        <Link
-          href="/tasks"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          style={{ fontFamily: "Geist, sans-serif" }}
-        >
+        <Link href="/tasks" className="text-sm text-muted-foreground hover:text-foreground transition-colors" style={{ fontFamily: "Geist, sans-serif" }}>
           任务中心
         </Link>
-        <Link
-          href="/results"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          style={{ fontFamily: "Geist, sans-serif" }}
-        >
+        <Link href="/results" className="text-sm text-muted-foreground hover:text-foreground transition-colors" style={{ fontFamily: "Geist, sans-serif" }}>
           结果管理
         </Link>
-        <Link
-          href="/settings"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          style={{ fontFamily: "Geist, sans-serif" }}
-        >
+        <Link href="/settings" className="text-sm text-muted-foreground hover:text-foreground transition-colors" style={{ fontFamily: "Geist, sans-serif" }}>
           设置
         </Link>
       </nav>
@@ -83,376 +114,495 @@ function TopNav() {
   );
 }
 
-const TAB_TO_TYPE: Record<string, string> = {
-  background: "background-replace",
-  "remove-bg": "background-replace",
-  outpaint: "outpaint",
-  upscale: "enhance",
-};
-
-function mapTabToProcessType(tab: string): string {
-  const map: Record<string, string> = {
-    background: "BACKGROUND_REMOVAL",
-    "remove-bg": "BACKGROUND_REMOVAL",
-    outpaint: "OUTPAINT",
-    upscale: "UPSCALE",
+function getStatusLabel(status: ToolTaskStatus) {
+  const labels: Record<ToolTaskStatus, string> = {
+    idle: "未开始",
+    queued: "已入队",
+    pending: "等待中",
+    processing: "处理中",
+    completed: "已完成",
+    failed: "失败",
+    cancelled: "已取消",
   };
-  return map[tab] || "BACKGROUND_REMOVAL";
+  return labels[status];
 }
 
-export default function ToolboxPage() {
-  const [activeTab, setActiveTab] = useState("background");
-  const [batchMode, setBatchMode] = useState(false);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [resultUrl, setResultUrl] = useState<string | null>(null);
+function getStatusClassName(status: ToolTaskStatus) {
+  if (status === "completed") return "bg-green-50 text-green-600 border-green-200";
+  if (status === "failed" || status === "cancelled") return "bg-red-50 text-red-600 border-red-200";
+  if (status === "processing") return "bg-blue-50 text-blue-600 border-blue-200";
+  if (status === "queued" || status === "pending") return "bg-amber-50 text-amber-600 border-amber-200";
+  return "bg-muted text-muted-foreground";
+}
+
+function createInitialDraft(presetId?: string): ToolDraftState {
+  const preset = presetId ? getPresetById(presetId) : undefined;
+  if (preset?.type === "tool") {
+    const toolType = normalizePresetToolType(preset.toolType ?? (preset.params as { toolType?: string }).toolType);
+    const presetParams = (preset.params as { parameters?: ToolParameters }).parameters;
+    return {
+      toolType,
+      parameters: presetParams ?? buildDefaultToolParameters(toolType),
+      batchMode: Boolean((preset.params as { batchMode?: boolean }).batchMode),
+      selectedPresetId: preset.id,
+      activePresetName: preset.name,
+      activePresetDescription: preset.description,
+    };
+  }
+
+  return {
+    toolType: "background_replace",
+    parameters: buildDefaultToolParameters("background_replace"),
+    batchMode: false,
+  };
+}
+
+function getResultUrl(task?: WorkflowTaskSummary) {
+  return task?.resultImageUrl ?? null;
+}
+
+function downloadImage(url?: string | null) {
+  if (!url) return;
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `tool-result-${Date.now()}.png`;
+  a.click();
+}
+
+function ToolboxPageInner() {
+  const searchParams = useSearchParams();
+  const presetId = searchParams.get("preset") ?? undefined;
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const referenceInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const { upload, uploading } = useUpload();
-  const { process: processImage, processing, error: processError, reset } = useImageProcess();
   const { toast } = useToast();
+  const [draft, setDraft] = useState<ToolDraftState>(() => createInitialDraft(presetId));
+  const [runState, setRunState] = useState<ToolRunState>(EMPTY_RUN_STATE);
+  const [creatingTask, setCreatingTask] = useState(false);
+  const { tasks, isPolling, startPolling, error: pollingError } = useWorkflowTaskPolling({
+    interval: 3000,
+    autoStart: false,
+  });
 
-  const handleFileSelect = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      reset();
-      setResultUrl(null);
-      try {
-        const res = await upload({ input: file });
-        if (res.inputAsset?.clientUrl) {
-          setImageUrl(res.inputAsset.clientUrl);
-        }
-      } catch {
-        // error handled in hook
-      }
-    },
-    [upload, reset]
+  const selectedTool = useMemo(
+    () => SUPPORTED_TOOLS.find((tool) => tool.id === draft.toolType) ?? SUPPORTED_TOOLS[0],
+    [draft.toolType]
   );
 
-  const handleDrop = useCallback(
-    async (e: React.DragEvent) => {
-      e.preventDefault();
-      const file = e.dataTransfer.files?.[0];
-      if (!file) return;
-      reset();
-      setResultUrl(null);
-      try {
-        const res = await upload({ input: file });
-        if (res.inputAsset?.clientUrl) {
-          setImageUrl(res.inputAsset.clientUrl);
-        }
-      } catch {
-        // error handled in hook
-      }
-    },
-    [upload, reset]
-  );
+  useEffect(() => {
+    setDraft((prev) => {
+      const initialized = createInitialDraft(presetId);
+      return {
+        ...initialized,
+        inputAsset: prev.inputAsset,
+        referenceAsset: prev.referenceAsset,
+        watermarkLogoAsset: prev.watermarkLogoAsset,
+      };
+    });
+    setRunState(EMPTY_RUN_STATE);
+  }, [presetId]);
 
-  const handleProcess = async () => {
-    if (!imageUrl) return;
-    reset();
-    const type = TAB_TO_TYPE[activeTab] as "background-replace" | "enhance" | "outpaint" | "watermark";
+  useEffect(() => {
+    if (!runState.taskId || tasks.length === 0) return;
+    const task = tasks.find((item) => item.id === runState.taskId);
+    if (!task) return;
+    setRunState({
+      taskId: task.id,
+      status: task.status,
+      progress: task.progress,
+      currentStep: task.currentStep,
+      resultImageUrl: getResultUrl(task),
+      errorMessage: task.errorMessage ? mapProviderErrorMessage(task.errorMessage) : undefined,
+      usedModel: task.usedModel,
+      processedImageId: task.processedImageId,
+    });
+  }, [runState.taskId, tasks]);
+
+  const updateToolType = (toolType: ToolType) => {
+    setDraft((prev) => ({
+      ...prev,
+      toolType,
+      parameters: buildDefaultToolParameters(toolType),
+      selectedPresetId: undefined,
+      activePresetName: undefined,
+      activePresetDescription: undefined,
+    }));
+    setRunState(EMPTY_RUN_STATE);
+  };
+
+  const updateParameters = (patch: Partial<ToolParameters>) => {
+    setDraft((prev) => ({
+      ...prev,
+      parameters: { ...prev.parameters, ...patch } as ToolParameters,
+    }));
+  };
+
+  const handleUploadAsset = async ({ role, file }: { role: "input" | "reference" | "logo"; file?: File }) => {
+    if (!file) return;
     try {
-      const res = await processImage({
-        type,
-        imageUrl,
+      const result = await upload(
+        role === "input"
+          ? { input: file }
+          : role === "reference"
+            ? { reference: file }
+            : { watermarkLogo: file }
+      );
+      const asset = role === "input" ? result.inputAsset : role === "reference" ? result.referenceAsset : result.watermarkLogoAsset;
+      if (!asset) return;
+      setDraft((prev) => ({
+        ...prev,
+        inputAsset: role === "input" ? asset : prev.inputAsset,
+        referenceAsset: role === "reference" ? asset : prev.referenceAsset,
+        watermarkLogoAsset: role === "logo" ? asset : prev.watermarkLogoAsset,
+      }));
+      setRunState(EMPTY_RUN_STATE);
+    } catch (error) {
+      toast({
+        title: "上传失败",
+        description: error instanceof Error ? error.message : "请重新选择图片",
+        variant: "destructive",
       });
-      if (res.processedUrl || res.imageData) {
-        setResultUrl(res.processedUrl || res.imageData || null);
-        await apiPost("/api/images", {
-          filename: `processed-${Date.now()}.png`,
-          originalUrl: imageUrl,
-          processedUrl: res.processedUrl || res.imageData,
-          processType: mapTabToProcessType(activeTab),
-          status: "COMPLETED",
-        });
-        toast({ title: "已保存到结果管理", description: "处理结果已自动保存" });
-      }
-    } catch {
-      // error handled in hook
     }
   };
 
-  const handleDownload = () => {
-    if (!resultUrl) return;
-    const a = document.createElement("a");
-    a.href = resultUrl;
-    a.download = `processed-${Date.now()}.png`;
-    a.click();
+  const handleCreateTask = async () => {
+    if (!draft.inputAsset) {
+      toast({ title: "请先上传图片", description: "工具任务需要一张输入图片。", variant: "destructive" });
+      return;
+    }
+
+    setCreatingTask(true);
+    try {
+      const request = buildToolLegacyTaskRequest({
+        toolType: draft.toolType,
+        inputAsset: draft.inputAsset,
+        referenceAsset: draft.referenceAsset,
+        watermarkLogoAsset: draft.watermarkLogoAsset,
+        parameters: draft.parameters,
+        selectedPresetId: draft.selectedPresetId,
+        batchMode: draft.batchMode,
+      });
+      const response = await apiPost<{ success: boolean; task: { id: string } }>("/api/tasks", request);
+      setRunState({
+        taskId: response.task.id,
+        status: "queued",
+        progress: 0,
+        currentStep: "任务已创建，等待处理",
+      });
+      startPolling([response.task.id]);
+      toast({
+        title: "工具任务已创建",
+        description: `${TOOL_TYPE_LABELS[draft.toolType]} 已进入任务队列。`,
+      });
+    } catch (error) {
+      toast({
+        title: "创建任务失败",
+        description: error instanceof Error ? error.message : "请检查图片和参数后重试",
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingTask(false);
+    }
   };
+
+  const resultPreviewUrl = runState.resultImageUrl ?? draft.inputAsset?.clientUrl;
+  const isBusy = creatingTask || uploading || isPolling || runState.status === "processing" || runState.status === "pending" || runState.status === "queued";
 
   return (
     <div className="h-screen flex flex-col bg-background">
       <TopNav />
 
-      {/* Header */}
       <div className="px-8 py-4 flex items-center justify-between shrink-0">
         <div>
-          <h1
-            className="text-xl font-semibold text-foreground"
-            style={{ fontFamily: "Inter, sans-serif" }}
-          >
-            素材精修工具
+          <h1 className="text-xl font-semibold text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
+            统一智能工具箱
           </h1>
-          <p
-            className="text-sm text-muted-foreground mt-0.5"
-            style={{ fontFamily: "Geist, sans-serif" }}
-          >
-            选择图片处理能力，快速完成商品素材精修
+          <p className="text-sm text-muted-foreground mt-0.5" style={{ fontFamily: "Geist, sans-serif" }}>
+            上传商品素材，选择工具能力，创建可追踪的 AI 处理任务
           </p>
+          {draft.activePresetName && (
+            <div className="mt-2 flex items-center gap-2">
+              <Badge variant="secondary">当前模板：{draft.activePresetName}</Badge>
+              {draft.activePresetDescription && (
+                <span className="text-xs text-muted-foreground">{draft.activePresetDescription}</span>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-3">
-          <Label
-            className="text-sm text-muted-foreground"
-            style={{ fontFamily: "Geist, sans-serif" }}
-          >
+          <Label className="text-sm text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
             批量模式
           </Label>
-          <Switch checked={batchMode} onCheckedChange={setBatchMode} />
+          <Switch checked={draft.batchMode} onCheckedChange={(checked) => setDraft((prev) => ({ ...prev, batchMode: checked }))} />
         </div>
       </div>
 
-      {/* Tab Bar */}
       <div className="px-8 border-b border-border shrink-0">
         <div className="flex gap-1">
-          {TOOL_TABS.map((tab) => (
+          {SUPPORTED_TOOLS.map((tool) => (
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              key={tool.id}
+              onClick={() => updateToolType(tool.id)}
               className={cn(
                 "flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors",
-                activeTab === tab.id
+                draft.toolType === tool.id
                   ? "text-foreground border-b-2 border-primary"
                   : "text-muted-foreground hover:text-foreground"
               )}
               style={{ fontFamily: "Inter, sans-serif" }}
             >
-              <tab.icon className="w-4 h-4" />
-              {tab.label}
+              <tool.icon className="w-4 h-4" />
+              {tool.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Workspace */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Panel */}
-        <aside className="w-[300px] border-r border-border bg-muted/30 flex flex-col overflow-y-auto">
+        <aside className="w-[320px] border-r border-border bg-muted/30 flex flex-col overflow-y-auto">
           <div className="p-5 space-y-6">
-            {/* Upload */}
             <section>
-              <h3
-                className="text-sm font-semibold text-foreground mb-3"
-                style={{ fontFamily: "Inter, sans-serif" }}
-              >
-                上传图片
+              <h3 className="text-sm font-semibold text-foreground mb-3" style={{ fontFamily: "Inter, sans-serif" }}>
+                输入素材
               </h3>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleFileSelect}
-              />
-              {!imageUrl ? (
-                <div
-                  className="border-2 border-dashed border-border rounded-xl p-8 flex flex-col items-center justify-center gap-3 hover:border-muted-foreground transition-colors cursor-pointer"
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => handleUploadAsset({ role: "input", file: event.target.files?.[0] })} />
+              {!draft.inputAsset ? (
+                <button
+                  className="w-full border-2 border-dashed border-border rounded-xl p-8 flex flex-col items-center justify-center gap-3 hover:border-muted-foreground transition-colors"
                   onClick={() => fileInputRef.current?.click()}
-                  onDrop={handleDrop}
-                  onDragOver={(e) => e.preventDefault()}
                 >
-                  {uploading ? (
-                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-                  ) : (
-                    <Upload className="w-8 h-8 text-muted-foreground" />
-                  )}
-                  <p
-                    className="text-sm text-muted-foreground text-center"
-                    style={{ fontFamily: "Geist, sans-serif" }}
-                  >
-                    {uploading ? "上传中..." : "点击或拖拽上传图片"}
-                  </p>
-                </div>
+                  {uploading ? <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /> : <Upload className="w-8 h-8 text-muted-foreground" />}
+                  <span className="text-sm text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
+                    {uploading ? "上传中..." : "点击上传图片"}
+                  </span>
+                </button>
               ) : (
                 <div className="space-y-3">
                   <div className="aspect-square bg-muted rounded-lg flex items-center justify-center overflow-hidden">
-                    <img
-                      src={imageUrl}
-                      alt="上传图片"
-                      className="w-full h-full object-contain"
-                    />
+                    <img src={draft.inputAsset.clientUrl} alt="输入图片" className="w-full h-full object-contain" />
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => {
-                      setImageUrl(null);
-                      setResultUrl(null);
-                      reset();
-                    }}
-                  >
+                  <Button variant="ghost" size="sm" className="w-full" onClick={() => fileInputRef.current?.click()}>
                     重新上传
                   </Button>
                 </div>
               )}
             </section>
 
-            {/* Tool Params */}
             <section>
-              <h3
-                className="text-sm font-semibold text-foreground mb-3"
-                style={{ fontFamily: "Inter, sans-serif" }}
-              >
-                {activeTab === "background"
-                  ? "背景选择"
-                  : activeTab === "remove-bg"
-                  ? "抠图设置"
-                  : activeTab === "outpaint"
-                  ? "扩图参数"
-                  : "放大参数"}
+              <h3 className="text-sm font-semibold text-foreground mb-3" style={{ fontFamily: "Inter, sans-serif" }}>
+                工具参数
               </h3>
-
-              {activeTab === "background" && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label style={{ fontFamily: "Geist, sans-serif" }}>
-                      风格强度
-                    </Label>
-                    <Slider defaultValue={[60]} max={100} step={1} />
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>自然</span>
-                      <span>强烈</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label style={{ fontFamily: "Geist, sans-serif" }}>
-                      自动优化
-                    </Label>
-                    <Switch checked={true} />
-                  </div>
-                </div>
-              )}
-
-              {activeTab === "upscale" && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label style={{ fontFamily: "Geist, sans-serif" }}>
-                      放大倍数
-                    </Label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {["2x", "4x", "8x"].map((v) => (
-                        <button
-                          key={v}
-                          className="px-3 py-2 rounded-lg border border-border text-sm hover:border-primary transition-colors"
-                          style={{ fontFamily: "Geist, sans-serif" }}
-                        >
-                          {v}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
+              <ToolParameterPanel
+                draft={draft}
+                updateParameters={updateParameters}
+                referenceInputRef={referenceInputRef}
+                logoInputRef={logoInputRef}
+                onUploadAsset={handleUploadAsset}
+              />
             </section>
           </div>
         </aside>
 
-        {/* Canvas */}
         <main className="flex-1 bg-muted flex items-center justify-center p-8 overflow-auto">
-          {!imageUrl ? (
+          {!resultPreviewUrl ? (
             <div className="text-center">
               <ImageIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
                 请先上传图片
               </p>
             </div>
-          ) : processing ? (
-            <div className="text-center">
-              <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-              <p className="text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
-                处理中...
-              </p>
-            </div>
-          ) : resultUrl ? (
-            <div className="w-full max-w-2xl aspect-square bg-card rounded-xl border border-border overflow-hidden shadow-sm relative">
-              <img src={resultUrl} alt="处理结果" className="w-full h-full object-contain" />
-              <button
-                onClick={() => setResultUrl(null)}
-                className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
           ) : (
-            <div className="w-full max-w-2xl aspect-square bg-card rounded-xl border border-border flex items-center justify-center shadow-sm relative overflow-hidden">
-              <img src={imageUrl} alt="原图" className="w-full h-full object-contain" />
+            <div className="w-full max-w-3xl aspect-square bg-card rounded-xl border border-border overflow-hidden shadow-sm relative">
+              <img src={resultPreviewUrl} alt={runState.resultImageUrl ? "处理结果" : "输入预览"} className="w-full h-full object-contain" />
+              {isBusy && (
+                <div className="absolute inset-0 bg-background/70 flex flex-col items-center justify-center gap-3">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  <span className="text-sm text-muted-foreground">{runState.currentStep || "任务处理中..."}</span>
+                </div>
+              )}
             </div>
           )}
         </main>
 
-        {/* Right Panel */}
-        <aside className="w-[320px] border-l border-border flex flex-col">
+        <aside className="w-[340px] border-l border-border flex flex-col overflow-y-auto">
           <div className="p-5 space-y-6">
             <section>
-              <h3
-                className="text-sm font-semibold text-foreground mb-3"
-                style={{ fontFamily: "Inter, sans-serif" }}
-              >
-                调整参数
-              </h3>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label style={{ fontFamily: "Geist, sans-serif" }}>
-                    亮度
-                  </Label>
-                  <Slider defaultValue={[50]} max={100} step={1} />
-                </div>
-                <div className="space-y-2">
-                  <Label style={{ fontFamily: "Geist, sans-serif" }}>
-                    对比度
-                  </Label>
-                  <Slider defaultValue={[50]} max={100} step={1} />
-                </div>
-                <div className="space-y-2">
-                  <Label style={{ fontFamily: "Geist, sans-serif" }}>
-                    饱和度
-                  </Label>
-                  <Slider defaultValue={[50]} max={100} step={1} />
-                </div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
+                  任务与结果
+                </h3>
+                <Badge variant="secondary" className={getStatusClassName(runState.status)}>
+                  {getStatusLabel(runState.status)}
+                </Badge>
               </div>
+              <p className="text-xs text-muted-foreground mt-2" style={{ fontFamily: "Geist, sans-serif" }}>
+                当前工具：{selectedTool.label}。{selectedTool.description}
+              </p>
+
+              {runState.taskId && (
+                <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+                  <p className="text-xs text-muted-foreground truncate">任务 ID：{runState.taskId}</p>
+                  {runState.currentStep && <p className="text-xs text-muted-foreground">{runState.currentStep}</p>}
+                  {(runState.status === "processing" || runState.status === "pending" || runState.status === "queued") && (
+                    <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                      <div className="h-full rounded-full bg-[#0066FF] transition-all" style={{ width: `${Math.max(0, Math.min(100, runState.progress))}%` }} />
+                    </div>
+                  )}
+                  {runState.usedModel && <p className="text-[11px] text-muted-foreground/70">模型：{runState.usedModel}</p>}
+                  {runState.errorMessage && (
+                    <div className="flex items-start gap-2 text-xs text-destructive">
+                      <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                      <span>{runState.errorMessage}</span>
+                    </div>
+                  )}
+                  {pollingError && <p className="text-xs text-destructive">状态刷新失败：{pollingError}</p>}
+                </div>
+              )}
             </section>
 
-            <div className="pt-4 space-y-3">
+            <div className="pt-2 space-y-3">
               <Button
                 className="w-full bg-[#0066FF] hover:bg-[#0052CC] text-white"
-                disabled={!imageUrl || processing}
-                onClick={handleProcess}
+                disabled={!draft.inputAsset || creatingTask || uploading}
+                onClick={handleCreateTask}
                 style={{ fontFamily: "Inter, sans-serif" }}
               >
-                {processing ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Sparkles className="w-4 h-4 mr-2" />
-                )}
-                {processing ? "处理中..." : "应用效果"}
+                {creatingTask ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
+                {creatingTask ? "创建任务中..." : "创建工具任务"}
               </Button>
-              <Button
-                variant="outline"
-                className="w-full"
-                disabled={!resultUrl}
-                onClick={handleDownload}
-                style={{ fontFamily: "Geist, sans-serif" }}
-              >
+              <Button variant="outline" className="w-full" disabled={!runState.resultImageUrl} onClick={() => downloadImage(runState.resultImageUrl)} style={{ fontFamily: "Geist, sans-serif" }}>
                 <Download className="w-4 h-4 mr-2" />
-                下载
+                下载结果
               </Button>
-              {processError && (
-                <p className="text-xs text-destructive text-center">{processError}</p>
-              )}
+              <Button variant="outline" className="w-full" asChild style={{ fontFamily: "Geist, sans-serif" }}>
+                <Link href="/tasks">
+                  <ListTodo className="w-4 h-4 mr-2" />
+                  查看任务中心
+                </Link>
+              </Button>
+              <Button variant="outline" className="w-full" asChild style={{ fontFamily: "Geist, sans-serif" }}>
+                <Link href="/results">打开结果管理</Link>
+              </Button>
             </div>
           </div>
         </aside>
       </div>
     </div>
+  );
+}
+
+type UpdateToolParameters = React.Dispatch<Partial<ToolParameters>>;
+type UploadToolAsset = React.Dispatch<{ role: "input" | "reference" | "logo"; file?: File }>;
+
+function ToolParameterPanel({
+  draft,
+  updateParameters,
+  referenceInputRef,
+  logoInputRef,
+  onUploadAsset,
+}: {
+  draft: ToolDraftState;
+  updateParameters: UpdateToolParameters;
+  referenceInputRef: React.RefObject<HTMLInputElement | null>;
+  logoInputRef: React.RefObject<HTMLInputElement | null>;
+  onUploadAsset: UploadToolAsset;
+}) {
+  if (draft.toolType === "watermark") {
+    const params = draft.parameters as WatermarkParams;
+    return (
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label>水印文字</Label>
+          <Input value={params.watermarkText} onChange={(event) => updateParameters({ watermarkText: event.target.value } as Partial<WatermarkParams>)} />
+        </div>
+        <div className="space-y-2">
+          <Label>透明度：{Math.round(params.watermarkOpacity * 100)}%</Label>
+          <Slider value={[params.watermarkOpacity * 100]} min={5} max={100} step={5} onValueChange={([value]) => updateParameters({ watermarkOpacity: value / 100 } as Partial<WatermarkParams>)} />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {(["bottom-right", "bottom-left", "top-right", "top-left", "center"] as WatermarkParams["watermarkPosition"][]).map((position) => (
+            <button
+              key={position}
+              className={cn("rounded-lg border px-3 py-2 text-xs", params.watermarkPosition === position ? "border-primary bg-primary/5 text-primary" : "border-border")}
+              onClick={() => updateParameters({ watermarkPosition: position } as Partial<WatermarkParams>)}
+            >
+              {position}
+            </button>
+          ))}
+        </div>
+        <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => onUploadAsset({ role: "logo", file: event.target.files?.[0] })} />
+        <Button variant="outline" size="sm" className="w-full" onClick={() => logoInputRef.current?.click()}>
+          上传 Logo 水印（可选）
+        </Button>
+      </div>
+    );
+  }
+
+  if (draft.toolType === "upscale") {
+    const params = draft.parameters as UpscaleParams;
+    return (
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label>放大倍数</Label>
+          <div className="grid grid-cols-3 gap-2">
+            {[2, 4, 8].map((factor) => (
+              <button
+                key={factor}
+                className={cn("rounded-lg border px-3 py-2 text-sm", params.upscaleFactor === factor ? "border-primary bg-primary/5 text-primary" : "border-border")}
+                onClick={() => updateParameters({ upscaleFactor: factor, outputResolution: `${factor}x` } as Partial<UpscaleParams>)}
+              >
+                {factor}x
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (draft.toolType === "outpaint") {
+    const params = draft.parameters as OutpaintParams;
+    return (
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label>扩图提示词</Label>
+          <Textarea value={params.prompt} onChange={(event) => updateParameters({ prompt: event.target.value } as Partial<OutpaintParams>)} rows={4} />
+        </div>
+        <div className="space-y-2">
+          <Label>横向扩展：{params.xScale.toFixed(1)}x</Label>
+          <Slider value={[params.xScale]} min={1} max={3} step={0.1} onValueChange={([value]) => updateParameters({ xScale: value } as Partial<OutpaintParams>)} />
+        </div>
+        <div className="space-y-2">
+          <Label>纵向扩展：{params.yScale.toFixed(1)}x</Label>
+          <Slider value={[params.yScale]} min={1} max={3} step={0.1} onValueChange={([value]) => updateParameters({ yScale: value } as Partial<OutpaintParams>)} />
+        </div>
+      </div>
+    );
+  }
+
+  const params = draft.parameters as BackgroundReplaceParams;
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label>背景提示词</Label>
+        <Textarea value={params.prompt} onChange={(event) => updateParameters({ prompt: event.target.value } as Partial<BackgroundReplaceParams>)} rows={4} />
+      </div>
+      <input ref={referenceInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => onUploadAsset({ role: "reference", file: event.target.files?.[0] })} />
+      <Button variant="outline" size="sm" className="w-full" onClick={() => referenceInputRef.current?.click()}>
+        上传参考背景（可选）
+      </Button>
+      {draft.referenceAsset && (
+        <p className="text-xs text-muted-foreground truncate">参考图：{draft.referenceAsset.originalFilename}</p>
+      )}
+    </div>
+  );
+}
+
+export default function ToolboxPage() {
+  return (
+    <Suspense fallback={<div className="h-screen bg-background" />}>
+      <ToolboxPageInner />
+    </Suspense>
   );
 }
