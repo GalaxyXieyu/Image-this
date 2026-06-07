@@ -1,0 +1,47 @@
+@theme {
+  /* === Workbench Surfaces === */
+  --color-wb-surface: #FFFFFF;
+  --color-wb-surface-raised: #F8FAFC;
+  --color-wb-surface-inset: #F1F5F9;
+  --color-wb-border: #E2E8F0;
+  --color-wb-border-strong: #CBD5E1;
+
+  /* === Workbench Text === */
+  --color-wb-text: #0F172A;
+  --color-wb-text-secondary: #64748B;
+  --color-wb-text-tertiary: #94A3B8;
+
+  /* === Workbench Accent (mapped to brand) === */
+  --color-wb-accent: #2563FF;
+  --color-wb-accent-hover: #1D4ED8;
+  --color-wb-accent-light: #DBEAFE;
+  --color-wb-success: #10B981;
+  --color-wb-warning: #FBBF24;
+  --color-wb-error: #EF4444;
+
+  /* === Workbench Layout === */
+  --wb-sidebar-width: 224px;
+  --wb-topnav-height: 56px;
+  --wb-actionbar-height: 56px;
+  --wb-detail-panel-width: 320px;
+  --wb-stepbar-height: 72px;
+}
+
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-wb-surface: #020617;
+    --color-wb-surface-raised: #0F172A;
+    --color-wb-surface-inset: #1E293B;
+    --color-wb-border: #1F2937;
+    --color-wb-border-strong: #374151;
+    --color-wb-text: #F8FAFC;
+    --color-wb-text-secondary: #94A3B8;
+    --color-wb-text-tertiary: #64748B;
+    --color-wb-accent: #60A5FA;
+    --color-wb-accent-hover: #93C5FD;
+    --color-wb-accent-light: #1E3A5F;
+    --color-wb-success: #34D399;
+    --color-wb-warning: #FDE68A;
+    --color-wb-error: #F87171;
+  }
+}
