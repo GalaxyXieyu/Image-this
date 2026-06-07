@@ -11,7 +11,7 @@
 - [x] **Phase 3: Scene Image Guided Workflow** - 实现场景图商品信息、候选生成、结果调整三步流程 (completed 2026-06-06)
 - [x] **Phase 4: Unified Smart Toolbox** - 用统一编辑器 shell 重建 AI 换背景、加水印、高清化、扩图等工具 (completed 2026-06-07)
 - [x] **Phase 04a: Brand UI/UX Optimization** - 按最新品牌规范收敛 Logo/IP、颜色、组件状态和核心页面视觉层级 (completed 2026-06-07)
-- [ ] **Phase 5: Workflow API and Worker Contract Refactor** - 将任务提交、worker dispatch、结果 payload 规范化为 typed workflow contract
+- [x] **Phase 5: Workflow API and Worker Contract Refactor** - 将任务提交、worker dispatch、结果 payload 规范化为 typed workflow contract (completed 2026-06-07)
 - [ ] **Phase 6: Old Frontend Removal and Regression Hardening** - 删除旧 workspace、补回归验证、检查 Electron/Windows 基线
 
 ## Phase Details
@@ -144,7 +144,7 @@ Plans:
 
 ## Progress
 
-**Current focus:** Phase 5 - Workflow API and Worker Contract Refactor
+**Current focus:** Phase 6 - Old Frontend Removal and Regression Hardening
 
 | Phase | Plans Complete | Status |
 |-------|----------------|--------|
@@ -152,6 +152,6 @@ Plans:
 | 2. Template Library and Preset Model | 1/1 | Complete |
 | 3. Scene Image Guided Workflow | 1/1 | Complete |
 | 4. Unified Smart Toolbox | 1/1 | Complete |
-| 5. Workflow API and Worker Contract Refactor | 0/TBD | Pending |
+| 5. Workflow API and Worker Contract Refactor | 1/1 | Complete |
 | 6. Old Frontend Removal and Regression Hardening | 0/TBD | Pending |
 
