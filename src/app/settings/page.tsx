@@ -360,6 +360,13 @@ export default function SettingsPage() {
     loadSettings();
   }, []);
 
+  // Load prompt templates when switching to prompts section
+  useEffect(() => {
+    if (activeSection === 'prompts' && status === 'authenticated') {
+      loadTemplates();
+    }
+  }, [activeSection, status]);
+
   if (status === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -725,13 +732,6 @@ export default function SettingsPage() {
     setCurrentTemplate(template);
     setIsDeleteDialogOpen(true);
   };
-
-  // 当切换到提示词标签时加载模板
-  useEffect(() => {
-    if (activeSection === 'prompts' && status === 'authenticated') {
-      loadTemplates();
-    }
-  }, [activeSection, status]);
 
   const renderContent = () => {
     switch (activeSection) {
