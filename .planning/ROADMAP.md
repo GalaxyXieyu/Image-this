@@ -144,7 +144,7 @@ Plans:
 
 ## Progress
 
-**Current focus:** All phases complete — branch ready for merge
+**Current focus:** Final regression — fix Settings page hooks error, complete smoke test, then merge.
 
 | Phase | Plans Complete | Status |
 |-------|----------------|--------|
@@ -153,5 +153,17 @@ Plans:
 | 3. Scene Image Guided Workflow | 1/1 | Complete |
 | 4. Unified Smart Toolbox | 1/1 | Complete |
 | 5. Workflow API and Worker Contract Refactor | 1/1 | Complete |
-| 6. Old Frontend Removal and Regression Hardening | 1/1 | Complete |
+| 6. Old Frontend Removal and Regression Hardening | 1/1 | Complete (pending final UI fixes) |
+
+### Final Regression Checklist (before merge)
+
+| # | Item | Status |
+|---|------|--------|
+| 1 | Fix `/settings` page React hooks error | **PASS** (commit `34c9bd8`) |
+| 2 | Smoke test `/settings` after fix | **PASS** |
+| 3 | Smoke test `/results` page | **PASS** |
+| 4 | Smoke test `/combo` page | **PASS** |
+| 5 | Final `npm run build` pass | **PASS** (39/39 pages) |
+| 6 | Push branch to remote | Ready |
+| 7 | Windows/Electron baseline validation | Post-merge |
 

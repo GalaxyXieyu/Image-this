@@ -167,6 +167,23 @@ Required in `.env`:
 - `NEXTAUTH_SECRET`: Auth secret
 - AI provider keys are stored per-user in database, not in env
 
+## Test Account
+
+For local development and UI testing:
+
+| Field | Value |
+|---|---|
+| Email | `test@imaginethis.local` |
+| Password | `TestPassword123!` |
+| Name | Test User |
+
+Register at `/auth/register` or use the API directly:
+```bash
+curl -X POST http://localhost:34123/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Test User","email":"test@imaginethis.local","password":"TestPassword123!"}'
+```
+
 ## Ports
 
 - Development: `34123`
