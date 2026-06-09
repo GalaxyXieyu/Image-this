@@ -15,8 +15,12 @@ export type Ip2Pose =
   | "point"
   | "surprise";
 
-function getIpPoseSrc(sheet: SpriteSheet) {
-  return sheet === "ip1" ? "/brands/ip1.svg" : "/brands/ip2.svg";
+function getIpPoseSrc(sheet: SpriteSheet, pose: string) {
+  if (sheet === "ip1") {
+    return `/brands/ip/lumo-core-${pose}.png`;
+  }
+
+  return `/brands/ip/lumo-helper-${pose}.png`;
 }
 
 interface SpriteImageProps {
@@ -34,7 +38,7 @@ export function SpriteImage({
   className,
   alt = "LUMO",
 }: SpriteImageProps) {
-  const src = getIpPoseSrc(sheet);
+  const src = getIpPoseSrc(sheet, pose);
 
   return (
     <img
@@ -52,7 +56,7 @@ export function BrandLogo({ className, iconClassName, textClassName }: { classNa
   return (
     <span className={cn("flex items-center gap-3", className)}>
       <img
-        src="/brands/imagethis-icon.svg"
+        src="/brands/logo/imagethis-icon.png"
         alt="ImageThis"
         className={cn("h-8 w-8 shrink-0 rounded-lg object-contain", iconClassName)}
         draggable={false}
@@ -77,7 +81,7 @@ export function BrandMascotImage({
   className?: string;
   alt?: string;
 }) {
-  const src = getIpPoseSrc(family);
+  const src = getIpPoseSrc(family, pose);
 
   return (
     <img

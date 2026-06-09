@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { BrandLogo } from "@/components/brands/SpriteImage";
 import {
   ShoppingBag,
   Scan,
@@ -19,17 +20,6 @@ import {
   MousePointerClick,
 } from "lucide-react";
 
-/* ─── Pure SVG Brand Mark (no external images) ─── */
-function BrandMark({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 32 32" fill="none" className={className} aria-hidden="true">
-      <rect width="32" height="32" rx="8" fill="#2563FF" />
-      <path d="M8 22l6-10 4 6 3-5 3 9H8z" fill="#fff" opacity="0.95" />
-      <circle cx="23" cy="10" r="2" fill="#7C3AED" />
-    </svg>
-  );
-}
-
 /* ─── Nav ─── */
 function TopNav() {
   const links = [
@@ -42,9 +32,8 @@ function TopNav() {
 
   return (
     <header className="sticky top-0 z-50 h-16 border-b border-border/60 bg-white/80 px-6 backdrop-blur-md flex items-center justify-between shrink-0">
-      <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
-        <BrandMark className="h-7 w-7" />
-        <span className="text-body font-semibold text-foreground tracking-tight">ImageThis</span>
+      <Link href="/" className="hover:opacity-80 transition-opacity">
+        <BrandLogo iconClassName="h-7 w-7 rounded-lg" textClassName="tracking-tight" />
       </Link>
       <nav className="flex items-center gap-1">
         {links.map((l) => (
