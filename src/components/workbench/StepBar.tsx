@@ -44,7 +44,7 @@ export function StepBar({
                   onClick={() => onStepClick?.(index)}
                   disabled={!onStepClick}
                   className={cn(
-                    "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium border-2 transition-colors",
+                    "w-8 h-8 rounded-full flex items-center justify-center text-data font-medium border-2 transition-colors",
                     isCompleted &&
                       "bg-primary border-primary text-primary-foreground",
                     isActive &&
@@ -62,7 +62,7 @@ export function StepBar({
                 </button>
                 <span
                   className={cn(
-                    "mt-1.5 text-xs whitespace-nowrap",
+                    "mt-1.5 text-caption whitespace-nowrap",
                     isActive
                       ? "text-foreground font-medium"
                       : "text-muted-foreground"

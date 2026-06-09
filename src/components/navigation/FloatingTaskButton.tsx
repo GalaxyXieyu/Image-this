@@ -6,6 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ListTodo, Clock, Loader, CheckCircle, XCircle, Wand2, Image as ImageIcon, Expand, Zap, ImagePlus, Video } from 'lucide-react';
+import { BrandEmptyState } from '@/components/brands/SpriteImage';
 import { getWorkflowTypeLabel, normalizeTaskStatus } from '@/lib/workbench/task-compat';
 
 interface QueueStats {
@@ -131,7 +132,7 @@ export default function FloatingTaskButton() {
             {hasActiveTasks && (
               <span className="absolute -top-1 -right-1 flex h-6 w-6">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-6 w-6 bg-red-500 items-center justify-center text-xs text-white font-bold">
+                <span className="relative inline-flex rounded-full h-6 w-6 bg-red-500 items-center justify-center text-caption text-white font-bold">
                   {stats.pending + stats.processing}
                 </span>
               </span>
@@ -143,9 +144,9 @@ export default function FloatingTaskButton() {
             {/* 统计摘要 */}
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-gray-900">任务队列</h3>
-              <div className="flex items-center gap-2 text-xs">
+              <div className="flex items-center gap-2 text-caption">
                 {stats.processing > 0 && (
-                  <Badge className="bg-blue-50 text-blue-600 border-blue-200">
+                  <Badge className="border-[#BFDBFE] bg-[#DBEAFE] text-primary">
                     <Loader className="w-3 h-3 mr-1 animate-spin" />
                     {stats.processing} 处理中
                   </Badge>
@@ -162,10 +163,12 @@ export default function FloatingTaskButton() {
             {/* 任务列表 */}
             <div className="space-y-2 max-h-80 overflow-y-auto">
               {tasks.length === 0 ? (
-                <div className="text-center py-6 text-gray-500">
-                  <ListTodo className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                  <p className="text-sm">暂无任务</p>
-                </div>
+                <BrandEmptyState
+                  pose="sleep"
+                  title="暂无任务"
+                  description="新建任务后，最近进度会显示在这里。"
+                  className="border-0 bg-transparent py-6"
+                />
               ) : (
                 tasks.map((task) => {
                   const TaskIcon = taskTypeIcons[task.type] || ListTodo;
@@ -194,8 +197,8 @@ export default function FloatingTaskButton() {
                         )}
                         {/* 状态指示器 */}
                         {isTaskStatus(task, 'processing') && (
-                          <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
-                            <Loader className="w-4 h-4 text-blue-600 animate-spin" />
+                          <div className="absolute inset-0 bg-primary/15 flex items-center justify-center">
+                            <Loader className="w-4 h-4 text-primary animate-spin" />
                           </div>
                         )}
                         {isTaskStatus(task, 'completed') && (
@@ -219,11 +222,11 @@ export default function FloatingTaskButton() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
                           <TaskIcon className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-                          <span className="text-sm font-medium text-gray-900 truncate">
+                          <span className="text-data font-medium text-gray-900 truncate">
                             {displayName}
                           </span>
                         </div>
-                        <p className="text-xs text-gray-500 truncate mt-0.5">
+                        <p className="text-caption text-gray-500 truncate mt-0.5">
                           {isTaskStatus(task, 'processing') ? task.currentStep : 
                            isTaskStatus(task, 'completed') ? '已完成' :
                            isTaskStatus(task, 'failed') ? '处理失败' :

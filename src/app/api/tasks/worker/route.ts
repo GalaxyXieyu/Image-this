@@ -172,13 +172,17 @@ class TaskProcessor {
     };
   }
 
-  private async claimPendingTasks(limit: number): Promise<QueueTaskForProcessing[]> {
+  private async claimPendingTasks(limit: number, taskIds?: string[]): Promise<QueueTaskForProcessing[]> {
     if (limit <= 0) {
       return [];
     }
 
+    const scopedTaskIds = taskIds?.filter((id) => typeof id === 'string' && id.length > 0);
     const candidates = await prisma.taskQueue.findMany({
-      where: { status: 'PENDING' },
+      where: {
+        status: 'PENDING',
+        ...(scopedTaskIds?.length ? { id: { in: scopedTaskIds } } : {}),
+      },
       orderBy: [
         { priority: 'desc' },
         { createdAt: 'asc' },
@@ -224,7 +228,7 @@ class TaskProcessor {
     return claimedTasks;
   }
 
-  async processNextTask() {
+  async processNextTask(taskIds?: string[]) {
     if (this.isProcessing) {
       return { message: '处理器正在运行中' };
     }
@@ -242,7 +246,7 @@ class TaskProcessor {
         };
       }
 
-      const [task] = await this.claimPendingTasks(1);
+      const [task] = await this.claimPendingTasks(1, taskIds);
 
       if (!task) {
         return { message: '没有待处理的任务', running: runningTasks, limit: concurrencyLimit };
@@ -401,7 +405,7 @@ class TaskProcessor {
     return results;
   }
 
-  async processBatch(maxTasks?: number) {
+  async processBatch(maxTasks?: number, taskIds?: string[]) {
     try {
       let totalProcessed = 0;
       let totalSuccessful = 0;
@@ -419,7 +423,7 @@ class TaskProcessor {
         };
       }
 
-      const pendingTasks = await this.claimPendingTasks(availableSlots);
+      const pendingTasks = await this.claimPendingTasks(availableSlots, taskIds);
 
       if (pendingTasks.length === 0) {
         return {
@@ -1201,16 +1205,19 @@ export async function POST(request: NextRequest) {
     
     const body = await request.json();
     const { batch = false, maxTasks } = body;
+    const taskIds = Array.isArray(body.taskIds)
+      ? body.taskIds.filter((id: unknown): id is string => typeof id === 'string' && id.length > 0)
+      : undefined;
 
-    console.log(`Worker模式: ${batch ? '批量处理' : '单任务处理'}, 请求并发: ${maxTasks ?? '按设置'}`);
+    console.log(`Worker模式: ${batch ? '批量处理' : '单任务处理'}, 请求并发: ${maxTasks ?? '按设置'}, 任务范围: ${taskIds?.length ? taskIds.length : '全队列'}`);
 
     let result;
     if (batch) {
       console.log('开始批量处理任务...');
-      result = await processor.processBatch(maxTasks);
+      result = await processor.processBatch(maxTasks, taskIds);
     } else {
       console.log('开始处理单个任务...');
-      result = await processor.processNextTask();
+      result = await processor.processNextTask(taskIds);
     }
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);

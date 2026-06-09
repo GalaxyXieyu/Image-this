@@ -28,7 +28,7 @@ export function TemplateGrid({
   if (presets.length === 0) {
     return (
       <div className={`flex items-center justify-center py-20 ${className || ""}`}>
-        <p className="text-muted-foreground text-sm">没有找到匹配的模板</p>
+        <p className="text-muted-foreground text-data">没有找到匹配的模板</p>
       </div>
     );
   }

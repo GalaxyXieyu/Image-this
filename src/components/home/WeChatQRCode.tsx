@@ -17,7 +17,7 @@ export default function WeChatQRCode({ onClose }: WeChatQRCodeProps) {
         className="bg-white p-8 rounded-lg shadow-xl text-center" 
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-xl font-bold mb-4">扫码联系客服</h3>
+        <h3 className="text-h3 font-bold mb-4">扫码联系客服</h3>
         <div className="flex gap-8">
           <div>
             <Image src="/客服1.jpg" alt="客服1" width={150} height={150} />

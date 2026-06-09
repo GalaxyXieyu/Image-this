@@ -59,7 +59,7 @@ async function initializeProvider(userId: string, provider: ImageProvider, overr
     },
     gpt: {
       enabled: provider === ImageProvider.GPT && !!userConfig.gpt,
-      apiUrl: userConfig.gpt?.apiUrl || 'https://yunwu.ai',
+      apiUrl: userConfig.gpt?.apiUrl || 'https://toapis.com',
       apiKey: userConfig.gpt?.apiKey || '',
       modelName: overrides?.gpt?.modelName ?? userConfig.gpt?.modelName ?? undefined
     },

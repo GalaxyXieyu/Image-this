@@ -37,6 +37,12 @@ npx prisma generate      # Regenerate Prisma Client
 npm run lint             # Run ESLint
 npm run clean            # Clean build caches
 npm run screenshots:readme  # Generate README screenshots with Playwright
+
+# UI/UX test pipeline
+npm run test:uiux        # Run login → scene image generation flow and write CSV/screenshots/report
+npm run test:uiux:login-generate  # Same as test:uiux, explicit flow name
+npm run test:uiux:record:opencli  # Exploratory opencli record probe; saves candidates under out/ui-ux-plan/<run-id>/opencli
+npm run test:uiux:codegen  # Manually record an editable Playwright script + HAR/storage under out/ui-ux-plan/<run-id>/recordings
 ```
 
 ## Architecture
@@ -183,6 +189,26 @@ curl -X POST http://localhost:34123/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{"name":"Test User","email":"test@imaginethis.local","password":"TestPassword123!"}'
 ```
+
+## UI/UX Test Workflow
+
+The reusable UI/UX test layer is split into two paths:
+
+1. **Record/explore first** when a flow is new or unstable:
+   - `npm run test:uiux:codegen` opens Playwright codegen and writes an editable script, HAR, storage state, and manifest under `out/ui-ux-plan/<run-id>/recordings/`.
+   - `npm run test:uiux:record:opencli` records API/network candidates from a live browser session.
+   - Clean up the recorded script by removing mistaken clicks, repeated waits, transient toast selectors, and unrelated navigation before moving stable steps into the replay path.
+2. **Replay/report after the flow is stable**:
+   - `npm run test:uiux` runs the login → workspace scene → upload assets → submit image generation task flow.
+   - Artifacts are written under `out/ui-ux-plan/<run-id>/`: CSV tables, screenshots, trace, network log, recordings/opencli probe assets, and Markdown report.
+
+Important boundaries:
+- `opencli` is an exploratory recorder. It does not directly replace the stable replay/report path.
+- Playwright codegen is the preferred way to export a reusable script after manually walking a flow.
+- Generated codegen scripts are source material: remove noisy operations first, then promote stable steps into `scripts/uiux/login-generate-image.mjs` or a maintained `tests/e2e/uiux/` script.
+- `chrome-mcp` exploration findings should enter the same CSV/report contract through case result, failure type, evidence path, screenshot path, and notes.
+- Actual image generation can be `BLOCKED/ENV` if local provider credentials are missing; the UI/task creation flow should still be recorded.
+- The local `ui-ux-test` skill is available at `/Users/galaxyxieyu/.claude/skills/ui-ux-test` and owns CSV/report conventions.
 
 ## Ports
 

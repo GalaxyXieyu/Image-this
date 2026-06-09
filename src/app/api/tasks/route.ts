@@ -153,14 +153,17 @@ function extractUsedModel(outputData?: string | null): string | null {
   }
 }
 
-function triggerWorkerAfterTaskCreation(request: NextRequest, taskCount: number) {
+function triggerWorkerAfterTaskCreation(request: NextRequest, taskIds: string[]) {
+  const scopedTaskIds = taskIds.filter((id) => typeof id === 'string' && id.length > 0);
+  if (scopedTaskIds.length === 0) return;
+
   const workerUrl = new URL('/api/tasks/worker', request.url);
-  const maxTasks = Math.max(1, taskCount);
+  const maxTasks = Math.max(1, scopedTaskIds.length);
 
   void fetch(workerUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ batch: true, maxTasks }),
+    body: JSON.stringify({ batch: true, maxTasks, taskIds: scopedTaskIds }),
   }).catch((error) => {
     console.error('[任务创建] 自动触发 worker 失败:', error);
   });
@@ -215,7 +218,7 @@ export async function POST(request: NextRequest) {
 
       // 使用Promise.all并行创建所有任务
       const createdTasks = await Promise.all(taskPromises);
-      triggerWorkerAfterTaskCreation(request, createdTasks.length);
+      triggerWorkerAfterTaskCreation(request, createdTasks.map((task) => task.id));
       
       // 返回创建的任务ID列表
       return NextResponse.json({
@@ -267,7 +270,7 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    triggerWorkerAfterTaskCreation(request, 1);
+    triggerWorkerAfterTaskCreation(request, [task.id]);
 
     return NextResponse.json({
       success: true,

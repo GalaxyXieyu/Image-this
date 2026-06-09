@@ -234,8 +234,8 @@ export function LogDiagnosticsCard() {
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="rounded-xl border border-border bg-secondary/50 p-4">
-            <div className="text-xs font-medium text-muted-foreground mb-1">当前日志目录</div>
-            <div className="font-mono text-sm text-foreground break-all">
+            <div className="text-caption font-medium text-muted-foreground mb-1">当前日志目录</div>
+            <div className="font-mono text-data text-foreground break-all">
               {logInfo?.directory || '仅桌面版可用'}
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -267,7 +267,7 @@ export function LogDiagnosticsCard() {
             />
           </div>
 
-          <div className="text-xs text-muted-foreground">
+          <div className="text-caption text-muted-foreground">
             日志内容会在读取时做基础脱敏，并且只读取文件末尾片段，避免大日志卡住界面。
           </div>
         </CardContent>
@@ -288,12 +288,12 @@ function LogFileList({
   return (
     <div className="rounded-xl border border-border overflow-hidden bg-card">
       <div className="px-4 py-3 bg-secondary/50 border-b">
-        <div className="text-sm font-semibold text-foreground">日志文件</div>
-        <div className="text-xs text-muted-foreground mt-0.5">选择一个文件查看末尾片段</div>
+        <div className="text-data font-semibold text-foreground">日志文件</div>
+        <div className="text-caption text-muted-foreground mt-0.5">选择一个文件查看末尾片段</div>
       </div>
       <div className="max-h-[560px] overflow-y-auto">
         {files.length === 0 ? (
-          <div className="p-4 text-sm text-muted-foreground">暂无日志文件</div>
+          <div className="p-4 text-data text-muted-foreground">暂无日志文件</div>
         ) : (
           files.map((file) => (
             <button
@@ -307,14 +307,14 @@ function LogFileList({
               }`}
             >
               <div className="flex items-center justify-between gap-2">
-                <div className="text-sm font-semibold truncate">{file.name}</div>
+                <div className="text-data font-semibold truncate">{file.name}</div>
                 {file.name.startsWith('error-') && (
                   <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive">
                     error
                   </span>
                 )}
               </div>
-              <div className="mt-1 text-xs text-muted-foreground">
+              <div className="mt-1 text-caption text-muted-foreground">
                 {(file.sizeBytes / 1024).toFixed(1)} KB · {new Date(file.modifiedAt).toLocaleString('zh-CN')}
               </div>
             </button>
@@ -345,10 +345,10 @@ function LogContentViewer({
       <div className="border-b bg-secondary/50 px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-sm font-semibold text-foreground truncate">
+            <div className="text-data font-semibold text-foreground truncate">
               {fileName || '未选择日志'}
             </div>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-caption text-muted-foreground">
               <span>{lines.length} 行</span>
               <span className="h-1 w-1 rounded-full bg-muted-foreground/30" />
               <span>{(content.length / 1024).toFixed(1)} KB 已读取</span>
@@ -384,11 +384,11 @@ function LogContentViewer({
       </div>
       <div className="h-[560px] overflow-auto bg-secondary/30 p-3">
         {isLoading ? (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+          <div className="flex h-full items-center justify-center text-data text-muted-foreground">
             正在读取日志...
           </div>
         ) : lines.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+          <div className="flex h-full items-center justify-center text-data text-muted-foreground">
             暂无日志内容
           </div>
         ) : (

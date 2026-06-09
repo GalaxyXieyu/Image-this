@@ -78,6 +78,19 @@ module.exports = {
   				soft: '#DBEAFE'
   			}
   		},
+  		fontFamily: {
+  			sans: ['var(--font-montserrat)', 'var(--font-noto-sans-sc)', 'system-ui', '-apple-system', 'sans-serif'],
+  			mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+  		},
+  		fontSize: {
+  			'display': ['56px', { lineHeight: '1.1', letterSpacing: '-0.01em', fontWeight: '700' }],
+  			'h1': ['56px', { lineHeight: '1.2', letterSpacing: '-0.02em', fontWeight: '700' }],
+  			'h2': ['32px', { lineHeight: '1.4', letterSpacing: '0', fontWeight: '600' }],
+  			'h3': ['20px', { lineHeight: '1.3', letterSpacing: '0', fontWeight: '600' }],
+  			'body': ['16px', { lineHeight: '1.75', letterSpacing: '0', fontWeight: '400' }],
+  			'caption': ['12px', { lineHeight: '1.6', letterSpacing: '0', fontWeight: '400' }],
+  			'data': ['14px', { lineHeight: '1.3', letterSpacing: '0', fontWeight: '500' }],
+  		},
   		borderRadius: {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',

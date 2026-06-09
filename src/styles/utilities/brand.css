@@ -1,15 +1,18 @@
 @layer utilities {
   .bg-brand-gradient {
-    background: linear-gradient(135deg, #2563FF 0%, #7C3AED 100%);
+    background: linear-gradient(135deg, #F8FBFC 0%, #DBEAFE 54%, #BFDBFE 100%);
   }
   .bg-brand-gradient-light {
-    background: linear-gradient(135deg, #DBEAFE 0%, #EDE9FE 50%, #FFFFFF 100%);
+    background:
+      radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.95) 0, rgba(255, 255, 255, 0) 34%),
+      radial-gradient(circle at 82% 78%, rgba(147, 197, 253, 0.22) 0, rgba(147, 197, 253, 0) 38%),
+      linear-gradient(135deg, #FFFFFF 0%, #EFF6FF 46%, #DBEAFE 100%);
   }
   .bg-brand-gradient-dark {
-    background: linear-gradient(135deg, #020617 0%, #1E1B4B 50%, #2563FF 100%);
+    background: linear-gradient(135deg, #020617 0%, #1E1B4B 56%, #2563FF 100%);
   }
   .text-brand-gradient {
-    background: linear-gradient(135deg, #2563FF 0%, #7C3AED 100%);
+    background: linear-gradient(135deg, #0F172A 0%, #2563FF 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;

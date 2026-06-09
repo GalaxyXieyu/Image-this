@@ -177,7 +177,7 @@ export function LazyImage({
       {/* 加载动画 */}
       {isLoading && showLoadingAnimation && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-          <div className="w-8 h-8 border-4 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
+          <div className="w-8 h-8 border-4 border-gray-300 border-t-primary rounded-full animate-spin" />
         </div>
       )}
 
@@ -198,7 +198,7 @@ export function LazyImage({
                 d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-            <p className="text-sm">加载失败</p>
+            <p className="text-data">加载失败</p>
           </div>
         </div>
       )}

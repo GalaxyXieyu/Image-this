@@ -101,7 +101,7 @@ export function DesktopUpdateCard() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-xl">
+          <CardTitle className="flex items-center gap-2 text-h3">
             <RotateCw className="h-5 w-5 text-primary" />
             应用更新
           </CardTitle>
@@ -112,23 +112,23 @@ export function DesktopUpdateCard() {
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-2">
             <div className="rounded-lg border border-border bg-secondary/50 p-3">
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">当前版本</div>
-              <div className="mt-1 text-base font-semibold text-foreground">{state.currentVersion}</div>
+              <div className="text-caption uppercase tracking-wide text-muted-foreground">当前版本</div>
+              <div className="mt-1 text-body font-semibold text-foreground">{state.currentVersion}</div>
             </div>
             <div className="rounded-lg border border-border bg-secondary/50 p-3">
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">更新状态</div>
-              <div className="mt-1 text-base font-semibold text-foreground">{statusLabel}</div>
+              <div className="text-caption uppercase tracking-wide text-muted-foreground">更新状态</div>
+              <div className="mt-1 text-body font-semibold text-foreground">{statusLabel}</div>
             </div>
           </div>
 
           {state.targetVersion ? (
-            <div className="text-sm text-muted-foreground">
+            <div className="text-data text-muted-foreground">
               目标版本：<span className="font-medium text-foreground">{state.targetVersion}</span>
             </div>
           ) : null}
 
           <div className="rounded-lg border border-border p-3">
-            <div className="flex items-start justify-between gap-4 text-sm text-muted-foreground">
+            <div className="flex items-start justify-between gap-4 text-data text-muted-foreground">
               <span>{statusHint}</span>
               <span className="shrink-0">{progressValue}%</span>
             </div>
@@ -141,7 +141,7 @@ export function DesktopUpdateCard() {
           </div>
 
           {state.status === 'disabled' ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-data text-amber-900">
               <div className="flex items-center gap-2 font-medium">
                 <Info className="h-4 w-4" />
                 还没有配置更新地址

@@ -1,7 +1,8 @@
 # ImageThis 品牌与产品 UI 规范
 
-> 更新日期：2026-06-06  
-> 品牌资产目录：`docs/brands/`  
+> 更新日期：2026-06-08  
+> 设计指引唯一主文档：`docs/brand-ui-spec.md`  
+> 品牌资产目录：`public/brands/`，只保留 PNG 运行时资产  
 > 适用范围：首页、模板库、场景工作台、智能工具箱、任务中心、结果管理、设置页、Electron 桌面端
 
 ## 1. 当前结论
@@ -44,14 +45,28 @@
 
 | 路径 | 用途 | 使用建议 |
 |---|---|---|
-| `docs/brands/logo/imagethis-logo-horizontal.svg` | 横版 Logo | 顶部导航、登录页、落地页、文档页 |
-| `docs/brands/logo/imagethis-logo-large.svg` | 大尺寸展示版 | 品牌展示页、封面图、演示物料 |
-| `docs/brands/logo/imagethis-wordmark.svg` | 纯文字标识 | 空间紧张但仍需品牌名的区域 |
-| `docs/brands/logo/imagethis-icon.svg` | 图标 | favicon、侧栏折叠、按钮小标识、加载状态 |
-| `docs/brands/icon/ip1.svg` | LUMO / 小光 IP 1 | 欢迎、引导、空状态 |
-| `docs/brands/icon/ip2.svg` | LUMO / 小光 IP 2 | 活动、提示、轻量说明 |
+| `public/brands/logo/imagethis-logo-horizontal.png` | 横版 Logo | 顶部导航、登录页、落地页、品牌物料 |
+| `public/brands/logo/imagethis-logo-large.png` | 大尺寸展示版 | 封面、演示、品牌展示 |
+| `public/brands/logo/imagethis-wordmark.png` | 纯文字标识 | 空间紧张但仍需品牌名的区域 |
+| `public/brands/logo/imagethis-icon.png` | 图标 | favicon、侧栏折叠、按钮小标识、加载状态 |
+| `public/brands/ip/lumo-core-*.png` | LUMO / 小光核心单帧切图 | 欢迎、引导、空状态 |
+| `public/brands/ip/lumo-helper-*.png` | LUMO / 小光辅助单帧切图 | 活动、提示、轻量说明 |
 
-### 3.2 Logo 组合
+只把正式可使用资产写入主规范；可直接被 UI 调用的 IP 单帧切图可以进入主资产清单，预览图、参考图、源图和生成中间产物不进入主资产清单。
+
+### 3.2 资产分类边界
+
+| 目录 | 内容 | 规则 |
+|---|---|---|
+| `public/brands/logo/` | 正式 Logo PNG | 可直接进入产品和品牌物料 |
+| `public/brands/ip/` | 正式 LUMO/IP 单帧 PNG | 用语义化文件名区分角色和姿态，可直接进入产品运行时 |
+| `public/brands/illustrations/` | 成品插画 PNG | 只有确定进入 UI 时才保留；草稿不入库 |
+
+`docs/` 只保留文档和 Pencil 文件，不再存放品牌图片、截图、SVG 或生成中间产物。
+
+`public/brands/` 不保留 `previews/`、`references/`、`sources/`、`split/` 这类临时或派生目录；需要重制时从设计源文件重新导出。
+
+### 3.3 Logo 组合
 
 | 场景 | 首选组合 | 说明 |
 |---|---|---|
@@ -61,7 +76,7 @@
 | 设置页/任务页 | 小图标 + 文字 | 不使用吉祥物抢焦点 |
 | 社媒/封面 | 大尺寸 Logo + LUMO | 仅限品牌传播，不进入核心工作台 |
 
-### 3.3 Logo 安全区与尺寸
+### 3.4 Logo 安全区与尺寸
 
 | 项目 | 规范 |
 |---|---|
@@ -71,7 +86,7 @@
 | 导航推荐尺寸 | 图标 28–32px，横版宽度 120–148px |
 | 登录/落地页推荐尺寸 | 横版宽度 160–220px |
 
-### 3.4 Logo 禁忌
+### 3.5 Logo 禁忌
 
 | 禁止项 | 原因 |
 |---|---|
@@ -160,28 +175,53 @@
 
 ## 5. 字体与文字层级
 
-| 场景 | 字体建议 | 说明 |
+### 5.1 字体栈
+
+| 场景 | 字体 | 字重 | 说明 |
+|---|---|---:|
+| 中文主字体 | `Noto Sans SC`（思源黑体） | 400 / 500 / 700 | 保证桌面端中文字符渲染一致，字腔清晰 |
+| 英文主字体 | `Montserrat` | 400 / 500 / 700 | 品牌气质统一，几何感强，与中文混排和谐 |
+| 数字 / 等宽 | `Montserrat` | 500 / 700 | 任务进度、价格、参数 |
+| 系统回退 | `system-ui, sans-serif` | — | 字体加载失败时的兜底 |
+
+字体栈定义（CSS）：
+
+```css
+font-family: 'Montserrat', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+```
+
+### 5.2 文字层级 Token
+
+| Token | 字号 | 行高 | 字间距 | 字重 | 用途 |
+|---|---:|---:|---:|---:|---|
+| `text-display` | 56px | 1.1 | -0.01em | 700 | 首页 Hero 英文大标题 |
+| `text-h1` | 56px | 1.2 | -0.02em | 700 | 页面大标题、品牌封面中文 |
+| `text-h2` | 32px | 1.4 | 0 | 600–700 | 区块标题、卡片标题、面板标题 |
+| `text-h3` | 20px | 1.3 | 0 | 600 | 子区块标题、表单分组标题 |
+| `text-body` | 16px | 1.75 | 0 | 400–500 | 正文、说明、表单标签 |
+| `text-caption` | 12px | 1.6 | 0 | 400–500 | 辅助信息、标签、时间戳 |
+| `text-data` | 14px | 1.3 | 0 | 500–600 | 参数、任务状态、数值 |
+
+### 5.3 与 Tailwind 默认字号的映射关系（禁止混用）
+
+| 品牌 Token | 对应 Tailwind 旧类名 | 现状问题 |
 |---|---|---|
-| 中文 | `Source Han Sans` / `Noto Sans SC` / 系统黑体 | 保证桌面端可读性 |
-| 英文 | `Inter` / `Geist` / 系统无衬线 | 与当前 Next.js 设计体系一致 |
-| 数字 | `Inter` / `Geist Mono` | 任务进度、价格、参数 |
+| `text-display` | `text-6xl` (60px) / `text-5xl` (48px) | 没有 56px 这一档，跳跃感强 |
+| `text-h1` | `text-4xl` (36px) ~ `text-5xl` (48px) | 页面标题普遍偏小，缺乏层级 |
+| `text-h2` | `text-2xl` (24px) / `text-3xl` (30px) | 区块标题用的是 24px，但规范要求 32px |
+| `text-body` | `text-base` (16px) | 这一档恰好一致，是唯一的对齐点 |
+| `text-caption` | `text-xs` (12px) | 恰好一致 |
 
-| 层级 | 桌面字号 | 行高 | 字重 | 用途 |
-|---|---:|---:|---:|---|
-| Display | 48–64 | 1.05 | 700–800 | 首页 Hero、品牌封面 |
-| H1 | 32–40 | 1.15 | 700 | 页面标题 |
-| H2 | 24–28 | 1.2 | 650–700 | 区块标题 |
-| H3 | 18–20 | 1.3 | 600 | 卡片标题、面板标题 |
-| Body | 14–16 | 1.6 | 400–500 | 正文、说明 |
-| Caption | 12–13 | 1.4 | 400–500 | 标签、辅助信息 |
-| Data | 12–14 | 1.3 | 500–600 | 参数、任务状态、数值 |
+**核心矛盾**：产品 UI 里大量使用了 `text-2xl`（24px）做标题、`text-xl`（20px）做副标题，与品牌规范里的 56px / 32px 差距很大，导致页面整体显得小气、层级扁平。
 
-文字规则：
+### 5.4 使用规则
 
-- 工作台内不要使用过大的标题压缩操作空间。
-- 页面标题清晰即可，不每页都做 Hero。
-- 中文宣传语可以有温度，操作说明必须短、准、可执行。
-- 按钮文案优先使用动词：`生成场景图`、`开始处理`、`保存到结果`。
+1. **禁止在 tailwind 类名中混用默认字号和 brand token**。统一使用 `text-h1`、`text-h2`、`text-body` 等品牌类名。
+2. **工作台内标题克制**：画布区和编辑区不使用 `text-h1`，最高用到 `text-h2`。
+3. **中文宣传语可以有温度，操作说明必须短、准、可执行**。
+4. **按钮文案优先使用动词**：`生成场景图`、`开始处理`、`保存到结果`。
+5. **字重不要滥用 Bold**：中文正文保持 400，只有标题和强调用 500/700。
+6. **数字保持等宽感**：`text-data` 用于所有状态数值、进度、价格，避免视觉跳动。
 
 ## 6. 图形、光效与 IP
 
@@ -227,9 +267,9 @@
 
 | 路径 | 用途 | 规则 |
 |---|---|---|
-| `docs/brands/icon/cut/ip2-trimmed-preview.png` | GPT 插图参考图 | 用作 LUMO 角色识别基准，保持蓝白角色、黑色贝雷帽、圆润 3D 卡通质感 |
-| `docs/brands/icon/ip1.svg` | 静态 IP 资产 | 用于欢迎、空状态、引导 |
-| `docs/brands/icon/ip2.svg` | 静态 IP 资产 | 用于提示、轻量说明、品牌展示 |
+| `public/brands/ip/lumo-helper-front.png` | GPT 插图参考图 | 用作 LUMO 角色识别基准，保持蓝白角色、黑色贝雷帽、圆润 3D 卡通质感 |
+| `public/brands/ip/lumo-core-*.png` | 静态 IP 资产 | 用于欢迎、空状态、引导 |
+| `public/brands/ip/lumo-helper-*.png` | 静态 IP 资产 | 用于提示、轻量说明、品牌展示 |
 
 ### 8.2 可生成场景
 
@@ -263,7 +303,7 @@
 |---|---|
 | Provider | GPT |
 | 模型配置 | `gpt-image-1` |
-| 参考图 | `docs/brands/icon/cut/ip2-trimmed-preview.png` |
+| 参考图 | `public/brands/ip/lumo-helper-front.png` |
 | 调用入口 | `/api/images-process/background-replace` |
 | 验证结果 | 成功返回 base64 图片并落盘 |
 | 生成产物 | `public/uploads/1780740082828-bg-replace-cmq26n0if00037z7xlk1wviqd.jpg` |
@@ -300,7 +340,7 @@
 
 - 是否只使用一套主色 token。
 - 主 CTA 是否仍是蓝色，不是粉橙。
-- Logo 是否来自 `docs/brands/logo/`，且没有被改色、拉伸或加重阴影。
+- Logo 是否来自 `public/brands/logo/`，且没有被改色、拉伸或加重阴影。
 - LUMO 是否只出现在欢迎、引导、空状态等陪伴场景。
 - 页面是否让图片、任务状态、操作路径优先于装饰。
 - 同一屏是否只有一个最强视觉焦点。
@@ -309,15 +349,15 @@
 
 ## 12. 后续资产补齐
 
-建议在 `docs/brands/` 下继续按用途管理：
+建议在 `public/brands/` 下继续按用途管理：
 
 ```text
-docs/brands/
-├── logo/       # 品牌标识
-├── icon/       # 当前 LUMO/IP 图形
-├── mascot/     # 后续 IP 表情与动作
-├── patterns/   # 背景纹理、轻光图形、装饰元素
-└── previews/   # 品牌展示图、社媒/封面预览
+public/brands/
+├── logo/           # 品牌标识 PNG
+├── ip/             # 当前 LUMO/IP PNG
+├── illustrations/  # 品牌插图 PNG
+├── patterns/       # 背景纹理、轻光图形、装饰元素 PNG
+└── previews/       # 品牌展示图、社媒/封面预览 PNG
 ```
 
 待补资产：

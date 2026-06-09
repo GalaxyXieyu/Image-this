@@ -7,6 +7,7 @@
 
 import React from "react";
 import Link from "next/link";
+import { BrandLogo } from "@/components/brands/SpriteImage";
 
 interface WorkbenchTopNavProps {
   title?: string;
@@ -17,16 +18,13 @@ export function WorkbenchTopNav({ title, rightContent }: WorkbenchTopNavProps) {
   return (
     <header className="h-14 border-b border-border bg-card flex items-center px-4 shrink-0">
       <div className="flex items-center gap-3">
-        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <img src="/brands/logo-icon.png" alt="ImageThis" className="w-7 h-7" />
-          <span className="font-semibold text-sm text-foreground">
-            ImageThis
-          </span>
+        <Link href="/" className="hover:opacity-80 transition-opacity">
+          <BrandLogo iconClassName="h-7 w-7" textClassName="text-data" />
         </Link>
         {title && (
           <>
             <span className="text-muted-foreground">/</span>
-            <span className="text-sm text-foreground font-medium">{title}</span>
+            <span className="text-data text-foreground font-medium">{title}</span>
           </>
         )}
       </div>

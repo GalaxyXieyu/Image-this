@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: In progress
-stopped_at: "All 6 phases + regression complete. Branch ready for push to remote."
-last_updated: "2026-06-08T06:30:00.000Z"
+status: Ready for handoff
+stopped_at: "All 6 phases + final regression complete. Local lint/build validation passed; push requires explicit approval."
+last_updated: "2026-06-09T00:00:00.000Z"
 progress:
   total_phases: 6
   completed_phases: 6
@@ -20,12 +20,12 @@ See: `.planning/PROJECT.md` (updated 2026-05-27)
 
 **Core value:** 电商卖家和运营可以用一个稳定、清晰、批量友好的 AI 工作台，快速产出商品主图、场景图、背景图、水印图、高清图和视频素材。
 
-**Current focus:** Final regression — fix Settings page hooks error and complete page-by-page UI smoke test before branch merge.
+**Current focus:** Final handoff — all planned phases and page-level regression are complete; local validation passes. Remote push is intentionally left for explicit user approval.
 
 ## Current Position
 
-Phase: 6 of 6 (complete), final regression in progress.
-Plan: Code review + UI/UX smoke test → fix blockers → push to remote.
+Phase: 6 of 6 (complete), final regression complete.
+Plan: Code review + UI/UX smoke test + local lint/build validation complete → await explicit approval before remote push.
 
 ### Regression Test Status (2026-06-08)
 
@@ -36,9 +36,9 @@ Plan: Code review + UI/UX smoke test → fix blockers → push to remote.
 | `/templates` | PASS | Template grid, preview, search OK |
 | `/tasks` | PASS | Task list, status badges, polling OK |
 | `/workspace/scene` | PASS | 3-step flow, asset upload, task submission OK |
-| `/settings` | **BLOCKED** | React hooks error: "Rendered more hooks than during the previous render" — `useEffect` at line 730 called after early returns (lines 363, 374) |
-| `/results` | **NOT TESTED** | Previous screenshot timed out; needs re-test after settings fix |
-| `/combo` | **NOT TESTED** | Needs smoke test after settings fix |
+| `/settings` | PASS | Hooks order fixed; settings page loads without render-count crash |
+| `/results` | PASS | Loads with sidebar, filters, grid layout |
+| `/combo` | PASS | Loads with template sidebar, step list, settings panel |
 
 ## Accumulated Context
 
@@ -61,7 +61,7 @@ Plan: Code review + UI/UX smoke test → fix blockers → push to remote.
 - [2026-06-07]: Phase 4 Wave 2 完成工具 preset 初始化和参数覆盖：`/tools` 支持 `?preset=` 和 `?tool=` 查询参数初始化工具状态，preset 中的 asset 引用（referenceAsset、watermarkLogoAsset）正确提取到 draft。
 - [2026-06-07]: Phase 4 Wave 3 完成结果保存语义：worker 已为所有 4 种工具创建 ProcessedImage 记录，`/results` 分类映射正确，工具页显示保存确认，结果页空状态提供工具箱入口，品牌导航统一。
 - [2026-06-07]: Phase 4 全部完成，`npm run build` 通过，已创建 `04-01-SUMMARY.md` 和 `04-VERIFICATION.md`。
-- [2026-06-06]: 已验证 GPT 图片能力可参考 `docs/brands/icon/cut/ip2-trimmed-preview.png` 生成 LUMO/IP 品牌插图候选稿；调用入口为 `/api/images-process/background-replace`，生成产物为 `public/uploads/1780740082828-bg-replace-cmq26n0if00037z7xlk1wviqd.jpg`。该能力进入 Phase 04a 首页、空状态、新手引导插图候选流程，但不能替代正式 Logo 或核心 UI 控件资产。
+- [2026-06-06]: 已验证 GPT 图片能力可参考 `public/brands/ip/lumo-helper-front.png` 生成 LUMO/IP 品牌插图候选稿；调用入口为 `/api/images-process/background-replace`，生成产物为 `public/uploads/1780740082828-bg-replace-cmq26n0if00037z7xlk1wviqd.jpg`。该能力进入 Phase 04a 首页、空状态、新手引导插图候选流程，但不能替代正式 Logo 或核心 UI 控件资产。
 - [Phase 04a]: Tailwind v3 @theme blocks in imported CSS files work when entry file has @tailwind directives before @imports
 - [Phase 04a]: Tailwind config must define colors in theme.extend.colors for JIT class generation even when CSS custom properties exist
 - [Phase 04a]: Home page CTA kept as variant=brand (solid blue) rather than gradient — already professional and clean
@@ -89,9 +89,9 @@ Plan: Code review + UI/UX smoke test → fix blockers → push to remote.
 - `.planning/phases/04-unified-smart-toolbox/04-01-SUMMARY.md`
 - `.planning/phases/04-unified-smart-toolbox/04-VERIFICATION.md`
 - `/Users/galaxyxieyu/Documents/image-this.pen`
-- `src/app/settings/page.tsx` — BLOCKED: hooks error at line 730
-- `src/app/combo/page.tsx` — NOT TESTED
-- `src/app/results/page.tsx` — NOT TESTED
+- `src/app/settings/page.tsx` — PASS: hooks order fixed
+- `src/app/combo/page.tsx` — PASS: smoke tested
+- `src/app/results/page.tsx` — PASS: smoke tested
 - `src/lib/workbench/worker-handlers.ts`
 - `src/lib/workbench/handlers/background-replace.ts`
 - `src/app/api/workflow/tasks/route.ts`
@@ -131,18 +131,19 @@ Historical baseline phases (01-desktop-runtime-performance, 02-task-input-asset-
 - [x] **Smoke test `/results` page** — PASS: loads with sidebar, filters, grid layout
 - [x] **Smoke test `/combo` page** — PASS: loads with template sidebar, step list, settings panel
 - [x] **Final `npm run build` pass** — PASS: 39/39 pages generated, no errors
-- [ ] **Push branch to remote** after all blockers cleared
+- [x] **Final `npm run lint` pass** — PASS: no errors; remaining warnings are existing cleanup/performance warnings
+- [ ] **Push branch to remote** after explicit user approval
 - [ ] Validate Windows/Electron baseline after merge.
 
 ### Blockers/Concerns
 
-- **ACTIVE BLOCKER**: `/settings` page crashes with "Rendered more hooks than during the previous render". Root cause: `useEffect` at line 730 executes after `if (status === 'loading')` early return at line 363 and `if (!session)` early return at line 374. On first render hooks count = N (before early returns), on second render hooks count = N+1 (includes the late useEffect). Fix: move the useEffect before all early returns, or extract conditional UI to a sub-component.
+- No active page-level regression blockers remain.
 - `src/app/api/tasks/worker/route.ts` is high-risk because it mixes scheduling, execution, provider dispatch, persistence, and retry behavior.
 - Worker lifecycle currently depends on `/api/tasks/worker` being triggered; do not assume a true always-on background worker.
-- `npm run build` passed on 2026-06-08 after Phase 6 Wave 3. Remaining warnings are dependency freshness notices and existing `<img>` lint performance warnings in preview surfaces.
+- `npm run lint` passed on 2026-06-09 with warnings only; `npm run build` passed with 39/39 pages generated. Remaining warnings are dependency freshness notices and existing cleanup/performance warnings in preview/runtime surfaces.
 
 ## Session Continuity
 
-Last session: 2026-06-08T06:00:00.000Z
-Stopped at: UI smoke test in progress — 5 pages pass, 1 blocker (settings hooks error), 2 pages untested (results, combo).
+Last session: 2026-06-09T00:00:00.000Z
+Stopped at: Final regression complete — all planned pages pass, `npm run lint` has no errors, `npm run build` passes. Remote push remains pending explicit approval.
 Resume file: None

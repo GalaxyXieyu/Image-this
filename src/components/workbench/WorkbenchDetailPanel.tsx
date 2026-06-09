@@ -38,7 +38,7 @@ export function WorkbenchDetailPanel({
       {/* Collapse toggle */}
       <div className="h-10 border-b border-border flex items-center justify-between px-3 shrink-0">
         {isOpen && title && (
-          <span className="text-sm font-medium text-foreground truncate">
+          <span className="text-data font-medium text-foreground truncate">
             {title}
           </span>
         )}

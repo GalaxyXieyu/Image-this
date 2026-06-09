@@ -15,9 +15,9 @@ export const defaultConfig: ProvidersConfig = {
   },
   gpt: {
     enabled: false,
-    apiUrl: 'https://yunwu.ai',
+    apiUrl: 'https://toapis.com',
     apiKey: '',
-    modelName: 'gpt-4o-image-vip',
+    modelName: 'gpt-image-2',
   },
   gemini: {
     enabled: false,

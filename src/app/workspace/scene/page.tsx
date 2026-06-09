@@ -26,11 +26,11 @@ import { getPresetById } from "@/lib/workbench/presets";
 import { buildSceneLegacyTaskRequests } from "@/lib/workbench/scene-task-adapter";
 import { getSceneGenerationModels } from "@/lib/ai-models";
 import type { InputAssetRef, SceneWorkflowDraft, TemplatePreset, WorkflowTaskStatus } from "@/types/workbench";
+import { BrandEmptyState, BrandImageFallback, BrandLogo } from "@/components/brands/SpriteImage";
 import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
-  Image as ImageIcon,
   Wand2,
   ShoppingBag,
 } from "lucide-react";
@@ -183,10 +183,10 @@ function StepBar({ currentStep }: { currentStep: Step }) {
             </div>
             <span
               className={cn(
-                "text-sm",
+                "text-data",
                 isActive ? "text-foreground" : "text-muted-foreground"
               )}
-              style={{ fontFamily: "Geist, sans-serif" }}
+             
             >
               {s.label}
             </span>
@@ -203,48 +203,42 @@ function StepBar({ currentStep }: { currentStep: Step }) {
 function TopNav() {
   return (
     <header className="h-16 border-b border-border px-8 flex items-center justify-between shrink-0">
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-primary" />
-        <span
-          className="text-base font-semibold text-foreground"
-          style={{ fontFamily: "Inter, sans-serif" }}
-        >
-          AI 商品视觉工作台
-        </span>
-      </div>
+      <Link href="/" className="hover:opacity-80 transition-opacity">
+        <BrandLogo />
+      </Link>
       <nav className="flex items-center gap-6">
         <Link
           href="/"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          style={{ fontFamily: "Geist, sans-serif" }}
+          className="text-data text-muted-foreground hover:text-foreground transition-colors"
+         
         >
           首页
         </Link>
         <Link
           href="/templates"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          style={{ fontFamily: "Geist, sans-serif" }}
+          className="text-data text-muted-foreground hover:text-foreground transition-colors"
+         
         >
           模板库
         </Link>
         <Link
           href="/tasks"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          style={{ fontFamily: "Geist, sans-serif" }}
+          className="text-data text-muted-foreground hover:text-foreground transition-colors"
+         
         >
           任务中心
         </Link>
         <Link
           href="/results"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          style={{ fontFamily: "Geist, sans-serif" }}
+          className="text-data text-muted-foreground hover:text-foreground transition-colors"
+         
         >
           结果管理
         </Link>
         <Link
           href="/settings"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          style={{ fontFamily: "Geist, sans-serif" }}
+          className="text-data text-muted-foreground hover:text-foreground transition-colors"
+         
         >
           设置
         </Link>
@@ -311,21 +305,21 @@ function ProductInfoStep({
                 <div>
                   <Badge variant="processing">已载入模板</Badge>
                   <h2
-                    className="mt-3 text-base font-semibold text-foreground"
-                    style={{ fontFamily: "Inter, sans-serif" }}
+                    className="mt-3 text-body font-semibold text-foreground"
+                   
                   >
                     {workflowData.activePresetName}
                   </h2>
                   {workflowData.activePresetDescription && (
                     <p
-                      className="mt-1 text-sm text-muted-foreground"
-                      style={{ fontFamily: "Geist, sans-serif" }}
+                      className="mt-1 text-data text-muted-foreground"
+                     
                     >
                       {workflowData.activePresetDescription}
                     </p>
                   )}
                 </div>
-                <div className="text-right text-xs text-muted-foreground">
+                <div className="text-right text-caption text-muted-foreground">
                   <p>模型：{workflowData.aiModel}</p>
                   <p>尺寸：{workflowData.outputResolution}</p>
                   <p>候选：{workflowData.candidateCount} 张</p>
@@ -335,38 +329,38 @@ function ProductInfoStep({
           )}
           <section className="space-y-4">
             <h2
-              className="text-lg font-semibold text-foreground"
-              style={{ fontFamily: "Inter, sans-serif" }}
+              className="text-h3 font-semibold text-foreground"
+             
             >
               产品基础信息
             </h2>
             <p
-              className="text-sm text-muted-foreground"
-              style={{ fontFamily: "Geist, sans-serif" }}
+              className="text-data text-muted-foreground"
+             
             >
               请尽可能详细地描述你的产品，AI 会根据这些信息生成最合适的场景图
             </p>
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label style={{ fontFamily: "Inter, sans-serif" }}>产品名称</Label>
+                <Label>产品名称</Label>
                 <Input
                   placeholder="例如：某某品牌保湿面霜"
                   value={workflowData.productName}
                   onChange={(e) =>
                     setWorkflowData((prev) => ({ ...prev, productName: e.target.value }))
                   }
-                  style={{ fontFamily: "Geist, sans-serif" }}
+                 
                 />
               </div>
               <div className="space-y-2">
-                <Label style={{ fontFamily: "Inter, sans-serif" }}>产品类型</Label>
+                <Label>产品类型</Label>
                 <Select
                   value={workflowData.productType}
                   onValueChange={(value) =>
                     setWorkflowData((prev) => ({ ...prev, productType: value }))
                   }
                 >
-                  <SelectTrigger style={{ fontFamily: "Geist, sans-serif" }}>
+                  <SelectTrigger>
                     <SelectValue placeholder="选择产品类型" />
                   </SelectTrigger>
                   <SelectContent>
@@ -381,30 +375,30 @@ function ProductInfoStep({
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label style={{ fontFamily: "Inter, sans-serif" }}>目标人群</Label>
+                <Label>目标人群</Label>
                 <Input
                   placeholder="例如：25-35 岁女性"
                   value={workflowData.targetAudience}
                   onChange={(e) =>
                     setWorkflowData((prev) => ({ ...prev, targetAudience: e.target.value }))
                   }
-                  style={{ fontFamily: "Geist, sans-serif" }}
+                 
                 />
               </div>
               <div className="space-y-2">
-                <Label style={{ fontFamily: "Inter, sans-serif" }}>使用场景</Label>
+                <Label>使用场景</Label>
                 <Input
                   placeholder="例如：日常护肤"
                   value={workflowData.usageScene}
                   onChange={(e) =>
                     setWorkflowData((prev) => ({ ...prev, usageScene: e.target.value }))
                   }
-                  style={{ fontFamily: "Geist, sans-serif" }}
+                 
                 />
               </div>
             </div>
             <div className="space-y-2">
-              <Label style={{ fontFamily: "Inter, sans-serif" }}>核心卖点</Label>
+              <Label>核心卖点</Label>
               <Textarea
                 placeholder="请列出产品的核心卖点..."
                 rows={3}
@@ -412,15 +406,15 @@ function ProductInfoStep({
                 onChange={(e) =>
                   setWorkflowData((prev) => ({ ...prev, sellingPoints: e.target.value }))
                 }
-                style={{ fontFamily: "Geist, sans-serif" }}
+               
               />
             </div>
           </section>
 
           <section className="space-y-4">
             <h2
-              className="text-lg font-semibold text-foreground"
-              style={{ fontFamily: "Inter, sans-serif" }}
+              className="text-h3 font-semibold text-foreground"
+             
             >
               使用平台
             </h2>
@@ -451,7 +445,7 @@ function ProductInfoStep({
                       }
                     }}
                   />
-                  <span className="text-sm" style={{ fontFamily: "Geist, sans-serif" }}>
+                  <span className="text-data">
                     {platform.label}
                   </span>
                 </label>
@@ -461,8 +455,8 @@ function ProductInfoStep({
 
           <section className="space-y-4">
             <h2
-              className="text-lg font-semibold text-foreground"
-              style={{ fontFamily: "Inter, sans-serif" }}
+              className="text-h3 font-semibold text-foreground"
+             
             >
               素材上传
             </h2>
@@ -480,12 +474,19 @@ function ProductInfoStep({
                 onClick={() => inputFileRef.current?.click()}
                 disabled={uploading}
               >
-                <ImageIcon className="w-10 h-10 text-muted-foreground" />
+                <div className="h-16 w-16 overflow-hidden rounded-xl">
+                  <BrandImageFallback
+                    title=""
+                    description=""
+                    pose={workflowData.inputAsset ? "cheer" : "think"}
+                    className="[&_p]:hidden"
+                  />
+                </div>
                 <div className="text-center">
-                  <p className="text-sm text-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
+                  <p className="text-data text-foreground">
                     {workflowData.inputAsset?.originalFilename ?? "上传商品图"}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1" style={{ fontFamily: "Geist, sans-serif" }}>
+                  <p className="text-caption text-muted-foreground mt-1">
                     商品主体图，生成时会保持主体稳定
                   </p>
                 </div>
@@ -504,18 +505,25 @@ function ProductInfoStep({
                 onClick={() => referenceFileRef.current?.click()}
                 disabled={uploading}
               >
-                <ImageIcon className="w-10 h-10 text-muted-foreground" />
+                <div className="h-16 w-16 overflow-hidden rounded-xl">
+                  <BrandImageFallback
+                    title=""
+                    description=""
+                    pose={workflowData.referenceAsset ? "star" : "sleep"}
+                    className="[&_p]:hidden"
+                  />
+                </div>
                 <div className="text-center">
-                  <p className="text-sm text-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
+                  <p className="text-data text-foreground">
                     {workflowData.referenceAsset?.originalFilename ?? "上传场景参考图"}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1" style={{ fontFamily: "Geist, sans-serif" }}>
+                  <p className="text-caption text-muted-foreground mt-1">
                     用于参考背景、构图、光线和氛围
                   </p>
                 </div>
               </button>
             </div>
-            <p className="text-xs text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
+            <p className="text-caption text-muted-foreground">
               支持 PNG、JPG；素材会先登记为 input asset，任务只携带轻量引用。
             </p>
           </section>
@@ -527,7 +535,7 @@ function ProductInfoStep({
           variant="ghost"
           asChild
           className="text-muted-foreground"
-          style={{ fontFamily: "Geist, sans-serif" }}
+         
         >
           <Link href="/templates">
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -537,7 +545,7 @@ function ProductInfoStep({
         <Button
           onClick={onNext}
           variant="brand"
-          style={{ fontFamily: "Inter, sans-serif" }}
+         
         >
           下一步：选择风格模板
           <ArrowRight className="w-4 h-4 ml-2" />
@@ -585,14 +593,14 @@ function StyleTemplateStep({
         <div className="max-w-5xl mx-auto space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
+              <h2 className="text-h3 font-semibold text-foreground">
                 AI 生成预览
               </h2>
-              <p className="text-sm text-muted-foreground mt-1" style={{ fontFamily: "Geist, sans-serif" }}>
+              <p className="text-data text-muted-foreground mt-1">
                 基于已提交的商品信息，AI 自动生成预览图
               </p>
             </div>
-            <Badge variant="secondary" className="bg-muted" style={{ fontFamily: "Geist, sans-serif" }}>
+            <Badge variant="secondary" className="bg-muted">
               已选 {selected.length} 张
             </Badge>
           </div>
@@ -628,10 +636,10 @@ function StyleTemplateStep({
                   <div className="w-full h-32 bg-muted rounded-lg flex items-center justify-center mb-4">
                     <template.icon className="w-8 h-8 text-muted-foreground" />
                   </div>
-                  <h3 className="text-sm font-medium text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
+                  <h3 className="text-data font-medium text-foreground">
                     {template.name}
                   </h3>
-                  <p className="text-xs text-muted-foreground mt-1" style={{ fontFamily: "Geist, sans-serif" }}>
+                  <p className="text-caption text-muted-foreground mt-1">
                     {template.desc}
                   </p>
                 </button>
@@ -642,7 +650,7 @@ function StyleTemplateStep({
       </div>
 
       <div className="h-16 border-t border-border px-8 flex items-center justify-between shrink-0 bg-background">
-        <Button variant="ghost" onClick={onBack} className="text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
+        <Button variant="ghost" onClick={onBack} className="text-muted-foreground">
           <ArrowLeft className="w-4 h-4 mr-2" />
           返回修改信息
         </Button>
@@ -650,7 +658,7 @@ function StyleTemplateStep({
           onClick={onNext}
           disabled={selected.length === 0}
           variant="brand"
-          style={{ fontFamily: "Inter, sans-serif" }}
+         
         >
           下一步：生成并调整
           <ArrowRight className="w-4 h-4 ml-2" />
@@ -841,26 +849,25 @@ function GenerateAdjustStep({
       <div className="flex-1 overflow-auto p-8">
         <div className="max-w-5xl mx-auto space-y-6">
           {results.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20">
-              <Wand2 className="w-12 h-12 text-muted-foreground mb-4" />
-              <h2 className="text-xl font-semibold text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
-                准备生成
-              </h2>
-              <p className="text-sm text-muted-foreground mt-2 mb-6" style={{ fontFamily: "Geist, sans-serif" }}>
-                点击开始生成，AI 将创建真实任务并进入任务中心队列
-              </p>
+            <div className="flex flex-col items-center justify-center py-12">
+              <BrandEmptyState
+                pose="think"
+                title="准备生成"
+                description="点击开始生成，AI 将创建真实任务并进入任务中心队列。"
+                className="w-full max-w-xl border-0 bg-transparent py-8"
+              />
 
               <div className="w-full max-w-xl space-y-4 mb-6">
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">AI 模型</Label>
+                    <Label className="text-caption text-muted-foreground">AI 模型</Label>
                     <Select
                       value={workflowData.aiModel}
                       onValueChange={(value) =>
                         setWorkflowData((prev) => ({ ...prev, aiModel: value }))
                       }
                     >
-                      <SelectTrigger className="text-sm">
+                      <SelectTrigger className="text-data">
                         <SelectValue placeholder="选择模型" />
                       </SelectTrigger>
                       <SelectContent>
@@ -879,14 +886,14 @@ function GenerateAdjustStep({
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">输出尺寸</Label>
+                    <Label className="text-caption text-muted-foreground">输出尺寸</Label>
                     <Select
                       value={workflowData.outputResolution}
                       onValueChange={(value) =>
                         setWorkflowData((prev) => ({ ...prev, outputResolution: value }))
                       }
                     >
-                      <SelectTrigger className="text-sm">
+                      <SelectTrigger className="text-data">
                         <SelectValue placeholder="选择尺寸" />
                       </SelectTrigger>
                       <SelectContent>
@@ -899,7 +906,7 @@ function GenerateAdjustStep({
                     </Select>
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">候选数量</Label>
+                    <Label className="text-caption text-muted-foreground">候选数量</Label>
                     <Select
                       value={String(workflowData.candidateCount)}
                       onValueChange={(value) =>
@@ -909,7 +916,7 @@ function GenerateAdjustStep({
                         }))
                       }
                     >
-                      <SelectTrigger className="text-sm">
+                      <SelectTrigger className="text-data">
                         <SelectValue placeholder="选择数量" />
                       </SelectTrigger>
                       <SelectContent>
@@ -926,7 +933,7 @@ function GenerateAdjustStep({
                 onClick={handleGenerate}
                 disabled={generating || !workflowData.inputAsset || !workflowData.referenceAsset}
                 variant="brand"
-                style={{ fontFamily: "Inter, sans-serif" }}
+               
               >
                 <Wand2 className="w-4 h-4 mr-2" />
                 开始生成
@@ -936,10 +943,10 @@ function GenerateAdjustStep({
             <>
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-xl font-semibold text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
+                  <h2 className="text-h3 font-semibold text-foreground">
                     生成结果
                   </h2>
-                  <p className="text-sm text-muted-foreground mt-1" style={{ fontFamily: "Geist, sans-serif" }}>
+                  <p className="text-data text-muted-foreground mt-1">
                     {generating
                       ? "正在创建任务，请稍候..."
                       : isPolling || activeCount > 0
@@ -947,13 +954,13 @@ function GenerateAdjustStep({
                         : `候选任务已结束，已完成 ${completedCount} 个，失败 ${failedCount} 个`}
                   </p>
                   {pollingError && (
-                    <p className="text-xs text-destructive mt-1" style={{ fontFamily: "Geist, sans-serif" }}>
+                    <p className="text-caption text-destructive mt-1">
                       状态刷新失败：{pollingError}
                     </p>
                   )}
                 </div>
                 {!generating && (
-                  <Button variant="outline" onClick={handleGenerate} style={{ fontFamily: "Inter, sans-serif" }}>
+                  <Button variant="outline" onClick={handleGenerate}>
                     <Wand2 className="w-4 h-4 mr-2" />
                     重新生成
                   </Button>
@@ -969,19 +976,23 @@ function GenerateAdjustStep({
                       ) : result.status === "processing" ? (
                         <div className="flex flex-col items-center gap-2 text-muted-foreground">
                           <Wand2 className="w-8 h-8 animate-pulse" />
-                          <span className="text-xs">{Math.max(0, result.progress)}%</span>
+                          <span className="text-caption">{Math.max(0, result.progress)}%</span>
                         </div>
                       ) : result.status === "failed" || result.status === "cancelled" ? (
-                        <div className="px-4 text-center text-xs text-destructive">
+                        <div className="px-4 text-center text-caption text-destructive">
                           {result.errorMessage ?? "任务处理失败"}
                         </div>
                       ) : (
-                        <ImageIcon className="w-8 h-8 text-muted-foreground" />
+                        <BrandImageFallback
+                          title={result.name}
+                          description={getCandidateStatusLabel(result.status)}
+                          pose={result.status === "queued" || result.status === "pending" ? "think" : "sleep"}
+                        />
                       )}
                     </div>
                     <div className="p-4">
                       <div className="flex items-center justify-between gap-2">
-                        <h3 className="text-sm font-medium text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
+                        <h3 className="text-data font-medium text-foreground">
                           {result.name}
                         </h3>
                         <Badge variant={getCandidateStatusVariant(result.status)}>
@@ -989,22 +1000,22 @@ function GenerateAdjustStep({
                         </Badge>
                       </div>
                       {result.currentStep && (
-                        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
+                        <p className="mt-1 line-clamp-2 text-caption text-muted-foreground">
                           {result.currentStep}
                         </p>
                       )}
                       {result.taskId && (
-                        <p className="mt-1 truncate text-xs text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
+                        <p className="mt-1 truncate text-caption text-muted-foreground">
                           任务 ID：{result.taskId}
                         </p>
                       )}
                       {(result.status === "completed" || result.status === "failed") && result.usedModel && (
-                        <p className="mt-1 truncate text-[11px] text-muted-foreground/70" style={{ fontFamily: "Geist, sans-serif" }}>
+                        <p className="mt-1 truncate text-[11px] text-muted-foreground/70">
                           模型：{result.usedModel}
                         </p>
                       )}
                       {result.savedImageId && (
-                        <p className="mt-1 truncate text-[11px] text-green-600" style={{ fontFamily: "Geist, sans-serif" }}>
+                        <p className="mt-1 truncate text-[11px] text-green-600">
                           已保存到结果管理
                         </p>
                       )}
@@ -1017,11 +1028,11 @@ function GenerateAdjustStep({
                         </div>
                       )}
                       <div className="flex items-center gap-2 mt-3">
-                        <Button size="sm" variant="outline" className="flex-1" style={{ fontFamily: "Geist, sans-serif" }} asChild>
+                        <Button size="sm" variant="outline" className="flex-1" asChild>
                           <Link href="/tasks">查看任务</Link>
                         </Button>
                         {result.savedImageId ? (
-                          <Button size="sm" variant="brand" className="flex-1" style={{ fontFamily: "Geist, sans-serif" }} asChild>
+                          <Button size="sm" variant="brand" className="flex-1" asChild>
                             <Link href="/results">查看结果</Link>
                           </Button>
                         ) : (
@@ -1029,7 +1040,7 @@ function GenerateAdjustStep({
                             size="sm"
                             variant="brand"
                             className="flex-1"
-                            style={{ fontFamily: "Geist, sans-serif" }}
+                           
                             onClick={() => handleSaveResult(result)}
                             disabled={
                               result.status !== "completed"
@@ -1051,11 +1062,11 @@ function GenerateAdjustStep({
       </div>
 
       <div className="h-16 border-t border-border px-8 flex items-center justify-between shrink-0 bg-background">
-        <Button variant="ghost" onClick={onBack} className="text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
+        <Button variant="ghost" onClick={onBack} className="text-muted-foreground">
           <ArrowLeft className="w-4 h-4 mr-2" />
           返回预览
         </Button>
-        <Button asChild variant="outline" style={{ fontFamily: "Inter, sans-serif" }}>
+        <Button asChild variant="outline">
           <Link href="/templates">完成，返回模板库</Link>
         </Button>
       </div>

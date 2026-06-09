@@ -63,8 +63,8 @@ export function TemplateSidebar({
         {/* 模板分类 */}
         <section>
           <h3
-            className="text-sm font-semibold text-foreground mb-3"
-            style={{ fontFamily: "Inter, sans-serif" }}
+            className="text-data font-semibold text-foreground mb-3"
+           
           >
             模板分类
           </h3>
@@ -78,12 +78,12 @@ export function TemplateSidebar({
                     onCategoryChange(key);
                   }}
                   className={cn(
-                    "w-full h-10 flex items-center gap-2.5 px-3 rounded-lg text-sm transition-colors",
+                    "w-full h-10 flex items-center gap-2.5 px-3 rounded-lg text-data transition-colors",
                     isActive
                       ? "bg-primary text-primary-foreground"
                       : "text-foreground hover:bg-accent hover:text-accent-foreground"
                   )}
-                  style={{ fontFamily: "Geist, sans-serif" }}
+                 
                 >
                   <Icon className="w-4 h-4 shrink-0" />
                   <span>{PRESET_CATEGORY_LABELS[key]}</span>
@@ -99,8 +99,8 @@ export function TemplateSidebar({
         {/* 组合模板 */}
         <section>
           <h3
-            className="text-sm font-semibold text-foreground mb-3"
-            style={{ fontFamily: "Inter, sans-serif" }}
+            className="text-data font-semibold text-foreground mb-3"
+           
           >
             组合模板
           </h3>
@@ -112,12 +112,12 @@ export function TemplateSidebar({
                   key={combo.id}
                   onClick={() => onComboClick(combo.id)}
                   className={cn(
-                    "w-full h-10 flex items-center gap-2.5 px-3 rounded-lg text-sm transition-colors",
+                    "w-full h-10 flex items-center gap-2.5 px-3 rounded-lg text-data transition-colors",
                     isActive
                       ? "bg-primary text-primary-foreground"
                       : "text-foreground hover:bg-accent hover:text-accent-foreground"
                   )}
-                  style={{ fontFamily: "Geist, sans-serif" }}
+                 
                 >
                   <LayoutGrid className="w-4 h-4 shrink-0" />
                   <span>{combo.name}</span>
@@ -133,8 +133,8 @@ export function TemplateSidebar({
         {/* 功能导航 */}
         <section>
           <h3
-            className="text-sm font-semibold text-foreground mb-3"
-            style={{ fontFamily: "Inter, sans-serif" }}
+            className="text-data font-semibold text-foreground mb-3"
+           
           >
             功能导航
           </h3>
@@ -146,12 +146,12 @@ export function TemplateSidebar({
                   key={item.href}
                   onClick={() => onFunctionNavClick(item.href)}
                   className={cn(
-                    "w-full h-10 flex items-center gap-2.5 px-3 rounded-lg text-sm transition-colors",
+                    "w-full h-10 flex items-center gap-2.5 px-3 rounded-lg text-data transition-colors",
                     isActive
                       ? "bg-primary text-primary-foreground"
                       : "text-foreground hover:bg-accent hover:text-accent-foreground"
                   )}
-                  style={{ fontFamily: "Geist, sans-serif" }}
+                 
                 >
                   <item.icon className="w-4 h-4 shrink-0" />
                   <span>{item.label}</span>

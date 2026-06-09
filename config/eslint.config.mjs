@@ -9,10 +9,23 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
+  {
+    ignores: [
+      ".next/**",
+      "node_modules/**",
+      "out/**",
+      "build/**",
+      "dist/**",
+      "dist-electron/**",
+      "coverage/**",
+      "test-results/**",
+      "playwright-report/**"
+    ]
+  },
   ...compat.extends("next/core-web-vitals"),
   {
     rules: {
-      "no-unused-vars": "warn",
+      "no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_", "ignoreRestSiblings": true }],
       "react-hooks/exhaustive-deps": "warn",
       "jsx-a11y/alt-text": "warn"
     }

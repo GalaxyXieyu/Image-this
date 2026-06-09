@@ -5,6 +5,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { getStoredSecrets, isDesktopSecretStoreEnabled, setStoredSecrets } from '@/lib/desktop-secret-store';
+import { loadConfigFromEnv } from '@/lib/image-processor/config';
 
 const USER_CONFIG_CACHE_TTL_MS = 30 * 1000;
 
@@ -103,13 +104,20 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
   }
 
   const config: UserConfig = {};
+  const envConfig = loadConfigFromEnv();
   const desktopSecrets = isDesktopSecretStoreEnabled() ? await getStoredSecrets(userId) : {};
-  const volcengineAccessKey = desktopSecrets.volcengineAccessKey || user.volcengineAccessKey || '';
-  const volcengineSecretKey = desktopSecrets.volcengineSecretKey || user.volcengineSecretKey || '';
-  const gptApiKey = desktopSecrets.gptApiKey || user.gptApiKey || '';
-  const geminiApiKey = desktopSecrets.geminiApiKey || user.geminiApiKey || '';
-  const arkApiKey = desktopSecrets.arkApiKey || user.arkApiKey || '';
-  const superbedToken = desktopSecrets.superbedToken || user.superbedToken || '';
+  const volcengineAccessKey = desktopSecrets.volcengineAccessKey || user.volcengineAccessKey || envConfig.volcengine.accessKey || '';
+  const volcengineSecretKey = desktopSecrets.volcengineSecretKey || user.volcengineSecretKey || envConfig.volcengine.secretKey || '';
+  const gptApiUrl = user.gptApiUrl || envConfig.gpt.apiUrl || '';
+  const gptApiKey = desktopSecrets.gptApiKey || user.gptApiKey || envConfig.gpt.apiKey || '';
+  const gptModelName = user.gptModelName || envConfig.gpt.modelName || undefined;
+  const geminiApiKey = desktopSecrets.geminiApiKey || user.geminiApiKey || envConfig.gemini.apiKey || '';
+  const geminiBaseUrl = user.geminiBaseUrl || envConfig.gemini.baseUrl || 'https://toapis.com';
+  const geminiModelName = user.geminiModelName || envConfig.gemini.modelName || 'gemini-3.1-flash-image-preview';
+  const arkApiKey = desktopSecrets.arkApiKey || user.arkApiKey || envConfig.jimeng.arkApiKey || '';
+  const jimengBaseUrl = user.jimengBaseUrl || envConfig.jimeng.baseUrl || undefined;
+  const jimengModelName = user.jimengModelName || envConfig.jimeng.modelName || undefined;
+  const superbedToken = desktopSecrets.superbedToken || user.superbedToken || process.env.SUPERBED_TOKEN || '';
 
   // 火山引擎配置
   if (volcengineAccessKey && volcengineSecretKey) {
@@ -117,20 +125,20 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
       accessKey: volcengineAccessKey,
       secretKey: volcengineSecretKey,
     };
-    console.log('[用户配置] Volcengine: 从数据库读取');
+    console.log('[用户配置] Volcengine: 已加载可用配置');
     console.log(`  - AccessKey: ${volcengineAccessKey.substring(0, 10)}...${volcengineAccessKey.substring(volcengineAccessKey.length - 10)}`);
   } else {
     console.warn('[用户配置] Volcengine: 未配置，请在设置页面配置火山引擎 AccessKey 和 SecretKey');
   }
 
   // GPT 配置
-  if (user.gptApiUrl && gptApiKey) {
+  if (gptApiUrl && gptApiKey) {
     config.gpt = {
-      apiUrl: user.gptApiUrl,
+      apiUrl: gptApiUrl,
       apiKey: gptApiKey,
-      modelName: user.gptModelName || undefined,
+      modelName: gptModelName,
     };
-    console.log('[用户配置] GPT: 从数据库读取');
+    console.log('[用户配置] GPT: 已加载可用配置');
   } else {
     console.warn('[用户配置] GPT: 未配置，请在设置页面配置 GPT API URL 和 API Key');
   }
@@ -139,10 +147,10 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
   if (geminiApiKey) {
     config.gemini = {
       apiKey: geminiApiKey,
-      baseUrl: user.geminiBaseUrl || 'https://toapis.com',
-      modelName: user.geminiModelName || 'gemini-3.1-flash-image-preview',
+      baseUrl: geminiBaseUrl,
+      modelName: geminiModelName,
     };
-    console.log('[用户配置] Gemini: 从数据库读取');
+    console.log('[用户配置] Gemini: 已加载可用配置');
   } else {
     console.warn('[用户配置] Gemini: 未配置，请在设置页面配置 Gemini API Key');
   }
@@ -151,12 +159,12 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
   if (arkApiKey || (volcengineAccessKey && volcengineSecretKey)) {
     config.jimeng = {
       arkApiKey: arkApiKey || undefined,
-      baseUrl: user.jimengBaseUrl || undefined,
-      modelName: user.jimengModelName || undefined,
+      baseUrl: jimengBaseUrl,
+      modelName: jimengModelName,
       accessKey: volcengineAccessKey || undefined,
       secretKey: volcengineSecretKey || undefined,
     };
-    console.log('[用户配置] 即梦: 从数据库读取');
+    console.log('[用户配置] 即梦: 已加载可用配置');
   } else {
     console.warn('[用户配置] 即梦: 未配置，请在设置页面配置 ARK API Key 或火山引擎 AccessKey/SecretKey');
   }
@@ -166,7 +174,7 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
     config.imagehosting = {
       superbedToken,
     };
-    console.log('[用户配置] 图床: 从数据库读取');
+    console.log('[用户配置] 图床: 已加载可用配置');
   } else {
     console.warn('[用户配置] 图床: 未配置，请在设置页面配置 Superbed Token');
   }

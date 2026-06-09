@@ -84,13 +84,13 @@ export default function RegisterPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-100 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-brand-gradient-light p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="space-y-1 text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Check className="w-8 h-8 text-green-600" />
             </div>
-            <CardTitle className="text-2xl font-bold text-green-800">注册成功！</CardTitle>
+            <CardTitle className="text-h3 font-bold text-green-800">注册成功！</CardTitle>
             <CardDescription>
               正在为您自动登录...
             </CardDescription>
@@ -101,10 +101,10 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-brand-gradient-light p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">注册账号</CardTitle>
+          <CardTitle className="text-h3 font-bold text-center">注册账号</CardTitle>
           <CardDescription className="text-center">
             创建账号开始使用 AI 图像处理平台
           </CardDescription>
@@ -158,7 +158,7 @@ export default function RegisterPage() {
             </div>
             
             {error && (
-              <div className="text-red-500 text-sm text-center">{error}</div>
+              <div className="text-red-500 text-data text-center">{error}</div>
             )}
             
             <Button 
@@ -172,7 +172,7 @@ export default function RegisterPage() {
           
           <div className="mt-6">
             <Separator />
-            <div className="text-center text-sm text-gray-500 mt-4 mb-4">
+            <div className="text-center text-data text-gray-500 mt-4 mb-4">
               或使用社交账号注册
             </div>
             
@@ -198,9 +198,9 @@ export default function RegisterPage() {
             </div>
           </div>
           
-          <div className="mt-6 text-center text-sm">
+          <div className="mt-6 text-center text-data">
             已有账号？{' '}
-            <Link href="/auth/login" className="text-blue-600 hover:underline">
+            <Link href="/auth/login" className="text-primary hover:underline">
               立即登录
             </Link>
           </div>

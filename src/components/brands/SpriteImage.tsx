@@ -1,59 +1,23 @@
-/**
- * SpriteImage — CSS sprite component for LUMO IP assets
- *
- * Uses background-image + background-size + background-position
- * to display a single frame from a sprite sheet.
- *
- * ip1-sprite: 1200×464, roughly 4 cols × 2 rows
- *   row 0: sleep(0,0) | love(1,0) | star(2,0) | think-hands(3,0)
- *   row 1: think(0,1) | angry(1,1) | cry(2,1) | happy(3,1)
- */
+"use client";
 
 import React from "react";
 import { cn } from "@/lib/utils";
 
 export type SpriteSheet = "ip1" | "ip2";
+export type Ip1Pose = "angry" | "cheer" | "cry" | "love" | "salute" | "sleep" | "star" | "think";
+export type Ip2Pose =
+  | "front"
+  | "side"
+  | "three-quarter"
+  | "wave"
+  | "welcome"
+  | "celebrate"
+  | "point"
+  | "surprise";
 
-const SPRITE_CONFIG: Record<
-  SpriteSheet,
-  { src: string; cols: number; rows: number; ratio: number }
-> = {
-  ip1: {
-    src: "/brands/lumo-ip1-sprite.png",
-    cols: 4,
-    rows: 2,
-    ratio: 300 / 232, // approximate cell aspect ratio (w/h)
-  },
-  ip2: {
-    src: "/brands/lumo-ip2-sprite.png",
-    cols: 4,
-    rows: 2,
-    ratio: 300 / 276,
-  },
-};
-
-/** Map pose name to grid position (col, row) */
-const IP1_POSES: Record<string, [number, number]> = {
-  sleep: [0, 0],
-  love: [1, 0],
-  star: [2, 0],
-  "think-hands": [3, 0],
-  think: [0, 1],
-  angry: [1, 1],
-  cry: [2, 1],
-  happy: [3, 1],
-};
-
-const IP2_POSES: Record<string, [number, number]> = {
-  front: [0, 0],
-  side: [1, 0],
-  "three-quarter": [2, 0],
-  wave: [3, 0],
-  welcome: [0, 1],
-  celebrate: [1, 1],
-  point: [2, 1],
-  surprise: [3, 1],
-};
+function getIpPoseSrc(sheet: SpriteSheet) {
+  return sheet === "ip1" ? "/brands/ip1.svg" : "/brands/ip2.svg";
+}
 
 interface SpriteImageProps {
   sheet: SpriteSheet;
@@ -70,36 +34,121 @@ export function SpriteImage({
   className,
   alt = "LUMO",
 }: SpriteImageProps) {
-  const config = SPRITE_CONFIG[sheet];
-  const poses = sheet === "ip1" ? IP1_POSES : IP2_POSES;
-  const pos = poses[pose] || [0, 0];
-  const [col, row] = pos;
-
-  // Calculate background size and position
-  // background-size: (cols * 100%) (rows * 100%) — zooms sprite so one cell fills container
-  // background-position: (col / (cols-1) * 100%) (row / (rows-1) * 100%)
-  const bgSizeW = config.cols * 100;
-  const bgSizeH = config.rows * 100;
-  const bgPosX = config.cols > 1 ? (col / (config.cols - 1)) * 100 : 0;
-  const bgPosY = config.rows > 1 ? (row / (config.rows - 1)) * 100 : 0;
+  const src = getIpPoseSrc(sheet);
 
   return (
-    <div
-      className={cn("shrink-0 bg-no-repeat", className)}
-      style={{
-        width: size,
-        height: size / config.ratio,
-        backgroundImage: `url(${config.src})`,
-        backgroundSize: `${bgSizeW}% ${bgSizeH}%`,
-        backgroundPosition: `${bgPosX}% ${bgPosY}%`,
-      }}
-      role="img"
-      aria-label={alt}
+    <img
+      src={src}
+      alt={alt}
+      data-pose={pose}
+      className={cn("shrink-0 object-contain", className)}
+      style={{ width: size, height: size }}
+      draggable={false}
     />
   );
 }
 
-/** Empty state helper with subdued LUMO + text */
+export function BrandLogo({ className, iconClassName, textClassName }: { className?: string; iconClassName?: string; textClassName?: string }) {
+  return (
+    <span className={cn("flex items-center gap-3", className)}>
+      <img
+        src="/brands/imagethis-icon.svg"
+        alt="ImageThis"
+        className={cn("h-8 w-8 shrink-0 rounded-lg object-contain", iconClassName)}
+        draggable={false}
+      />
+      <span className={cn("text-body font-semibold text-foreground", textClassName)}>
+        ImageThis
+      </span>
+    </span>
+  );
+}
+
+export function BrandMascotImage({
+  family = "ip1",
+  pose = "think",
+  size = 112,
+  className,
+  alt = "LUMO",
+}: {
+  family?: "ip1" | "ip2";
+  pose?: Ip1Pose | Ip2Pose;
+  size?: number;
+  className?: string;
+  alt?: string;
+}) {
+  const src = getIpPoseSrc(family);
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      data-pose={pose}
+      className={cn("shrink-0 object-contain", className)}
+      style={{ width: size, height: size }}
+      draggable={false}
+    />
+  );
+}
+
+export function BrandImageFallback({
+  title = "ImageThis",
+  description,
+  pose = "star",
+  mascot = true,
+  className,
+}: {
+  title?: string;
+  description?: string;
+  pose?: Ip1Pose;
+  mascot?: boolean;
+  className?: string;
+}) {
+  return (
+    <div className={cn("relative flex h-full w-full items-center justify-center overflow-hidden bg-brand-gradient-light", className)}>
+      <div className="absolute left-6 top-6 h-20 w-20 rounded-full bg-white/80 blur-2xl" />
+      <div className="absolute bottom-0 right-0 h-28 w-28 rounded-full bg-[#BFDBFE]/35 blur-3xl" />
+      <div className="absolute inset-x-8 bottom-5 h-px bg-gradient-to-r from-transparent via-[#BFDBFE] to-transparent" />
+      <div className="relative z-10 flex flex-col items-center gap-2 px-4 text-center">
+        {mascot ? (
+          <BrandMascotImage family="ip1" pose={pose} size={68} className="opacity-70" />
+        ) : (
+          <div className="relative mb-1 h-16 w-24">
+            <div className="absolute left-1 top-3 h-11 w-16 rounded-xl border border-[#D8E6EA] bg-white/85 shadow-sm" />
+            <div className="absolute right-1 top-0 h-14 w-14 rounded-2xl border border-[#CFE3E7] bg-[#F7FBFC] shadow-sm" />
+            <div className="absolute bottom-0 left-9 h-7 w-12 rounded-full bg-[#DDD6FE]/80" />
+          </div>
+        )}
+        {title && <p className="text-data font-semibold text-foreground">{title}</p>}
+        {description && <p className="max-w-48 text-caption text-muted-foreground">{description}</p>}
+      </div>
+    </div>
+  );
+}
+
+export function BrandEmptyState({
+  pose = "think",
+  title,
+  description,
+  action,
+  className,
+}: {
+  pose?: Ip1Pose;
+  title: string;
+  description?: string;
+  action?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex flex-col items-center justify-center gap-3 rounded-2xl border border-border bg-brand-gradient-light px-8 py-10 text-center", className)}>
+      <BrandMascotImage family="ip1" pose={pose} size={112} className="opacity-80" />
+      <p className="text-body font-semibold text-foreground">{title}</p>
+      {description && <p className="max-w-sm text-data text-muted-foreground">{description}</p>}
+      {action && <div className="mt-2">{action}</div>}
+    </div>
+  );
+}
+
 export function LumoEmptyState({
   pose,
   title,
@@ -121,9 +170,9 @@ export function LumoEmptyState({
         size={size}
         className="opacity-60"
       />
-      <p className="text-base font-medium text-foreground">{title}</p>
+      <p className="text-body font-medium text-foreground">{title}</p>
       {description && (
-        <p className="text-sm text-muted-foreground">{description}</p>
+        <p className="text-data text-muted-foreground">{description}</p>
       )}
       {action && <div className="mt-1">{action}</div>}
     </div>

@@ -12,12 +12,13 @@ import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { type TemplatePreset, type PresetCategory } from "@/types/workbench";
 import { PRESET_CATEGORY_LABELS } from "@/lib/workbench/presets";
-import { ShoppingBag, ChevronDown, ChevronUp, Heart, Share2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Heart, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { TemplateReferencePreview } from "./TemplateReferencePreview";
 
 interface TemplateDetailPanelProps {
   preset?: TemplatePreset;
-  onUse?: (preset: TemplatePreset) => void;
+  onUse?: React.Dispatch<TemplatePreset>;
   className?: string;
 }
 
@@ -29,19 +30,7 @@ export function TemplateDetailPanel({
   const [paramsOpen, setParamsOpen] = useState(false);
 
   if (!preset) {
-    return (
-      <aside
-        className={cn(
-          "w-[320px] h-full border-l border-border bg-card flex flex-col shrink-0",
-          className
-        )}
-      >
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-muted-foreground">
-          <ShoppingBag className="w-12 h-12 mb-4 opacity-30" />
-          <p className="text-sm">选择一个模板查看详情</p>
-        </div>
-      </aside>
-    );
+    return null;
   }
 
   const categoryLabel = PRESET_CATEGORY_LABELS[preset.category as PresetCategory] || preset.category;
@@ -55,16 +44,8 @@ export function TemplateDetailPanel({
     >
       {/* Preview area: 180px height, muted bg, 12px radius */}
       <div className="p-4">
-        <div
-          className="h-[180px] bg-muted rounded-xl flex flex-col items-center justify-center gap-2"
-        >
-          <ShoppingBag className="w-10 h-10 text-muted-foreground" />
-          <span
-            className="text-sm text-muted-foreground"
-            style={{ fontFamily: "Geist, sans-serif" }}
-          >
-            模板预览
-          </span>
+        <div className="h-[180px] overflow-hidden rounded-xl">
+          <TemplateReferencePreview preset={preset} />
         </div>
       </div>
 
@@ -72,29 +53,29 @@ export function TemplateDetailPanel({
       <div className="px-4 pb-4 space-y-4">
         {/* Template name: Inter 16px weight 600 */}
         <h3
-          className="text-base font-semibold text-foreground"
-          style={{ fontFamily: "Inter, sans-serif" }}
+          className="text-body font-semibold text-foreground"
+         
         >
           {preset.name}
         </h3>
 
         {/* Description: Geist 14px */}
         <p
-          className="text-sm text-muted-foreground leading-relaxed"
-          style={{ fontFamily: "Geist, sans-serif" }}
+          className="text-data text-muted-foreground leading-relaxed"
+         
         >
           {preset.description || "暂无描述"}
         </p>
 
         {/* Category badge */}
         <div className="flex flex-wrap gap-2">
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-caption font-medium bg-primary/10 text-primary">
             {categoryLabel}
           </span>
           {preset.tags.slice(0, 3).map((tag) => (
             <span
               key={tag}
-              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground"
+              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-caption font-medium bg-muted text-muted-foreground"
             >
               {tag}
             </span>
@@ -102,37 +83,37 @@ export function TemplateDetailPanel({
         </div>
 
         {/* Metadata rows */}
-        <div className="space-y-2 text-sm">
+        <div className="space-y-2 text-data">
           <div className="flex justify-between">
-            <span className="text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
+            <span className="text-muted-foreground">
               使用次数
             </span>
-            <span className="text-foreground font-medium" style={{ fontFamily: "Geist, sans-serif" }}>
+            <span className="text-foreground font-medium">
               {preset.usageCount}
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
+            <span className="text-muted-foreground">
               版本
             </span>
-            <span className="text-foreground font-medium" style={{ fontFamily: "Geist, sans-serif" }}>
+            <span className="text-foreground font-medium">
               v{preset.version}
             </span>
           </div>
           <div className="flex justify-between">
-            <span className="text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
+            <span className="text-muted-foreground">
               类型
             </span>
-            <span className="text-foreground font-medium" style={{ fontFamily: "Geist, sans-serif" }}>
+            <span className="text-foreground font-medium">
               {preset.type === "scene" ? "场景图" : preset.type === "tool" ? "工具" : "组合"}
             </span>
           </div>
           {preset.toolType && (
             <div className="flex justify-between">
-              <span className="text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
+              <span className="text-muted-foreground">
                 工具
               </span>
-              <span className="text-foreground font-medium" style={{ fontFamily: "Geist, sans-serif" }}>
+              <span className="text-foreground font-medium">
                 {preset.toolType === "background"
                   ? "换背景"
                   : preset.toolType === "watermark"
@@ -153,8 +134,8 @@ export function TemplateDetailPanel({
         <div className="border border-border rounded-lg overflow-hidden">
           <button
             onClick={() => setParamsOpen(!paramsOpen)}
-            className="w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors"
-            style={{ fontFamily: "Geist, sans-serif" }}
+            className="w-full flex items-center justify-between px-3 py-2.5 text-data font-medium text-foreground hover:bg-muted/50 transition-colors"
+           
           >
             <span>参数预览</span>
             {paramsOpen ? (
@@ -166,7 +147,7 @@ export function TemplateDetailPanel({
           {paramsOpen && (
             <div className="px-3 pb-3 space-y-1.5 border-t border-border">
               {Object.entries(preset.params).map(([key, value]) => (
-                <div key={key} className="flex justify-between text-xs">
+                <div key={key} className="flex justify-between text-caption">
                   <span className="text-muted-foreground capitalize">{key}</span>
                   <span className="text-foreground font-mono truncate max-w-[180px]">
                     {typeof value === "object"

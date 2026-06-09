@@ -1,12 +1,23 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Montserrat } from "next/font/google";
+import { Noto_Sans_SC } from "next/font/google";
 import { DesktopUpdateProvider } from "@/components/providers/DesktopUpdateProvider";
 import FloatingTaskButton from "@/components/navigation/FloatingTaskButton";
 import { Toaster } from "@/components/ui/toaster";
 import { NextAuthProvider } from "@/providers/auth-provider";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
+const montserrat = Montserrat({
+  subsets: ["latin"],
+  variable: "--font-montserrat",
+  weight: ["400", "500", "700"],
+});
+
+const notoSansSC = Noto_Sans_SC({
+  subsets: ["latin"],
+  variable: "--font-noto-sans-sc",
+  weight: ["400", "500", "700"],
+});
 
 export const metadata: Metadata = {
   title: "AI 商品视觉工作台",
@@ -25,7 +36,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN">
-      <body className={inter.className}>
+      <body className={`${montserrat.variable} ${notoSansSC.variable} font-sans`}>
         <NextAuthProvider>
           <DesktopUpdateProvider>
             {children}

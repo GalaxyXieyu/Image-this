@@ -73,7 +73,7 @@ export function WorkbenchSidebar({ className = "" }: WorkbenchSidebarProps) {
       <nav className="p-3 space-y-6">
         {NAV_SECTIONS.map((section) => (
           <div key={section.title}>
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-3 mb-2">
+            <h3 className="text-caption font-medium text-muted-foreground uppercase tracking-wider px-3 mb-2">
               {section.title}
             </h3>
             <ul className="space-y-0.5">
@@ -84,7 +84,7 @@ export function WorkbenchSidebar({ className = "" }: WorkbenchSidebarProps) {
                     <Link
                       href={item.href}
                       className={cn(
-                        "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors",
+                        "flex items-center gap-2.5 px-3 py-2 rounded-md text-data transition-colors",
                         isActive
                           ? "bg-accent text-accent-foreground font-medium"
                           : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
@@ -93,7 +93,7 @@ export function WorkbenchSidebar({ className = "" }: WorkbenchSidebarProps) {
                       <item.icon className="w-4 h-4 shrink-0" />
                       <span>{item.label}</span>
                       {item.badge && (
-                        <span className="ml-auto text-xs bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full">
+                        <span className="ml-auto text-caption bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full">
                           {item.badge}
                         </span>
                       )}

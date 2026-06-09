@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { apiGet, apiDelete } from "@/lib/api-client";
 import { useTaskPolling } from "@/lib/use-task-polling";
 import { getWorkflowTypeLabel, normalizeTaskStatus } from "@/lib/workbench/task-compat";
+import { BrandEmptyState, BrandLogo } from "@/components/brands/SpriteImage";
 import {
   RefreshCw,
   RotateCcw,
@@ -56,50 +57,43 @@ function TopNav() {
   return (
     <header className="h-16 border-b border-border px-8 flex items-center justify-between shrink-0"
     >
-      <div className="flex items-center gap-3"
-      >
-        <div className="w-8 h-8 rounded-lg bg-primary" />
-        <span
-          className="text-base font-semibold text-foreground"
-          style={{ fontFamily: "Inter, sans-serif" }}
-        >
-          AI 商品视觉工作台
-        </span>
-      </div>
+      <Link href="/" className="hover:opacity-80 transition-opacity">
+        <BrandLogo />
+      </Link>
       <nav className="flex items-center gap-6"
       >
         <Link
           href="/"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          style={{ fontFamily: "Geist, sans-serif" }}
+          className="text-data text-muted-foreground hover:text-foreground transition-colors"
+         
         >
           首页
         </Link>
         <Link
           href="/templates"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          style={{ fontFamily: "Geist, sans-serif" }}
+          className="text-data text-muted-foreground hover:text-foreground transition-colors"
+         
         >
           模板库
         </Link>
         <Link
           href="/tasks"
-          className="text-sm text-foreground font-medium"
-          style={{ fontFamily: "Geist, sans-serif" }}
+          className="text-data text-foreground font-medium"
+         
         >
           任务中心
         </Link>
         <Link
           href="/results"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          style={{ fontFamily: "Geist, sans-serif" }}
+          className="text-data text-muted-foreground hover:text-foreground transition-colors"
+         
         >
           结果管理
         </Link>
         <Link
           href="/settings"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          style={{ fontFamily: "Geist, sans-serif" }}
+          className="text-data text-muted-foreground hover:text-foreground transition-colors"
+         
         >
           设置
         </Link>
@@ -124,7 +118,7 @@ function StatusBadge({ status }: { status: TaskStatus }) {
   };
 
   return (
-    <Badge variant={variantMap[status]} style={{ fontFamily: "Geist, sans-serif" }}>
+    <Badge variant={variantMap[status]}>
       {labels[status]}
     </Badge>
   );
@@ -257,16 +251,16 @@ export default function TasksPage() {
       {/* Header */}
       <div className="px-8 py-6 flex items-center justify-between shrink-0">
         <div>
-          <h1 className="text-xl font-semibold text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
+          <h1 className="text-h3 font-semibold text-foreground">
             任务中心
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5" style={{ fontFamily: "Geist, sans-serif" }}>
+          <p className="text-data text-muted-foreground mt-0.5">
             查看和管理你的生成任务
           </p>
         </div>
         <div className="flex items-center gap-3">
           {isPolling && (
-            <div className="flex items-center gap-1.5 text-xs text-processing">
+            <div className="flex items-center gap-1.5 text-caption text-processing">
               <Radio className="w-3.5 h-3.5 animate-pulse" />
               实时更新中
             </div>
@@ -286,12 +280,12 @@ export default function TasksPage() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                "px-4 py-2.5 text-sm font-medium transition-colors",
+                "px-4 py-2.5 text-data font-medium transition-colors",
                 activeTab === tab.id
                   ? "text-foreground border-b-2 border-primary"
                   : "text-muted-foreground hover:text-foreground"
               )}
-              style={{ fontFamily: "Geist, sans-serif" }}
+             
             >
               {tab.label}
             </button>
@@ -310,7 +304,7 @@ export default function TasksPage() {
 
           {error && (
             <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-6 text-center">
-              <p className="text-sm text-destructive">{error}</p>
+              <p className="text-data text-destructive">{error}</p>
               <Button variant="outline" size="sm" className="mt-3" onClick={fetchTasks}>
                 重试
               </Button>
@@ -318,12 +312,12 @@ export default function TasksPage() {
           )}
 
           {!loading && !error && filteredTasks.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-              <ImageIcon className="w-10 h-10 mb-3" />
-              <p className="text-sm" style={{ fontFamily: "Geist, sans-serif" }}>
-                暂无任务
-              </p>
-            </div>
+            <BrandEmptyState
+              pose="sleep"
+              title="暂无任务"
+              description="创建场景图或工具任务后，进度会集中显示在这里。"
+              className="py-16"
+            />
           )}
 
           {filteredTasks.map((task) => (
@@ -337,14 +331,14 @@ export default function TasksPage() {
                     <ImageIcon className="w-5 h-5 text-muted-foreground" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-medium text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
+                    <h3 className="text-data font-medium text-foreground">
                       {task.name}
                     </h3>
-                    <p className="text-xs text-muted-foreground mt-0.5" style={{ fontFamily: "Geist, sans-serif" }}>
+                    <p className="text-caption text-muted-foreground mt-0.5">
                       {task.createdAt} · {task.completed}/{task.total} 张
                     </p>
                     {(task.status === "completed" || task.status === "failed") && task.usedModel && (
-                      <p className="text-[11px] text-muted-foreground/70 mt-0.5" style={{ fontFamily: "Geist, sans-serif" }}>
+                      <p className="text-[11px] text-muted-foreground/70 mt-0.5">
                         模型: {task.usedModel}
                       </p>
                     )}
@@ -356,10 +350,10 @@ export default function TasksPage() {
               {(task.status === "running" || task.status === "pending") && (
                 <div className="mt-4">
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
+                    <span className="text-caption text-muted-foreground">
                       进度 {task.progress}%
                     </span>
-                    <span className="text-xs text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
+                    <span className="text-caption text-muted-foreground">
                       {task.completed}/{task.total}
                     </span>
                   </div>

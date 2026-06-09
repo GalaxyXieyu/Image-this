@@ -5,8 +5,8 @@
   --color-primary-hover: #1D4ED8;
   --color-primary-soft: #DBEAFE;
   --color-primary-lighter: #EFF6FF;
-  --color-primary-border: #93C5FD;
-  --color-primary-ring: #3B82F6;
+  --color-primary-border: #BFDBFE;
+  --color-primary-ring: #93C5FD;
 
   /* === AI Accent === */
   --color-ai: #7C3AED;
@@ -59,7 +59,7 @@
   --color-destructive-foreground: #FFFFFF;
   --color-border: #E2E8F0;
   --color-input: #E2E8F0;
-  --color-ring: #3B82F6;
+  --color-ring: #93C5FD;
   --radius: 0.5rem;
 }
 

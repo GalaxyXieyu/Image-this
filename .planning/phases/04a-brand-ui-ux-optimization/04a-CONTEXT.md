@@ -40,7 +40,7 @@ Canonical references:
 | 粉橙降级为强调色 | 只用于活动、促销、转化提醒，不做默认主按钮 |
 | Logo 保持单色逻辑 | 不把 Logo 本体改成渐变，不加厚重阴影 |
 | LUMO 限制使用场景 | 欢迎、引导、空状态、加载；不进入核心编辑画布 |
-| GPT 插图能力进入资产候选流程 | 参考 `docs/brands/icon/cut/ip2-trimmed-preview.png` 生成首页、空状态、新手引导候选稿 |
+| GPT 插图能力进入资产候选流程 | 参考 `public/brands/ip/lumo-helper-front.png` 生成首页、空状态、新手引导候选稿 |
 | 浅色模式作为默认工作台 | 深色只用于用户选择或品牌演示场景 |
 
 ## Phase boundary

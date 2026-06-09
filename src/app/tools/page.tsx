@@ -16,6 +16,7 @@ import { useUpload } from "@/lib/use-upload";
 import { useToast } from "@/components/ui/use-toast";
 import { useWorkflowTaskPolling } from "@/hooks/workbench/useWorkflowTaskPolling";
 import { mapProviderErrorMessage } from "@/lib/provider-error-utils";
+import { BrandEmptyState, BrandLogo } from "@/components/brands/SpriteImage";
 import { getPresetById } from "@/lib/workbench/presets";
 import {
   buildDefaultToolParameters,
@@ -34,7 +35,6 @@ import type {
   WorkflowTaskSummary,
 } from "@/types/workbench";
 import {
-  Image as ImageIcon,
   Wand2,
   Expand,
   ZoomIn,
@@ -87,26 +87,23 @@ const EMPTY_RUN_STATE: ToolRunState = {
 function TopNav() {
   return (
     <header className="h-16 border-b border-border px-8 flex items-center justify-between shrink-0">
-      <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-        <img src="/brands/logo-icon.png" alt="ImageThis" className="w-8 h-8" />
-        <span className="text-base font-semibold text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
-          ImageThis
-        </span>
+      <Link href="/" className="hover:opacity-80 transition-opacity">
+        <BrandLogo />
       </Link>
       <nav className="flex items-center gap-6">
-        <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors" style={{ fontFamily: "Geist, sans-serif" }}>
+        <Link href="/" className="text-data text-muted-foreground hover:text-foreground transition-colors">
           首页
         </Link>
-        <Link href="/templates" className="text-sm text-muted-foreground hover:text-foreground transition-colors" style={{ fontFamily: "Geist, sans-serif" }}>
+        <Link href="/templates" className="text-data text-muted-foreground hover:text-foreground transition-colors">
           模板库
         </Link>
-        <Link href="/tasks" className="text-sm text-muted-foreground hover:text-foreground transition-colors" style={{ fontFamily: "Geist, sans-serif" }}>
+        <Link href="/tasks" className="text-data text-muted-foreground hover:text-foreground transition-colors">
           任务中心
         </Link>
-        <Link href="/results" className="text-sm text-muted-foreground hover:text-foreground transition-colors" style={{ fontFamily: "Geist, sans-serif" }}>
+        <Link href="/results" className="text-data text-muted-foreground hover:text-foreground transition-colors">
           结果管理
         </Link>
-        <Link href="/settings" className="text-sm text-muted-foreground hover:text-foreground transition-colors" style={{ fontFamily: "Geist, sans-serif" }}>
+        <Link href="/settings" className="text-data text-muted-foreground hover:text-foreground transition-colors">
           设置
         </Link>
       </nav>
@@ -130,7 +127,7 @@ function getStatusLabel(status: ToolTaskStatus) {
 function getStatusClassName(status: ToolTaskStatus) {
   if (status === "completed") return "bg-green-50 text-green-600 border-green-200";
   if (status === "failed" || status === "cancelled") return "bg-red-50 text-red-600 border-red-200";
-  if (status === "processing") return "bg-blue-50 text-blue-600 border-blue-200";
+  if (status === "processing") return "bg-[#DBEAFE] text-primary border-[#BFDBFE]";
   if (status === "queued" || status === "pending") return "bg-amber-50 text-amber-600 border-amber-200";
   return "bg-muted text-muted-foreground";
 }
@@ -339,23 +336,23 @@ function ToolboxPageInner() {
 
       <div className="px-8 py-4 flex items-center justify-between shrink-0">
         <div>
-          <h1 className="text-xl font-semibold text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
+          <h1 className="text-h3 font-semibold text-foreground">
             统一智能工具箱
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5" style={{ fontFamily: "Geist, sans-serif" }}>
+          <p className="text-data text-muted-foreground mt-0.5">
             上传商品素材，选择工具能力，创建可追踪的 AI 处理任务
           </p>
           {draft.activePresetName && (
             <div className="mt-2 flex items-center gap-2">
               <Badge variant="secondary">当前模板：{draft.activePresetName}</Badge>
               {draft.activePresetDescription && (
-                <span className="text-xs text-muted-foreground">{draft.activePresetDescription}</span>
+                <span className="text-caption text-muted-foreground">{draft.activePresetDescription}</span>
               )}
             </div>
           )}
         </div>
         <div className="flex items-center gap-3">
-          <Label className="text-sm text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
+          <Label className="text-data text-muted-foreground">
             批量模式
           </Label>
           <Switch checked={draft.batchMode} onCheckedChange={(checked) => setDraft((prev) => ({ ...prev, batchMode: checked }))} />
@@ -369,12 +366,12 @@ function ToolboxPageInner() {
               key={tool.id}
               onClick={() => updateToolType(tool.id)}
               className={cn(
-                "flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors",
+                "flex items-center gap-2 px-4 py-2.5 text-data font-medium transition-colors",
                 draft.toolType === tool.id
                   ? "text-foreground border-b-2 border-primary"
                   : "text-muted-foreground hover:text-foreground"
               )}
-              style={{ fontFamily: "Inter, sans-serif" }}
+             
             >
               <tool.icon className="w-4 h-4" />
               {tool.label}
@@ -387,7 +384,7 @@ function ToolboxPageInner() {
         <aside className="w-[320px] border-r border-border bg-muted/30 flex flex-col overflow-y-auto">
           <div className="p-5 space-y-6">
             <section>
-              <h3 className="text-sm font-semibold text-foreground mb-3" style={{ fontFamily: "Inter, sans-serif" }}>
+              <h3 className="text-data font-semibold text-foreground mb-3">
                 输入素材
               </h3>
               <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => handleUploadAsset({ role: "input", file: event.target.files?.[0] })} />
@@ -397,7 +394,7 @@ function ToolboxPageInner() {
                   onClick={() => fileInputRef.current?.click()}
                 >
                   {uploading ? <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /> : <Upload className="w-8 h-8 text-muted-foreground" />}
-                  <span className="text-sm text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
+                  <span className="text-data text-muted-foreground">
                     {uploading ? "上传中..." : "点击上传图片"}
                   </span>
                 </button>
@@ -414,7 +411,7 @@ function ToolboxPageInner() {
             </section>
 
             <section>
-              <h3 className="text-sm font-semibold text-foreground mb-3" style={{ fontFamily: "Inter, sans-serif" }}>
+              <h3 className="text-data font-semibold text-foreground mb-3">
                 工具参数
               </h3>
               <ToolParameterPanel
@@ -430,22 +427,19 @@ function ToolboxPageInner() {
 
         <main className="flex-1 bg-muted flex items-center justify-center p-8 overflow-auto">
           {!resultPreviewUrl ? (
-            <div className="text-center flex flex-col items-center gap-4">
-              <img src="/brands/split/ip1-think.png" alt="上传引导" className="w-28 h-28 opacity-50" draggable={false} />
-              <p className="text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
-                请先上传图片
-              </p>
-              <p className="text-xs text-muted-foreground/70">
-                支持 JPG、PNG 格式，建议 1024×1024 以上
-              </p>
-            </div>
+            <BrandEmptyState
+              pose="think"
+              title="请先上传图片"
+              description="支持 JPG、PNG 格式，建议 1024×1024 以上。"
+              className="min-w-[360px] border-white/70 bg-background/80 shadow-sm"
+            />
           ) : (
             <div className="w-full max-w-3xl aspect-square bg-card rounded-xl border border-border overflow-hidden shadow-sm relative">
               <img src={resultPreviewUrl} alt={runState.resultImageUrl ? "处理结果" : "输入预览"} className="w-full h-full object-contain" />
               {isBusy && (
                 <div className="absolute inset-0 bg-background/70 flex flex-col items-center justify-center gap-3">
                   <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                  <span className="text-sm text-muted-foreground">{runState.currentStep || "任务处理中..."}</span>
+                  <span className="text-data text-muted-foreground">{runState.currentStep || "任务处理中..."}</span>
                 </div>
               )}
             </div>
@@ -456,21 +450,21 @@ function ToolboxPageInner() {
           <div className="p-5 space-y-6">
             <section>
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
+                <h3 className="text-data font-semibold text-foreground">
                   任务与结果
                 </h3>
                 <Badge variant="secondary" className={getStatusClassName(runState.status)}>
                   {getStatusLabel(runState.status)}
                 </Badge>
               </div>
-              <p className="text-xs text-muted-foreground mt-2" style={{ fontFamily: "Geist, sans-serif" }}>
+              <p className="text-caption text-muted-foreground mt-2">
                 当前工具：{selectedTool.label}。{selectedTool.description}
               </p>
 
               {runState.taskId && (
                 <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3 space-y-2">
-                  <p className="text-xs text-muted-foreground truncate">任务 ID：{runState.taskId}</p>
-                  {runState.currentStep && <p className="text-xs text-muted-foreground">{runState.currentStep}</p>}
+                  <p className="text-caption text-muted-foreground truncate">任务 ID：{runState.taskId}</p>
+                  {runState.currentStep && <p className="text-caption text-muted-foreground">{runState.currentStep}</p>}
                   {(runState.status === "processing" || runState.status === "pending" || runState.status === "queued") && (
                     <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                       <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.max(0, Math.min(100, runState.progress))}%` }} />
@@ -478,12 +472,12 @@ function ToolboxPageInner() {
                   )}
                   {runState.usedModel && <p className="text-[11px] text-muted-foreground/70">模型：{runState.usedModel}</p>}
                   {runState.errorMessage && (
-                    <div className="flex items-start gap-2 text-xs text-destructive">
+                    <div className="flex items-start gap-2 text-caption text-destructive">
                       <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                       <span>{runState.errorMessage}</span>
                     </div>
                   )}
-                  {pollingError && <p className="text-xs text-destructive">状态刷新失败：{pollingError}</p>}
+                  {pollingError && <p className="text-caption text-destructive">状态刷新失败：{pollingError}</p>}
                   {runState.status === "completed" && runState.processedImageId && (
                     <p className="text-[11px] text-green-600">结果已保存到结果管理</p>
                   )}
@@ -497,22 +491,22 @@ function ToolboxPageInner() {
                 className="w-full"
                 disabled={!draft.inputAsset || creatingTask || uploading}
                 onClick={handleCreateTask}
-                style={{ fontFamily: "Inter, sans-serif" }}
+               
               >
                 {creatingTask ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
                 {creatingTask ? "创建任务中..." : "创建工具任务"}
               </Button>
-              <Button variant="outline" className="w-full" disabled={!runState.resultImageUrl} onClick={() => downloadImage(runState.resultImageUrl)} style={{ fontFamily: "Geist, sans-serif" }}>
+              <Button variant="outline" className="w-full" disabled={!runState.resultImageUrl} onClick={() => downloadImage(runState.resultImageUrl)}>
                 <Download className="w-4 h-4 mr-2" />
                 下载结果
               </Button>
-              <Button variant="outline" className="w-full" asChild style={{ fontFamily: "Geist, sans-serif" }}>
+              <Button variant="outline" className="w-full" asChild>
                 <Link href="/tasks">
                   <ListTodo className="w-4 h-4 mr-2" />
                   查看任务中心
                 </Link>
               </Button>
-              <Button variant="outline" className="w-full" asChild style={{ fontFamily: "Geist, sans-serif" }}>
+              <Button variant="outline" className="w-full" asChild>
                 <Link href="/results">
                   {runState.status === "completed" ? "查看结果管理" : "打开结果管理"}
                 </Link>
@@ -574,7 +568,7 @@ function ToolParameterPanel({
             {(["text", "logo"] as WatermarkParams["watermarkType"][]).map((type) => (
               <button
                 key={type}
-                className={cn("rounded-lg border px-3 py-2 text-sm", params.watermarkType === type ? "border-primary bg-primary/5 text-primary" : "border-border")}
+                className={cn("rounded-lg border px-3 py-2 text-data", params.watermarkType === type ? "border-primary bg-primary/5 text-primary" : "border-border")}
                 onClick={() => updateParameters({ watermarkType: type } as Partial<WatermarkParams>)}
               >
                 {type === "text" ? "文字" : "Logo"}
@@ -596,7 +590,7 @@ function ToolParameterPanel({
             {(["bottom-right", "bottom-left", "top-right", "top-left", "center"] as WatermarkParams["watermarkPosition"][]).map((position) => (
               <button
                 key={position}
-                className={cn("rounded-lg border px-3 py-2 text-xs", params.watermarkPosition === position ? "border-primary bg-primary/5 text-primary" : "border-border")}
+                className={cn("rounded-lg border px-3 py-2 text-caption", params.watermarkPosition === position ? "border-primary bg-primary/5 text-primary" : "border-border")}
                 onClick={() => updateParameters({ watermarkPosition: position } as Partial<WatermarkParams>)}
               >
                 {position}
@@ -613,7 +607,7 @@ function ToolParameterPanel({
           上传 Logo 水印（可选）
         </Button>
         {draft.watermarkLogoAsset && (
-          <p className="text-xs text-muted-foreground truncate">
+          <p className="text-caption text-muted-foreground truncate">
             Logo：{draft.watermarkLogoAsset.originalFilename}
           </p>
         )}
@@ -631,7 +625,7 @@ function ToolParameterPanel({
             {[2, 4, 8].map((factor) => (
               <button
                 key={factor}
-                className={cn("rounded-lg border px-3 py-2 text-sm", params.upscaleFactor === factor ? "border-primary bg-primary/5 text-primary" : "border-border")}
+                className={cn("rounded-lg border px-3 py-2 text-data", params.upscaleFactor === factor ? "border-primary bg-primary/5 text-primary" : "border-border")}
                 onClick={() => updateParameters({ upscaleFactor: factor, outputResolution: `${factor}x` } as Partial<UpscaleParams>)}
               >
                 {factor}x
@@ -690,7 +684,7 @@ function ToolParameterPanel({
         上传参考背景（可选）
       </Button>
       {draft.referenceAsset && (
-        <p className="text-xs text-muted-foreground truncate">
+        <p className="text-caption text-muted-foreground truncate">
           参考图：{draft.referenceAsset.originalFilename}
         </p>
       )}

@@ -127,8 +127,8 @@ Located in `prisma/schema.prisma`:
 
 **Product/Design:**
 - `docs/ai-studio-2-prd.md`：当前产品定义、页面关系、业务规则和阶段验收口径。
-- `docs/brand-ui-spec.md`：品牌视觉、UI token、Logo/IP 使用边界。
-- `docs/brands/**`：品牌 SVG 资产。
+- `docs/brand-ui-spec.md`：唯一品牌视觉与产品 UI 规范来源；如果其它规划文档和它冲突，以这里为准。
+- `public/brands/**`：运行时品牌 PNG 资产，按 `logo/`、`ip/`、`illustrations/` 分组。
 
 **Operations:**
 - `docs/desktop-operations.md`：桌面发布、Windows 签名、SQLite 数据库修复。

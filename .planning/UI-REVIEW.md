@@ -1,7 +1,7 @@
 # UI Review Report — ImageThis 品牌/UI 基线审查
 
 **Date:** 2026-06-06  
-**Scope:** `docs/brand-ui-spec.md`、`docs/brands/`、新版工作台 GSD 文档  
+**Scope:** `docs/brand-ui-spec.md`、`public/brands/`、新版工作台 GSD 文档  
 **Method:** 品牌资产检查 + 现有 UI 规范比对 + 产品工作台页面风险审查
 
 ---
@@ -103,7 +103,7 @@
 
 | 项目 | 结果 |
 |---|---|
-| 参考 IP | `docs/brands/icon/cut/ip2-trimmed-preview.png` |
+| 参考 IP | `public/brands/ip/lumo-helper-front.png` |
 | Provider | GPT |
 | 模型配置 | `gpt-image-1` |
 | 调用入口 | `/api/images-process/background-replace` |
@@ -204,3 +204,48 @@ src/styles/
 ## Build Status
 - npm run build: PASS
 - npx tsc --noEmit: PASS
+
+---
+
+# UI/UX Test Pipeline Addition
+
+## Date: 2026-06-09
+
+## Purpose
+
+新增一条可复用的 UI/UX 测试闭环，用于覆盖“登录 → 场景工作台 → 上传商品图/参考图 → 选择模板 → 提交生成图片任务”。
+
+## Commands
+
+```bash
+npm run test:uiux
+npm run test:uiux:login-generate
+npm run test:uiux:record:opencli
+npm run test:uiux:codegen
+```
+
+## Artifact Contract
+
+每轮输出到：`out/ui-ux-plan/<run-id>/`
+
+- `01_scope.csv`
+- `02_coverage_matrix.csv`
+- `03_test_cases.csv`
+- `04_execution_log.csv`
+- `05_bug_list.csv`
+- `06_summary.csv`
+- `screenshots/`
+- `traces/`
+- `recordings/`
+- `opencli/`
+- `network.json`
+- `step-log.jsonl`
+- `ui-ux-test-report-<run-id>.md`
+
+## Tool Boundary
+
+- Playwright `codegen` 是“操作一次 → 导出脚本 → 删除错误步骤 → 沉淀复跑”的主入口，录制产物保存在 `recordings/`。
+- `opencli` 用于探索录制和 API/network candidates，不作为默认复跑入口。
+- `chrome-mcp` 保留为视觉/体验探索入口；发现项必须落到 `04_execution_log.csv`、`05_bug_list.csv` 和截图证据路径。
+- `npm run test:uiux` 用于稳定复跑和报告生成。
+- 真实出图依赖本地 provider 凭据；如果缺少凭据，结果图 case 记为 `BLOCKED/ENV`，不伪造 PASS。

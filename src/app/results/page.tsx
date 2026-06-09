@@ -8,11 +8,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { apiGet, apiPatch } from "@/lib/api-client";
+import { BrandEmptyState, BrandImageFallback, BrandLogo } from "@/components/brands/SpriteImage";
 import {
   Search,
   Download,
   Trash2,
-  MoreHorizontal,
   Grid,
   List,
   Image as ImageIcon,
@@ -24,9 +24,9 @@ import {
 function ImageThumbnail({ src, alt, className }: { src?: string | null; alt: string; className?: string }) {
   const [error, setError] = useState(false);
   if (!src || error) {
-    return <ImageIcon className={cn("text-muted-foreground/50", className)} />;
+    return <BrandImageFallback title="图片预览" description="素材暂不可用" pose="sleep" className={cn("rounded-none", className)} />;
   }
-  return <img src={src} alt={alt} className="w-full h-full object-cover" onError={() => setError(true)} />;
+  return <img src={src} alt={alt} className={cn("w-full h-full object-cover", className)} onError={() => setError(true)} />;
 }
 
 interface BackendImage {
@@ -90,48 +90,42 @@ const CATEGORY_LABELS: Record<string, string> = {
 function TopNav() {
   return (
     <header className="h-16 border-b border-border px-8 flex items-center justify-between shrink-0">
-      <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-        <img src="/brands/logo-icon.png" alt="ImageThis" className="w-8 h-8" />
-        <span
-          className="text-base font-semibold text-foreground"
-          style={{ fontFamily: "Inter, sans-serif" }}
-        >
-          ImageThis
-        </span>
+      <Link href="/" className="hover:opacity-80 transition-opacity">
+        <BrandLogo />
       </Link>
       <nav className="flex items-center gap-6">
         <Link
           href="/"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          style={{ fontFamily: "Geist, sans-serif" }}
+          className="text-data text-muted-foreground hover:text-foreground transition-colors"
+         
         >
           首页
         </Link>
         <Link
           href="/templates"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          style={{ fontFamily: "Geist, sans-serif" }}
+          className="text-data text-muted-foreground hover:text-foreground transition-colors"
+         
         >
           模板库
         </Link>
         <Link
           href="/tasks"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          style={{ fontFamily: "Geist, sans-serif" }}
+          className="text-data text-muted-foreground hover:text-foreground transition-colors"
+         
         >
           任务中心
         </Link>
         <Link
           href="/results"
-          className="text-sm text-foreground font-medium"
-          style={{ fontFamily: "Geist, sans-serif" }}
+          className="text-data text-foreground font-medium"
+         
         >
           结果管理
         </Link>
         <Link
           href="/settings"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          style={{ fontFamily: "Geist, sans-serif" }}
+          className="text-data text-muted-foreground hover:text-foreground transition-colors"
+         
         >
           设置
         </Link>
@@ -240,14 +234,14 @@ export default function ResultsPage() {
       <div className="px-6 py-4 flex items-center justify-between shrink-0 border-b border-border">
         <div>
           <h1
-            className="text-lg font-semibold text-foreground"
-            style={{ fontFamily: "Inter, sans-serif" }}
+            className="text-body font-semibold text-foreground"
+           
           >
             结果管理
           </h1>
           <p
-            className="text-sm text-muted-foreground mt-0.5"
-            style={{ fontFamily: "Geist, sans-serif" }}
+            className="text-data text-muted-foreground mt-0.5"
+           
           >
             查看和下载已生成的图片结果
           </p>
@@ -261,7 +255,7 @@ export default function ResultsPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && fetchResults()}
-              style={{ fontFamily: "Geist, sans-serif" }}
+             
             />
             <Button variant="outline" size="sm" onClick={fetchResults} disabled={loading}>
               <Loader2 className={cn("w-4 h-4", loading && "animate-spin")} />
@@ -271,7 +265,7 @@ export default function ResultsPage() {
             <button
               onClick={() => setViewMode("grid")}
               className={cn(
-                "px-3 py-2 text-sm transition-colors",
+                "px-3 py-2 text-data transition-colors",
                 viewMode === "grid"
                   ? "bg-primary text-primary-foreground"
                   : "bg-background text-muted-foreground hover:text-foreground"
@@ -282,7 +276,7 @@ export default function ResultsPage() {
             <button
               onClick={() => setViewMode("list")}
               className={cn(
-                "px-3 py-2 text-sm transition-colors",
+                "px-3 py-2 text-data transition-colors",
                 viewMode === "list"
                   ? "bg-primary text-primary-foreground"
                   : "bg-background text-muted-foreground hover:text-foreground"
@@ -300,8 +294,8 @@ export default function ResultsPage() {
         <aside className="w-[200px] border-r border-border flex flex-col shrink-0">
           <div className="p-4">
             <h2
-              className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3"
-              style={{ fontFamily: "Inter, sans-serif" }}
+              className="text-caption font-semibold text-muted-foreground uppercase tracking-wider mb-3"
+             
             >
               场景分类
             </h2>
@@ -311,17 +305,17 @@ export default function ResultsPage() {
                   key={id}
                   onClick={() => setActiveCategory(id)}
                   className={cn(
-                    "w-full flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors",
+                    "w-full flex items-center justify-between px-3 py-2 rounded-md text-data transition-colors",
                     activeCategory === id
                       ? "bg-primary/10 text-primary font-medium"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
-                  style={{ fontFamily: "Geist, sans-serif" }}
+                 
                 >
                   <span>{label}</span>
                   <Badge
                     variant={activeCategory === id ? "default" : "secondary"}
-                    className="text-xs h-5 px-1.5"
+                    className="text-caption h-5 px-1.5"
                   >
                     {categoryCounts[id] || 0}
                   </Badge>
@@ -338,16 +332,16 @@ export default function ResultsPage() {
             <div className="flex items-center gap-4">
               <button
                 onClick={toggleSelectAll}
-                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                style={{ fontFamily: "Geist, sans-serif" }}
+                className="flex items-center gap-2 text-data text-muted-foreground hover:text-foreground transition-colors"
+               
               >
                 <CheckSquare className={cn("w-4 h-4", isAllSelected && "text-primary")} />
                 全选
               </button>
               {selectedIds.size > 0 && (
                 <span
-                  className="text-sm text-muted-foreground"
-                  style={{ fontFamily: "Geist, sans-serif" }}
+                  className="text-data text-muted-foreground"
+                 
                 >
                   已选择 {selectedIds.size} 项
                 </span>
@@ -386,7 +380,7 @@ export default function ResultsPage() {
 
             {error && (
               <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-6 text-center">
-                <p className="text-sm text-destructive">{error}</p>
+                <p className="text-data text-destructive">{error}</p>
                 <Button variant="outline" size="sm" className="mt-3" onClick={fetchResults}>
                   重试
                 </Button>
@@ -432,14 +426,14 @@ export default function ResultsPage() {
                         {/* Card info — minimal */}
                         <div className="px-3 py-2">
                           <h3
-                            className="text-sm font-medium text-foreground truncate"
-                            style={{ fontFamily: "Inter, sans-serif" }}
+                            className="text-data font-medium text-foreground truncate"
+                           
                           >
                             {item.name}
                           </h3>
                           <p
-                            className="text-xs text-muted-foreground mt-0.5"
-                            style={{ fontFamily: "Geist, sans-serif" }}
+                            className="text-caption text-muted-foreground mt-0.5"
+                           
                           >
                             {item.createdAt}
                           </p>
@@ -468,14 +462,14 @@ export default function ResultsPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3
-                            className="text-sm font-medium text-foreground truncate"
-                            style={{ fontFamily: "Inter, sans-serif" }}
+                            className="text-data font-medium text-foreground truncate"
+                           
                           >
                             {item.name}
                           </h3>
                           <p
-                            className="text-xs text-muted-foreground"
-                            style={{ fontFamily: "Geist, sans-serif" }}
+                            className="text-caption text-muted-foreground"
+                           
                           >
                             {item.createdAt}
                           </p>
@@ -494,29 +488,28 @@ export default function ResultsPage() {
                 )}
 
                 {filteredResults.length === 0 && (
-                  <div className="flex flex-col items-center justify-center h-96 text-muted-foreground gap-4">
-                    <img src="/brands/split/ip1-star.png" alt="暂无结果" className="w-28 h-28 opacity-50" draggable={false} />
-                    <p className="text-base font-medium text-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
-                      暂无结果
-                    </p>
-                    <p className="text-sm text-muted-foreground" style={{ fontFamily: "Geist, sans-serif" }}>
-                      去工作台生成你的第一张商品图吧
-                    </p>
-                    <div className="flex items-center gap-3">
-                      <Button variant="brand" asChild>
-                        <Link href="/workspace/scene">
-                          <Wand2 className="w-4 h-4 mr-2" />
-                          场景生成
-                        </Link>
-                      </Button>
-                      <Button variant="outline" asChild>
-                        <Link href="/tools">
-                          <ImageIcon className="w-4 h-4 mr-2" />
-                          工具箱
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
+                  <BrandEmptyState
+                    pose="star"
+                    title="暂无结果"
+                    description="去工作台生成你的第一张商品图吧。"
+                    className="h-96 border-0 bg-transparent"
+                    action={
+                      <div className="flex items-center gap-3">
+                        <Button variant="brand" asChild>
+                          <Link href="/workspace/scene">
+                            <Wand2 className="w-4 h-4 mr-2" />
+                            场景生成
+                          </Link>
+                        </Button>
+                        <Button variant="outline" asChild>
+                          <Link href="/tools">
+                            <ImageIcon className="w-4 h-4 mr-2" />
+                            工具箱
+                          </Link>
+                        </Button>
+                      </div>
+                    }
+                  />
                 )}
               </>
             )}

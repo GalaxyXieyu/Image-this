@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { apiPost } from "@/lib/api-client";
+import { BrandLogo, BrandImageFallback } from "@/components/brands/SpriteImage";
 import {
   Settings,
   Trash2,
@@ -122,48 +123,42 @@ const INITIAL_STEPS: WorkflowStep[] = [
 function TopNav() {
   return (
     <header className="h-16 border-b border-border px-8 flex items-center justify-between shrink-0">
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-primary" />
-        <span
-          className="text-base font-semibold text-foreground"
-          style={{ fontFamily: "Inter, sans-serif" }}
-        >
-          AI 商品视觉工作台
-        </span>
-      </div>
+      <Link href="/" className="hover:opacity-80 transition-opacity">
+        <BrandLogo />
+      </Link>
       <nav className="flex items-center gap-6">
         <Link
           href="/"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          style={{ fontFamily: "Geist, sans-serif" }}
+          className="text-data text-muted-foreground hover:text-foreground transition-colors"
+         
         >
           首页
         </Link>
         <Link
           href="/templates"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          style={{ fontFamily: "Geist, sans-serif" }}
+          className="text-data text-muted-foreground hover:text-foreground transition-colors"
+         
         >
           模板库
         </Link>
         <Link
           href="/tasks"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          style={{ fontFamily: "Geist, sans-serif" }}
+          className="text-data text-muted-foreground hover:text-foreground transition-colors"
+         
         >
           任务中心
         </Link>
         <Link
           href="/results"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          style={{ fontFamily: "Geist, sans-serif" }}
+          className="text-data text-muted-foreground hover:text-foreground transition-colors"
+         
         >
           结果管理
         </Link>
         <Link
           href="/settings"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          style={{ fontFamily: "Geist, sans-serif" }}
+          className="text-data text-muted-foreground hover:text-foreground transition-colors"
+         
         >
           设置
         </Link>
@@ -276,14 +271,14 @@ export default function ComboPage() {
       <div className="px-8 py-5 flex items-center justify-between shrink-0 border-b border-border">
         <div>
           <h1
-            className="text-xl font-semibold text-foreground"
-            style={{ fontFamily: "Inter, sans-serif" }}
+            className="text-h3 font-semibold text-foreground"
+           
           >
             智能组合
           </h1>
           <p
-            className="text-sm text-muted-foreground mt-0.5"
-            style={{ fontFamily: "Geist, sans-serif" }}
+            className="text-data text-muted-foreground mt-0.5"
+           
           >
             拖拽编排处理流程，一键批量执行多个 AI 处理步骤
           </p>
@@ -305,12 +300,12 @@ export default function ComboPage() {
                     setSelectedTemplate(null);
                   }}
                   className={cn(
-                    "px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors",
+                    "px-2.5 py-1.5 rounded-md text-caption font-medium transition-colors",
                     activeCategory === cat.id
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted text-muted-foreground hover:text-foreground"
                   )}
-                  style={{ fontFamily: "Geist, sans-serif" }}
+                 
                 >
                   {cat.label}
                 </button>
@@ -332,13 +327,16 @@ export default function ComboPage() {
                       : "border-border hover:border-muted-foreground"
                   )}
                 >
-                  <div className="absolute inset-0 bg-muted flex items-center justify-center">
-                    <ImageIcon className="w-6 h-6 text-muted-foreground/50" />
-                  </div>
+                  <BrandImageFallback
+                    title={tpl.name}
+                    description="组合模板"
+                    pose={activeCategory === "marketing" ? "cheer" : "star"}
+                    className="absolute inset-0"
+                  />
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-2">
                     <span
                       className="text-[11px] text-white font-medium leading-tight block truncate"
-                      style={{ fontFamily: "Geist, sans-serif" }}
+                     
                     >
                       {tpl.name}
                     </span>
@@ -367,7 +365,7 @@ export default function ComboPage() {
                     className="group relative rounded-xl border border-border bg-card p-4 hover:shadow-sm transition-shadow"
                   >
                     {/* Order badge */}
-                    <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold shadow-sm">
+                    <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-caption font-bold shadow-sm">
                       {step.order}
                     </div>
 
@@ -393,14 +391,14 @@ export default function ComboPage() {
                       {/* Info */}
                       <div className="flex-1 min-w-0">
                         <h3
-                          className="text-sm font-medium text-foreground"
-                          style={{ fontFamily: "Inter, sans-serif" }}
+                          className="text-data font-medium text-foreground"
+                         
                         >
                           {step.name}
                         </h3>
                         <p
-                          className="text-xs text-muted-foreground mt-0.5 truncate"
-                          style={{ fontFamily: "Geist, sans-serif" }}
+                          className="text-caption text-muted-foreground mt-0.5 truncate"
+                         
                         >
                           {step.description}
                         </p>
@@ -463,8 +461,8 @@ export default function ComboPage() {
               >
                 <Plus className="w-4 h-4" />
                 <span
-                  className="text-sm font-medium"
-                  style={{ fontFamily: "Geist, sans-serif" }}
+                  className="text-data font-medium"
+                 
                 >
                   添加处理步骤
                 </span>
@@ -478,8 +476,8 @@ export default function ComboPage() {
           <div className="p-5 space-y-6">
             {/* Section title */}
             <h2
-              className="text-sm font-semibold text-foreground"
-              style={{ fontFamily: "Inter, sans-serif" }}
+              className="text-data font-semibold text-foreground"
+             
             >
               方案信息
             </h2>
@@ -487,27 +485,32 @@ export default function ComboPage() {
             {/* 生成场景模板 */}
             <section className="space-y-2.5">
               <Label
-                className="text-xs font-medium text-muted-foreground"
-                style={{ fontFamily: "Geist, sans-serif" }}
+                className="text-caption font-medium text-muted-foreground"
+               
               >
                 生成场景模板
               </Label>
               <div className="rounded-lg border border-border bg-card p-3 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center shrink-0">
-                  <ImageIcon className="w-4 h-4 text-muted-foreground" />
+                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md">
+                  <BrandImageFallback
+                    title=""
+                    description=""
+                    pose={selectedTemplate ? "cheer" : "think"}
+                    className="[&_p]:hidden"
+                  />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p
-                    className="text-sm font-medium text-foreground truncate"
-                    style={{ fontFamily: "Inter, sans-serif" }}
+                    className="text-data font-medium text-foreground truncate"
+                   
                   >
                     {selectedTemplate
                       ? templates.find((t) => t.id === selectedTemplate)?.name ?? "未选择"
                       : "未选择模板"}
                   </p>
                   <p
-                    className="text-xs text-muted-foreground"
-                    style={{ fontFamily: "Geist, sans-serif" }}
+                    className="text-caption text-muted-foreground"
+                   
                   >
                     {selectedTemplate
                       ? SCENE_CATEGORIES.find((c) => c.id === activeCategory)?.label ?? ""
@@ -520,8 +523,8 @@ export default function ComboPage() {
             {/* 批量产品图片数量 */}
             <section className="space-y-2.5">
               <Label
-                className="text-xs font-medium text-muted-foreground"
-                style={{ fontFamily: "Geist, sans-serif" }}
+                className="text-caption font-medium text-muted-foreground"
+               
               >
                 批量产品图片数量
               </Label>
@@ -534,8 +537,8 @@ export default function ComboPage() {
                 className="h-9"
               />
               <p
-                className="text-xs text-muted-foreground"
-                style={{ fontFamily: "Geist, sans-serif" }}
+                className="text-caption text-muted-foreground"
+               
               >
                 单次最多处理 100 张图片
               </p>
@@ -544,8 +547,8 @@ export default function ComboPage() {
             {/* 执行设置 */}
             <section className="space-y-3">
               <Label
-                className="text-xs font-medium text-muted-foreground"
-                style={{ fontFamily: "Geist, sans-serif" }}
+                className="text-caption font-medium text-muted-foreground"
+               
               >
                 执行设置
               </Label>
@@ -553,8 +556,8 @@ export default function ComboPage() {
               {/* Resolution */}
               <div className="space-y-1.5">
                 <Label
-                  className="text-xs text-muted-foreground"
-                  style={{ fontFamily: "Geist, sans-serif" }}
+                  className="text-caption text-muted-foreground"
+                 
                 >
                   输出分辨率
                 </Label>
@@ -564,12 +567,12 @@ export default function ComboPage() {
                       key={res}
                       onClick={() => setResolution(res)}
                       className={cn(
-                        "px-2 py-1.5 rounded-md border text-xs font-medium transition-colors",
+                        "px-2 py-1.5 rounded-md border text-caption font-medium transition-colors",
                         resolution === res
                           ? "border-primary bg-primary/5 text-primary"
                           : "border-border text-muted-foreground hover:text-foreground"
                       )}
-                      style={{ fontFamily: "Geist, sans-serif" }}
+                     
                     >
                       {res}
                     </button>
@@ -581,8 +584,8 @@ export default function ComboPage() {
               <div className="space-y-3 pt-1">
                 <div className="flex items-center justify-between">
                   <Label
-                    className="text-sm text-foreground cursor-pointer"
-                    style={{ fontFamily: "Geist, sans-serif" }}
+                    className="text-data text-foreground cursor-pointer"
+                   
                   >
                     自动添加水印
                   </Label>
@@ -593,8 +596,8 @@ export default function ComboPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <Label
-                    className="text-sm text-foreground cursor-pointer"
-                    style={{ fontFamily: "Geist, sans-serif" }}
+                    className="text-data text-foreground cursor-pointer"
+                   
                   >
                     失败自动重试
                   </Label>
@@ -611,7 +614,7 @@ export default function ComboPage() {
               <Button
                 variant="outline"
                 className="w-full"
-                style={{ fontFamily: "Geist, sans-serif" }}
+               
               >
                 <Bookmark className="w-4 h-4 mr-2" />
                 保存为常用模板
@@ -619,7 +622,7 @@ export default function ComboPage() {
               <Button
                 variant="brand"
                 className="w-full"
-                style={{ fontFamily: "Inter, sans-serif" }}
+               
                 onClick={handleExecute}
                 disabled={executing || steps.length === 0}
               >

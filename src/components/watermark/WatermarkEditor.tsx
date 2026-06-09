@@ -289,8 +289,8 @@ export default function WatermarkEditor({
         {!backgroundImage && (
           <div className="absolute inset-0 flex items-center justify-center text-gray-400 select-none">
             <div className="text-center px-4">
-              <p className="text-sm font-medium text-gray-500 mb-1.5">请先上传背景图片</p>
-              <p className="text-xs text-gray-400">点击右上角"上传图片"或"上传文件夹"按钮</p>
+              <p className="text-data font-medium text-gray-500 mb-1.5">请先上传背景图片</p>
+              <p className="text-caption text-gray-400">点击右上角“上传图片”或“上传文件夹”按钮</p>
             </div>
           </div>
         )}

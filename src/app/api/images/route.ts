@@ -188,16 +188,12 @@ export async function GET(request: NextRequest) {
       thumbnailUrl: normalizeImageUrlForClient(img.thumbnailUrl),
     }));
     
-    // 根据 includeFullSize 参数决定返回的字段
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let finalImages: any[] = images;
-    if (!includeFullSize) {
-      // 移除完整尺寸图片 URL 和 metadata 字段
-      finalImages = images.map(img => {
-        const { originalUrl, processedUrl, metadata, ...rest } = img;
-        return rest;
-      });
-    }
+    const finalImages = includeFullSize
+      ? images
+      : images.map(img => {
+          const { originalUrl, processedUrl, metadata, ...rest } = img;
+          return rest;
+        });
 
     // 获取总数（这个总数可能包含文件不存在的记录，但作为近似值使用）
     const total = await prisma.processedImage.count({ where });

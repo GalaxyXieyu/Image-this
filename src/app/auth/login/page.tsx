@@ -57,10 +57,10 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-brand-gradient-light p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">登录</CardTitle>
+          <CardTitle className="text-h2 font-bold text-center">登录</CardTitle>
           <CardDescription className="text-center">
             使用邮箱密码或社交账号登录
           </CardDescription>
@@ -91,7 +91,7 @@ export default function LoginPage() {
             </div>
             
             {error && (
-              <div className="text-red-500 text-sm text-center">{error}</div>
+              <div className="text-red-500 text-data text-center">{error}</div>
             )}
             
             <Button 
@@ -105,7 +105,7 @@ export default function LoginPage() {
           
           <div className="mt-6">
             <Separator />
-            <div className="text-center text-sm text-gray-500 mt-4 mb-4">
+            <div className="text-center text-data text-gray-500 mt-4 mb-4">
               或使用社交账号登录
             </div>
             
@@ -131,9 +131,9 @@ export default function LoginPage() {
             </div>
           </div>
           
-          <div className="mt-6 text-center text-sm">
+          <div className="mt-6 text-center text-data">
             还没有账号？{' '}
-            <Link href="/auth/register" className="text-blue-600 hover:underline">
+            <Link href="/auth/register" className="text-primary hover:underline">
               立即注册
             </Link>
           </div>

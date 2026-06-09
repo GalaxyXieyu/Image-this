@@ -17,7 +17,6 @@ import {
   COMBO_PRESETS,
   getPresetsByCategory,
   searchPresets,
-  getPresetById,
 } from "@/lib/workbench/presets";
 import { Input } from "@/components/ui/input";
 import {
@@ -37,15 +36,12 @@ function TemplatesPageInner() {
 
   // URL state
   const urlCategory = (searchParams.get("category") as PresetCategory) || "all";
-  const urlPresetId = searchParams.get("preset") || undefined;
 
   // Local state
   const [activeCategory, setActiveCategory] = useState<PresetCategory>(urlCategory);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("newest");
-  const [selectedPreset, setSelectedPreset] = useState<TemplatePreset | undefined>(
-    urlPresetId ? getPresetById(urlPresetId) : undefined
-  );
+  const [selectedPreset, setSelectedPreset] = useState<TemplatePreset | undefined>(undefined);
   const [activeComboId, setActiveComboId] = useState<string | undefined>(
     searchParams.get("combo") || undefined
   );
@@ -99,6 +95,7 @@ function TemplatesPageInner() {
         params.set("category", category);
       }
       params.delete("combo");
+      params.delete("preset");
       router.replace(`/templates?${params.toString()}`, { scroll: false });
     },
     [router, searchParams]
@@ -113,6 +110,7 @@ function TemplatesPageInner() {
       const params = new URLSearchParams(searchParams.toString());
       params.set("combo", comboId);
       params.delete("category");
+      params.delete("preset");
       router.replace(`/templates?${params.toString()}`, { scroll: false });
     },
     [router, searchParams]
@@ -174,36 +172,36 @@ function TemplatesPageInner() {
           <nav className="flex items-center gap-6">
             <Link
               href="/"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              style={{ fontFamily: "Geist, sans-serif" }}
+              className="text-data text-muted-foreground hover:text-foreground transition-colors"
+             
             >
               首页
             </Link>
             <Link
               href="/templates"
-              className="text-sm text-foreground font-medium"
-              style={{ fontFamily: "Geist, sans-serif" }}
+              className="text-data text-foreground font-medium"
+             
             >
               模板库
             </Link>
             <Link
               href="/tasks"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              style={{ fontFamily: "Geist, sans-serif" }}
+              className="text-data text-muted-foreground hover:text-foreground transition-colors"
+             
             >
               任务中心
             </Link>
             <Link
               href="/results"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              style={{ fontFamily: "Geist, sans-serif" }}
+              className="text-data text-muted-foreground hover:text-foreground transition-colors"
+             
             >
               结果管理
             </Link>
         <Link
           href="/settings"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          style={{ fontFamily: "Geist, sans-serif" }}
+          className="text-data text-muted-foreground hover:text-foreground transition-colors"
+         
         >
           设置
         </Link>
@@ -228,15 +226,15 @@ function TemplatesPageInner() {
                 placeholder="搜索模板..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-9 text-sm"
-                style={{ fontFamily: "Geist, sans-serif" }}
+                className="pl-9 h-9 text-data"
+               
               />
             </div>
             <Select
               value={sortBy}
               onValueChange={(v) => setSortBy(v as SortOption)}
             >
-              <SelectTrigger className="w-32 h-9 text-sm">
+              <SelectTrigger className="w-32 h-9 text-data">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -275,7 +273,6 @@ export default function TemplatesPage() {
           <main className="flex-1 bg-background flex items-center justify-center">
             <p className="text-muted-foreground">加载中...</p>
           </main>
-          <aside className="w-[320px] h-full border-l border-border bg-card shrink-0" />
         </div>
       </WorkbenchShell>
     }>
