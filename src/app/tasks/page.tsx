@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -146,6 +148,8 @@ interface TasksApiResponse {
 }
 
 export default function TasksPage() {
+  const router = useRouter();
+  const { data: session, status } = useSession();
   const [activeTab, setActiveTab] = useState("all");
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -153,6 +157,8 @@ export default function TasksPage() {
   const [stats, setStats] = useState({ pending: 0, running: 0, completed: 0, failed: 0, total: 0 });
 
   const fetchTasks = useCallback(async () => {
+    if (status !== "authenticated") return;
+
     setLoading(true);
     setError(null);
     try {
@@ -192,11 +198,19 @@ export default function TasksPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeTab]);
+  }, [activeTab, status]);
 
   useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
+    if (status === "unauthenticated") {
+      router.push("/auth/login?callbackUrl=/tasks");
+    }
+  }, [router, status]);
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      fetchTasks();
+    }
+  }, [fetchTasks, status]);
 
   const handleDelete = async (taskId: string) => {
     if (!confirm("确定要删除这个任务吗？")) return;
@@ -230,6 +244,21 @@ export default function TasksPage() {
   }, []);
 
   const { isPolling } = useTaskPolling(activeTaskIds, updateTasksFromPolling);
+
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-muted-foreground" />
+          <p className="text-data text-muted-foreground">加载中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return null;
+  }
 
   const filteredTasks = tasks.filter((task) => {
     if (activeTab === "all") return true;
