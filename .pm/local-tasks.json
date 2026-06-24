@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "backend": "local",
+  "tasklists": [
+    {
+      "guid": "local:image-this",
+      "name": "Image-this",
+      "url": "local://tasklist/local:image-this",
+      "owner": {
+        "id": "local-user",
+        "name": "local-user"
+      }
+    }
+  ],
+  "tasks": []
+}

@@ -1,0 +1,79 @@
+{
+  "generated_at": "2026-06-10T22:23:29+08:00",
+  "project": {
+    "name": "Image-this",
+    "repo_root": "/Volumes/DATABASE/code/business/Image-this",
+    "config_path": "/Volumes/DATABASE/code/business/Image-this/pm.json",
+    "tasklist_name": "Image-this",
+    "tasklist_guid": "local:image-this",
+    "task_prefix": "T",
+    "kind": "task",
+    "task_backend": "local",
+    "doc_backend": "repo"
+  },
+  "repo_scan": {
+    "root": "/Volumes/DATABASE/code/business/Image-this",
+    "exists": true,
+    "name": "Image-this",
+    "markers": {
+      "git": true,
+      "package_json": true,
+      "pnpm_lock": false,
+      "yarn_lock": false,
+      "npm_lock": true,
+      "pyproject": false,
+      "requirements_txt": false,
+      "go_mod": false,
+      "cargo_toml": false,
+      "miniapp_app_json": false,
+      "miniapp_project_config": false,
+      "src_dir": true,
+      "pages_dir": false,
+      "components_dir": false
+    },
+    "package_manager": "npm",
+    "framework_hints": [
+      "nextjs",
+      "typescript"
+    ]
+  },
+  "bootstrap": {
+    "project_mode": "brownfield",
+    "recommended_action": "map-codebase",
+    "task_backend": "local",
+    "doc_backend": "repo",
+    "doc_folder_name": "Image-this",
+    "doc_folder_token": "",
+    "doc_folder_url": "",
+    "project_doc_token": "",
+    "project_doc_url": "",
+    "requirements_doc_token": "",
+    "requirements_doc_url": "",
+    "roadmap_doc_token": "",
+    "roadmap_doc_url": "",
+    "state_doc_token": "",
+    "state_doc_url": "",
+    "notes": [
+      "brownfield 项目优先做 map-codebase，再补项目/路线图/状态文档。",
+      "greenfield 项目优先做 new-project，再进入任务拆解。",
+      "当前 task backend=local，doc backend=repo。"
+    ]
+  },
+  "doc_index": {
+    "folder_name": "Image-this",
+    "folder_token": "",
+    "folder_url": "",
+    "project_doc_token": "",
+    "project_doc_url": "",
+    "requirements_doc_token": "",
+    "requirements_doc_url": "",
+    "roadmap_doc_token": "",
+    "roadmap_doc_url": "",
+    "state_doc_token": "",
+    "state_doc_url": ""
+  },
+  "open_tasks": [],
+  "next_task": null,
+  "current_task": null,
+  "recent_comments": []
+}
