@@ -70,8 +70,8 @@ npm ci --prefer-offline --no-audit --no-fund
 log "$GREEN" "✅ 依赖安装完成"
 
 log "$YELLOW" "[4/8] 🗄️ Prisma generate + db push"
-npx --no-install prisma generate
-DATABASE_URL="file:./data/app.db" npx --no-install prisma db push --skip-generate
+./node_modules/.bin/prisma generate
+DATABASE_URL="file:./data/app.db" ./node_modules/.bin/prisma db push --skip-generate
 log "$GREEN" "✅ Prisma 同步完成"
 
 log "$YELLOW" "[5/8] 🛠️ npm run build"
