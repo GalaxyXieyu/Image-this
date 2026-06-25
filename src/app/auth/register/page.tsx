@@ -100,8 +100,8 @@ export default function RegisterPage() {
         description="正在准备你的商品视觉生产工作台。"
       >
         <div className="space-y-4 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-50">
-            <Check className="h-7 w-7 text-[#2f67ff]" />
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+            <Check className="h-7 w-7 text-primary" />
           </div>
           <div className="space-y-1">
             <h2 className="text-xl font-semibold tracking-tight text-foreground">注册成功！</h2>
@@ -181,7 +181,7 @@ export default function RegisterPage() {
 
           <Button
             type="submit"
-            className="h-9 w-full rounded-sm bg-[#2f67ff] text-sm font-medium hover:bg-[#2858dc]"
+            className="h-9 w-full rounded-sm bg-accent-gradient text-sm font-medium text-white hover:opacity-90"
             disabled={isLoading}
           >
             {isLoading ? '注册中...' : '注册'}
@@ -218,7 +218,7 @@ export default function RegisterPage() {
 
         <div className="text-center text-xs text-muted-foreground">
           已有账号？{' '}
-          <Link href={loginHref} className="font-medium text-[#2f67ff] hover:underline">
+          <Link href={loginHref} className="font-medium text-primary hover:underline">
             立即登录
           </Link>
         </div>

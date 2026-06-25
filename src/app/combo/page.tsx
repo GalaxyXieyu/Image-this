@@ -1,16 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import { apiPost } from "@/lib/api-client";
-import { BrandLogo, BrandImageFallback } from "@/components/brands/SpriteImage";
 import {
-  Settings,
   Trash2,
   GripVertical,
   Plus,
@@ -22,20 +20,35 @@ import {
   ZoomIn,
   Droplets,
   Sparkles,
+  ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
+  ArrowLeft,
   Loader2,
+  Upload,
+  Settings2,
 } from "lucide-react";
 
-/* ------------------------------------------------------------------ */
-/*  Mock Data                                                          */
-/* ------------------------------------------------------------------ */
+/* ─── Data ───────────────────────────────────────────────────────── */
 
 const SCENE_CATEGORIES = [
-  { id: "daily", label: "日常场景" },
-  { id: "marketing", label: "营销场景" },
-  { id: "festival", label: "节日氛围" },
-  { id: "outdoor", label: "户外场景" },
-  { id: "indoor", label: "室内场景" },
+  { id: "daily", label: "日常" },
+  { id: "marketing", label: "营销" },
+  { id: "festival", label: "节日" },
+  { id: "outdoor", label: "户外" },
+  { id: "indoor", label: "室内" },
+];
+
+const TEMPLATE_GRADIENTS: string[] = [
+  "linear-gradient(135deg, #f5f3ff 0%, #ddd6fe 100%)",
+  "linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)",
+  "linear-gradient(135deg, #fdf2f8 0%, #fbcfe8 100%)",
+  "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)",
+  "linear-gradient(135deg, #ecfeff 0%, #a5f3fc 100%)",
+  "linear-gradient(135deg, #f3e8ff 0%, #c084fc 100%)",
+  "linear-gradient(135deg, #fff7ed 0%, #fed7aa 100%)",
+  "linear-gradient(135deg, #f0fdf4 0%, #bbf7d0 100%)",
 ];
 
 const SCENE_TEMPLATES: Record<string, { id: string; name: string }[]> = {
@@ -76,20 +89,53 @@ const SCENE_TEMPLATES: Record<string, { id: string; name: string }[]> = {
 
 type StepType = "scene" | "background" | "upscale" | "watermark" | "outpaint";
 
+interface SceneParams { sceneStyle: string; candidateCount: number }
+interface BackgroundParams { bgType: string; featherEdge: number; keepShadow: boolean }
+interface UpscaleParams { factor: number; denoise: number }
+interface WatermarkParams { content: string; position: string; opacity: number }
+interface OutpaintParams { direction: string; ratio: number }
+
+type StepParams =
+  | { type: "scene"; params: SceneParams }
+  | { type: "background"; params: BackgroundParams }
+  | { type: "upscale"; params: UpscaleParams }
+  | { type: "watermark"; params: WatermarkParams }
+  | { type: "outpaint"; params: OutpaintParams };
+
 interface WorkflowStep {
   id: string;
   order: number;
   type: StepType;
   name: string;
   description: string;
+  params: StepParams["params"];
 }
 
-const STEP_META: Record<StepType, { icon: React.ElementType; color: string }> = {
-  scene: { icon: ImageIcon, color: "bg-primary-soft text-primary" },
-  background: { icon: Wand2, color: "bg-primary-soft text-primary" },
-  upscale: { icon: ZoomIn, color: "bg-primary-soft text-primary" },
-  watermark: { icon: Droplets, color: "bg-primary-soft text-primary" },
-  outpaint: { icon: Expand, color: "bg-primary-soft text-primary" },
+const STEP_META: Record<
+  StepType,
+  { icon: React.ElementType; name: string; description: string }
+> = {
+  scene: { icon: ImageIcon, name: "生成场景图", description: "基于模板自动生成商品场景图" },
+  background: { icon: Wand2, name: "AI 换背景", description: "智能替换背景，融合光影" },
+  upscale: { icon: ZoomIn, name: "高清放大", description: "AI 超分辨率放大，提升清晰度" },
+  watermark: { icon: Droplets, name: "水印与尺寸", description: "添加品牌水印，调整输出尺寸" },
+  outpaint: { icon: Expand, name: "智能扩图", description: "智能扩展画布，补充画面内容" },
+};
+
+const DEFAULT_PARAMS: Record<StepType, StepParams["params"]> = {
+  scene: { sceneStyle: "natural", candidateCount: 4 } as SceneParams,
+  background: { bgType: "studio", featherEdge: 8, keepShadow: true } as BackgroundParams,
+  upscale: { factor: 2, denoise: 30 } as UpscaleParams,
+  watermark: { content: "@品牌名", position: "bottom-right", opacity: 70 } as WatermarkParams,
+  outpaint: { direction: "all", ratio: 25 } as OutpaintParams,
+};
+
+const TYPE_TO_API: Record<StepType, string> = {
+  scene: "SCENE_GENERATION",
+  background: "BACKGROUND_REMOVAL",
+  upscale: "IMAGE_UPSCALING",
+  watermark: "WATERMARK",
+  outpaint: "IMAGE_EXPANSION",
 };
 
 const INITIAL_STEPS: WorkflowStep[] = [
@@ -97,111 +143,76 @@ const INITIAL_STEPS: WorkflowStep[] = [
     id: "s1",
     order: 1,
     type: "scene",
-    name: "生成场景图",
-    description: "基于模板自动生成商品场景图",
+    ...STEP_META.scene,
+    params: { ...DEFAULT_PARAMS.scene },
   },
   {
     id: "s2",
     order: 2,
     type: "background",
-    name: "AI换背景",
-    description: "智能替换背景，融合光影",
+    ...STEP_META.background,
+    params: { ...DEFAULT_PARAMS.background },
   },
   {
     id: "s3",
     order: 3,
     type: "watermark",
-    name: "水印与尺寸调整",
-    description: "添加品牌水印，调整输出尺寸",
+    ...STEP_META.watermark,
+    params: { ...DEFAULT_PARAMS.watermark },
   },
 ];
 
-/* ------------------------------------------------------------------ */
-/*  TopNav (shared pattern)                                            */
-/* ------------------------------------------------------------------ */
+const ASPECT_RATIOS = [
+  { id: "1:1", label: "1:1" },
+  { id: "3:4", label: "3:4" },
+  { id: "4:3", label: "4:3" },
+  { id: "16:9", label: "16:9" },
+  { id: "9:16", label: "9:16" },
+];
 
-function TopNav() {
-  return (
-    <header className="h-16 border-b border-border px-8 flex items-center justify-between shrink-0">
-      <Link href="/" className="hover:opacity-80 transition-opacity">
-        <BrandLogo />
-      </Link>
-      <nav className="flex items-center gap-6">
-        <Link
-          href="/"
-          className="text-data text-muted-foreground hover:text-foreground transition-colors"
-         
-        >
-          首页
-        </Link>
-        <Link
-          href="/templates"
-          className="text-data text-muted-foreground hover:text-foreground transition-colors"
-         
-        >
-          模板库
-        </Link>
-        <Link
-          href="/tasks"
-          className="text-data text-muted-foreground hover:text-foreground transition-colors"
-         
-        >
-          任务中心
-        </Link>
-        <Link
-          href="/results"
-          className="text-data text-muted-foreground hover:text-foreground transition-colors"
-         
-        >
-          结果管理
-        </Link>
-        <Link
-          href="/settings"
-          className="text-data text-muted-foreground hover:text-foreground transition-colors"
-         
-        >
-          设置
-        </Link>
-      </nav>
-    </header>
-  );
-}
+const RESOLUTIONS = [
+  { id: "1k", label: "1K · 标准" },
+  { id: "2k", label: "2K · 推荐" },
+  { id: "4k", label: "4K · 超清" },
+];
 
-/* ------------------------------------------------------------------ */
-/*  Main Page                                                          */
-/* ------------------------------------------------------------------ */
+/* ─── Page ───────────────────────────────────────────────────────── */
 
 export default function ComboPage() {
   const [activeCategory, setActiveCategory] = useState("daily");
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [steps, setSteps] = useState<WorkflowStep[]>(INITIAL_STEPS);
+  const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
+
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [rightCollapsed, setRightCollapsed] = useState(false);
+
+  /* global settings */
   const [batchCount, setBatchCount] = useState(10);
-  const [resolution, setResolution] = useState("1024x1024");
+  const [aspectRatio, setAspectRatio] = useState("1:1");
+  const [resolution, setResolution] = useState("2k");
   const [watermarkEnabled, setWatermarkEnabled] = useState(true);
   const [autoRetry, setAutoRetry] = useState(true);
   const [executing, setExecuting] = useState(false);
 
-  // Use legacy task type names that the worker recognizes
-  const typeToApiType: Record<StepType, string> = {
-    scene: "BACKGROUND_REMOVAL",
-    background: "BACKGROUND_REMOVAL",
-    upscale: "IMAGE_UPSCALING",
-    watermark: "WATERMARK",
-    outpaint: "IMAGE_EXPANSION",
-  };
+  const templates = SCENE_TEMPLATES[activeCategory] ?? [];
+  const selectedStep = useMemo(
+    () => steps.find((s) => s.id === selectedStepId) ?? null,
+    [steps, selectedStepId]
+  );
 
   const handleExecute = async () => {
     if (steps.length === 0) return;
     setExecuting(true);
     try {
       const tasks = steps.map((step) => ({
-        type: typeToApiType[step.type],
+        type: TYPE_TO_API[step.type],
         inputData: JSON.stringify({
-          resolution,
-          watermarkEnabled,
-          autoRetry,
-          batchCount,
+          stepType: step.type,
           stepName: step.name,
+          stepParams: step.params,
+          global: { batchCount, aspectRatio, resolution, watermarkEnabled, autoRetry },
+          templateId: selectedTemplate,
         }),
         totalSteps: 1,
       }));
@@ -217,39 +228,25 @@ export default function ComboPage() {
     const available: StepType[] = ["scene", "background", "upscale", "watermark", "outpaint"];
     const used = new Set(steps.map((s) => s.type));
     const nextType = available.find((t) => !used.has(t)) ?? "upscale";
-    const nextOrder = steps.length + 1;
-    const names: Record<StepType, string> = {
-      scene: "生成场景图",
-      background: "AI换背景",
-      upscale: "高清放大",
-      watermark: "水印与尺寸调整",
-      outpaint: "智能扩图",
-    };
-    const descriptions: Record<StepType, string> = {
-      scene: "基于模板自动生成商品场景图",
-      background: "智能替换背景，融合光影",
-      upscale: "AI 超分辨率放大，提升清晰度",
-      watermark: "添加品牌水印，调整输出尺寸",
-      outpaint: "智能扩展画布，补充画面内容",
-    };
+    const meta = STEP_META[nextType];
     setSteps((prev) => [
       ...prev,
       {
         id: `s${Date.now()}`,
-        order: nextOrder,
+        order: prev.length + 1,
         type: nextType,
-        name: names[nextType],
-        description: descriptions[nextType],
+        name: meta.name,
+        description: meta.description,
+        params: { ...DEFAULT_PARAMS[nextType] },
       },
     ]);
   };
 
   const removeStep = (id: string) => {
     setSteps((prev) =>
-      prev
-        .filter((s) => s.id !== id)
-        .map((s, idx) => ({ ...s, order: idx + 1 }))
+      prev.filter((s) => s.id !== id).map((s, idx) => ({ ...s, order: idx + 1 }))
     );
+    if (selectedStepId === id) setSelectedStepId(null);
   };
 
   const moveStep = (index: number, direction: -1 | 1) => {
@@ -261,382 +258,823 @@ export default function ComboPage() {
     setSteps(copy.map((s, idx) => ({ ...s, order: idx + 1 })));
   };
 
-  const templates = SCENE_TEMPLATES[activeCategory] ?? [];
+  const updateStepParams = (id: string, patch: Partial<StepParams["params"]>) => {
+    setSteps((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, params: { ...s.params, ...patch } } : s))
+    );
+  };
 
   return (
-    <div className="h-screen flex flex-col bg-background">
-      <TopNav />
-
-      {/* Header */}
-      <div className="px-8 py-5 flex items-center justify-between shrink-0 border-b border-border">
-        <div>
-          <h1
-            className="text-h3 font-semibold text-foreground"
-           
-          >
-            智能组合
-          </h1>
-          <p
-            className="text-data text-muted-foreground mt-0.5"
-           
-          >
-            拖拽编排处理流程，一键批量执行多个 AI 处理步骤
-          </p>
-        </div>
+    <div className="relative h-full flex flex-col bg-background">
+      {/* Page header */}
+      <div className="shrink-0 border-b border-line px-6 py-4">
+        <h1 className="text-h3 font-semibold text-ink">组合工作流</h1>
+        <p className="mt-0.5 text-data text-ink-2">
+          编排多个 AI 处理步骤，一键批量执行流水线
+        </p>
       </div>
 
       {/* Three-column workspace */}
       <div className="flex-1 flex overflow-hidden">
-        {/* ---------- Left Sidebar (~260px) ---------- */}
-        <aside className="w-[260px] border-r border-border bg-muted/30 flex flex-col shrink-0">
-          {/* Category tabs */}
-          <div className="px-3 pt-3 pb-2">
-            <div className="flex flex-wrap gap-1.5">
-              {SCENE_CATEGORIES.map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => {
-                    setActiveCategory(cat.id);
-                    setSelectedTemplate(null);
-                  }}
-                  className={cn(
-                    "px-2.5 py-1.5 rounded-md text-caption font-medium transition-colors",
-                    activeCategory === cat.id
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground hover:text-foreground"
-                  )}
-                 
-                >
-                  {cat.label}
-                </button>
-              ))}
+        {/* ───── Left: scene templates ───── */}
+        {leftCollapsed ? (
+          <CollapsedRail
+            side="left"
+            label="场景模板"
+            onExpand={() => setLeftCollapsed(false)}
+          />
+        ) : (
+          <aside className="flex w-[260px] shrink-0 flex-col border-r border-line bg-surface-glass backdrop-blur-[20px] backdrop-saturate-150">
+            <div className="flex items-center justify-between px-4 pt-4 pb-2">
+              <span className="text-data font-semibold text-ink">场景模板</span>
+              <button
+                type="button"
+                onClick={() => setLeftCollapsed(true)}
+                className="rounded-md p-1 text-ink-3 hover:bg-surface-muted hover:text-ink"
+                aria-label="折叠"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
             </div>
-          </div>
-
-          {/* Template grid */}
-          <div className="flex-1 overflow-y-auto px-3 pb-4">
-            <div className="grid grid-cols-2 gap-2">
-              {templates.map((tpl) => (
-                <button
-                  key={tpl.id}
-                  onClick={() => setSelectedTemplate(tpl.id)}
-                  className={cn(
-                    "group relative aspect-square rounded-lg border overflow-hidden transition-all",
-                    selectedTemplate === tpl.id
-                      ? "border-primary ring-1 ring-primary"
-                      : "border-border hover:border-muted-foreground"
-                  )}
-                >
-                  <BrandImageFallback
-                    title={tpl.name}
-                    description="组合模板"
-                    pose={activeCategory === "marketing" ? "cheer" : "star"}
-                    className="absolute inset-0"
-                  />
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                    <span
-                      className="text-[11px] text-white font-medium leading-tight block truncate"
-                     
+            <div className="px-3 pb-2">
+              <div className="flex flex-wrap gap-1.5">
+                {SCENE_CATEGORIES.map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => {
+                      setActiveCategory(cat.id);
+                      setSelectedTemplate(null);
+                    }}
+                    className={cn(
+                      "rounded-full px-2.5 py-1 text-caption font-medium transition-colors",
+                      activeCategory === cat.id
+                        ? "bg-accent-gradient text-white shadow-soft"
+                        : "bg-surface-muted text-ink-2 hover:text-ink"
+                    )}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-3 pb-4">
+              <div className="grid grid-cols-2 gap-2">
+                {templates.map((tpl, idx) => {
+                  const active = selectedTemplate === tpl.id;
+                  const gradient = TEMPLATE_GRADIENTS[(idx + tpl.id.charCodeAt(tpl.id.length - 1)) % TEMPLATE_GRADIENTS.length];
+                  return (
+                    <button
+                      key={tpl.id}
+                      onClick={() => setSelectedTemplate(tpl.id)}
+                      className={cn(
+                        "group relative aspect-square overflow-hidden rounded-[14px] border transition-all",
+                        active
+                          ? "border-brand ring-2 ring-brand ring-offset-2 ring-offset-background"
+                          : "border-line hover:border-brand/40"
+                      )}
                     >
-                      {tpl.name}
-                    </span>
-                  </div>
-                  {selectedTemplate === tpl.id && (
-                    <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
-                      <Sparkles className="w-2.5 h-2.5 text-white" />
-                    </div>
-                  )}
-                </button>
-              ))}
+                      <div className="absolute inset-0" style={{ background: gradient }} />
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/65 to-transparent px-2 py-1.5">
+                        <span className="block truncate text-[11px] font-medium text-white">
+                          {tpl.name}
+                        </span>
+                      </div>
+                      {active && (
+                        <div className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent-gradient">
+                          <Sparkles className="h-2.5 w-2.5 text-white" />
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        </aside>
+          </aside>
+        )}
 
-        {/* ---------- Center Pipeline Editor ---------- */}
-        <main className="flex-1 flex flex-col bg-background overflow-hidden">
-          <div className="flex-1 overflow-y-auto px-8 py-6">
-            <div className="max-w-xl mx-auto space-y-4">
+        {/* ───── Center: pipeline ───── */}
+        <main className="flex flex-1 flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-8 pb-24 pt-6">
+            <div className="mx-auto flex max-w-[640px] flex-col gap-4">
+              {/* Input area */}
+              <div className="glass-panel flex items-center gap-3 rounded-[18px] p-4">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-brand-soft text-brand">
+                  <Upload className="h-5 w-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[14px] font-bold text-ink">上传商品图片</p>
+                  <p className="mt-0.5 text-[12px] text-ink-3">
+                    拖入或点击上传，支持批量 · 作为流水线输入
+                  </p>
+                </div>
+                <Button className="h-8 rounded-[10px] bg-accent-gradient px-3.5 text-[13px] font-semibold text-white">
+                  选择文件
+                </Button>
+              </div>
+
+              {/* Separator label */}
+              <div className="mt-2 flex items-center gap-3 text-[12px] font-semibold uppercase tracking-wider text-ink-3">
+                <span className="h-px flex-1 bg-line-strong" />
+                处理流水线
+                <span className="h-px flex-1 bg-line-strong" />
+              </div>
+
+              {/* Steps */}
               {steps.map((step, index) => {
                 const meta = STEP_META[step.type];
                 const Icon = meta.icon;
+                const isSelected = selectedStepId === step.id;
                 return (
-                  <div
-                    key={step.id}
-                    className="group relative rounded-xl border border-border bg-card p-4 hover:shadow-sm transition-shadow"
-                  >
-                    {/* Order badge */}
-                    <div className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-caption font-bold shadow-sm">
-                      {step.order}
-                    </div>
+                  <div key={step.id} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStepId(step.id)}
+                      className={cn(
+                        "group relative flex w-full items-center gap-3 rounded-[18px] border p-3.5 text-left transition-all",
+                        isSelected
+                          ? "glass-panel border-brand ring-2 ring-brand/40"
+                          : "border-line bg-surface hover:border-brand/30 hover:shadow-soft"
+                      )}
+                    >
+                      {/* Order badge */}
+                      <span
+                        className={cn(
+                          "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-bold shadow-soft",
+                          isSelected
+                            ? "bg-accent-gradient text-white"
+                            : "bg-brand text-white"
+                        )}
+                      >
+                        {step.order}
+                      </span>
 
-                    <div className="flex items-center gap-4 pl-3">
-                      {/* Drag handle */}
-                      <button
-                        className="text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing"
+                      <span
+                        className="cursor-grab text-ink-3 hover:text-ink active:cursor-grabbing"
                         title="拖拽排序"
                       >
-                        <GripVertical className="w-4 h-4" />
-                      </button>
+                        <GripVertical className="h-4 w-4" />
+                      </span>
 
-                      {/* Icon */}
-                      <div
+                      <span
                         className={cn(
-                          "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
-                          meta.color
+                          "flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]",
+                          isSelected
+                            ? "bg-accent-gradient text-white"
+                            : "bg-brand-soft text-brand"
                         )}
                       >
-                        <Icon className="w-5 h-5" />
-                      </div>
+                        <Icon className="h-5 w-5" />
+                      </span>
 
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <h3
-                          className="text-data font-medium text-foreground"
-                         
-                        >
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[14px] font-semibold text-ink">
                           {step.name}
-                        </h3>
-                        <p
-                          className="text-caption text-muted-foreground mt-0.5 truncate"
-                         
-                        >
+                        </span>
+                        <span className="mt-0.5 block truncate text-[12px] text-ink-3">
                           {step.description}
-                        </p>
-                      </div>
+                        </span>
+                      </span>
 
-                      {/* Actions */}
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                         {index > 0 && (
-                          <button
-                            onClick={() => moveStep(index, -1)}
-                            className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              moveStep(index, -1);
+                            }}
+                            className="rounded-md p-1.5 text-ink-3 hover:bg-surface-muted hover:text-ink"
                             title="上移"
                           >
-                            <ChevronRight className="w-3.5 h-3.5 rotate-[-90deg]" />
-                          </button>
+                            <ChevronUp className="h-3.5 w-3.5" />
+                          </span>
                         )}
                         {index < steps.length - 1 && (
-                          <button
-                            onClick={() => moveStep(index, 1)}
-                            className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              moveStep(index, 1);
+                            }}
+                            className="rounded-md p-1.5 text-ink-3 hover:bg-surface-muted hover:text-ink"
                             title="下移"
                           >
-                            <ChevronRight className="w-3.5 h-3.5 rotate-90" />
-                          </button>
+                            <ChevronDown className="h-3.5 w-3.5" />
+                          </span>
                         )}
-                        <button
-                          className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
-                          title="设置"
-                        >
-                          <Settings className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => removeStep(step.id)}
-                          className="p-1.5 rounded-md hover:bg-red-50 text-muted-foreground hover:text-red-600"
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeStep(step.id);
+                          }}
+                          className="rounded-md p-1.5 text-ink-3 hover:bg-danger/10 hover:text-danger"
                           title="删除"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </span>
+                      </span>
+                    </button>
 
                     {/* Connector line */}
                     {index < steps.length - 1 && (
-                      <div className="absolute -bottom-3 left-6 w-px h-3 bg-primary" />
+                      <div className="flex justify-center py-1.5">
+                        <span className="h-3 w-px bg-brand/40" />
+                      </div>
                     )}
                   </div>
                 );
               })}
 
-              {/* Add step button */}
               <button
+                type="button"
                 onClick={addStep}
                 disabled={steps.length >= 5}
                 className={cn(
-                  "w-full rounded-xl border-2 border-dashed p-4 flex items-center justify-center gap-2 transition-colors",
+                  "flex w-full items-center justify-center gap-2 rounded-[18px] border-2 border-dashed p-4 transition-all",
                   steps.length >= 5
-                    ? "border-border text-muted-foreground cursor-not-allowed"
-                    : "border-muted-foreground/30 text-muted-foreground hover:border-primary hover:text-primary"
+                    ? "cursor-not-allowed border-line text-ink-3"
+                    : "border-line-strong text-ink-2 hover:border-brand hover:bg-brand-soft/30 hover:text-brand"
                 )}
               >
-                <Plus className="w-4 h-4" />
-                <span
-                  className="text-data font-medium"
-                 
-                >
-                  添加处理步骤
-                </span>
+                <Plus className="h-4 w-4" />
+                <span className="text-[14px] font-semibold">添加处理步骤</span>
+                <span className="text-[12px] text-ink-3">({steps.length}/5)</span>
               </button>
+            </div>
+          </div>
+
+          {/* Floating action group */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-5 z-30 flex justify-center">
+            <div className="glass-panel pointer-events-auto flex items-center gap-2 rounded-full p-1.5 shadow-float">
+              <Button
+                variant="ghost"
+                className="h-11 gap-1.5 rounded-full px-5 text-[14px] font-semibold text-ink-2 hover:bg-surface-muted"
+              >
+                <Bookmark className="h-4 w-4" />
+                保存为常用模板
+              </Button>
+              <Button
+                onClick={handleExecute}
+                disabled={executing || steps.length === 0}
+                className="h-11 gap-2 rounded-full bg-accent-gradient px-7 text-[14px] font-semibold text-white shadow-float transition-transform hover:-translate-y-0.5 disabled:opacity-50"
+              >
+                {executing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
+                {executing ? "提交中…" : "执行批量处理"}
+              </Button>
             </div>
           </div>
         </main>
 
-        {/* ---------- Right Sidebar (~320px) ---------- */}
-        <aside className="w-[320px] border-l border-border bg-muted/30 flex flex-col shrink-0 overflow-y-auto">
-          <div className="p-5 space-y-6">
-            {/* Section title */}
-            <h2
-              className="text-data font-semibold text-foreground"
-             
-            >
-              方案信息
-            </h2>
-
-            {/* 生成场景模板 */}
-            <section className="space-y-2.5">
-              <Label
-                className="text-caption font-medium text-muted-foreground"
-               
-              >
-                生成场景模板
-              </Label>
-              <div className="rounded-lg border border-border bg-card p-3 flex items-center gap-3">
-                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md">
-                  <BrandImageFallback
-                    title=""
-                    description=""
-                    pose={selectedTemplate ? "cheer" : "think"}
-                    className="[&_p]:hidden"
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p
-                    className="text-data font-medium text-foreground truncate"
-                   
-                  >
-                    {selectedTemplate
-                      ? templates.find((t) => t.id === selectedTemplate)?.name ?? "未选择"
-                      : "未选择模板"}
-                  </p>
-                  <p
-                    className="text-caption text-muted-foreground"
-                   
-                  >
-                    {selectedTemplate
-                      ? SCENE_CATEGORIES.find((c) => c.id === activeCategory)?.label ?? ""
-                      : "从左侧面板选择一个模板"}
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            {/* 批量产品图片数量 */}
-            <section className="space-y-2.5">
-              <Label
-                className="text-caption font-medium text-muted-foreground"
-               
-              >
-                批量产品图片数量
-              </Label>
-              <Input
-                type="number"
-                min={1}
-                max={100}
-                value={batchCount}
-                onChange={(e) => setBatchCount(Number(e.target.value))}
-                className="h-9"
+        {/* ───── Right: settings / step params ───── */}
+        {rightCollapsed ? (
+          <CollapsedRail
+            side="right"
+            label="执行设置"
+            onExpand={() => setRightCollapsed(false)}
+          />
+        ) : (
+          <aside className="flex w-[320px] shrink-0 flex-col overflow-y-auto border-l border-line bg-surface-glass backdrop-blur-[20px] backdrop-saturate-150">
+            {selectedStep ? (
+              <StepParamPanel
+                step={selectedStep}
+                onClose={() => setSelectedStepId(null)}
+                onCollapse={() => setRightCollapsed(true)}
+                onChange={(patch) => updateStepParams(selectedStep.id, patch)}
               />
-              <p
-                className="text-caption text-muted-foreground"
-               
-              >
-                单次最多处理 100 张图片
-              </p>
-            </section>
-
-            {/* 执行设置 */}
-            <section className="space-y-3">
-              <Label
-                className="text-caption font-medium text-muted-foreground"
-               
-              >
-                执行设置
-              </Label>
-
-              {/* Resolution */}
-              <div className="space-y-1.5">
-                <Label
-                  className="text-caption text-muted-foreground"
-                 
-                >
-                  输出分辨率
-                </Label>
-                <div className="grid grid-cols-3 gap-2">
-                  {["1024x1024", "1024x1536", "1536x1024"].map((res) => (
-                    <button
-                      key={res}
-                      onClick={() => setResolution(res)}
-                      className={cn(
-                        "px-2 py-1.5 rounded-md border text-caption font-medium transition-colors",
-                        resolution === res
-                          ? "border-primary bg-primary/5 text-primary"
-                          : "border-border text-muted-foreground hover:text-foreground"
-                      )}
-                     
-                    >
-                      {res}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Toggles */}
-              <div className="space-y-3 pt-1">
-                <div className="flex items-center justify-between">
-                  <Label
-                    className="text-data text-foreground cursor-pointer"
-                   
-                  >
-                    自动添加水印
-                  </Label>
-                  <Switch
-                    checked={watermarkEnabled}
-                    onCheckedChange={setWatermarkEnabled}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Label
-                    className="text-data text-foreground cursor-pointer"
-                   
-                  >
-                    失败自动重试
-                  </Label>
-                  <Switch checked={autoRetry} onCheckedChange={setAutoRetry} />
-                </div>
-              </div>
-            </section>
-
-            {/* Divider */}
-            <div className="border-t border-border" />
-
-            {/* Action buttons */}
-            <div className="space-y-3">
-              <Button
-                variant="outline"
-                className="w-full"
-               
-              >
-                <Bookmark className="w-4 h-4 mr-2" />
-                保存为常用模板
-              </Button>
-              <Button
-                variant="brand"
-                className="w-full"
-               
-                onClick={handleExecute}
-                disabled={executing || steps.length === 0}
-              >
-                {executing ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Play className="w-4 h-4 mr-2" />
-                )}
-                {executing ? "提交中..." : "执行批量处理"}
-              </Button>
-            </div>
-          </div>
-        </aside>
+            ) : (
+              <GlobalSettingsPanel
+                onCollapse={() => setRightCollapsed(true)}
+                selectedTemplateName={
+                  selectedTemplate
+                    ? templates.find((t) => t.id === selectedTemplate)?.name ?? null
+                    : null
+                }
+                activeCategoryLabel={
+                  SCENE_CATEGORIES.find((c) => c.id === activeCategory)?.label ?? ""
+                }
+                batchCount={batchCount}
+                setBatchCount={setBatchCount}
+                aspectRatio={aspectRatio}
+                setAspectRatio={setAspectRatio}
+                resolution={resolution}
+                setResolution={setResolution}
+                watermarkEnabled={watermarkEnabled}
+                setWatermarkEnabled={setWatermarkEnabled}
+                autoRetry={autoRetry}
+                setAutoRetry={setAutoRetry}
+              />
+            )}
+          </aside>
+        )}
       </div>
     </div>
+  );
+}
+
+/* ─── Right: global settings ─────────────────────────────────────── */
+
+function GlobalSettingsPanel({
+  onCollapse,
+  selectedTemplateName,
+  activeCategoryLabel,
+  batchCount,
+  setBatchCount,
+  aspectRatio,
+  setAspectRatio,
+  resolution,
+  setResolution,
+  watermarkEnabled,
+  setWatermarkEnabled,
+  autoRetry,
+  setAutoRetry,
+}: {
+  onCollapse: () => void;
+  selectedTemplateName: string | null;
+  activeCategoryLabel: string;
+  batchCount: number;
+  setBatchCount: (n: number) => void;
+  aspectRatio: string;
+  setAspectRatio: (v: string) => void;
+  resolution: string;
+  setResolution: (v: string) => void;
+  watermarkEnabled: boolean;
+  setWatermarkEnabled: (v: boolean) => void;
+  autoRetry: boolean;
+  setAutoRetry: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-5 p-5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Settings2 className="h-4 w-4 text-brand" />
+          <span className="text-data font-semibold text-ink">全局执行设置</span>
+        </div>
+        <button
+          type="button"
+          onClick={onCollapse}
+          className="rounded-md p-1 text-ink-3 hover:bg-surface-muted hover:text-ink"
+          aria-label="折叠"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+
+      <section className="flex flex-col gap-2">
+        <Label className="text-caption font-medium text-ink-3">方案信息</Label>
+        <div className="rounded-[14px] border border-line bg-surface p-3">
+          <p className="truncate text-[13px] font-semibold text-ink">
+            {selectedTemplateName ?? "未选择模板"}
+          </p>
+          <p className="mt-0.5 text-[12px] text-ink-3">
+            {selectedTemplateName ? activeCategoryLabel : "从左侧选择一个场景模板"}
+          </p>
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <Label className="text-caption font-medium text-ink-3">批量数量</Label>
+        <Input
+          type="number"
+          min={1}
+          max={100}
+          value={batchCount}
+          onChange={(e) => setBatchCount(Number(e.target.value))}
+          className="h-9 rounded-[11px]"
+        />
+        <p className="text-[11px] text-ink-3">单次最多处理 100 张图片</p>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <Label className="text-caption font-medium text-ink-3">画面比例</Label>
+        <div className="grid grid-cols-5 gap-1.5">
+          {ASPECT_RATIOS.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => setAspectRatio(r.id)}
+              className={cn(
+                "rounded-[10px] border px-1 py-1.5 text-[11px] font-semibold transition-colors",
+                aspectRatio === r.id
+                  ? "border-brand bg-brand-soft text-brand-text"
+                  : "border-line-strong text-ink-2 hover:text-ink"
+              )}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <Label className="text-caption font-medium text-ink-3">输出清晰度</Label>
+        <div className="grid grid-cols-3 gap-1.5">
+          {RESOLUTIONS.map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => setResolution(r.id)}
+              className={cn(
+                "rounded-[10px] border px-1 py-2 text-[11px] font-semibold transition-colors",
+                resolution === r.id
+                  ? "border-brand bg-brand-soft text-brand-text"
+                  : "border-line-strong text-ink-2 hover:text-ink"
+              )}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <div className="border-t border-line" />
+
+      <div className="flex items-center justify-between">
+        <Label className="cursor-pointer text-data text-ink">自动添加水印</Label>
+        <Switch checked={watermarkEnabled} onCheckedChange={setWatermarkEnabled} />
+      </div>
+      <div className="flex items-center justify-between">
+        <Label className="cursor-pointer text-data text-ink">失败自动重试</Label>
+        <Switch checked={autoRetry} onCheckedChange={setAutoRetry} />
+      </div>
+    </div>
+  );
+}
+
+/* ─── Right: per-step parameters ─────────────────────────────────── */
+
+function StepParamPanel({
+  step,
+  onClose,
+  onCollapse,
+  onChange,
+}: {
+  step: WorkflowStep;
+  onClose: () => void;
+  onCollapse: () => void;
+  onChange: (patch: Partial<StepParams["params"]>) => void;
+}) {
+  const Icon = STEP_META[step.type].icon;
+  return (
+    <div className="flex flex-col gap-5 p-5">
+      <div className="flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-ink-2 hover:bg-surface-muted hover:text-ink"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span className="text-data font-semibold">{step.name}</span>
+        </button>
+        <button
+          type="button"
+          onClick={onCollapse}
+          className="rounded-md p-1 text-ink-3 hover:bg-surface-muted hover:text-ink"
+          aria-label="折叠"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="flex items-center gap-2.5 rounded-[14px] bg-brand-soft p-3 text-brand-text">
+        <Icon className="h-4 w-4" />
+        <span className="text-[12px] font-semibold">步骤 {step.order} · {step.name}</span>
+      </div>
+
+      {step.type === "scene" && (
+        <SceneStepParams params={step.params as SceneParams} onChange={onChange} />
+      )}
+      {step.type === "background" && (
+        <BackgroundStepParams params={step.params as BackgroundParams} onChange={onChange} />
+      )}
+      {step.type === "upscale" && (
+        <UpscaleStepParams params={step.params as UpscaleParams} onChange={onChange} />
+      )}
+      {step.type === "watermark" && (
+        <WatermarkStepParams params={step.params as WatermarkParams} onChange={onChange} />
+      )}
+      {step.type === "outpaint" && (
+        <OutpaintStepParams params={step.params as OutpaintParams} onChange={onChange} />
+      )}
+    </div>
+  );
+}
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <Label className="text-caption font-medium text-ink-3">{children}</Label>;
+}
+
+function SliderRow({
+  label,
+  value,
+  suffix,
+  min,
+  max,
+  step = 1,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  suffix?: string;
+  min: number;
+  max: number;
+  step?: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <section className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <FieldLabel>{label}</FieldLabel>
+        <span className="text-[12px] font-semibold text-brand-text">
+          {value}
+          {suffix ?? ""}
+        </span>
+      </div>
+      <Slider
+        value={[value]}
+        min={min}
+        max={max}
+        step={step}
+        onValueChange={(v) => onChange(v[0])}
+      />
+    </section>
+  );
+}
+
+function ChipGroup<T extends string>({
+  options,
+  value,
+  onChange,
+  cols = 2,
+}: {
+  options: { id: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+  cols?: number;
+}) {
+  const colClass =
+    cols === 5 ? "grid-cols-5" : cols === 4 ? "grid-cols-4" : cols === 3 ? "grid-cols-3" : "grid-cols-2";
+  return (
+    <div className={cn("grid gap-1.5", colClass)}>
+      {options.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          onClick={() => onChange(o.id)}
+          className={cn(
+            "rounded-[10px] border px-2 py-2 text-[12px] font-semibold transition-colors",
+            value === o.id
+              ? "border-brand bg-brand-soft text-brand-text"
+              : "border-line-strong text-ink-2 hover:text-ink"
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function SceneStepParams({
+  params,
+  onChange,
+}: {
+  params: SceneParams;
+  onChange: (patch: Partial<SceneParams>) => void;
+}) {
+  return (
+    <>
+      <section className="flex flex-col gap-2">
+        <FieldLabel>场景风格</FieldLabel>
+        <ChipGroup
+          value={params.sceneStyle}
+          onChange={(v) => onChange({ sceneStyle: v })}
+          options={[
+            { id: "natural", label: "自然光" },
+            { id: "studio", label: "棚拍" },
+            { id: "lifestyle", label: "生活场景" },
+            { id: "minimal", label: "极简" },
+          ]}
+        />
+      </section>
+      <section className="flex flex-col gap-2">
+        <FieldLabel>候选数量</FieldLabel>
+        <div className="flex flex-wrap gap-1.5">
+          {[1, 2, 3, 4, 5, 6].map((n) => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => onChange({ candidateCount: n })}
+              className={cn(
+                "h-8 w-8 rounded-[10px] border text-[12px] font-semibold transition-colors",
+                params.candidateCount === n
+                  ? "border-brand bg-brand-soft text-brand-text"
+                  : "border-line-strong text-ink-2 hover:text-ink"
+              )}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+      </section>
+    </>
+  );
+}
+
+function BackgroundStepParams({
+  params,
+  onChange,
+}: {
+  params: BackgroundParams;
+  onChange: (patch: Partial<BackgroundParams>) => void;
+}) {
+  return (
+    <>
+      <section className="flex flex-col gap-2">
+        <FieldLabel>背景类型</FieldLabel>
+        <ChipGroup
+          value={params.bgType}
+          onChange={(v) => onChange({ bgType: v })}
+          options={[
+            { id: "studio", label: "纯色棚拍" },
+            { id: "scene", label: "AI 场景" },
+            { id: "white", label: "白底" },
+            { id: "blur", label: "虚化" },
+          ]}
+        />
+      </section>
+      <SliderRow
+        label="边缘羽化"
+        value={params.featherEdge}
+        suffix=" px"
+        min={0}
+        max={24}
+        onChange={(featherEdge) => onChange({ featherEdge })}
+      />
+      <div className="flex items-center justify-between">
+        <Label className="cursor-pointer text-data text-ink">保留主体阴影</Label>
+        <Switch
+          checked={params.keepShadow}
+          onCheckedChange={(keepShadow) => onChange({ keepShadow })}
+        />
+      </div>
+    </>
+  );
+}
+
+function UpscaleStepParams({
+  params,
+  onChange,
+}: {
+  params: UpscaleParams;
+  onChange: (patch: Partial<UpscaleParams>) => void;
+}) {
+  return (
+    <>
+      <section className="flex flex-col gap-2">
+        <FieldLabel>放大倍数</FieldLabel>
+        <ChipGroup
+          value={String(params.factor) as "2" | "3" | "4"}
+          onChange={(v) => onChange({ factor: Number(v) })}
+          options={[
+            { id: "2", label: "2×" },
+            { id: "3", label: "3×" },
+            { id: "4", label: "4×" },
+          ]}
+          cols={3}
+        />
+      </section>
+      <SliderRow
+        label="降噪强度"
+        value={params.denoise}
+        suffix="%"
+        min={0}
+        max={100}
+        onChange={(denoise) => onChange({ denoise })}
+      />
+    </>
+  );
+}
+
+function WatermarkStepParams({
+  params,
+  onChange,
+}: {
+  params: WatermarkParams;
+  onChange: (patch: Partial<WatermarkParams>) => void;
+}) {
+  return (
+    <>
+      <section className="flex flex-col gap-2">
+        <FieldLabel>水印内容</FieldLabel>
+        <Input
+          value={params.content}
+          onChange={(e) => onChange({ content: e.target.value })}
+          placeholder="@品牌名"
+          className="h-9 rounded-[11px]"
+        />
+      </section>
+      <section className="flex flex-col gap-2">
+        <FieldLabel>水印位置</FieldLabel>
+        <ChipGroup
+          value={params.position}
+          onChange={(v) => onChange({ position: v })}
+          options={[
+            { id: "top-left", label: "左上" },
+            { id: "top-right", label: "右上" },
+            { id: "bottom-left", label: "左下" },
+            { id: "bottom-right", label: "右下" },
+            { id: "center", label: "居中" },
+          ]}
+          cols={3}
+        />
+      </section>
+      <SliderRow
+        label="不透明度"
+        value={params.opacity}
+        suffix="%"
+        min={10}
+        max={100}
+        onChange={(opacity) => onChange({ opacity })}
+      />
+    </>
+  );
+}
+
+function OutpaintStepParams({
+  params,
+  onChange,
+}: {
+  params: OutpaintParams;
+  onChange: (patch: Partial<OutpaintParams>) => void;
+}) {
+  return (
+    <>
+      <section className="flex flex-col gap-2">
+        <FieldLabel>扩展方向</FieldLabel>
+        <ChipGroup
+          value={params.direction}
+          onChange={(v) => onChange({ direction: v })}
+          options={[
+            { id: "all", label: "四周扩展" },
+            { id: "horizontal", label: "左右" },
+            { id: "vertical", label: "上下" },
+          ]}
+          cols={3}
+        />
+      </section>
+      <SliderRow
+        label="扩展比例"
+        value={params.ratio}
+        suffix="%"
+        min={10}
+        max={80}
+        onChange={(ratio) => onChange({ ratio })}
+      />
+    </>
+  );
+}
+
+/* ─── Collapsed sidebar rail ─────────────────────────────────────── */
+
+function CollapsedRail({
+  side,
+  label,
+  onExpand,
+}: {
+  side: "left" | "right";
+  label: string;
+  onExpand: () => void;
+}) {
+  const Chevron = side === "left" ? ChevronRight : ChevronLeft;
+  return (
+    <aside
+      className={cn(
+        "flex w-12 shrink-0 flex-col items-center gap-3 bg-surface-glass py-4 backdrop-blur-[20px] backdrop-saturate-150",
+        side === "left" ? "border-r border-line" : "border-l border-line"
+      )}
+    >
+      <button
+        type="button"
+        onClick={onExpand}
+        className="rounded-md p-1.5 text-ink-2 hover:bg-surface-muted hover:text-ink"
+        aria-label="展开"
+      >
+        <Chevron className="h-4 w-4" />
+      </button>
+      <div
+        className="select-none text-[12px] font-semibold tracking-widest text-ink-3"
+        style={{ writingMode: "vertical-rl" }}
+      >
+        {label}
+      </div>
+    </aside>
   );
 }

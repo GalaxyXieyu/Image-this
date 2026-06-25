@@ -16,7 +16,8 @@ import { useUpload } from "@/lib/use-upload";
 import { useToast } from "@/components/ui/use-toast";
 import { useWorkflowTaskPolling } from "@/hooks/workbench/useWorkflowTaskPolling";
 import { mapProviderErrorMessage } from "@/lib/provider-error-utils";
-import { BrandEmptyState, BrandLogo } from "@/components/brands/SpriteImage";
+import { BrandEmptyState } from "@/components/brands/SpriteImage";
+import { ConicSpinner } from "@/components/ui/conic-spinner";
 import { getPresetById } from "@/lib/workbench/presets";
 import {
   buildDefaultToolParameters,
@@ -83,33 +84,6 @@ const EMPTY_RUN_STATE: ToolRunState = {
   status: "idle",
   progress: 0,
 };
-
-function TopNav() {
-  return (
-    <header className="h-16 border-b border-border px-8 flex items-center justify-between shrink-0">
-      <Link href="/" className="hover:opacity-80 transition-opacity">
-        <BrandLogo />
-      </Link>
-      <nav className="flex items-center gap-6">
-        <Link href="/" className="text-data text-muted-foreground hover:text-foreground transition-colors">
-          首页
-        </Link>
-        <Link href="/templates" className="text-data text-muted-foreground hover:text-foreground transition-colors">
-          模板库
-        </Link>
-        <Link href="/tasks" className="text-data text-muted-foreground hover:text-foreground transition-colors">
-          任务中心
-        </Link>
-        <Link href="/results" className="text-data text-muted-foreground hover:text-foreground transition-colors">
-          结果管理
-        </Link>
-        <Link href="/settings" className="text-data text-muted-foreground hover:text-foreground transition-colors">
-          设置
-        </Link>
-      </nav>
-    </header>
-  );
-}
 
 function getStatusLabel(status: ToolTaskStatus) {
   const labels: Record<ToolTaskStatus, string> = {
@@ -331,79 +305,86 @@ function ToolboxPageInner() {
   const isBusy = creatingTask || uploading || isPolling || runState.status === "processing" || runState.status === "pending" || runState.status === "queued";
 
   return (
-    <div className="h-screen flex flex-col bg-background">
-      <TopNav />
+    <div className="h-full flex flex-col bg-background">
 
-      <div className="px-8 py-4 flex items-center justify-between shrink-0">
+      <div className="flex items-center justify-between border-b border-line px-6 py-4 shrink-0">
         <div>
-          <h1 className="text-h3 font-semibold text-foreground">
-            统一智能工具箱
-          </h1>
-          <p className="text-data text-muted-foreground mt-0.5">
+          <h1 className="text-h3 font-semibold text-ink">单点工具箱</h1>
+          <p className="mt-0.5 text-data text-ink-2">
             上传商品素材，选择工具能力，创建可追踪的 AI 处理任务
           </p>
           {draft.activePresetName && (
             <div className="mt-2 flex items-center gap-2">
-              <Badge variant="secondary">当前模板：{draft.activePresetName}</Badge>
+              <Badge variant="secondary" className="bg-brand-soft text-brand-text">
+                当前模板：{draft.activePresetName}
+              </Badge>
               {draft.activePresetDescription && (
-                <span className="text-caption text-muted-foreground">{draft.activePresetDescription}</span>
+                <span className="text-caption text-ink-3">{draft.activePresetDescription}</span>
               )}
             </div>
           )}
         </div>
-        <div className="flex items-center gap-3">
-          <Label className="text-data text-muted-foreground">
-            批量模式
-          </Label>
-          <Switch checked={draft.batchMode} onCheckedChange={(checked) => setDraft((prev) => ({ ...prev, batchMode: checked }))} />
-        </div>
-      </div>
-
-      <div className="px-8 border-b border-border shrink-0">
-        <div className="flex gap-1">
-          {SUPPORTED_TOOLS.map((tool) => (
-            <button
-              key={tool.id}
-              onClick={() => updateToolType(tool.id)}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2.5 text-data font-medium transition-colors",
-                draft.toolType === tool.id
-                  ? "text-foreground border-b-2 border-primary"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-             
-            >
-              <tool.icon className="w-4 h-4" />
-              {tool.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 rounded-full border border-line bg-surface-glass p-1 backdrop-blur-[18px] backdrop-saturate-150">
+            {SUPPORTED_TOOLS.map((tool) => {
+              const active = draft.toolType === tool.id;
+              return (
+                <button
+                  key={tool.id}
+                  onClick={() => updateToolType(tool.id)}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-data font-medium transition-colors",
+                    active
+                      ? "bg-accent-gradient text-white shadow-soft"
+                      : "text-ink-2 hover:bg-surface-muted hover:text-ink"
+                  )}
+                >
+                  <tool.icon className="h-3.5 w-3.5" />
+                  {tool.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5">
+            <Label className="cursor-pointer text-caption text-ink-2">批量模式</Label>
+            <Switch
+              checked={draft.batchMode}
+              onCheckedChange={(checked) => setDraft((prev) => ({ ...prev, batchMode: checked }))}
+            />
+          </div>
         </div>
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        <aside className="w-[320px] border-r border-border bg-muted/30 flex flex-col overflow-y-auto">
-          <div className="p-5 space-y-6">
+        <aside className="flex w-[320px] flex-col overflow-y-auto border-r border-line bg-surface-glass backdrop-blur-[20px] backdrop-saturate-150">
+          <div className="flex flex-col gap-5 p-5">
             <section>
-              <h3 className="text-data font-semibold text-foreground mb-3">
-                输入素材
-              </h3>
+              <h3 className="mb-3 text-data font-semibold text-ink">输入素材</h3>
               <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => handleUploadAsset({ role: "input", file: event.target.files?.[0] })} />
               {!draft.inputAsset ? (
                 <button
-                  className="w-full border-2 border-dashed border-border rounded-xl p-8 flex flex-col items-center justify-center gap-3 hover:border-muted-foreground transition-colors"
+                  type="button"
+                  className="flex w-full flex-col items-center justify-center gap-3 rounded-[14px] border-[1.5px] border-dashed border-line-strong bg-surface p-7 transition-all hover:border-brand hover:bg-brand-soft/30"
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  {uploading ? <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /> : <Upload className="w-8 h-8 text-muted-foreground" />}
-                  <span className="text-data text-muted-foreground">
-                    {uploading ? "上传中..." : "点击上传图片"}
+                  {uploading ? (
+                    <ConicSpinner size={42} showPulse={false} />
+                  ) : (
+                    <span className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-brand-soft">
+                      <Upload className="h-6 w-6 text-brand" />
+                    </span>
+                  )}
+                  <span className="text-data font-semibold text-ink">
+                    {uploading ? "上传中…" : "点击或拖入图片"}
                   </span>
+                  <span className="text-[11px] text-ink-3">上传多张即自动进入批量处理</span>
                 </button>
               ) : (
-                <div className="space-y-3">
-                  <div className="aspect-square bg-muted rounded-lg flex items-center justify-center overflow-hidden">
-                    <img src={draft.inputAsset.clientUrl} alt="输入图片" className="w-full h-full object-contain" />
+                <div className="flex flex-col gap-3">
+                  <div className="flex aspect-square items-center justify-center overflow-hidden rounded-[14px] border border-line bg-surface">
+                    <img src={draft.inputAsset.clientUrl} alt="输入图片" className="h-full w-full object-contain" />
                   </div>
-                  <Button variant="ghost" size="sm" className="w-full" onClick={() => fileInputRef.current?.click()}>
+                  <Button variant="ghost" size="sm" className="w-full text-ink-2" onClick={() => fileInputRef.current?.click()}>
                     重新上传
                   </Button>
                 </div>
@@ -411,9 +392,7 @@ function ToolboxPageInner() {
             </section>
 
             <section>
-              <h3 className="text-data font-semibold text-foreground mb-3">
-                工具参数
-              </h3>
+              <h3 className="mb-3 text-data font-semibold text-ink">工具参数</h3>
               <ToolParameterPanel
                 draft={draft}
                 updateParameters={updateParameters}
@@ -425,28 +404,30 @@ function ToolboxPageInner() {
           </div>
         </aside>
 
-        <main className="flex-1 bg-muted flex items-center justify-center p-8 overflow-auto">
+        <main className="flex flex-1 items-center justify-center overflow-auto bg-surface-muted/40 p-8">
           {!resultPreviewUrl ? (
             <BrandEmptyState
               pose="think"
               title="请先上传图片"
               description="支持 JPG、PNG 格式，建议 1024×1024 以上。"
-              className="min-w-[360px] border-white/70 bg-background/80 shadow-sm"
+              className="glass-panel min-w-[360px] rounded-[20px]"
             />
           ) : (
-            <div className="w-full max-w-3xl aspect-square bg-card rounded-xl border border-border overflow-hidden shadow-sm relative">
-              <img src={resultPreviewUrl} alt={runState.resultImageUrl ? "处理结果" : "输入预览"} className="w-full h-full object-contain" />
+            <div className="glass-panel relative aspect-square w-full max-w-3xl overflow-hidden rounded-[24px]">
+              <img src={resultPreviewUrl} alt={runState.resultImageUrl ? "处理结果" : "输入预览"} className="h-full w-full object-contain" />
               {isBusy && (
-                <div className="absolute inset-0 bg-background/70 flex flex-col items-center justify-center gap-3">
-                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                  <span className="text-data text-muted-foreground">{runState.currentStep || "任务处理中..."}</span>
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-surface/70 backdrop-blur-sm">
+                  <ConicSpinner size={64} />
+                  <span className="text-data font-semibold text-brand-text">
+                    {runState.currentStep || "任务处理中…"}
+                  </span>
                 </div>
               )}
             </div>
           )}
         </main>
 
-        <aside className="w-[340px] border-l border-border flex flex-col overflow-y-auto">
+        <aside className="flex w-[340px] flex-col overflow-y-auto border-l border-line bg-surface-glass backdrop-blur-[20px] backdrop-saturate-150">
           <div className="p-5 space-y-6">
             <section>
               <div className="flex items-center justify-between">

@@ -1,0 +1,112 @@
+{
+  "generated_at": "2026-06-25T20:03:58+08:00",
+  "project": {
+    "name": "Image-this",
+    "repo_root": "/Volumes/DATABASE/code/business/Image-this",
+    "config_path": "/Volumes/DATABASE/code/business/Image-this/pm.json",
+    "tasklist_name": "Image-this",
+    "tasklist_guid": "local:image-this",
+    "task_prefix": "T",
+    "kind": "task",
+    "task_backend": "local",
+    "doc_backend": "repo"
+  },
+  "repo_scan": {
+    "root": "/Volumes/DATABASE/code/business/Image-this",
+    "exists": true,
+    "name": "Image-this",
+    "markers": {
+      "git": true,
+      "package_json": true,
+      "pnpm_lock": false,
+      "yarn_lock": false,
+      "npm_lock": true,
+      "pyproject": false,
+      "requirements_txt": false,
+      "go_mod": false,
+      "cargo_toml": false,
+      "miniapp_app_json": false,
+      "miniapp_project_config": false,
+      "src_dir": true,
+      "pages_dir": false,
+      "components_dir": false
+    },
+    "package_manager": "npm",
+    "framework_hints": [
+      "nextjs",
+      "typescript"
+    ]
+  },
+  "bootstrap": {
+    "project_mode": "brownfield",
+    "recommended_action": "map-codebase",
+    "task_backend": "local",
+    "doc_backend": "repo",
+    "doc_folder_name": "Image-this",
+    "doc_folder_token": "",
+    "doc_folder_url": "",
+    "project_doc_token": "",
+    "project_doc_url": "",
+    "requirements_doc_token": "",
+    "requirements_doc_url": "",
+    "roadmap_doc_token": "",
+    "roadmap_doc_url": "",
+    "state_doc_token": "",
+    "state_doc_url": "",
+    "notes": [
+      "brownfield 项目优先做 map-codebase，再补项目/路线图/状态文档。",
+      "greenfield 项目优先做 new-project，再进入任务拆解。",
+      "当前 task backend=local，doc backend=repo。"
+    ]
+  },
+  "doc_index": {
+    "folder_name": "Image-this",
+    "folder_token": "",
+    "folder_url": "",
+    "project_doc_token": "",
+    "project_doc_url": "",
+    "requirements_doc_token": "",
+    "requirements_doc_url": "",
+    "roadmap_doc_token": "",
+    "roadmap_doc_url": "",
+    "state_doc_token": "",
+    "state_doc_url": ""
+  },
+  "open_tasks": [
+    {
+      "task_id": "T1",
+      "summary": "[T1] 重设计 v2.0 整站 UI/UX 验收",
+      "status": "todo",
+      "guid": "local-task-32a4ac1eceb9",
+      "url": "local://task/local-task-32a4ac1eceb9",
+      "updated_at": "2026-06-25T20:03:58+08:00",
+      "created_at": "2026-06-25T20:03:58+08:00"
+    }
+  ],
+  "next_task": {
+    "task_id": "T1",
+    "summary": "[T1] 重设计 v2.0 整站 UI/UX 验收",
+    "status": "todo",
+    "guid": "local-task-32a4ac1eceb9",
+    "url": "local://task/local-task-32a4ac1eceb9",
+    "updated_at": "2026-06-25T20:03:58+08:00",
+    "created_at": "2026-06-25T20:03:58+08:00"
+  },
+  "current_task": {
+    "task_id": "T1",
+    "summary": "[T1] 重设计 v2.0 整站 UI/UX 验收",
+    "status": "todo",
+    "guid": "local-task-32a4ac1eceb9",
+    "url": "local://task/local-task-32a4ac1eceb9",
+    "description": "任务编号：T1\n创建时间：2026-06-25 20:03:58 CST\n类型：task\nRepo：/Volumes/DATABASE/code/business/Image-this\n\n需求：\nPhase 1-9 已落地。用 chrome-devtools MCP 逐屏验收 9 条页面路径（/、/workspace/scene、/combo、/tools、/results、/tasks、/settings、/prompt-studio、/auth/login），按测试计划检查:布局、玻璃质感、紫罗兰渐变 token、Newsreader 衬线、响应式 zoom、主题切换、关键交互(步骤切换/工具切换/选中态/折叠展开/运行调试 demo)。每屏截图存档 + 标注 PASS/FLAG/BLOCK，最终汇总到 .planning/UI-REVIEW.md 并回写 PM。\n\n执行要求：\n- 以 task/doc 为主，不再依赖本地 task/context/state 文件。\n- 进度默认写评论，验收证据优先回填附件或评论。",
+    "updated_at": "2026-06-25T20:03:58+08:00",
+    "completed_at": "",
+    "attachments": [],
+    "tasklists": [
+      {
+        "tasklist_guid": "local:image-this"
+      }
+    ]
+  },
+  "recent_comments": []
+}

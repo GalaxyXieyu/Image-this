@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -32,8 +33,7 @@ import { DesktopUpdateCard } from '@/components/settings/DesktopUpdateCard';
 import { LogDiagnosticsCard } from '@/components/settings/LogDiagnosticsCard';
 import { Save, Key, Sparkles, User, Image, FileText, Plus, Edit, Trash2, Star, StarOff, Cpu, HardDrive, FolderOpen, Folder, RefreshCw, Search, ChevronsUpDown, SlidersHorizontal, FileSearch } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
-import { BrandEmptyState, BrandLogo } from '@/components/brands/SpriteImage';
-import Link from 'next/link';
+import { BrandEmptyState } from '@/components/brands/SpriteImage';
 
 type SettingSection = 'models' | 'imagehosting' | 'runtime' | 'logs' | 'profile' | 'prompts' | 'updates';
 
@@ -1264,60 +1264,19 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* TopNav */}
-      <header className="h-14 border-b border-border bg-card flex items-center px-4 shrink-0">
-        <div className="flex items-center gap-3">
-          <Link href="/" className="hover:opacity-80 transition-opacity">
-            <BrandLogo iconClassName="h-8 w-8" textClassName="text-data" />
-          </Link>
-          <span className="text-muted-foreground">/</span>
-          <span className="text-data text-foreground font-medium">设置</span>
-        </div>
-        <div className="ml-auto flex items-center gap-2">
-          <Link
-            href="/"
-            className="text-data text-muted-foreground hover:text-foreground transition-colors"
-           
-          >
-            首页
-          </Link>
-          <Link
-            href="/templates"
-            className="text-data text-muted-foreground hover:text-foreground transition-colors"
-           
-          >
-            模板库
-          </Link>
-          <Link
-            href="/tasks"
-            className="text-data text-muted-foreground hover:text-foreground transition-colors"
-           
-          >
-            任务中心
-          </Link>
-          <Link
-            href="/results"
-            className="text-data text-muted-foreground hover:text-foreground transition-colors"
-           
-          >
-            结果管理
-          </Link>
-        </div>
-      </header>
-
+    <div className="h-full bg-background flex flex-col overflow-y-auto">
       <div className="flex-1 px-4 sm:px-6 lg:px-8 py-8 bg-background">
         <div className="mb-8">
-          <h1 className="text-h2 font-bold text-foreground">设置</h1>
-          <p className="text-muted-foreground mt-2">管理您的 AI 服务配置和账户信息</p>
+          <h1 className="font-serif text-h2 font-semibold tracking-[-0.01em] text-ink">设置</h1>
+          <p className="mt-2 text-ink-2">管理 AI 服务配置、提示词、系统并发与账户信息</p>
         </div>
 
         <div className="flex gap-6 h-[calc(100vh-12rem)]">
           {/* 左侧边栏 */}
           <aside className="w-72 flex-shrink-0">
             <div className="h-full">
-              <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden h-full flex flex-col">
-                <nav className="p-2 space-y-1 flex-1 overflow-y-auto">
+              <div className="glass-panel flex h-full flex-col overflow-hidden rounded-[18px]">
+                <nav className="flex-1 space-y-1 overflow-y-auto p-2">
                   {menuItems.map((item) => {
                     const Icon = item.icon;
                     const isActive = activeSection === item.id;
@@ -1325,24 +1284,22 @@ export default function SettingsPage() {
                       <button
                         key={item.id}
                         onClick={() => setActiveSection(item.id)}
-                        className={`w-full flex items-start px-4 py-3.5 rounded-lg text-left transition-all duration-200 relative group ${
+                        className={cn(
+                          "group relative flex w-full items-start rounded-[12px] px-3.5 py-3 text-left transition-all duration-200",
                           isActive
-                            ? `${item.bgColor} ${item.color} font-medium`
-                            : 'text-muted-foreground hover:bg-muted'
-                        }`}
-                      >
-                        {/* 左侧高亮边框 */}
-                        {isActive && (
-                          <div className={`absolute left-0 top-0 bottom-0 w-1 ${item.borderColor.replace('border-', 'bg-')} rounded-r-sm`}></div>
+                            ? "bg-brand-soft text-brand-text"
+                            : "text-ink-2 hover:bg-surface-muted hover:text-ink"
                         )}
-                        
-                        <Icon className={`w-5 h-5 mr-3 mt-0.5 flex-shrink-0 ${isActive ? item.color : 'text-muted-foreground group-hover:text-muted-foreground'}`} />
-                        
-                        <div className="flex-1 min-w-0">
-                          <div className={`text-data font-medium leading-tight ${isActive ? item.color : 'text-foreground'}`}>
+                      >
+                        {isActive && (
+                          <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-accent-gradient" />
+                        )}
+                        <Icon className={cn("mr-3 mt-0.5 h-5 w-5 flex-shrink-0", isActive ? "text-brand" : "text-ink-3")} />
+                        <div className="min-w-0 flex-1">
+                          <div className={cn("text-data font-semibold leading-tight", isActive ? "text-brand-text" : "text-ink")}>
                             {item.label}
                           </div>
-                          <div className={`text-caption mt-1 leading-tight ${isActive ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                          <div className="mt-1 text-caption leading-tight text-ink-3">
                             {item.subtitle}
                           </div>
                         </div>

@@ -249,3 +249,120 @@ npm run test:uiux:codegen
 - `chrome-mcp` 保留为视觉/体验探索入口；发现项必须落到 `04_execution_log.csv`、`05_bug_list.csv` 和截图证据路径。
 - `npm run test:uiux` 用于稳定复跑和报告生成。
 - 真实出图依赖本地 provider 凭据；如果缺少凭据，结果图 case 记为 `BLOCKED/ENV`，不伪造 PASS。
+---
+
+# Round 2 — 重设计 v2.0 整站 UI/UX 验收（PM T1）
+
+**Date:** 2026-06-25
+**Method:** chrome-devtools MCP（headless Chrome，1440×900）+ 测试账号 `test@imaginethis.local`，按 `.planning/UI-REVIEW-PLAN.md` 9 屏 × 4 维度跑完，dev server `localhost:34123`。
+**Screenshots:** `.planning/ui-reviews/2026-06-25/S{1..9}-*.png` + `S1-home-dark.png` + `S8-prompt-studio-run.png`。
+
+## R2.1 验收矩阵
+
+| # | 屏 | 截图 | A 布局 | B 视觉 token | C 交互 | D 主题 | 备注 |
+|---|---|---|---|---|---|---|---|
+| 1 | `/` | S1-home.png + S1-home-dark.png | PASS | PASS | PASS | PASS | Hero 衬线 46px / 紫罗兰渐变「专业视觉」/ 右侧浮动玻璃预览卡 / 01-03 三栏；暗色 `rgb(19,19,22)` 正确反色，accent 紫不变 |
+| 2 | `/workspace/scene` | S2-workspace-scene.png | PASS | PASS | PASS | n/t | AppShell 双层栏（首页/工作台/图库/设置 + 场景生成/组合工作流/单点工具 active pill）✓；StepBar 紫色圆点段（**非"玻璃药丸"**）；Step1 三段 glass-panel + sticky 底部紫色「下一步」 |
+| 3 | `/combo` | S3-combo.png | PASS | FLAG | PASS | n/t | 3 栏 glass + pipeline 序号紫徽标 + GripVertical ✓；左栏 6 张 LUMO 模板缩略图**复用同一只 LUMO 鸟图**（占位资源未替换）；底部「执行批量处理」是紫色实心按钮，**非设计稿要求的"悬浮玻璃药丸"** |
+| 4 | `/tools` | S4-tools.png | PASS | PASS | PASS | n/t | 4 工具紫色胶囊组替代下划线 tab ✓；左中右 glass ✓；批量模式 toggle ✓；未上传时「创建工具任务」disabled |
+| 5 | `/results` | S5-results.png | PASS | FLAG | PASS | n/t | 7 类分类 + 0 数字徽标 ✓；网格/列表 segmented ✓；「批量删除」红色描边 ✓；**左侧 nav 与主区域均为白底卡片，未应用 glass-panel** |
+| 6 | `/tasks` | S6-tasks.png | PASS | **BLOCK** | PASS | n/t | **未迁移 brand token**：Tab 是黑色下划线（"全部 (0)" 有黑色下划线、其余黑色文字），不是紫罗兰胶囊；空状态卡片是浅灰描边方框，无 glass-panel；标题 "任务中心" 是 sans-serif 非衬线。Plan §3 明确要求 "卡片对齐 brand token" |
+| 7 | `/settings` | S7-settings.png | PASS | PASS | PASS | n/t | 衬线大标题 "设置" ✓；左侧 nav 选中态紫色渐变高亮 ✓；「保存本区配置」紫色渐变 ✓；GPT/Gemini/即梦 多 provider 卡片对齐 |
+| 8 | `/prompt-studio` | S8-prompt-studio.png + S8-prompt-studio-run.png | PASS | PASS | PASS | n/t | 全屏无 AppShell ✓；v3/v2/v1 版本胶囊 ✓；「运行调试」紫色渐变 CTA + 「组 1（可编辑）」紫色徽标 ✓；并发 1/2/3/4 数字徽标 ✓；点击运行 < 1s 即跳 "已完成"（**未观察到 ConicSpinner 中间态**，时间窗口太短） |
+| 9 | `/auth/login` | S9-auth-login.png | PASS | **BLOCK** | PASS | n/t | 表单提交跳转 `/workspace/scene` 正常；无 AppShell（HIDDEN_PREFIXES 生效）；**左侧大块品牌色 `#2563FF` 蓝、「登录」CTA 蓝实色、「立即注册」蓝链接**——违反 Plan §3 "无任何 `border-blue-*` / 蓝色硬编码"、"主 CTA 是紫罗兰渐变（非旧蓝）" |
+
+> 备注：D 主题列只在 S1 真实切换验证（dark-class 切换、`bg` token → `rgb(19,19,22)`、紫色 accent 不变）。S2-S8 标 n/t（not tested）以节省时间，建议在修复 F2/F3 后批量回归。
+
+## R2.2 通用回归
+
+- [x] 顶栏不重复（页面级 TopNav 已清理；S2-S4 双层 AppShell 是设计意图，非重复）
+- [PARTIAL] `font-serif` 实际生效：Hero h1 / Settings h1 ✓；**Tasks h1、Results h1 仍为 sans-serif**
+- [PARTIAL] 主 CTA 是紫罗兰渐变：S1/S2/S3/S4/S5/S7/S8 ✓；**S9 登录 CTA 是旧蓝**
+- [PARTIAL] 无蓝色硬编码：S9 登录页明显违反
+- [PARTIAL] Console 无报错：**S6 /tasks 抛 `获取任务数据失败: TimeoutError: signal timed out`**；其它页面无 hydration mismatch / React warning
+
+## R2.3 待跟进事项（建议单独建子任务）
+
+| ID | 屏 | 维度 | 严重度 | 描述 | 建议 |
+|---|---|---|---|---|---|
+| F1 | /tasks | C 交互 | **HIGH** | console 出现 `TimeoutError: signal timed out` —— 任务列表 fetch 超时，疑似 AbortController 超时阈值过短或 worker 接口慢 | 排查 `src/app/tasks/page.tsx` / `/api/tasks/status` 的 fetch timeout 与重试逻辑 |
+| F2 | /tasks | B 视觉 | **BLOCK** | Tab 未迁移到紫罗兰胶囊；空状态卡片未应用 glass-panel；h1 非衬线 | 与 S4/tools 的胶囊 Tab、S6/tasks 的 brand 卡片对齐 |
+| F3 | /auth/login | B 视觉 | **BLOCK** | 左侧品牌色块 + CTA + 链接全部使用旧蓝 `#2563FF`，违反 v2.0 紫罗兰主色 | 替换为 `bg-accent-gradient` / `text-primary`；同步 `src/app/auth/login/page.tsx` 与 register 页 |
+| F4 | /results | B 视觉 | MEDIUM | 左侧分类 nav 与主区域未应用 glass-panel | 套用 `glass-panel` 类，与 S3/combo 视觉一致 |
+| F5 | /combo | B 视觉 | LOW | 6 张场景模板缩略图复用同一只 LUMO 鸟，未提供真实预览图 | 补真实模板缩略图或临时改为渐变占位 |
+| F6 | /combo | A 布局 | LOW | 底部「执行批量处理」是紫色实心按钮，Plan 期望"悬浮玻璃药丸" | 套用 glass-pill 样式 |
+| F7 | /workspace/scene | A 布局 | LOW | StepBar 是简单圆点段，未做成"玻璃药丸"（pill）形式 | 与 Plan §S2 描述对齐 |
+
+## R2.4 汇总判定
+
+- **整体**：v2.0 设计语言落地大部分页面（首页/工作台/工具/设置/组合/提示词工作室）已统一紫罗兰 + 玻璃 + 衬线 token。
+- **必修 Blockers（2）**：F2（/tasks 未迁移）、F3（/auth/login 蓝色硬编码）。
+- **High 风险（1）**：F1（/tasks fetch 超时报错）。
+- **可后置（4）**：F4-F7 视觉/资源细节。
+- **建议**：T1 验收**不通过**，需修复 F1/F2/F3 后回归 → 再 close。
+
+---
+
+# Round 3 — F1/F2/F3 修复回归（PM T1 close）
+
+**Date:** 2026-06-25
+**Method:** chrome-devtools MCP headless，登录后 9 屏 light 全量 + 8 屏 dark 全量（S9 在 R2 已验登录页，且修复后 -after 已记录），最后查 console。
+**Screenshots:** `.planning/ui-reviews/2026-06-25/R3-S{1..8}-{light,dark}.png` + Round 2 的 `-after.png`。
+
+## R3.1 修复确认
+
+| 子任务 | 验证 | 结果 |
+|---|---|---|
+| T2 / F1 | /tasks 停留 + 切其他页 console | **PASS**（无 TimeoutError，整轮 9 屏只 1 个无关 404） |
+| T3 / F2 | /tasks 紫罗兰胶囊 Tab + glass-panel 卡 + 衬线 h1（light + dark） | **PASS** |
+| T4 / F3 | /auth/login 左侧紫罗兰渐变 + 紫色 CTA + text-primary 链接；register 同步；grep auth 无蓝色硬编码 | **PASS** |
+
+## R3.2 9 屏 light + dark 矩阵
+
+| # | 屏 | Light | Dark | 备注 |
+|---|---|---|---|---|
+| 1 | `/` | PASS | PASS | 紫渐变 hero + 玻璃预览卡，dark `bg #131316` 反色正确 |
+| 2 | `/workspace/scene` | PASS | PASS | AppShell 双层栏 ✓，玻璃面板 dark 反色 ✓ |
+| 3 | `/combo` | PASS | PASS | 三栏 glass + pipeline 紫徽标，dark 下连接线/序号清晰 |
+| 4 | `/tools` | PASS | PASS | 紫罗兰胶囊组 + 三栏 glass，dark 下 active pill 仍紫 |
+| 5 | `/results` | PASS | PASS | dark 下分类 nav active 紫色徽标 ✓（仍有 F4 玻璃缺失 - R2 已记录，不阻塞） |
+| 6 | `/tasks` | **PASS（修复后）** | **PASS（修复后）** | 紫罗兰胶囊 Tab + glass-panel 卡 + 衬线 h1 都已生效 |
+| 7 | `/settings` | PASS | PASS | 左 nav 紫渐变高亮 + 衬线 + provider 卡片 dark 适配 |
+| 8 | `/prompt-studio` | PASS | PASS | 紫渐变运行 CTA + 组卡 dark 适配，并发徽标紫 |
+| 9 | `/auth/login` | **PASS（修复后）** | n/a | 全屏品牌色块 → 紫罗兰渐变，CTA + 链接均紫，AuthShell 不在 AppShell 内不参与暗色切换 |
+
+## R3.3 通用回归（修复后）
+
+- [x] 顶栏不重复
+- [x] `font-serif` 全屏生效（含 S6 修复后）
+- [x] 主 CTA 紫罗兰渐变（含 S9 修复后）
+- [x] 无蓝色硬编码（auth 已清，全仓 grep 通过）
+- [x] Console 无 hydration / TimeoutError / React warning（仅 1 个无关 404 静态资源）
+
+## R3.4 终判
+
+- **T1 验收：通过**（v2.0 整站 UI/UX 落地完成）
+- **遗留 4 个 LOW/MEDIUM FLAG**（R2 列出的 F4/F5/F6/F7）：
+  - F4 /results glass-panel
+  - F5 /combo 模板缩略图
+  - F6 /combo 执行按钮玻璃药丸
+  - F7 /workspace/scene StepBar 玻璃药丸
+
+  这些不阻塞 v2.0 基线 close。已建议后续单独排期。
+
+---
+
+# Round 4 — F4-F7 顺手修复（T1 close 后追加）
+
+**Date:** 2026-06-25
+**Files:**
+- F4 `/results`：`src/app/results/page.tsx` — h1 改 font-serif text-h2；左 sidebar / 顶 toolbar 套 `glass-panel`；空状态外层用 glass-panel + rounded-card + shadow-soft 包裹
+- F5 `/combo`：`src/app/combo/page.tsx` — 删除 LUMO BrandImageFallback 占位，新增 `TEMPLATE_GRADIENTS` 8 色调色板，模板缩略图用 inline 渐变背景，移除未用 import
+- F6 `/combo`：底部执行按钮组**原已是 glass-panel + rounded-full 浮动药丸**（R2 误判），无需修改
+- F7 `/workspace/scene`：`src/app/workspace/scene/page.tsx` — StepBar 容器 `rounded-[16px]` → `rounded-full` + 加 shadow-soft
+
+**Verification screenshots:** `R4-S2-workspace.png` / `R4-S3-combo.png` / `R4-S5-results.png`（dark 主题下截，三处修复都已生效）
+
+**Lint:** 0 errors（164 warnings 同基线）
+
+**遗留风险**：无。R2 列出的全部 4 个 FLAG 现已闭环。

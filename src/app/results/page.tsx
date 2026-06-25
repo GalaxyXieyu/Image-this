@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { apiGet, apiPatch } from "@/lib/api-client";
-import { BrandEmptyState, BrandImageFallback, BrandLogo } from "@/components/brands/SpriteImage";
+import { BrandEmptyState, BrandImageFallback } from "@/components/brands/SpriteImage";
 import {
   Search,
   Download,
@@ -77,62 +77,14 @@ function formatDate(dateStr: string | Date): string {
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
-  all: "全部场景",
+  all: "全部",
+  scene: "场景图",
   main: "主图",
   detail: "详情图",
   marketing: "营销图",
-  "white-bg": "白底图",
-  scene: "场景图",
   poster: "海报",
-  other: "其他",
+  "white-bg": "白底图",
 };
-
-function TopNav() {
-  return (
-    <header className="h-16 border-b border-border px-8 flex items-center justify-between shrink-0">
-      <Link href="/" className="hover:opacity-80 transition-opacity">
-        <BrandLogo />
-      </Link>
-      <nav className="flex items-center gap-6">
-        <Link
-          href="/"
-          className="text-data text-muted-foreground hover:text-foreground transition-colors"
-         
-        >
-          首页
-        </Link>
-        <Link
-          href="/templates"
-          className="text-data text-muted-foreground hover:text-foreground transition-colors"
-         
-        >
-          模板库
-        </Link>
-        <Link
-          href="/tasks"
-          className="text-data text-muted-foreground hover:text-foreground transition-colors"
-         
-        >
-          任务中心
-        </Link>
-        <Link
-          href="/results"
-          className="text-data text-foreground font-medium"
-         
-        >
-          结果管理
-        </Link>
-        <Link
-          href="/settings"
-          className="text-data text-muted-foreground hover:text-foreground transition-colors"
-         
-        >
-          设置
-        </Link>
-      </nav>
-    </header>
-  );
-}
 
 export default function ResultsPage() {
   const [activeCategory, setActiveCategory] = useState("all");
@@ -227,144 +179,127 @@ export default function ResultsPage() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-background">
-      <TopNav />
-
+    <div className="h-full flex flex-col bg-background">
       {/* Header */}
-      <div className="px-6 py-4 flex items-center justify-between shrink-0 border-b border-border">
+      <div className="flex items-center justify-between border-b border-line px-6 py-4 shrink-0">
         <div>
-          <h1
-            className="text-body font-semibold text-foreground"
-           
-          >
-            结果管理
-          </h1>
-          <p
-            className="text-data text-muted-foreground mt-0.5"
-           
-          >
-            查看和下载已生成的图片结果
+          <h1 className="font-serif text-h2 text-ink tracking-tight">图库</h1>
+          <p className="mt-1 text-data text-ink-2">
+            查看、筛选、批量下载已生成的商品图
           </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="relative flex items-center gap-2">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="搜索图片..."
-              className="pl-9 w-64"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && fetchResults()}
-             
-            />
-            <Button variant="outline" size="sm" onClick={fetchResults} disabled={loading}>
-              <Loader2 className={cn("w-4 h-4", loading && "animate-spin")} />
-            </Button>
-          </div>
-          <div className="flex items-center border rounded-md overflow-hidden">
-            <button
-              onClick={() => setViewMode("grid")}
-              className={cn(
-                "px-3 py-2 text-data transition-colors",
-                viewMode === "grid"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-background text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Grid className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode("list")}
-              className={cn(
-                "px-3 py-2 text-data transition-colors",
-                viewMode === "list"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-background text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <List className="w-4 h-4" />
-            </button>
-          </div>
         </div>
       </div>
 
       {/* Two-column layout */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left sidebar */}
-        <aside className="w-[200px] border-r border-border flex flex-col shrink-0">
+        {/* Left sidebar — categories */}
+        <aside className="flex w-[220px] shrink-0 flex-col glass-panel rounded-none border-r border-line">
           <div className="p-4">
-            <h2
-              className="text-caption font-semibold text-muted-foreground uppercase tracking-wider mb-3"
-             
-            >
+            <h2 className="mb-3 text-caption font-semibold uppercase tracking-wider text-ink-3">
               场景分类
             </h2>
-            <nav className="space-y-0.5">
-              {Object.entries(CATEGORY_LABELS).map(([id, label]) => (
-                <button
-                  key={id}
-                  onClick={() => setActiveCategory(id)}
-                  className={cn(
-                    "w-full flex items-center justify-between px-3 py-2 rounded-md text-data transition-colors",
-                    activeCategory === id
-                      ? "bg-primary/10 text-primary font-medium"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  )}
-                 
-                >
-                  <span>{label}</span>
-                  <Badge
-                    variant={activeCategory === id ? "default" : "secondary"}
-                    className="text-caption h-5 px-1.5"
+            <nav className="flex flex-col gap-0.5">
+              {Object.entries(CATEGORY_LABELS).map(([id, label]) => {
+                const active = activeCategory === id;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => setActiveCategory(id)}
+                    className={cn(
+                      "flex w-full items-center justify-between rounded-[10px] px-3 py-2 text-data transition-colors",
+                      active
+                        ? "bg-brand-soft font-semibold text-brand-text"
+                        : "text-ink-2 hover:bg-surface-muted hover:text-ink"
+                    )}
                   >
-                    {categoryCounts[id] || 0}
-                  </Badge>
-                </button>
-              ))}
+                    <span>{label}</span>
+                    <span
+                      className={cn(
+                        "rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+                        active
+                          ? "bg-accent-gradient text-white"
+                          : "bg-surface-muted text-ink-3"
+                      )}
+                    >
+                      {categoryCounts[id] || 0}
+                    </span>
+                  </button>
+                );
+              })}
             </nav>
           </div>
         </aside>
 
         {/* Main area */}
-        <main className="flex-1 flex flex-col overflow-hidden">
-          {/* Bulk actions bar — subdued */}
-          <div className="px-6 py-2.5 border-b border-border flex items-center justify-between shrink-0 bg-secondary/50">
-            <div className="flex items-center gap-4">
+        <main className="flex flex-1 flex-col overflow-hidden">
+          {/* Single-row toolbar: select all + search + view mode + bulk */}
+          <div className="flex items-center justify-between gap-3 border-b border-line glass-panel rounded-none px-6 py-2.5 shrink-0">
+            <div className="flex items-center gap-3">
               <button
                 onClick={toggleSelectAll}
-                className="flex items-center gap-2 text-data text-muted-foreground hover:text-foreground transition-colors"
-               
+                className="flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-data text-ink-2 transition-colors hover:text-ink"
               >
-                <CheckSquare className={cn("w-4 h-4", isAllSelected && "text-primary")} />
+                <CheckSquare className={cn("h-3.5 w-3.5", isAllSelected && "text-brand")} />
                 全选
               </button>
               {selectedIds.size > 0 && (
-                <span
-                  className="text-data text-muted-foreground"
-                 
-                >
-                  已选择 {selectedIds.size} 项
-                </span>
+                <span className="text-data text-brand-text">已选 {selectedIds.size} 项</span>
               )}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-3" />
+                <Input
+                  placeholder="搜索图片…"
+                  className="h-8 w-56 rounded-full pl-8 text-[13px]"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && fetchResults()}
+                />
+              </div>
             </div>
             <div className="flex items-center gap-2">
+              <div className="flex items-center gap-0.5 rounded-full border border-line bg-surface p-0.5">
+                <button
+                  onClick={() => setViewMode("grid")}
+                  className={cn(
+                    "rounded-full p-1.5 transition-colors",
+                    viewMode === "grid"
+                      ? "bg-accent-gradient text-white"
+                      : "text-ink-3 hover:text-ink"
+                  )}
+                  aria-label="网格视图"
+                >
+                  <Grid className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => setViewMode("list")}
+                  className={cn(
+                    "rounded-full p-1.5 transition-colors",
+                    viewMode === "list"
+                      ? "bg-accent-gradient text-white"
+                      : "text-ink-3 hover:text-ink"
+                  )}
+                  aria-label="列表视图"
+                >
+                  <List className="h-3.5 w-3.5" />
+                </button>
+              </div>
               <Button
                 variant="outline"
                 size="sm"
                 disabled={selectedIds.size === 0}
-                className="bg-background"
+                className="h-8 rounded-full border-line-strong bg-surface text-[13px]"
               >
-                <Download className="w-4 h-4 mr-1.5" />
+                <Download className="mr-1 h-3.5 w-3.5" />
                 批量下载
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 disabled={selectedIds.size === 0}
-                className="text-destructive hover:text-destructive bg-background"
+                className="h-8 rounded-full border-line-strong bg-surface text-[13px] text-danger hover:text-danger"
                 onClick={handleBulkDelete}
               >
-                <Trash2 className="w-4 h-4 mr-1.5" />
+                <Trash2 className="mr-1 h-3.5 w-3.5" />
                 批量删除
               </Button>
             </div>
@@ -390,96 +325,85 @@ export default function ResultsPage() {
             {!loading && !error && (
               <>
                 {viewMode === "grid" ? (
-                  <div className="grid grid-cols-4 gap-3">
+                  <div
+                    className="grid gap-3"
+                    style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}
+                  >
                     {filteredResults.map((item) => (
                       <div
                         key={item.id}
                         className={cn(
-                          "group rounded-lg border bg-card overflow-hidden transition-all duration-200",
-                          selectedIds.has(item.id)
-                            ? "ring-2 ring-primary border-primary"
-                            : "border-border hover:border-primary/40"
+                          "group glass-panel overflow-hidden rounded-[16px] transition-all duration-200 hover:-translate-y-0.5",
+                          selectedIds.has(item.id) && "ring-2 ring-brand"
                         )}
                       >
-                        {/* Image thumbnail — dominant */}
-                        <div className="relative aspect-[4/3] bg-muted flex items-center justify-center overflow-hidden">
-                          <ImageThumbnail src={item.thumbnail || item.processedUrl} alt={item.name} className="w-10 h-10" />
+                        <div className="relative aspect-square overflow-hidden bg-surface-muted">
+                          <ImageThumbnail src={item.thumbnail || item.processedUrl} alt={item.name} className="h-full w-full" />
+                          {/* Category corner badge */}
+                          <span className="absolute left-2 top-2 rounded-full bg-surface/85 px-2 py-0.5 text-[10px] font-semibold text-brand-text backdrop-blur-sm">
+                            {CATEGORY_LABELS[item.category] || "其他"}
+                          </span>
                           {/* Checkbox overlay */}
-                          <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Checkbox
-                              checked={selectedIds.has(item.id)}
-                              onCheckedChange={() => toggleSelect(item.id)}
-                            />
+                          <div className={cn(
+                            "absolute right-2 top-2 transition-opacity",
+                            selectedIds.has(item.id) ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                          )}>
+                            <div className="rounded-md bg-surface/85 p-1 backdrop-blur-sm">
+                              <Checkbox
+                                checked={selectedIds.has(item.id)}
+                                onCheckedChange={() => toggleSelect(item.id)}
+                              />
+                            </div>
                           </div>
                           {/* Hover actions */}
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                            <Button size="sm" variant="secondary">
-                              <Download className="w-4 h-4 mr-1.5" />
-                              下载
-                            </Button>
-                            <Button size="sm" variant="destructive">
-                              <Trash2 className="w-4 h-4 mr-1.5" />
-                              删除
-                            </Button>
+                          <div className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
+                            <button className="rounded-full bg-white/90 p-1.5 text-ink-2 hover:text-ink" title="下载">
+                              <Download className="h-3.5 w-3.5" />
+                            </button>
+                            <button className="rounded-full bg-white/90 p-1.5 text-ink-2 hover:text-danger" title="删除">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
                           </div>
                         </div>
-                        {/* Card info — minimal */}
-                        <div className="px-3 py-2">
-                          <h3
-                            className="text-data font-medium text-foreground truncate"
-                           
-                          >
-                            {item.name}
-                          </h3>
-                          <p
-                            className="text-caption text-muted-foreground mt-0.5"
-                           
-                          >
-                            {item.createdAt}
-                          </p>
+                        <div className="px-2.5 py-2">
+                          <h3 className="truncate text-[12px] font-semibold text-ink">{item.name}</h3>
+                          <p className="mt-0.5 text-[11px] text-ink-3">{item.createdAt}</p>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="flex flex-col gap-1.5">
                     {filteredResults.map((item) => (
                       <div
                         key={item.id}
                         className={cn(
-                          "flex items-center gap-4 p-3 rounded-lg border bg-card transition-all duration-200",
+                          "group flex items-center gap-3 rounded-[12px] border bg-surface p-2.5 transition-all hover:border-brand/40",
                           selectedIds.has(item.id)
-                            ? "ring-2 ring-primary border-primary"
-                            : "border-border hover:border-primary/40"
+                            ? "border-brand ring-1 ring-brand"
+                            : "border-line"
                         )}
                       >
                         <Checkbox
                           checked={selectedIds.has(item.id)}
                           onCheckedChange={() => toggleSelect(item.id)}
                         />
-                        <div className="w-14 h-14 rounded-md bg-muted flex items-center justify-center shrink-0 overflow-hidden">
-                          <ImageThumbnail src={item.thumbnail || item.processedUrl} alt={item.name} className="w-5 h-5" />
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[8px] bg-surface-muted">
+                          <ImageThumbnail src={item.thumbnail || item.processedUrl} alt={item.name} className="h-full w-full" />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <h3
-                            className="text-data font-medium text-foreground truncate"
-                           
-                          >
-                            {item.name}
-                          </h3>
-                          <p
-                            className="text-caption text-muted-foreground"
-                           
-                          >
-                            {item.createdAt}
-                          </p>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="truncate text-[13px] font-semibold text-ink">{item.name}</h3>
+                          <p className="text-[11px] text-ink-3">{item.createdAt}</p>
                         </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button variant="ghost" size="sm">
-                            <Download className="w-4 h-4" />
+                        <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold text-brand-text">
+                          {CATEGORY_LABELS[item.category] || "其他"}
+                        </span>
+                        <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-ink-2">
+                            <Download className="h-3.5 w-3.5" />
                           </Button>
-                          <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive">
-                            <Trash2 className="w-4 h-4" />
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-ink-2 hover:text-danger">
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </div>
@@ -488,11 +412,11 @@ export default function ResultsPage() {
                 )}
 
                 {filteredResults.length === 0 && (
+                  <div className="glass-panel rounded-card shadow-soft py-12">
                   <BrandEmptyState
                     pose="star"
                     title="暂无结果"
                     description="去工作台生成你的第一张商品图吧。"
-                    className="h-96 border-0 bg-transparent"
                     action={
                       <div className="flex items-center gap-3">
                         <Button variant="brand" asChild>
@@ -510,6 +434,7 @@ export default function ResultsPage() {
                       </div>
                     }
                   />
+                  </div>
                 )}
               </>
             )}

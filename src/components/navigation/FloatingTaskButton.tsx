@@ -77,7 +77,7 @@ export default function FloatingTaskButton() {
       try {
         // 获取统计
         const statsRes = await fetch('/api/tasks/worker', {
-          signal: AbortSignal.timeout(3000)
+          signal: AbortSignal.timeout(10000)
         });
         if (statsRes.ok) {
           const data = await statsRes.json();
@@ -85,10 +85,10 @@ export default function FloatingTaskButton() {
             setStats(data.status);
           }
         }
-        
+
         // 获取最近任务列表
         const tasksRes = await fetch('/api/tasks/recent', {
-          signal: AbortSignal.timeout(3000)
+          signal: AbortSignal.timeout(10000)
         });
         if (tasksRes.ok) {
           const data = await tasksRes.json();
@@ -97,7 +97,7 @@ export default function FloatingTaskButton() {
           }
         }
       } catch (err) {
-        if (err instanceof Error && err.name !== 'AbortError') {
+        if (err instanceof Error && err.name !== 'AbortError' && err.name !== 'TimeoutError') {
           console.error('获取任务数据失败:', err);
         }
       }

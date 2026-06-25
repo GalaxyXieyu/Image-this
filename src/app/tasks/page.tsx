@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { apiGet, apiDelete } from "@/lib/api-client";
 import { useTaskPolling } from "@/lib/use-task-polling";
 import { getWorkflowTypeLabel, normalizeTaskStatus } from "@/lib/workbench/task-compat";
-import { BrandEmptyState, BrandLogo } from "@/components/brands/SpriteImage";
+import { BrandEmptyState } from "@/components/brands/SpriteImage";
 import {
   RefreshCw,
   RotateCcw,
@@ -53,55 +53,6 @@ function mapTaskType(type: string): string {
 function formatDate(dateStr: string | Date): string {
   const d = new Date(dateStr);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
-
-function TopNav() {
-  return (
-    <header className="h-16 border-b border-border px-8 flex items-center justify-between shrink-0"
-    >
-      <Link href="/" className="hover:opacity-80 transition-opacity">
-        <BrandLogo />
-      </Link>
-      <nav className="flex items-center gap-6"
-      >
-        <Link
-          href="/"
-          className="text-data text-muted-foreground hover:text-foreground transition-colors"
-         
-        >
-          首页
-        </Link>
-        <Link
-          href="/templates"
-          className="text-data text-muted-foreground hover:text-foreground transition-colors"
-         
-        >
-          模板库
-        </Link>
-        <Link
-          href="/tasks"
-          className="text-data text-foreground font-medium"
-         
-        >
-          任务中心
-        </Link>
-        <Link
-          href="/results"
-          className="text-data text-muted-foreground hover:text-foreground transition-colors"
-         
-        >
-          结果管理
-        </Link>
-        <Link
-          href="/settings"
-          className="text-data text-muted-foreground hover:text-foreground transition-colors"
-         
-        >
-          设置
-        </Link>
-      </nav>
-    </header>
-  );
 }
 
 function StatusBadge({ status }: { status: TaskStatus }) {
@@ -274,16 +225,15 @@ export default function TasksPage() {
   ];
 
   return (
-    <div className="h-screen flex flex-col bg-background">
-      <TopNav />
+    <div className="h-full flex flex-col bg-background">
 
       {/* Header */}
       <div className="px-8 py-6 flex items-center justify-between shrink-0">
         <div>
-          <h1 className="text-h3 font-semibold text-foreground">
+          <h1 className="font-serif text-h2 text-foreground tracking-tight">
             任务中心
           </h1>
-          <p className="text-data text-muted-foreground mt-0.5">
+          <p className="text-data text-muted-foreground mt-1">
             查看和管理你的生成任务
           </p>
         </div>
@@ -301,20 +251,19 @@ export default function TasksPage() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="px-8 border-b border-border shrink-0">
-        <div className="flex gap-1">
+      {/* Tabs — 紫罗兰胶囊组（对齐 /tools） */}
+      <div className="px-8 shrink-0">
+        <div className="inline-flex items-center gap-1 rounded-full glass-panel p-1">
           {tabLabels.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                "px-4 py-2.5 text-data font-medium transition-colors",
+                "px-4 py-1.5 text-data font-medium rounded-full transition-all",
                 activeTab === tab.id
-                  ? "text-foreground border-b-2 border-primary"
+                  ? "bg-accent-gradient text-white shadow-soft"
                   : "text-muted-foreground hover:text-foreground"
               )}
-             
             >
               {tab.label}
             </button>
@@ -341,18 +290,19 @@ export default function TasksPage() {
           )}
 
           {!loading && !error && filteredTasks.length === 0 && (
-            <BrandEmptyState
-              pose="sleep"
-              title="暂无任务"
-              description="创建场景图或工具任务后，进度会集中显示在这里。"
-              className="py-16"
-            />
+            <div className="glass-panel rounded-card shadow-soft py-16">
+              <BrandEmptyState
+                pose="sleep"
+                title="暂无任务"
+                description="创建场景图或工具任务后，进度会集中显示在这里。"
+              />
+            </div>
           )}
 
           {filteredTasks.map((task) => (
             <div
               key={task.id}
-              className="rounded-xl border border-border bg-card p-5 hover:shadow-sm transition-shadow"
+              className="glass-panel rounded-card shadow-soft hover:shadow-float p-5 transition-shadow"
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-4">

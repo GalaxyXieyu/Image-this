@@ -1,0 +1,29 @@
+{
+  "generated_at": "2026-06-25T20:03:58+08:00",
+  "repo_scan": {
+    "root": "/Volumes/DATABASE/code/business/Image-this",
+    "exists": true,
+    "name": "Image-this",
+    "markers": {
+      "git": true,
+      "package_json": true,
+      "pnpm_lock": false,
+      "yarn_lock": false,
+      "npm_lock": true,
+      "pyproject": false,
+      "requirements_txt": false,
+      "go_mod": false,
+      "cargo_toml": false,
+      "miniapp_app_json": false,
+      "miniapp_project_config": false,
+      "src_dir": true,
+      "pages_dir": false,
+      "components_dir": false
+    },
+    "package_manager": "npm",
+    "framework_hints": [
+      "nextjs",
+      "typescript"
+    ]
+  }
+}

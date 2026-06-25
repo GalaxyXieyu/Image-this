@@ -19,7 +19,9 @@ const eslintConfig = [
       "dist-electron/**",
       "coverage/**",
       "test-results/**",
-      "playwright-report/**"
+      "playwright-report/**",
+      "design_handoff/**",
+      "应用页面完整盘点/**"
     ]
   },
   ...compat.extends("next/core-web-vitals"),

@@ -108,7 +108,7 @@ export default function LoginPage() {
 
           <Button
             type="submit"
-            className="h-9 w-full rounded-sm bg-[#2f67ff] text-sm font-medium hover:bg-[#2858dc]"
+            className="h-9 w-full rounded-sm bg-accent-gradient text-sm font-medium text-white hover:opacity-90"
             disabled={isLoading}
           >
             {isLoading ? '登录中...' : '登录'}
@@ -145,7 +145,7 @@ export default function LoginPage() {
 
         <div className="text-center text-xs text-muted-foreground">
           还没有账号？{' '}
-          <Link href={registerHref} className="font-medium text-[#2f67ff] hover:underline">
+          <Link href={registerHref} className="font-medium text-primary hover:underline">
             立即注册
           </Link>
         </div>

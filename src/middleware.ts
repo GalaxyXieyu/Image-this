@@ -10,6 +10,7 @@ const PROTECTED_PREFIXES = [
   "/tasks",
   "/results",
   "/settings",
+  "/prompt-studio",
 ];
 
 function isProtectedPath(pathname: string) {
@@ -55,5 +56,6 @@ export const config = {
     "/tasks/:path*",
     "/results/:path*",
     "/settings/:path*",
+    "/prompt-studio/:path*",
   ],
 };

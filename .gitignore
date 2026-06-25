@@ -229,3 +229,8 @@ dist-electron/
 .tmp-smoke/
 .tmp-smoke-login/
 .tools/
+
+# Design redesign reference handoff (not part of app source)
+design_handoff/
+应用页面完整盘点/
+应用页面完整盘点.zip

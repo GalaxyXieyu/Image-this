@@ -17,7 +17,7 @@ module.exports = {
   			primary: {
   				DEFAULT: 'hsl(var(--primary))',
   				foreground: 'hsl(var(--primary-foreground))',
-  				hover: '#1D4ED8'
+  				hover: 'var(--brand-text)'
   			},
   			secondary: {
   				DEFAULT: 'hsl(var(--secondary))',
@@ -43,6 +43,28 @@ module.exports = {
   				DEFAULT: 'hsl(var(--card))',
   				foreground: 'hsl(var(--card-foreground))'
   			},
+  			brand: {
+  				DEFAULT: 'var(--brand)',
+  				to: 'var(--brand-2)',
+  				soft: 'var(--brand-soft)',
+  				text: 'var(--brand-text)'
+  			},
+  			surface: {
+  				DEFAULT: 'var(--surface)',
+  				muted: 'var(--surface-2)',
+  				glass: 'var(--glass)'
+  			},
+  			ink: {
+  				DEFAULT: 'var(--ink)',
+  				2: 'var(--ink-2)',
+  				3: 'var(--ink-3)'
+  			},
+  			line: {
+  				DEFAULT: 'var(--line-soft)',
+  				strong: 'var(--line-strong)'
+  			},
+  			ok: 'var(--ok)',
+  			warn: 'var(--warn)',
   			chart: {
   				'1': 'hsl(var(--chart-1))',
   				'2': 'hsl(var(--chart-2))',
@@ -73,13 +95,14 @@ module.exports = {
   				soft: '#FEE2E2'
   			},
   			processing: {
-  				DEFAULT: '#2563FF',
+  				DEFAULT: '#7B5CFF',
   				foreground: '#FFFFFF',
-  				soft: '#DBEAFE'
+  				soft: 'rgba(123, 92, 255, 0.14)'
   			}
   		},
   		fontFamily: {
-  			sans: ['var(--font-montserrat)', 'var(--font-noto-sans-sc)', 'system-ui', '-apple-system', 'sans-serif'],
+  			sans: ['var(--font-sans)', 'var(--font-noto-sans-sc)', 'system-ui', '-apple-system', 'sans-serif'],
+  			serif: ['var(--font-serif)', 'var(--font-noto-serif-sc)', 'Georgia', 'serif'],
   			mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
   		},
   		fontSize: {
@@ -94,7 +117,12 @@ module.exports = {
   		borderRadius: {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
-  			sm: 'calc(var(--radius) - 4px)'
+  			sm: 'calc(var(--radius) - 4px)',
+  			card: 'var(--radius-card)'
+  		},
+  		boxShadow: {
+  			soft: 'var(--shadow-soft)',
+  			float: 'var(--shadow-float)'
   		},
   		keyframes: {
   			'accordion-down': {

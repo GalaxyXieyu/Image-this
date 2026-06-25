@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
+import { ConicSpinner } from "@/components/ui/conic-spinner";
 import {
   Select,
   SelectContent,
@@ -26,7 +26,7 @@ import { getPresetById } from "@/lib/workbench/presets";
 import { buildSceneLegacyTaskRequests } from "@/lib/workbench/scene-task-adapter";
 import { getSceneGenerationModels } from "@/lib/ai-models";
 import type { InputAssetRef, SceneWorkflowDraft, TemplatePreset, WorkflowTaskStatus } from "@/types/workbench";
-import { BrandEmptyState, BrandImageFallback, BrandLogo } from "@/components/brands/SpriteImage";
+import { BrandEmptyState, BrandImageFallback } from "@/components/brands/SpriteImage";
 import {
   ArrowLeft,
   ArrowRight,
@@ -165,87 +165,50 @@ function StepBar({ currentStep }: { currentStep: Step }) {
   ];
 
   return (
-    <div className="h-16 border-b border-border bg-background flex items-center justify-center gap-8 px-8 shrink-0">
-      {steps.map((s, i) => {
-        const isActive = currentStep === s.num;
-        const isCompleted = currentStep > s.num;
-        return (
-          <div key={s.num} className="flex items-center gap-2">
-            <div
-              className={cn(
-                "w-7 h-7 rounded-full flex items-center justify-center text-[13px]",
-                isActive || isCompleted
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground"
+    <div className="px-6 pt-4 pb-2 shrink-0">
+      <div className="glass-panel shadow-soft mx-auto flex max-w-[860px] items-center justify-center gap-0 rounded-full px-6 py-2.5">
+        {steps.map((s, i) => {
+          const isActive = currentStep === s.num;
+          const isCompleted = currentStep > s.num;
+          const reached = isActive || isCompleted;
+          return (
+            <div key={s.num} className="flex items-center">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className={cn(
+                    "flex h-7 w-7 items-center justify-center rounded-full text-[13px] font-semibold transition-colors",
+                    reached
+                      ? "bg-accent-gradient text-white shadow-soft"
+                      : "bg-surface-muted text-ink-3"
+                  )}
+                >
+                  {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : s.num}
+                </div>
+                <span
+                  className={cn(
+                    "text-data font-medium",
+                    isActive ? "text-ink" : reached ? "text-ink-2" : "text-ink-3"
+                  )}
+                >
+                  {s.label}
+                </span>
+              </div>
+              {i < steps.length - 1 && (
+                <div
+                  className={cn(
+                    "mx-4 h-px w-12 transition-colors",
+                    currentStep > s.num ? "bg-brand" : "bg-line-strong"
+                  )}
+                />
               )}
-            >
-              {isCompleted ? <CheckCircle2 className="w-4 h-4" /> : s.num}
             </div>
-            <span
-              className={cn(
-                "text-data",
-                isActive ? "text-foreground" : "text-muted-foreground"
-              )}
-             
-            >
-              {s.label}
-            </span>
-            {i < steps.length - 1 && (
-              <div className="w-8 h-px bg-border ml-2" />
-            )}
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-function TopNav() {
-  return (
-    <header className="h-16 border-b border-border px-8 flex items-center justify-between shrink-0">
-      <Link href="/" className="hover:opacity-80 transition-opacity">
-        <BrandLogo />
-      </Link>
-      <nav className="flex items-center gap-6">
-        <Link
-          href="/"
-          className="text-data text-muted-foreground hover:text-foreground transition-colors"
-         
-        >
-          首页
-        </Link>
-        <Link
-          href="/templates"
-          className="text-data text-muted-foreground hover:text-foreground transition-colors"
-         
-        >
-          模板库
-        </Link>
-        <Link
-          href="/tasks"
-          className="text-data text-muted-foreground hover:text-foreground transition-colors"
-         
-        >
-          任务中心
-        </Link>
-        <Link
-          href="/results"
-          className="text-data text-muted-foreground hover:text-foreground transition-colors"
-         
-        >
-          结果管理
-        </Link>
-        <Link
-          href="/settings"
-          className="text-data text-muted-foreground hover:text-foreground transition-colors"
-         
-        >
-          设置
-        </Link>
-      </nav>
-    </header>
-  );
-}
 
 const platforms = [
   { id: "taobao", label: "淘宝/天猫" },
@@ -297,29 +260,23 @@ function ProductInfoStep({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-auto p-8">
-        <div className="max-w-4xl mx-auto space-y-8">
+      <div className="flex-1 overflow-auto px-6 pb-4 pt-2">
+        <div className="max-w-[1100px] mx-auto flex flex-col gap-3.5">
           {workflowData.activePresetName && (
-            <section className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+            <section className="glass-panel rounded-[20px] p-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <Badge variant="processing">已载入模板</Badge>
-                  <h2
-                    className="mt-3 text-body font-semibold text-foreground"
-                   
-                  >
+                  <h2 className="mt-3 text-body font-semibold text-ink">
                     {workflowData.activePresetName}
                   </h2>
                   {workflowData.activePresetDescription && (
-                    <p
-                      className="mt-1 text-data text-muted-foreground"
-                     
-                    >
+                    <p className="mt-1 text-data text-ink-2">
                       {workflowData.activePresetDescription}
                     </p>
                   )}
                 </div>
-                <div className="text-right text-caption text-muted-foreground">
+                <div className="text-right text-caption text-ink-3">
                   <p>模型：{workflowData.aiModel}</p>
                   <p>尺寸：{workflowData.outputResolution}</p>
                   <p>候选：{workflowData.candidateCount} 张</p>
@@ -327,20 +284,12 @@ function ProductInfoStep({
               </div>
             </section>
           )}
-          <section className="space-y-4">
-            <h2
-              className="text-h3 font-semibold text-foreground"
-             
-            >
-              产品基础信息
-            </h2>
-            <p
-              className="text-data text-muted-foreground"
-             
-            >
-              请尽可能详细地描述你的产品，AI 会根据这些信息生成最合适的场景图
+          <section className="glass-panel rounded-[24px] p-[20px_22px]">
+            <h2 className="text-base font-bold text-ink">产品基础信息</h2>
+            <p className="mt-1 text-[13px] text-ink-2">
+              请尽可能详细地描述你的产品，AI 会据此生成最合适的场景图
             </p>
-            <div className="grid grid-cols-2 gap-6">
+            <div className="mt-3.5 grid grid-cols-2 gap-x-3.5 gap-y-3">
               <div className="space-y-2">
                 <Label>产品名称</Label>
                 <Input
@@ -397,70 +346,62 @@ function ProductInfoStep({
                 />
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>核心卖点</Label>
+            <div className="mt-3 space-y-1.5">
+              <Label className="text-[13px] font-semibold text-ink-2">核心卖点</Label>
               <Textarea
-                placeholder="请列出产品的核心卖点..."
-                rows={3}
+                placeholder="请列出产品的核心卖点……"
+                rows={2}
                 value={workflowData.sellingPoints}
                 onChange={(e) =>
                   setWorkflowData((prev) => ({ ...prev, sellingPoints: e.target.value }))
                 }
-               
+                className="resize-none rounded-[12px]"
               />
             </div>
           </section>
 
-          <section className="space-y-4">
-            <h2
-              className="text-h3 font-semibold text-foreground"
-             
-            >
-              使用平台
-            </h2>
-            <div className="flex flex-wrap gap-3">
-              {platforms.map((platform) => (
-                <label
-                  key={platform.id}
-                  className={cn(
-                    "flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer transition-colors",
-                    workflowData.platforms.includes(platform.id)
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-muted-foreground"
-                  )}
-                >
-                  <Checkbox
-                    checked={workflowData.platforms.includes(platform.id)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setWorkflowData((prev) => ({
-                          ...prev,
-                          platforms: [...prev.platforms, platform.id],
-                        }));
-                      } else {
-                        setWorkflowData((prev) => ({
-                          ...prev,
-                          platforms: prev.platforms.filter((p) => p !== platform.id),
-                        }));
-                      }
+          <section className="glass-panel rounded-[24px] p-[20px_22px]">
+            <h2 className="text-base font-bold text-ink">使用平台</h2>
+            <div className="mt-3.5 flex flex-wrap gap-2.5">
+              {platforms.map((platform) => {
+                const selected = workflowData.platforms.includes(platform.id);
+                return (
+                  <button
+                    key={platform.id}
+                    type="button"
+                    onClick={() => {
+                      setWorkflowData((prev) => ({
+                        ...prev,
+                        platforms: selected
+                          ? prev.platforms.filter((p) => p !== platform.id)
+                          : [...prev.platforms, platform.id],
+                      }));
                     }}
-                  />
-                  <span className="text-data">
+                    className={cn(
+                      "inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-data transition-colors",
+                      selected
+                        ? "border-brand bg-brand-soft text-brand-text"
+                        : "border-line-strong text-ink-2 hover:border-brand/40 hover:text-ink"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "flex h-4 w-4 items-center justify-center rounded-[5px] border transition-colors",
+                        selected ? "border-brand bg-brand text-white" : "border-line-strong"
+                      )}
+                    >
+                      {selected && <CheckCircle2 className="h-3 w-3" />}
+                    </span>
                     {platform.label}
-                  </span>
-                </label>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           </section>
 
-          <section className="space-y-4">
-            <h2
-              className="text-h3 font-semibold text-foreground"
-             
-            >
-              素材上传
-            </h2>
-            <div className="grid grid-cols-2 gap-4">
+          <section className="glass-panel rounded-[24px] p-[20px_22px]">
+            <h2 className="text-base font-bold text-ink">素材上传</h2>
+            <div className="mt-3.5 grid grid-cols-2 gap-3.5">
               <input
                 ref={inputFileRef}
                 type="file"
@@ -470,24 +411,24 @@ function ProductInfoStep({
               />
               <button
                 type="button"
-                className="border-2 border-dashed border-border rounded-xl p-8 flex flex-col items-center justify-center gap-3 hover:border-muted-foreground transition-colors"
+                className="flex flex-col items-center gap-2.5 rounded-[14px] border-[1.5px] border-dashed border-line-strong bg-surface p-[18px] transition-all hover:border-brand hover:bg-brand-soft/40"
                 onClick={() => inputFileRef.current?.click()}
                 disabled={uploading}
               >
-                <div className="h-16 w-16 overflow-hidden rounded-xl">
+                <span className="flex h-[52px] w-[52px] items-center justify-center rounded-[15px] bg-brand-soft">
                   <BrandImageFallback
                     title=""
                     description=""
                     pose={workflowData.inputAsset ? "cheer" : "think"}
-                    className="[&_p]:hidden"
+                    className="[&_p]:hidden h-9 w-9"
                   />
-                </div>
+                </span>
                 <div className="text-center">
-                  <p className="text-data text-foreground">
+                  <p className="text-[14px] font-semibold text-ink">
                     {workflowData.inputAsset?.originalFilename ?? "上传商品图"}
                   </p>
-                  <p className="text-caption text-muted-foreground mt-1">
-                    商品主体图，生成时会保持主体稳定
+                  <p className="mt-1 text-[12px] text-ink-3">
+                    商品主体图，生成时保持主体稳定
                   </p>
                 </div>
               </button>
@@ -501,54 +442,48 @@ function ProductInfoStep({
               />
               <button
                 type="button"
-                className="border-2 border-dashed border-border rounded-xl p-8 flex flex-col items-center justify-center gap-3 hover:border-muted-foreground transition-colors"
+                className="flex flex-col items-center gap-2.5 rounded-[14px] border-[1.5px] border-dashed border-line-strong bg-surface p-[18px] transition-all hover:border-brand hover:bg-brand-soft/40"
                 onClick={() => referenceFileRef.current?.click()}
                 disabled={uploading}
               >
-                <div className="h-16 w-16 overflow-hidden rounded-xl">
+                <span className="flex h-[52px] w-[52px] items-center justify-center rounded-[15px] bg-surface-muted">
                   <BrandImageFallback
                     title=""
                     description=""
                     pose={workflowData.referenceAsset ? "star" : "sleep"}
-                    className="[&_p]:hidden"
+                    className="[&_p]:hidden h-9 w-9"
                   />
-                </div>
+                </span>
                 <div className="text-center">
-                  <p className="text-data text-foreground">
+                  <p className="text-[14px] font-semibold text-ink">
                     {workflowData.referenceAsset?.originalFilename ?? "上传场景参考图"}
                   </p>
-                  <p className="text-caption text-muted-foreground mt-1">
-                    用于参考背景、构图、光线和氛围
+                  <p className="mt-1 text-[12px] text-ink-3">
+                    参考背景、构图、光线与氛围
                   </p>
                 </div>
               </button>
             </div>
-            <p className="text-caption text-muted-foreground">
-              支持 PNG、JPG；素材会先登记为 input asset，任务只携带轻量引用。
+            <p className="mt-3.5 text-[12px] text-ink-3">
+              支持 PNG、JPG;素材会先登记为 input asset，任务只携带轻量引用。
             </p>
           </section>
         </div>
       </div>
 
-      <div className="h-16 border-t border-border px-8 flex items-center justify-between shrink-0 bg-background">
-        <Button
-          variant="ghost"
-          asChild
-          className="text-muted-foreground"
-         
-        >
-          <Link href="/templates">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            返回模板库
+      <div className="sticky bottom-0 z-30 flex items-center justify-between border-t border-line bg-surface-glass px-6 py-3.5 backdrop-blur-[18px] backdrop-saturate-150 shrink-0">
+        <Button variant="ghost" asChild className="text-ink-2 hover:bg-surface-muted">
+          <Link href="/">
+            <ArrowLeft className="mr-1.5 h-4 w-4" />
+            返回首页
           </Link>
         </Button>
         <Button
           onClick={onNext}
-          variant="brand"
-         
+          className="h-12 rounded-[14px] bg-accent-gradient px-6 text-[15px] font-semibold text-white shadow-float transition-transform hover:-translate-y-0.5"
         >
           下一步：选择风格模板
-          <ArrowRight className="w-4 h-4 ml-2" />
+          <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
     </div>
@@ -589,23 +524,21 @@ function StyleTemplateStep({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-auto p-8">
-        <div className="max-w-5xl mx-auto space-y-6">
+      <div className="flex-1 overflow-auto px-6 pb-4 pt-2">
+        <div className="max-w-[1100px] mx-auto flex flex-col gap-5">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-h3 font-semibold text-foreground">
-                AI 生成预览
-              </h2>
-              <p className="text-data text-muted-foreground mt-1">
-                基于已提交的商品信息，AI 自动生成预览图
+              <h2 className="text-[22px] font-bold text-ink">AI 生成预览</h2>
+              <p className="mt-1 text-[14px] text-ink-2">
+                基于已提交的商品信息，选择想要的风格方向
               </p>
             </div>
-            <Badge variant="secondary" className="bg-muted">
+            <span className="rounded-full border border-line bg-surface px-3.5 py-1.5 text-[13px] font-semibold text-brand-text">
               已选 {selected.length} 张
-            </Badge>
+            </span>
           </div>
 
-          <div className="grid grid-cols-4 gap-5">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
             {templates.map((template) => {
               const isSelected = selected.includes(template.id);
               return (
@@ -627,21 +560,26 @@ function StyleTemplateStep({
                     }
                   }}
                   className={cn(
-                    "flex flex-col items-center p-6 rounded-xl border transition-all",
-                    isSelected
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-muted-foreground"
+                    "glass-panel relative flex flex-col items-start rounded-[20px] p-3.5 text-left transition-all hover:-translate-y-0.5",
+                    isSelected ? "ring-2 ring-brand ring-offset-2 ring-offset-background" : ""
                   )}
                 >
-                  <div className="w-full h-32 bg-muted rounded-lg flex items-center justify-center mb-4">
-                    <template.icon className="w-8 h-8 text-muted-foreground" />
+                  <div
+                    className="relative mb-3 flex h-[104px] w-full items-center justify-center rounded-[13px]"
+                    style={{
+                      background:
+                        "repeating-linear-gradient(45deg, var(--surface-2), var(--surface-2) 9px, transparent 9px, transparent 18px)",
+                    }}
+                  >
+                    <template.icon className="h-[30px] w-[30px] text-brand opacity-85" />
+                    {isSelected && (
+                      <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-accent-gradient">
+                        <CheckCircle2 className="h-3 w-3 text-white" />
+                      </span>
+                    )}
                   </div>
-                  <h3 className="text-data font-medium text-foreground">
-                    {template.name}
-                  </h3>
-                  <p className="text-caption text-muted-foreground mt-1">
-                    {template.desc}
-                  </p>
+                  <div className="text-[14px] font-semibold text-ink">{template.name}</div>
+                  <p className="mt-1 text-[12px] text-ink-3">{template.desc}</p>
                 </button>
               );
             })}
@@ -649,19 +587,18 @@ function StyleTemplateStep({
         </div>
       </div>
 
-      <div className="h-16 border-t border-border px-8 flex items-center justify-between shrink-0 bg-background">
-        <Button variant="ghost" onClick={onBack} className="text-muted-foreground">
-          <ArrowLeft className="w-4 h-4 mr-2" />
+      <div className="sticky bottom-0 z-30 flex items-center justify-between border-t border-line bg-surface-glass px-6 py-3.5 backdrop-blur-[18px] backdrop-saturate-150 shrink-0">
+        <Button variant="ghost" onClick={onBack} className="text-ink-2 hover:bg-surface-muted">
+          <ArrowLeft className="mr-1.5 h-4 w-4" />
           返回修改信息
         </Button>
         <Button
           onClick={onNext}
           disabled={selected.length === 0}
-          variant="brand"
-         
+          className="h-12 rounded-[14px] bg-accent-gradient px-6 text-[15px] font-semibold text-white shadow-float transition-transform hover:-translate-y-0.5 disabled:opacity-50"
         >
           下一步：生成并调整
-          <ArrowRight className="w-4 h-4 ml-2" />
+          <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
     </div>
@@ -974,9 +911,11 @@ function GenerateAdjustStep({
                       {result.resultImageUrl ? (
                         <img src={result.resultImageUrl} alt={result.name} className="h-full w-full object-cover" />
                       ) : result.status === "processing" ? (
-                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                          <Wand2 className="w-8 h-8 animate-pulse" />
-                          <span className="text-caption">{Math.max(0, result.progress)}%</span>
+                        <div className="flex flex-col items-center gap-3 text-ink-2">
+                          <ConicSpinner size={56} />
+                          <span className="text-[13px] font-semibold text-brand-text">
+                            {Math.max(0, result.progress)}%
+                          </span>
                         </div>
                       ) : result.status === "failed" || result.status === "cancelled" ? (
                         <div className="px-4 text-center text-caption text-destructive">
@@ -1061,13 +1000,17 @@ function GenerateAdjustStep({
         </div>
       </div>
 
-      <div className="h-16 border-t border-border px-8 flex items-center justify-between shrink-0 bg-background">
-        <Button variant="ghost" onClick={onBack} className="text-muted-foreground">
-          <ArrowLeft className="w-4 h-4 mr-2" />
+      <div className="sticky bottom-0 z-30 flex items-center justify-between border-t border-line bg-surface-glass px-6 py-3.5 backdrop-blur-[18px] backdrop-saturate-150 shrink-0">
+        <Button variant="ghost" onClick={onBack} className="text-ink-2 hover:bg-surface-muted">
+          <ArrowLeft className="mr-1.5 h-4 w-4" />
           返回预览
         </Button>
-        <Button asChild variant="outline">
-          <Link href="/templates">完成，返回模板库</Link>
+        <Button
+          asChild
+          variant="outline"
+          className="h-12 rounded-[14px] border-line-strong bg-surface px-6 text-[15px] font-semibold text-ink"
+        >
+          <Link href="/results">完成,前往图库</Link>
         </Button>
       </div>
     </div>
@@ -1087,8 +1030,7 @@ function SceneWorkspacePageInner() {
   );
 
   return (
-    <div className="h-screen flex flex-col bg-background">
-      <TopNav />
+    <div className="h-full flex flex-col bg-background">
       <StepBar currentStep={step} />
       {step === 1 && (
         <ProductInfoStep
