@@ -59,7 +59,12 @@ if [ -f "$SHARED_DIR/.env.production" ]; then
   cp "$SHARED_DIR/.env.production" "$NEW_RELEASE_DIR/.env.production"
   log "$BLUE" "ℹ️ 已套用 $SHARED_DIR/.env.production"
 else
-  log "$YELLOW" "⚠️ 未找到 $SHARED_DIR/.env.production，依赖系统环境变量"
+  cat > "$NEW_RELEASE_DIR/.env.production" <<EOF
+DATABASE_URL=file:./data/app.db
+NEXTAUTH_URL=http://localhost:${PORT}
+NEXTAUTH_SECRET=placeholder-please-set-${SHARED_DIR//\//_}-env-production
+EOF
+  log "$YELLOW" "⚠️ 未找到 $SHARED_DIR/.env.production，已写入 placeholder。生产环境务必手动维护该文件。"
 fi
 log "$GREEN" "✅ 关联完成"
 
