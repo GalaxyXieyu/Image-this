@@ -19,10 +19,11 @@ function readEnvFile(filePath) {
   return envVars;
 }
 
-const cwd = __dirname;
+// 该文件位于 <release>/config/，运行时 cwd 指向 release 根。
+const releaseRoot = path.resolve(__dirname, '..');
 const envVars = {
-  ...readEnvFile(path.join(cwd, '.env.production')),
-  ...readEnvFile(path.join(cwd, '.env')),
+  ...readEnvFile(path.join(releaseRoot, '.env.production')),
+  ...readEnvFile(path.join(releaseRoot, '.env')),
 };
 if (!envVars.NEXTAUTH_SECRET && process.env.NEXTAUTH_SECRET) {
   envVars.NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET;
@@ -31,18 +32,22 @@ if (!envVars.NEXTAUTH_URL && process.env.NEXTAUTH_URL) {
   envVars.NEXTAUTH_URL = process.env.NEXTAUTH_URL;
 }
 
+const appName = process.env.PM_APP_NAME || 'imagine-this-web';
+const port = process.env.PORT || envVars.PORT || '34123';
+
 module.exports = {
   apps: [
     {
-      name: 'imagine-this-web',
-      cwd,
-      script: 'server.js',
+      name: appName,
+      cwd: releaseRoot,
+      script: 'node_modules/next/dist/bin/next',
+      args: ['start', '-p', String(port)],
       instances: 1,
       exec_mode: 'fork',
       interpreter: 'node',
       env: {
         NODE_ENV: 'production',
-        PORT: 34123,
+        PORT: String(port),
         DATABASE_URL: 'file:./data/app.db',
         ...envVars,
       },
