@@ -121,7 +121,9 @@ export default function FloatingTaskButton() {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div
+      className="fixed right-4 z-50 md:right-6 bottom-[calc(env(safe-area-inset-bottom,0px)+72px)] md:bottom-6"
+    >
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
           <Button 
@@ -139,7 +141,7 @@ export default function FloatingTaskButton() {
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-96" align="end" side="top">
+        <PopoverContent className="w-[calc(100vw-2rem)] max-w-[384px]" align="end" side="top">
           <div className="space-y-3">
             {/* 统计摘要 */}
             <div className="flex items-center justify-between">
