@@ -24,6 +24,11 @@ export function normalizeTaskConcurrency(value: unknown): number {
   return Math.max(1, Math.min(10, Math.floor(parsed)));
 }
 
+export interface ProviderModel {
+  id: string;
+  enabled: boolean;
+}
+
 export interface UserConfig {
   volcengine?: {
     accessKey: string;
@@ -33,11 +38,13 @@ export interface UserConfig {
     apiUrl: string;
     apiKey: string;
     modelName?: string;
+    models?: ProviderModel[];
   };
   gemini?: {
     apiKey: string;
     baseUrl: string;
     modelName?: string;
+    models?: ProviderModel[];
   };
   jimeng?: {
     arkApiKey?: string;
@@ -45,6 +52,7 @@ export interface UserConfig {
     modelName?: string;
     accessKey?: string;
     secretKey?: string;
+    models?: ProviderModel[];
   };
   imagehosting?: {
     superbedToken: string;
@@ -55,6 +63,34 @@ export interface UserConfig {
   taskRuntime?: {
     concurrency: number;
   };
+}
+
+function parseModelsJson(json: string | null | undefined, fallbackModelName?: string): ProviderModel[] {
+  if (json) {
+    try {
+      const parsed = JSON.parse(json);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((m) => m && typeof m.id === 'string')
+          .map((m) => ({ id: m.id, enabled: !!m.enabled }));
+      }
+    } catch {
+      // fall through to fallback
+    }
+  }
+  if (fallbackModelName) {
+    return [{ id: fallbackModelName, enabled: true }];
+  }
+  return [];
+}
+
+function serializeModels(models?: ProviderModel[]): string | null {
+  if (!models || models.length === 0) return null;
+  return JSON.stringify(models.map((m) => ({ id: m.id, enabled: !!m.enabled })));
+}
+
+function firstEnabledModelId(models?: ProviderModel[]): string | undefined {
+  return models?.find((m) => m.enabled)?.id;
 }
 
 function cloneUserConfig(config: UserConfig): UserConfig {
@@ -81,14 +117,17 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
       gptApiUrl: true,
       gptApiKey: true,
       gptModelName: true,
+      gptModelsJson: true,
       hasGptApiKey: true,
       geminiApiKey: true,
       geminiBaseUrl: true,
       geminiModelName: true,
+      geminiModelsJson: true,
       hasGeminiApiKey: true,
       arkApiKey: true,
       jimengBaseUrl: true,
       jimengModelName: true,
+      jimengModelsJson: true,
       hasJimengCredentials: true,
       superbedToken: true,
       hasSuperbedToken: true,
@@ -133,10 +172,12 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
 
   // GPT 配置
   if (gptApiUrl && gptApiKey) {
+    const models = parseModelsJson(user.gptModelsJson, gptModelName);
     config.gpt = {
       apiUrl: gptApiUrl,
       apiKey: gptApiKey,
-      modelName: gptModelName,
+      modelName: firstEnabledModelId(models) ?? gptModelName,
+      models,
     };
     console.log('[用户配置] GPT: 已加载可用配置');
   } else {
@@ -145,10 +186,12 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
 
   // Gemini 配置
   if (geminiApiKey) {
+    const models = parseModelsJson(user.geminiModelsJson, geminiModelName);
     config.gemini = {
       apiKey: geminiApiKey,
       baseUrl: geminiBaseUrl,
-      modelName: geminiModelName,
+      modelName: firstEnabledModelId(models) ?? geminiModelName,
+      models,
     };
     console.log('[用户配置] Gemini: 已加载可用配置');
   } else {
@@ -157,10 +200,12 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
 
   // 即梦配置（统一：Ark API 或 Legacy 视觉 API）
   if (arkApiKey || (volcengineAccessKey && volcengineSecretKey)) {
+    const models = parseModelsJson(user.jimengModelsJson, jimengModelName);
     config.jimeng = {
       arkApiKey: arkApiKey || undefined,
       baseUrl: jimengBaseUrl,
-      modelName: jimengModelName,
+      modelName: firstEnabledModelId(models) ?? jimengModelName,
+      models,
       accessKey: volcengineAccessKey || undefined,
       secretKey: volcengineSecretKey || undefined,
     };
@@ -235,15 +280,18 @@ export async function saveUserConfig(userId: string, config: UserConfig): Promis
       hasVolcengineCredentials: !!(config.volcengine?.accessKey && config.volcengine?.secretKey),
       gptApiUrl: config.gpt?.apiUrl || null,
       gptApiKey: isDesktopSecretStoreEnabled() ? null : config.gpt?.apiKey || null,
-      gptModelName: config.gpt?.modelName || null,
+      gptModelName: firstEnabledModelId(config.gpt?.models) ?? config.gpt?.modelName ?? null,
+      gptModelsJson: serializeModels(config.gpt?.models),
       hasGptApiKey: !!config.gpt?.apiKey,
       geminiApiKey: isDesktopSecretStoreEnabled() ? null : config.gemini?.apiKey || null,
       geminiBaseUrl: config.gemini?.baseUrl || null,
-      geminiModelName: config.gemini?.modelName || null,
+      geminiModelName: firstEnabledModelId(config.gemini?.models) ?? config.gemini?.modelName ?? null,
+      geminiModelsJson: serializeModels(config.gemini?.models),
       hasGeminiApiKey: !!config.gemini?.apiKey,
       arkApiKey: isDesktopSecretStoreEnabled() ? null : config.jimeng?.arkApiKey || null,
       jimengBaseUrl: config.jimeng?.baseUrl || null,
-      jimengModelName: config.jimeng?.modelName || null,
+      jimengModelName: firstEnabledModelId(config.jimeng?.models) ?? config.jimeng?.modelName ?? null,
+      jimengModelsJson: serializeModels(config.jimeng?.models),
       hasJimengCredentials: !!(config.jimeng?.arkApiKey || (config.jimeng?.accessKey && config.jimeng?.secretKey)),
       superbedToken: isDesktopSecretStoreEnabled() ? null : config.imagehosting?.superbedToken || null,
       hasSuperbedToken: !!config.imagehosting?.superbedToken,

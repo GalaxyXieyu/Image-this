@@ -23,27 +23,38 @@ export async function POST(request: NextRequest) {
     
     // 转换前端配置格式到后端格式
     const userConfig: UserConfig = {};
-    
+
+    function normalizeModels(raw: unknown): { id: string; enabled: boolean }[] | undefined {
+      if (!Array.isArray(raw)) return undefined;
+      const cleaned = raw
+        .filter((m): m is { id?: unknown; enabled?: unknown } => typeof m === 'object' && m !== null)
+        .map((m) => ({ id: String(m.id ?? '').trim(), enabled: !!m.enabled }))
+        .filter((m) => m.id.length > 0);
+      return cleaned.length > 0 ? cleaned : undefined;
+    }
+
     if (body.volcengine?.enabled && body.volcengine?.accessKey && body.volcengine?.secretKey) {
       userConfig.volcengine = {
         accessKey: body.volcengine.accessKey,
         secretKey: body.volcengine.secretKey,
       };
     }
-    
+
     if (body.gpt?.enabled && body.gpt?.apiUrl && body.gpt?.apiKey) {
       userConfig.gpt = {
         apiUrl: body.gpt.apiUrl,
         apiKey: body.gpt.apiKey,
         modelName: body.gpt.modelName || undefined,
+        models: normalizeModels(body.gpt.models),
       };
     }
-    
+
     if (body.gemini?.enabled && body.gemini?.apiKey) {
       userConfig.gemini = {
         apiKey: body.gemini.apiKey,
         baseUrl: body.gemini.baseUrl || 'https://toapis.com',
         modelName: body.gemini.modelName || 'gemini-3.1-flash-image-preview',
+        models: normalizeModels(body.gemini.models),
       };
     }
 
@@ -52,6 +63,7 @@ export async function POST(request: NextRequest) {
         arkApiKey: body.jimeng.arkApiKey || undefined,
         baseUrl: body.jimeng.baseUrl || undefined,
         modelName: body.jimeng.modelName || undefined,
+        models: normalizeModels(body.jimeng.models),
         accessKey: body.jimeng.accessKey || undefined,
         secretKey: body.jimeng.secretKey || undefined,
       };
@@ -120,19 +132,22 @@ export async function GET(request: NextRequest) {
         enabled: !!userConfig.gpt,
         apiUrl: userConfig.gpt?.apiUrl || 'https://yunwu.ai',
         apiKey: userConfig.gpt?.apiKey || '',
-        modelName: userConfig.gpt?.modelName || 'gpt-4o-image-vip'
+        modelName: userConfig.gpt?.modelName || 'gpt-4o-image-vip',
+        models: userConfig.gpt?.models ?? (userConfig.gpt?.modelName ? [{ id: userConfig.gpt.modelName, enabled: true }] : [])
       },
       gemini: {
         enabled: !!userConfig.gemini,
         apiKey: userConfig.gemini?.apiKey || '',
         baseUrl: userConfig.gemini?.baseUrl || 'https://toapis.com',
-        modelName: userConfig.gemini?.modelName || 'gemini-3.1-flash-image-preview'
+        modelName: userConfig.gemini?.modelName || 'gemini-3.1-flash-image-preview',
+        models: userConfig.gemini?.models ?? (userConfig.gemini?.modelName ? [{ id: userConfig.gemini.modelName, enabled: true }] : [])
       },
       jimeng: {
         enabled: !!userConfig.jimeng,
         arkApiKey: userConfig.jimeng?.arkApiKey || '',
         baseUrl: userConfig.jimeng?.baseUrl || 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
         modelName: userConfig.jimeng?.modelName || 'seedream-4.5',
+        models: userConfig.jimeng?.models ?? (userConfig.jimeng?.modelName ? [{ id: userConfig.jimeng.modelName, enabled: true }] : []),
         accessKey: userConfig.jimeng?.accessKey || '',
         secretKey: userConfig.jimeng?.secretKey || ''
       },

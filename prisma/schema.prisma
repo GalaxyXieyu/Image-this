@@ -58,15 +58,18 @@ model User {
   hasVolcengineCredentials Boolean @default(false)
   gptApiUrl           String? // GPT API 地址
   gptApiKey           String? // GPT API Key
-  gptModelName        String? // GPT Model Name
+  gptModelName        String? // GPT 默认模型（兼容旧字段，= models 列表里第一个启用项）
+  gptModelsJson       String? // GPT 模型列表 JSON，元素结构 { id, enabled }
   hasGptApiKey        Boolean @default(false)
   geminiApiKey        String? // Gemini API Key
   geminiBaseUrl       String? // Gemini Base URL
-  geminiModelName     String? // Gemini Model Name
+  geminiModelName     String? // Gemini 默认模型
+  geminiModelsJson    String? // Gemini 模型列表 JSON
   hasGeminiApiKey     Boolean @default(false)
   arkApiKey           String? // 即梦 Ark API Key
   jimengBaseUrl       String? // 即梦 Base URL
-  jimengModelName     String? // 即梦 Model Name
+  jimengModelName     String? // 即梦 默认模型
+  jimengModelsJson    String? // 即梦 模型列表 JSON
   hasJimengCredentials Boolean @default(false)
   superbedToken       String? // Superbed 图床 Token
   hasSuperbedToken    Boolean @default(false)

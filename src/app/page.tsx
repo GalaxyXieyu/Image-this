@@ -8,6 +8,7 @@ import {
   ImageIcon,
   Focus,
   Zap,
+  MousePointerClick,
 } from "lucide-react";
 
 /* ─── Hero ─────────────────────────────────────────────────────── */
@@ -148,6 +149,88 @@ function WorkflowSection() {
   );
 }
 
+/* ─── Categories ───────────────────────────────────────────────── */
+function CategoriesSection() {
+  const categories = [
+    { title: "美妆场景图", desc: "AI 合成真实使用场景", tint: "linear-gradient(135deg, #fdf2f8 0%, #fbcfe8 100%)" },
+    { title: "食品白底图", desc: "高精抠图商品化", tint: "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)" },
+    { title: "服饰海报", desc: "营销海报一键生成", tint: "linear-gradient(135deg, #f3e8ff 0%, #c084fc 100%)" },
+    { title: "家居场景", desc: "室内场景合成", tint: "linear-gradient(135deg, #ecfeff 0%, #a5f3fc 100%)" },
+    { title: "3C 产品图", desc: "科技感产品呈现", tint: "linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)" },
+    { title: "母婴用品", desc: "温馨风格渲染", tint: "linear-gradient(135deg, #fff7ed 0%, #fed7aa 100%)" },
+  ];
+
+  return (
+    <section className="w-full max-w-[1160px] px-2 py-10">
+      <div className="flex items-end justify-between gap-4 border-b border-line pb-4">
+        <h2 className="font-serif text-[34px] font-semibold tracking-[-0.01em] text-ink">
+          覆盖全品类场景
+        </h2>
+        <p className="max-w-[320px] text-right text-data text-ink-3">
+          美妆 · 食品 · 服饰 · 家居 · 3C · 母婴，一键生成专业素材
+        </p>
+      </div>
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {categories.map((c) => (
+          <div
+            key={c.title}
+            className="glass-panel overflow-hidden rounded-[20px] transition-transform hover:-translate-y-1"
+          >
+            <div
+              className="flex h-32 items-center justify-center"
+              style={{ background: c.tint }}
+            >
+              <ImageIcon className="h-9 w-9 text-ink-3/60" />
+            </div>
+            <div className="px-5 py-4">
+              <h3 className="text-[16px] font-bold text-ink">{c.title}</h3>
+              <p className="mt-1 text-[13px] leading-[1.5] text-ink-2">{c.desc}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ─── Final CTA ───────────────────────────────────────────────── */
+function FinalCtaSection() {
+  return (
+    <section className="w-full max-w-[1160px] px-2 py-12">
+      <div className="glass-panel rounded-[28px] px-10 py-14 text-center shadow-soft">
+        <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-brand-soft px-3.5 py-1.5 text-data text-brand-text">
+          <MousePointerClick className="h-3.5 w-3.5" />
+          立即体验 AI 视觉生产
+        </div>
+        <h2 className="mx-auto mt-5 max-w-[720px] font-serif text-[34px] font-semibold leading-[1.3] tracking-[-0.01em] text-ink">
+          今天就开始，让 AI 为你的商品打造专业视觉
+        </h2>
+        <p className="mx-auto mt-3 max-w-[560px] text-[15px] leading-[1.6] text-ink-2">
+          无需设计经验，上传商品图即可生成可直接上架的全套素材
+        </p>
+        <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+          <Button
+            asChild
+            className="h-[50px] gap-2 rounded-full bg-accent-gradient px-7 text-[15px] font-semibold text-white shadow-float transition-transform hover:-translate-y-0.5"
+          >
+            <Link href="/workspace/scene">
+              免费开始生成
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
+          <Button
+            asChild
+            variant="outline"
+            className="h-[50px] rounded-full border-line-strong bg-surface px-6 text-[15px] font-semibold text-ink hover:bg-surface-muted"
+          >
+            <Link href="/tools">浏览工具箱</Link>
+          </Button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* ─── Page ─────────────────────────────────────────────────────── */
 export default function HomePage() {
   return (
@@ -155,6 +238,8 @@ export default function HomePage() {
       <main className="mx-auto flex w-full max-w-[1200px] flex-col items-center px-6 pb-16">
         <HeroSection />
         <WorkflowSection />
+        <CategoriesSection />
+        <FinalCtaSection />
       </main>
     </div>
   );

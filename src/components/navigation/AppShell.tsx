@@ -167,11 +167,13 @@ function TopNav({
         <div className="ml-auto flex items-center gap-1.5">
           <button
             type="button"
-            className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-surface/80 px-3 py-1.5 text-data text-muted-foreground transition-colors hover:text-foreground"
+            className="relative hidden sm:inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-surface/80 px-3 py-1.5 text-data text-muted-foreground transition-colors hover:text-foreground"
             aria-label="检查更新"
+            title="检查更新"
           >
             <Download className="h-3.5 w-3.5" />
             <span className="hidden md:inline">更新</span>
+            <span className="absolute -right-0.5 -top-0.5 inline-flex h-2 w-2 rounded-full bg-danger ring-2 ring-background" aria-hidden />
           </button>
           <button
             type="button"

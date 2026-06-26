@@ -31,11 +31,21 @@ import {
 } from '@/components/ui/dialog';
 import { DesktopUpdateCard } from '@/components/settings/DesktopUpdateCard';
 import { LogDiagnosticsCard } from '@/components/settings/LogDiagnosticsCard';
-import { Save, Key, Sparkles, User, Image, FileText, Plus, Edit, Trash2, Star, StarOff, Cpu, HardDrive, FolderOpen, Folder, RefreshCw, Search, ChevronsUpDown, SlidersHorizontal, FileSearch } from 'lucide-react';
+import { Save, Key, Sparkles, User, Image, FileText, Plus, Edit, Trash2, Star, StarOff, Cpu, HardDrive, FolderOpen, Folder, RefreshCw, Search, ChevronsUpDown, SlidersHorizontal, FileSearch, ChevronRight, X } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/use-toast';
 import { BrandEmptyState } from '@/components/brands/SpriteImage';
 
 type SettingSection = 'models' | 'imagehosting' | 'runtime' | 'logs' | 'profile' | 'prompts' | 'updates';
+
+type ProviderId = 'gpt' | 'gemini' | 'jimeng';
+type ProviderModel = { id: string; enabled: boolean };
+
+const PROVIDER_META: Record<ProviderId, { label: string; subtitle: string; defaultModel: string; keyPlaceholder: string; defaultUrl: string }> = {
+  gpt:    { label: 'GPT-4o Image',   subtitle: 'OpenAI 兼容图像接口',  defaultModel: 'gpt-4o-image-vip',           keyPlaceholder: 'sk-...',  defaultUrl: 'https://yunwu.ai' },
+  gemini: { label: 'Google Gemini',  subtitle: 'Gemini 图像生成',      defaultModel: 'gemini-3.1-flash-image-preview', keyPlaceholder: 'AIza...', defaultUrl: 'https://toapis.com' },
+  jimeng: { label: '即梦 Seedream',  subtitle: '火山引擎 Ark API',    defaultModel: 'seedream-4.5',               keyPlaceholder: 'ark-...', defaultUrl: 'https://ark.cn-beijing.volces.com/api/v3/images/generations' },
+};
 
 interface PromptTemplate {
   id: string;
@@ -225,7 +235,15 @@ export default function SettingsPage() {
 
   const [isSaving, setIsSaving] = useState(false);
 
-  // 动态模型列表状态
+  // 每 provider 的模型列表（新设计：一张卡 = 一个模型）
+  const [providerModels, setProviderModels] = useState<Record<ProviderId, ProviderModel[]>>({
+    gpt: [],
+    gemini: [],
+    jimeng: [],
+  });
+  const [modalProvider, setModalProvider] = useState<ProviderId | null>(null);
+
+  // 动态模型列表状态（用于「获取模型列表」按钮）
   const [gptModels, setGptModels] = useState<string[]>([]);
   const [geminiModels, setGeminiModels] = useState<string[]>([]);
   const [jimengModels, setJimengModels] = useState<string[]>([]);
@@ -352,6 +370,17 @@ export default function SettingsPage() {
               localStoragePath: data.config.localStorage?.savePath || '',
               taskConcurrency: data.config.taskRuntime?.concurrency || 2
             });
+            setProviderModels({
+              gpt: Array.isArray(data.config.gpt?.models) && data.config.gpt.models.length > 0
+                ? data.config.gpt.models
+                : (data.config.gpt?.modelName ? [{ id: data.config.gpt.modelName, enabled: true }] : []),
+              gemini: Array.isArray(data.config.gemini?.models) && data.config.gemini.models.length > 0
+                ? data.config.gemini.models
+                : (data.config.gemini?.modelName ? [{ id: data.config.gemini.modelName, enabled: true }] : []),
+              jimeng: Array.isArray(data.config.jimeng?.models) && data.config.jimeng.models.length > 0
+                ? data.config.jimeng.models
+                : (data.config.jimeng?.modelName ? [{ id: data.config.jimeng.modelName, enabled: true }] : []),
+            });
           }
         }
       } catch (error) {
@@ -397,19 +426,22 @@ export default function SettingsPage() {
           enabled: !!(apiSettings.gptApiKey),
           apiUrl: apiSettings.gptApiUrl,
           apiKey: apiSettings.gptApiKey,
-          modelName: apiSettings.gptModelName
+          modelName: apiSettings.gptModelName,
+          models: providerModels.gpt,
         },
         gemini: {
           enabled: !!(apiSettings.geminiApiKey),
           apiKey: apiSettings.geminiApiKey,
           baseUrl: apiSettings.geminiBaseUrl,
-          modelName: apiSettings.geminiModelName
+          modelName: apiSettings.geminiModelName,
+          models: providerModels.gemini,
         },
         jimeng: {
           enabled: !!(apiSettings.arkApiKey || (apiSettings.volcengineAccessKey && apiSettings.volcengineSecretKey)),
           arkApiKey: apiSettings.arkApiKey,
           baseUrl: apiSettings.jimengBaseUrl,
           modelName: apiSettings.jimengModelName,
+          models: providerModels.jimeng,
           accessKey: apiSettings.volcengineAccessKey,
           secretKey: apiSettings.volcengineSecretKey
         },
@@ -736,231 +768,82 @@ export default function SettingsPage() {
 
   const renderContent = () => {
     switch (activeSection) {
-      case 'models':
+      case 'models': {
+        const providerIds: ProviderId[] = ['gpt', 'gemini', 'jimeng'];
+        const flatModels = providerIds.flatMap((p) =>
+          (providerModels[p] ?? []).map((m) => ({ provider: p, ...m }))
+        );
+        const providerCount = providerIds.filter((p) => providerModels[p]?.length > 0).length;
         return (
           <div className="space-y-6">
             {/* 统计行 */}
             <div className="flex items-baseline justify-between">
               <div>
                 <h2 className="font-serif text-h3 text-ink tracking-tight">AI 模型配置</h2>
-                <p className="mt-1 text-data text-ink-3">每张卡片是一个 Provider，展开后可配置接口与密钥</p>
+                <p className="mt-1 text-data text-ink-3">每张卡片是一个模型，点击可配置其 Provider 的接口与密钥</p>
               </div>
               <div className="text-data text-ink-3">
                 <span className="inline-flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full bg-success" />
-                  3 个 Provider
+                  {providerCount} 个 Provider · {flatModels.length} 个模型
                 </span>
               </div>
             </div>
 
-            {/* GPT API配置 */}
-            <Card>
-              <CardHeader className="flex flex-row items-start justify-between space-y-0">
-                <CardTitle className="flex items-center">
-                  <Key className="w-5 h-5 mr-2 text-primary" />
-                  GPT API
-                </CardTitle>
-                {renderInlineSaveButton()}
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-data text-muted-foreground mb-4">
-                  支持：背景替换、图片生成
-                </div>
-                <div>
-                  <Label htmlFor="gptApiUrl">API 地址</Label>
-                  <Input
-                    id="gptApiUrl"
-                    placeholder="https://yunwu.ai"
-                    value={apiSettings.gptApiUrl}
-                    onChange={(e) => handleInputChange('gptApiUrl', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="gptModelName">模型名称</Label>
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <SearchableModelSelect
-                        id="gptModelName"
-                        value={apiSettings.gptModelName}
-                        onChange={(value) => handleInputChange('gptModelName', value)}
-                        options={Array.from(new Set([apiSettings.gptModelName, ...gptModels]))}
-                        placeholder="选择或输入模型..."
-                      />
+            {/* 模型卡片网格 */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {flatModels.map((m, idx) => {
+                const meta = PROVIDER_META[m.provider];
+                return (
+                  <button
+                    key={`${m.provider}-${m.id}-${idx}`}
+                    onClick={() => setModalProvider(m.provider)}
+                    className="glass-panel group flex flex-col gap-3 rounded-[16px] p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-float"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-muted px-2 py-0.5 text-[11px] font-medium text-ink-2">
+                        <Cpu className="h-3 w-3" />
+                        {meta.label}
+                      </span>
+                      <span className={cn(
+                        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
+                        m.enabled ? "bg-success/10 text-success" : "bg-surface-muted text-ink-3"
+                      )}>
+                        <span className={cn("h-1.5 w-1.5 rounded-full", m.enabled ? "bg-success" : "bg-ink-3")} />
+                        {m.enabled ? '已启用' : '已停用'}
+                      </span>
                     </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={() => fetchModels('gpt')}
-                      disabled={fetchingModels.gpt}
-                      title="获取模型列表"
-                    >
-                      <RefreshCw className={`h-4 w-4 ${fetchingModels.gpt ? 'animate-spin' : ''}`} />
-                    </Button>
-                  </div>
-                  <p className="text-caption text-muted-foreground mt-1">选择模型或点击刷新获取列表</p>
-                </div>
-                <div>
-                  <Label htmlFor="gptApiKey">API 密钥</Label>
-                  <Input
-                    id="gptApiKey"
-                    type="password"
-                    placeholder="sk-..."
-                    value={apiSettings.gptApiKey}
-                    onChange={(e) => handleInputChange('gptApiKey', e.target.value)}
-                  />
-                </div>
-              </CardContent>
-            </Card>
+                    <div className="font-mono text-[13px] font-semibold text-ink truncate">{m.id}</div>
+                    <div className="mt-auto inline-flex items-center justify-end text-[12px] font-medium text-brand-text">
+                      配置 <ChevronRight className="ml-0.5 h-3 w-3" />
+                    </div>
+                  </button>
+                );
+              })}
+              {/* 新增 Provider 卡 */}
+              {providerCount < 3 && (
+                <button
+                  onClick={() => {
+                    // 找到第一个未配置的 provider
+                    const empty = providerIds.find((p) => (providerModels[p] ?? []).length === 0);
+                    if (empty) setModalProvider(empty);
+                  }}
+                  className="flex min-h-[140px] flex-col items-center justify-center gap-2 rounded-[16px] border-2 border-dashed border-border/60 bg-transparent text-ink-3 transition-colors hover:border-brand hover:text-brand-text"
+                >
+                  <Plus className="h-6 w-6" />
+                  <span className="text-[13px] font-medium">新增 Provider</span>
+                </button>
+              )}
+            </div>
 
-            {/* Google Gemini配置 */}
-            <Card>
-              <CardHeader className="flex flex-row items-start justify-between space-y-0">
-                <CardTitle className="flex items-center">
-                  <Sparkles className="w-5 h-5 mr-2 text-primary" />
-                  Google Gemini
-                </CardTitle>
-                {renderInlineSaveButton()}
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-data text-muted-foreground mb-4">
-                  支持：图片生成、图片理解（即将推出）
-                </div>
-                <div>
-                  <Label htmlFor="geminiModelName">模型名称</Label>
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <SearchableModelSelect
-                        id="geminiModelName"
-                        value={apiSettings.geminiModelName}
-                        onChange={(value) => handleInputChange('geminiModelName', value)}
-                        options={Array.from(new Set([apiSettings.geminiModelName, ...geminiModels]))}
-                        placeholder="选择或输入模型..."
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={() => fetchModels('gemini')}
-                      disabled={fetchingModels.gemini}
-                      title="获取模型列表"
-                    >
-                      <RefreshCw className={`h-4 w-4 ${fetchingModels.gemini ? 'animate-spin' : ''}`} />
-                    </Button>
-                  </div>
-                  <p className="text-caption text-muted-foreground mt-1">选择模型或点击刷新获取列表</p>
-                </div>
-                <div>
-                  <Label htmlFor="geminiBaseUrl">API 地址</Label>
-                  <Input
-                    id="geminiBaseUrl"
-                    placeholder="https://toapis.com"
-                    value={apiSettings.geminiBaseUrl}
-                    onChange={(e) => handleInputChange('geminiBaseUrl', e.target.value)}
-                  />
-                  <p className="text-caption text-muted-foreground mt-1">例如 toapis 的基础地址 https://toapis.com</p>
-                </div>
-                <div>
-                  <Label htmlFor="geminiApiKey">API 密钥</Label>
-                  <Input
-                    id="geminiApiKey"
-                    type="password"
-                    placeholder="sk-..."
-                    value={apiSettings.geminiApiKey}
-                    onChange={(e) => handleInputChange('geminiApiKey', e.target.value)}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* 即梦配置 */}
-            <Card>
-              <CardHeader className="flex flex-row items-start justify-between space-y-0">
-                <CardTitle className="flex items-center">
-                  <Sparkles className="w-5 h-5 mr-2 text-primary" />
-                  即梦
-                </CardTitle>
-                {renderInlineSaveButton()}
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-data text-muted-foreground mb-4">
-                  支持：高质量图片生成、背景替换（Ark API 或 Legacy 视觉 API）
-                </div>
-                <div>
-                  <Label htmlFor="jimengBaseUrl">API 地址</Label>
-                  <Input
-                    id="jimengBaseUrl"
-                    placeholder="https://ark.cn-beijing.volces.com/api/v3/images/generations"
-                    value={apiSettings.jimengBaseUrl}
-                    onChange={(e) => handleInputChange('jimengBaseUrl', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="jimengModelName">模型名称</Label>
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <SearchableModelSelect
-                        id="jimengModelName"
-                        value={apiSettings.jimengModelName}
-                        onChange={(value) => handleInputChange('jimengModelName', value)}
-                        options={Array.from(new Set([apiSettings.jimengModelName, ...jimengModels]))}
-                        placeholder="选择或输入模型..."
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={() => fetchModels('jimeng')}
-                      disabled={fetchingModels.jimeng}
-                      title="获取模型列表"
-                    >
-                      <RefreshCw className={`h-4 w-4 ${fetchingModels.jimeng ? 'animate-spin' : ''}`} />
-                    </Button>
-                  </div>
-                  <p className="text-caption text-muted-foreground mt-1">选择模型或点击刷新获取列表</p>
-                </div>
-                <div>
-                  <Label htmlFor="arkApiKey">ARK API Key</Label>
-                  <Input
-                    id="arkApiKey"
-                    type="password"
-                    placeholder="输入 ARK API Key（推荐，Ark 模式）"
-                    value={apiSettings.arkApiKey}
-                    onChange={(e) => handleInputChange('arkApiKey', e.target.value)}
-                  />
-                  <p className="text-caption text-muted-foreground mt-1">
-                    推荐：使用火山引擎 Ark API，无需图床
-                  </p>
-                </div>
-                <div className="border-t pt-4">
-                  <p className="text-caption text-muted-foreground mb-2">Legacy 视觉 API（同时用于画质增强、扩图）</p>
-                  <div>
-                    <Label htmlFor="volcengineAccessKey">Access Key</Label>
-                    <Input
-                      id="volcengineAccessKey"
-                      placeholder="AKLT..."
-                      value={apiSettings.volcengineAccessKey}
-                      onChange={(e) => handleInputChange('volcengineAccessKey', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="volcengineSecretKey">Secret Key</Label>
-                    <Input
-                      id="volcengineSecretKey"
-                      type="password"
-                      placeholder="输入密钥"
-                      value={apiSettings.volcengineSecretKey}
-                      onChange={(e) => handleInputChange('volcengineSecretKey', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {flatModels.length === 0 && (
+              <p className="text-data text-ink-3">尚未配置任何模型，点击右上「新增 Provider」开始</p>
+            )}
           </div>
         );
+      }
 
+      // 旧 inline 表单已替换为卡片网格 + Provider 弹窗，下面保留 dead code 防止其它引用
       case 'imagehosting':
         return (
           <div className="space-y-6">
@@ -1510,6 +1393,192 @@ export default function SettingsPage() {
               删除
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Provider 配置弹窗 */}
+      <Dialog open={!!modalProvider} onOpenChange={(open) => !open && setModalProvider(null)}>
+        <DialogContent className="max-w-lg">
+          {modalProvider && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-surface-muted">
+                    <Cpu className="h-5 w-5 text-ink-2" />
+                  </span>
+                  <div>
+                    <DialogTitle className="text-[16px] font-semibold">{PROVIDER_META[modalProvider].label}</DialogTitle>
+                    <DialogDescription className="text-[12px]">{PROVIDER_META[modalProvider].subtitle}</DialogDescription>
+                  </div>
+                </div>
+              </DialogHeader>
+
+              <div className="space-y-4 py-2">
+                {/* Provider 类型 3 选 1 */}
+                <div>
+                  <Label className="text-[12px] font-medium text-ink-2">Provider 类型</Label>
+                  <div className="mt-1.5 grid grid-cols-3 gap-2">
+                    {(Object.keys(PROVIDER_META) as ProviderId[]).map((p) => {
+                      const active = p === modalProvider;
+                      return (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => setModalProvider(p)}
+                          className={cn(
+                            "rounded-[12px] border px-3 py-2 text-[12px] font-medium transition-colors",
+                            active
+                              ? "border-brand bg-brand-soft text-brand-text"
+                              : "border-border bg-surface text-ink-2 hover:border-brand-soft"
+                          )}
+                        >
+                          {PROVIDER_META[p].label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* API 地址 */}
+                <div>
+                  <Label className="text-[12px] font-medium text-ink-2">API 地址</Label>
+                  <Input
+                    className="mt-1.5"
+                    value={modalProvider === 'gpt' ? apiSettings.gptApiUrl : modalProvider === 'gemini' ? apiSettings.geminiBaseUrl : apiSettings.jimengBaseUrl}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (modalProvider === 'gpt') handleInputChange('gptApiUrl', v);
+                      else if (modalProvider === 'gemini') handleInputChange('geminiBaseUrl', v);
+                      else handleInputChange('jimengBaseUrl', v);
+                    }}
+                    placeholder={PROVIDER_META[modalProvider].defaultUrl}
+                  />
+                </div>
+
+                {/* 模型列表 */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[12px] font-medium text-ink-2">模型（可多选启用）</Label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProviderModels((prev) => ({
+                          ...prev,
+                          [modalProvider]: [...(prev[modalProvider] ?? []), { id: PROVIDER_META[modalProvider].defaultModel, enabled: true }],
+                        }));
+                      }}
+                      className="inline-flex items-center gap-1 text-[12px] font-medium text-brand-text hover:underline"
+                    >
+                      <Plus className="h-3 w-3" />
+                      添加模型
+                    </button>
+                  </div>
+                  <div className="mt-2 space-y-2">
+                    {(providerModels[modalProvider] ?? []).map((m, idx) => (
+                      <div
+                        key={idx}
+                        className={cn(
+                          "flex items-center gap-2 rounded-[10px] border bg-surface px-2 py-1.5",
+                          m.enabled ? "border-brand/40" : "border-border"
+                        )}
+                      >
+                        <Input
+                          className="h-8 flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0"
+                          value={m.id}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setProviderModels((prev) => ({
+                              ...prev,
+                              [modalProvider]: prev[modalProvider].map((mm, i) => (i === idx ? { ...mm, id: v } : mm)),
+                            }));
+                          }}
+                          placeholder={PROVIDER_META[modalProvider].defaultModel}
+                        />
+                        <Switch
+                          checked={m.enabled}
+                          onCheckedChange={(checked) => {
+                            setProviderModels((prev) => ({
+                              ...prev,
+                              [modalProvider]: prev[modalProvider].map((mm, i) => (i === idx ? { ...mm, enabled: checked } : mm)),
+                            }));
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProviderModels((prev) => ({
+                              ...prev,
+                              [modalProvider]: prev[modalProvider].filter((_, i) => i !== idx),
+                            }));
+                          }}
+                          className="text-ink-3 hover:text-danger"
+                          aria-label="删除模型"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                    {(providerModels[modalProvider] ?? []).length === 0 && (
+                      <p className="text-[12px] text-ink-3">暂无模型，点击右上「+ 添加模型」</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* API 密钥 */}
+                <div>
+                  <Label className="text-[12px] font-medium text-ink-2">API 密钥</Label>
+                  <Input
+                    className="mt-1.5"
+                    type="password"
+                    value={modalProvider === 'gpt' ? apiSettings.gptApiKey : modalProvider === 'gemini' ? apiSettings.geminiApiKey : apiSettings.arkApiKey}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (modalProvider === 'gpt') handleInputChange('gptApiKey', v);
+                      else if (modalProvider === 'gemini') handleInputChange('geminiApiKey', v);
+                      else handleInputChange('arkApiKey', v);
+                    }}
+                    placeholder={PROVIDER_META[modalProvider].keyPlaceholder}
+                  />
+                </div>
+              </div>
+
+              <DialogFooter className="flex items-center justify-between gap-2 sm:justify-between">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-danger hover:bg-danger/10 hover:text-danger"
+                  onClick={() => {
+                    if (!modalProvider) return;
+                    setProviderModels((prev) => ({ ...prev, [modalProvider]: [] }));
+                    if (modalProvider === 'gpt') {
+                      handleInputChange('gptApiKey', '');
+                    } else if (modalProvider === 'gemini') {
+                      handleInputChange('geminiApiKey', '');
+                    } else {
+                      handleInputChange('arkApiKey', '');
+                    }
+                  }}
+                >
+                  <Trash2 className="mr-1 h-3.5 w-3.5" />
+                  删除 Provider
+                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setModalProvider(null)}>取消</Button>
+                  <Button
+                    size="sm"
+                    className="bg-accent-gradient text-white hover:opacity-90"
+                    onClick={async () => {
+                      await handleSave();
+                      setModalProvider(null);
+                    }}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? '保存中…' : '保存配置'}
+                  </Button>
+                </div>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
