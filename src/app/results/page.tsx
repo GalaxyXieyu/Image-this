@@ -190,10 +190,28 @@ export default function ResultsPage() {
         </div>
       </div>
 
-      {/* Two-column layout */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left sidebar — categories */}
-        <aside className="flex w-[220px] shrink-0 flex-col glass-panel rounded-none border-r border-line">
+      {/* Two-column layout: 移动端 sidebar 折叠成顶部横滚 chips */}
+      <div className="flex flex-1 flex-col md:flex-row overflow-hidden">
+        {/* 移动端：横滚分类 chips */}
+        <div className="md:hidden flex items-center gap-1.5 overflow-x-auto border-b border-line px-4 py-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          {Object.entries(CATEGORY_LABELS).map(([id, label]) => {
+            const active = activeCategory === id;
+            return (
+              <button
+                key={id}
+                onClick={() => setActiveCategory(id)}
+                className={cn(
+                  "shrink-0 rounded-full px-3 py-1 text-data transition-colors",
+                  active ? "bg-accent-gradient text-white" : "border border-line bg-surface text-ink-2"
+                )}
+              >
+                {label} {categoryCounts[id] ?? 0}
+              </button>
+            );
+          })}
+        </div>
+        {/* 桌面：左侧分类 sidebar */}
+        <aside className="hidden md:flex w-[220px] shrink-0 flex-col glass-panel rounded-none border-r border-line">
           <div className="p-4">
             <h2 className="mb-3 text-caption font-semibold uppercase tracking-wider text-ink-3">
               场景分类

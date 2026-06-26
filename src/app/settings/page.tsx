@@ -1180,7 +1180,7 @@ export default function SettingsPage() {
           return (
             <div className="mb-6">
               <div className="border-b border-line">
-                <nav className="flex items-center gap-1">
+                <nav className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                   {tabGroups.map((g) => {
                     const active = currentTab.id === g.id;
                     return (
@@ -1396,9 +1396,9 @@ export default function SettingsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Provider 配置弹窗 */}
+      {/* Provider 配置弹窗（移动端全屏 sheet） */}
       <Dialog open={!!modalProvider} onOpenChange={(open) => !open && setModalProvider(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-md:!fixed max-md:!inset-0 max-md:!max-w-none max-md:!w-screen max-md:!h-[100dvh] max-md:!translate-x-0 max-md:!translate-y-0 max-md:!top-0 max-md:!left-0 max-md:!rounded-none max-md:!border-0 max-md:!overflow-y-auto">
           {modalProvider && (
             <>
               <DialogHeader>

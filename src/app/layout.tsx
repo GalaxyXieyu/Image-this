@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Newsreader } from "next/font/google";
 import { Noto_Sans_SC, Noto_Serif_SC } from "next/font/google";
 import { DesktopUpdateProvider } from "@/components/providers/DesktopUpdateProvider";
@@ -39,11 +39,28 @@ const notoSerifSC = Noto_Serif_SC({
 export const metadata: Metadata = {
   title: "AI 商品视觉工作台",
   description: "专业的 AI 商品图像处理平台，支持场景图生成、背景替换、智能扩图、高清放大等功能。",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "ImageThis",
+  },
   icons: {
     icon: "/icon.png",
     shortcut: "/icon.png",
     apple: "/icon.png",
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#FFFFFF" },
+    { media: "(prefers-color-scheme: dark)", color: "#131316" },
+  ],
 };
 
 export default function RootLayout({

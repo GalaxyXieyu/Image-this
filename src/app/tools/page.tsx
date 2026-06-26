@@ -336,8 +336,8 @@ function ToolboxPageInner() {
         </div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
-        <aside className="flex w-[320px] flex-col overflow-y-auto border-r border-line bg-surface-glass backdrop-blur-[20px] backdrop-saturate-150">
+      <div className="flex-1 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden">
+        <aside className="flex md:w-[320px] md:shrink-0 flex-col md:overflow-y-auto border-b md:border-b-0 md:border-r border-line bg-surface-glass backdrop-blur-[20px] backdrop-saturate-150">
           <div className="flex flex-col gap-5 p-5">
             <section>
               <h3 className="mb-3 text-data font-semibold text-ink">输入素材</h3>
@@ -385,7 +385,7 @@ function ToolboxPageInner() {
           </div>
         </aside>
 
-        <main className="flex flex-1 items-center justify-center overflow-auto bg-surface-muted/40 p-8">
+        <main className="flex flex-1 items-center justify-center md:overflow-auto bg-surface-muted/40 p-4 md:p-8">
           {!resultPreviewUrl ? (
             <BrandEmptyState
               pose="think"
@@ -408,7 +408,7 @@ function ToolboxPageInner() {
           )}
         </main>
 
-        <aside className="flex w-[340px] flex-col overflow-y-auto border-l border-line bg-surface-glass backdrop-blur-[20px] backdrop-saturate-150">
+        <aside className="flex md:w-[340px] md:shrink-0 flex-col md:overflow-y-auto border-t md:border-t-0 md:border-l border-line bg-surface-glass backdrop-blur-[20px] backdrop-saturate-150">
           <div className="p-5 space-y-6">
             <section>
               <div className="flex items-center justify-between">

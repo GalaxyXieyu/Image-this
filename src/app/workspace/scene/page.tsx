@@ -166,7 +166,7 @@ function StepBar({ currentStep }: { currentStep: Step }) {
 
   return (
     <div className="px-6 pt-4 pb-2 shrink-0">
-      <div className="glass-panel shadow-soft mx-auto flex max-w-[860px] items-center justify-center gap-0 rounded-full px-6 py-2.5">
+      <div className="glass-panel shadow-soft mx-auto flex max-w-[860px] items-center justify-center gap-0 rounded-full px-3 md:px-6 py-2 md:py-2.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         {steps.map((s, i) => {
           const isActive = currentStep === s.num;
           const isCompleted = currentStep > s.num;
@@ -904,7 +904,7 @@ function GenerateAdjustStep({
                 )}
               </div>
 
-              <div className="grid grid-cols-4 gap-5">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-5">
                 {results.map((result) => (
                   <div key={result.id} className="flex flex-col rounded-xl border border-border overflow-hidden">
                     <div className="h-40 bg-muted flex items-center justify-center overflow-hidden">

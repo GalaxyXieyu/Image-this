@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { MobileDesktopOnly } from "@/components/navigation/MobileDesktopOnly";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -266,16 +267,17 @@ export default function ComboPage() {
 
   return (
     <div className="relative h-full flex flex-col bg-background">
-      {/* Page header */}
-      <div className="shrink-0 border-b border-line px-6 py-4">
+      <MobileDesktopOnly title="组合工作流" reason="组合工作流需要同时管理左侧模板、中间流水线和右侧参数三栏，手机屏幕放不下。" />
+      {/* Page header — 桌面端 */}
+      <div className="hidden md:block shrink-0 border-b border-line px-6 py-4">
         <h1 className="text-h3 font-semibold text-ink">组合工作流</h1>
         <p className="mt-0.5 text-data text-ink-2">
           编排多个 AI 处理步骤，一键批量执行流水线
         </p>
       </div>
 
-      {/* Three-column workspace */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* Three-column workspace — 桌面端 */}
+      <div className="hidden md:flex flex-1 overflow-hidden">
         {/* ───── Left: scene templates ───── */}
         {leftCollapsed ? (
           <CollapsedRail

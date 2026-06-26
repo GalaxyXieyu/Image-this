@@ -12,14 +12,27 @@
 @tailwind utilities;
 
 /* === 响应式 zoom：中等屏整体缩放，让密度不骤降（设计规范第 1.5 节） === */
-@media (max-width: 1240px) {
+/* 仅 >=768px (桌面/平板) 启用 zoom；手机不缩放，改用真正的响应式布局 */
+@media (min-width: 768px) and (max-width: 1240px) {
   :root { zoom: 0.95; }
 }
-@media (max-width: 1080px) {
+@media (min-width: 768px) and (max-width: 1080px) {
   :root { zoom: 0.88; }
 }
-@media (max-width: 920px) {
+@media (min-width: 768px) and (max-width: 920px) {
   :root { zoom: 0.82; }
+}
+
+/* === 移动端：safe-area + 触摸优化 === */
+@media (max-width: 767px) {
+  body {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* 给主 scroll 容器加 safe-area padding（防底部 tab bar 遮挡） */
+  .pb-mobile-safe {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0) + 64px);
+  }
 }
 
 /* === v2.0 玻璃拟态 / 强调渐变 utilities（设计规范第 1.4 节）=== */

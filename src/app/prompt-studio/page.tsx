@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { MobileDesktopOnly } from "@/components/navigation/MobileDesktopOnly";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -150,8 +151,9 @@ export default function PromptStudioPage() {
 
   return (
     <div className="flex h-[100dvh] flex-col bg-background app-bg-glow">
-      {/* Top bar */}
-      <header className="flex shrink-0 items-center justify-between border-b border-line bg-surface px-6 py-3.5">
+      <MobileDesktopOnly title="提示词工作室" reason="提示词工作室需要并排多列对比和大段文本编辑，手机屏幕放不下。" />
+      {/* Top bar — 桌面端 */}
+      <header className="hidden md:flex shrink-0 items-center justify-between border-b border-line bg-surface px-6 py-3.5">
         <div className="flex items-center gap-3.5">
           <Button
             asChild
