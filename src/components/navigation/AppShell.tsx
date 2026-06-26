@@ -91,6 +91,7 @@ function TopNav({
 }) {
   return (
     <header className="shrink-0 border-b border-border/60 bg-surface-glass backdrop-blur-[20px] backdrop-saturate-150">
+      {/* Row 1: logo / 一级 nav / 右上按钮 */}
       <div className="flex h-14 items-center gap-4 px-6">
         <Link href="/" className="flex items-center transition-opacity hover:opacity-80">
           <BrandLogo iconClassName="h-7 w-7 rounded-lg" textClassName="tracking-tight" />
@@ -116,54 +117,6 @@ function TopNav({
           })}
         </nav>
 
-        {isWorkspace && (
-          <div className="ml-3 hidden md:flex items-center gap-1 rounded-full border border-border/70 bg-surface-muted/70 p-1">
-            {WORKSPACE_SEGMENTS.map((seg) => {
-              const active = seg.match(pathname);
-              const Icon = seg.icon;
-              return (
-                <Link
-                  key={seg.href}
-                  href={seg.href}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-data transition-colors",
-                    active
-                      ? "bg-surface text-brand-text shadow-soft"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  {seg.label}
-                </Link>
-              );
-            })}
-          </div>
-        )}
-
-        {isTools && (
-          <div className="ml-2 hidden lg:flex items-center gap-1.5">
-            {TOOL_PILLS.map((pill) => {
-              const active = activeTool === pill.tool;
-              const Icon = pill.icon;
-              return (
-                <Link
-                  key={pill.tool}
-                  href={`/tools?tool=${pill.tool}`}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-data transition-colors",
-                    active
-                      ? "bg-accent-gradient text-white shadow-soft"
-                      : "border border-border/70 bg-surface/80 text-muted-foreground hover:border-brand-soft hover:text-foreground"
-                  )}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  {pill.label}
-                </Link>
-              );
-            })}
-          </div>
-        )}
-
         <div className="ml-auto flex items-center gap-1.5">
           <button
             type="button"
@@ -185,6 +138,57 @@ function TopNav({
           <ThemeToggle />
         </div>
       </div>
+
+      {/* Row 2: 工作台二级 nav（仅 workspace/combo/tools 页显示） */}
+      {isWorkspace && (
+        <div className="flex h-12 items-center gap-3 border-t border-border/40 px-6">
+          <div className="flex items-center gap-1 rounded-full border border-border/70 bg-surface-muted/70 p-1">
+            {WORKSPACE_SEGMENTS.map((seg) => {
+              const active = seg.match(pathname);
+              const Icon = seg.icon;
+              return (
+                <Link
+                  key={seg.href}
+                  href={seg.href}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-data transition-colors",
+                    active
+                      ? "bg-surface text-brand-text shadow-soft"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {seg.label}
+                </Link>
+              );
+            })}
+          </div>
+
+          {isTools && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {TOOL_PILLS.map((pill) => {
+                const active = activeTool === pill.tool;
+                const Icon = pill.icon;
+                return (
+                  <Link
+                    key={pill.tool}
+                    href={`/tools?tool=${pill.tool}`}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-data transition-colors",
+                      active
+                        ? "bg-accent-gradient text-white shadow-soft"
+                        : "border border-border/70 bg-surface/80 text-muted-foreground hover:border-brand-soft hover:text-foreground"
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {pill.label}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </header>
   );
 }

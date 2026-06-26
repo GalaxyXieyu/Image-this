@@ -170,7 +170,7 @@ function ToolboxPageInner() {
   const { upload, uploading } = useUpload();
   const { toast } = useToast();
   const [draft, setDraft] = useState<ToolDraftState>(() => createInitialDraft(presetId, toolParam));
-  const appliedPresetRef = useRef<string | undefined>(presetId);
+  const appliedSyncRef = useRef<{ preset?: string; tool?: string }>({ preset: presetId, tool: toolParam });
   const [runState, setRunState] = useState<ToolRunState>(EMPTY_RUN_STATE);
   const [creatingTask, setCreatingTask] = useState(false);
   const { tasks, isPolling, startPolling, error: pollingError } = useWorkflowTaskPolling({
@@ -184,8 +184,8 @@ function ToolboxPageInner() {
   );
 
   useEffect(() => {
-    if (appliedPresetRef.current === presetId) return;
-    appliedPresetRef.current = presetId;
+    if (appliedSyncRef.current.preset === presetId && appliedSyncRef.current.tool === toolParam) return;
+    appliedSyncRef.current = { preset: presetId, tool: toolParam };
     setDraft((prev) => {
       const initialized = createInitialDraft(presetId, toolParam);
       return {
@@ -324,27 +324,8 @@ function ToolboxPageInner() {
             </div>
           )}
         </div>
+        {/* 工具切换由 AppShell 二级 nav 承担，此处不再重复，仅保留批量模式 toggle */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 rounded-full border border-line bg-surface-glass p-1 backdrop-blur-[18px] backdrop-saturate-150">
-            {SUPPORTED_TOOLS.map((tool) => {
-              const active = draft.toolType === tool.id;
-              return (
-                <button
-                  key={tool.id}
-                  onClick={() => updateToolType(tool.id)}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-data font-medium transition-colors",
-                    active
-                      ? "bg-accent-gradient text-white shadow-soft"
-                      : "text-ink-2 hover:bg-surface-muted hover:text-ink"
-                  )}
-                >
-                  <tool.icon className="h-3.5 w-3.5" />
-                  {tool.label}
-                </button>
-              );
-            })}
-          </div>
           <div className="flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5">
             <Label className="cursor-pointer text-caption text-ink-2">批量模式</Label>
             <Switch
