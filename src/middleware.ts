@@ -33,7 +33,9 @@ export async function middleware(request: NextRequest) {
     secret: process.env.NEXTAUTH_SECRET,
   });
 
-  if (token) {
+  // 有 token.id 才算登录；NextAuth jwt callback 在用户行消失时会清空 token
+  // (返回 {})，那时 token 仍为 truthy 但没有 id —— 必须按未登录处理。
+  if (token?.id) {
     return NextResponse.next();
   }
 
