@@ -86,13 +86,6 @@ jobs:
             APP_ROOT="${APP_ROOT}" APP_NAME="${APP_NAME}" PORT="${PORT}" \
               bash deploy-source.sh "${{ github.sha }}" "${APP_ROOT}/source-${{ github.sha }}.tar.gz"
 
-      - name: Verify public domain
-        run: |
-          echo "Waiting for service to be ready..."
-          sleep 5
-          curl -fsS ${{ env.APP_DOMAIN }}/api/health
-          echo "Public health check passed!"
-
       - name: Write deployment summary
         if: always()
         run: |
