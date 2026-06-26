@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
-import { Bell, Download, Moon, Sun } from "lucide-react";
+import { Suspense, useEffect, useState } from "react";
+import { Bell, Download, Moon, Sun, Wand2, Layers, Wrench, Sparkles, Droplets, ZoomIn, Expand } from "lucide-react";
 import { BrandLogo } from "@/components/brands/SpriteImage";
 import { cn } from "@/lib/utils";
 
@@ -27,17 +27,19 @@ const PRIMARY_ITEMS: PrimaryItem[] = [
 ];
 
 const WORKSPACE_SEGMENTS = [
-  { label: "场景生成", href: "/workspace/scene", match: (p: string) => p.startsWith("/workspace") },
-  { label: "组合工作流", href: "/combo", match: (p: string) => p.startsWith("/combo") },
-  { label: "单点工具", href: "/tools", match: (p: string) => p.startsWith("/tools") },
+  { label: "场景生成", href: "/workspace/scene", icon: Wand2, match: (p: string) => p.startsWith("/workspace") },
+  { label: "组合工作流", href: "/combo", icon: Layers, match: (p: string) => p.startsWith("/combo") },
+  { label: "单点工具", href: "/tools", icon: Wrench, match: (p: string) => p.startsWith("/tools") },
 ];
 
 const TOOL_PILLS = [
-  { label: "AI换背景", tool: "background_replace" },
-  { label: "加水印", tool: "watermark" },
-  { label: "高清放大", tool: "upscale" },
-  { label: "智能扩图", tool: "outpaint" },
+  { label: "AI换背景", tool: "background_replace", icon: Sparkles },
+  { label: "加水印", tool: "watermark", icon: Droplets },
+  { label: "高清放大", tool: "upscale", icon: ZoomIn },
+  { label: "智能扩图", tool: "outpaint", icon: Expand },
 ];
+
+const DEFAULT_TOOL = "background_replace";
 
 const HIDDEN_PREFIXES = ["/auth", "/prompt-studio"];
 
@@ -54,13 +56,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-[100dvh] flex-col bg-background text-foreground app-bg-glow">
-      <TopNav pathname={pathname} isWorkspace={isWorkspace} isTools={isTools} />
+      <Suspense fallback={<TopNav pathname={pathname} isWorkspace={isWorkspace} isTools={isTools} activeTool={DEFAULT_TOOL} />}>
+        <TopNavWithSearch pathname={pathname} isWorkspace={isWorkspace} isTools={isTools} />
+      </Suspense>
       <main className="flex-1 min-h-0 overflow-hidden">{children}</main>
     </div>
   );
 }
 
-function TopNav({
+function TopNavWithSearch({
   pathname,
   isWorkspace,
   isTools,
@@ -68,6 +72,22 @@ function TopNav({
   pathname: string;
   isWorkspace: boolean;
   isTools: boolean;
+}) {
+  const searchParams = useSearchParams();
+  const activeTool = searchParams.get("tool") ?? DEFAULT_TOOL;
+  return <TopNav pathname={pathname} isWorkspace={isWorkspace} isTools={isTools} activeTool={activeTool} />;
+}
+
+function TopNav({
+  pathname,
+  isWorkspace,
+  isTools,
+  activeTool,
+}: {
+  pathname: string;
+  isWorkspace: boolean;
+  isTools: boolean;
+  activeTool: string;
 }) {
   return (
     <header className="shrink-0 border-b border-border/60 bg-surface-glass backdrop-blur-[20px] backdrop-saturate-150">
@@ -100,17 +120,19 @@ function TopNav({
           <div className="ml-3 hidden md:flex items-center gap-1 rounded-full border border-border/70 bg-surface-muted/70 p-1">
             {WORKSPACE_SEGMENTS.map((seg) => {
               const active = seg.match(pathname);
+              const Icon = seg.icon;
               return (
                 <Link
                   key={seg.href}
                   href={seg.href}
                   className={cn(
-                    "rounded-full px-3 py-1 text-data transition-colors",
+                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-data transition-colors",
                     active
-                      ? "bg-accent-gradient text-white shadow-sm"
+                      ? "bg-surface text-brand-text shadow-soft"
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
+                  <Icon className="h-3.5 w-3.5" />
                   {seg.label}
                 </Link>
               );
@@ -120,15 +142,25 @@ function TopNav({
 
         {isTools && (
           <div className="ml-2 hidden lg:flex items-center gap-1.5">
-            {TOOL_PILLS.map((pill) => (
-              <Link
-                key={pill.tool}
-                href={`/tools?tool=${pill.tool}`}
-                className="rounded-full border border-border/70 bg-surface/80 px-3 py-1 text-data text-muted-foreground transition-colors hover:border-brand-soft hover:text-foreground"
-              >
-                {pill.label}
-              </Link>
-            ))}
+            {TOOL_PILLS.map((pill) => {
+              const active = activeTool === pill.tool;
+              const Icon = pill.icon;
+              return (
+                <Link
+                  key={pill.tool}
+                  href={`/tools?tool=${pill.tool}`}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-data transition-colors",
+                    active
+                      ? "bg-accent-gradient text-white shadow-soft"
+                      : "border border-border/70 bg-surface/80 text-muted-foreground hover:border-brand-soft hover:text-foreground"
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {pill.label}
+                </Link>
+              );
+            })}
           </div>
         )}
 

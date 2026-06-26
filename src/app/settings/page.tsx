@@ -739,6 +739,20 @@ export default function SettingsPage() {
       case 'models':
         return (
           <div className="space-y-6">
+            {/* 统计行 */}
+            <div className="flex items-baseline justify-between">
+              <div>
+                <h2 className="font-serif text-h3 text-ink tracking-tight">AI 模型配置</h2>
+                <p className="mt-1 text-data text-ink-3">每张卡片是一个 Provider，展开后可配置接口与密钥</p>
+              </div>
+              <div className="text-data text-ink-3">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-success" />
+                  3 个 Provider
+                </span>
+              </div>
+            </div>
+
             {/* GPT API配置 */}
             <Card>
               <CardHeader className="flex flex-row items-start justify-between space-y-0">
@@ -1271,46 +1285,73 @@ export default function SettingsPage() {
           <p className="mt-2 text-ink-2">管理 AI 服务配置、提示词、系统并发与账户信息</p>
         </div>
 
-        <div className="flex gap-6 h-[calc(100vh-12rem)]">
-          {/* 左侧边栏 */}
-          <aside className="w-72 flex-shrink-0">
-            <div className="h-full">
-              <div className="glass-panel flex h-full flex-col overflow-hidden rounded-[18px]">
-                <nav className="flex-1 space-y-1 overflow-y-auto p-2">
-                  {menuItems.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = activeSection === item.id;
+        {/* 顶部 4 Tab + 各 Tab 内子 section */}
+        {(() => {
+          const tabGroups: { id: string; label: string; sections: SettingSection[] }[] = [
+            { id: 'models', label: 'AI 模型配置', sections: ['models'] },
+            { id: 'prompts', label: '提示词模板', sections: ['prompts'] },
+            { id: 'system', label: '系统设置', sections: ['imagehosting', 'runtime', 'logs'] },
+            { id: 'profile', label: '用户信息', sections: ['profile', 'updates'] },
+          ];
+          const currentTab = tabGroups.find((g) => g.sections.includes(activeSection)) ?? tabGroups[0];
+          return (
+            <div className="mb-6">
+              <div className="border-b border-line">
+                <nav className="flex items-center gap-1">
+                  {tabGroups.map((g) => {
+                    const active = currentTab.id === g.id;
                     return (
                       <button
-                        key={item.id}
-                        onClick={() => setActiveSection(item.id)}
+                        key={g.id}
+                        onClick={() => setActiveSection(g.sections[0])}
                         className={cn(
-                          "group relative flex w-full items-start rounded-[12px] px-3.5 py-3 text-left transition-all duration-200",
-                          isActive
-                            ? "bg-brand-soft text-brand-text"
-                            : "text-ink-2 hover:bg-surface-muted hover:text-ink"
+                          "relative inline-flex items-center gap-2 px-4 py-3 text-[14px] font-medium transition-colors",
+                          active
+                            ? "text-brand-text"
+                            : "text-ink-3 hover:text-ink"
                         )}
                       >
-                        {isActive && (
-                          <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-accent-gradient" />
+                        {(() => {
+                          const Icon = menuItems.find((m) => m.id === g.sections[0])?.icon;
+                          return Icon ? <Icon className="h-4 w-4" /> : null;
+                        })()}
+                        {g.label}
+                        {active && (
+                          <span className="absolute inset-x-2 bottom-0 h-[2px] rounded-full bg-accent-gradient" />
                         )}
-                        <Icon className={cn("mr-3 mt-0.5 h-5 w-5 flex-shrink-0", isActive ? "text-brand" : "text-ink-3")} />
-                        <div className="min-w-0 flex-1">
-                          <div className={cn("text-data font-semibold leading-tight", isActive ? "text-brand-text" : "text-ink")}>
-                            {item.label}
-                          </div>
-                          <div className="mt-1 text-caption leading-tight text-ink-3">
-                            {item.subtitle}
-                          </div>
-                        </div>
                       </button>
                     );
                   })}
                 </nav>
               </div>
+              {currentTab.sections.length > 1 && (
+                <div className="mt-3 flex items-center gap-1.5">
+                  {currentTab.sections.map((sid) => {
+                    const item = menuItems.find((m) => m.id === sid);
+                    if (!item) return null;
+                    const active = activeSection === sid;
+                    return (
+                      <button
+                        key={sid}
+                        onClick={() => setActiveSection(sid)}
+                        className={cn(
+                          "rounded-full px-3 py-1 text-[12px] font-medium transition-colors",
+                          active
+                            ? "bg-brand-soft text-brand-text"
+                            : "text-ink-3 hover:bg-surface-muted hover:text-ink"
+                        )}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          </aside>
+          );
+        })()}
 
+        <div className="flex gap-6 min-h-[calc(100vh-16rem)]">
           {/* 右侧内容区域 */}
           <div className="flex-1 space-y-6">
             {renderContent()}
