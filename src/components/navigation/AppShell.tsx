@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Suspense, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Bell, Download, Moon, Sun, Wand2, Layers, Wrench, Sparkles, Droplets, ZoomIn, Expand, Home, Image as ImageIcon, Settings as SettingsIcon, Menu, X } from "lucide-react";
 import { BrandLogo } from "@/components/brands/SpriteImage";
 import { cn } from "@/lib/utils";
@@ -60,41 +61,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Suspense fallback={<TopNav pathname={pathname} isWorkspace={isWorkspace} isTools={isTools} activeTool={DEFAULT_TOOL} />}>
         <TopNavWithSearch pathname={pathname} isWorkspace={isWorkspace} isTools={isTools} />
       </Suspense>
-      <main className="flex-1 min-h-0 overflow-hidden pb-14 md:pb-0">{children}</main>
-      <MobileBottomNav pathname={pathname} />
+      <main className="flex-1 min-h-0 overflow-hidden">{children}</main>
     </div>
-  );
-}
-
-/* ──────────────────────────────────────────────
-   Mobile bottom tab bar (hidden on md+)
-   ────────────────────────────────────────────── */
-function MobileBottomNav({ pathname }: { pathname: string }) {
-  return (
-    <nav
-      className="md:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-surface-glass backdrop-blur-[20px] backdrop-saturate-150"
-      style={{ paddingBottom: "env(safe-area-inset-bottom, 0)" }}
-    >
-      <div className="flex h-14 items-stretch justify-around">
-        {PRIMARY_ITEMS.map((item) => {
-          const active = item.match(pathname);
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors",
-                active ? "text-brand-text" : "text-muted-foreground"
-              )}
-            >
-              <Icon className={cn("h-5 w-5", active && "stroke-[2.5]")} />
-              {item.label}
-            </Link>
-          );
-        })}
-      </div>
-    </nav>
   );
 }
 
@@ -174,16 +142,16 @@ function TopNav({
           <ThemeToggle />
         </div>
 
-        {/* 移动：右上汉堡（含 主题切换 + 更新 + 通知） */}
+        {/* 移动：右上汉堡（一级 + 二级 nav + 工具 + 更新/通知 全在抽屉里） */}
         <div className="ml-auto md:hidden flex items-center gap-1.5">
           <ThemeToggle />
-          <MobileMenu />
+          <MobileMenu pathname={pathname} isWorkspace={isWorkspace} isTools={isTools} activeTool={activeTool} />
         </div>
       </div>
 
-      {/* Row 2: 工作台二级 nav（仅 workspace/combo/tools 页显示），移动端可横滚 */}
+      {/* Row 2: 工作台二级 nav（桌面端） — 移动端隐藏，由侧边栏抽屉承接 */}
       {isWorkspace && (
-        <div className="flex h-12 items-center gap-3 border-t border-border/40 px-4 md:px-6 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <div className="hidden md:flex h-12 items-center gap-3 border-t border-border/40 px-4 md:px-6 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           <div className="flex items-center gap-1 rounded-full border border-border/70 bg-surface-muted/70 p-1">
             {WORKSPACE_SEGMENTS.map((seg) => {
               const active = seg.match(pathname);
@@ -235,8 +203,140 @@ function TopNav({
   );
 }
 
-function MobileMenu() {
+function MobileMenu({
+  pathname,
+  isWorkspace,
+  isTools,
+  activeTool,
+}: {
+  pathname: string;
+  isWorkspace: boolean;
+  isTools: boolean;
+  activeTool: string;
+}) {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const close = () => setOpen(false);
+  // 用 portal 把抽屉挂到 <body>，避免被 <header backdrop-blur> 形成的
+  // 局部 stacking context 困住，导致页面 main 内容覆盖到抽屉之上。
+  const overlay = open && mounted ? createPortal(
+    (
+      <div className="fixed inset-0 z-[60]" onClick={close}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div
+            className="fixed right-0 top-0 w-[82%] max-w-[320px] bg-background border-l border-border/60 flex flex-col shadow-float overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+            style={{ paddingTop: "env(safe-area-inset-top, 0)", height: "100dvh" }}
+          >
+            <div className="flex items-center justify-between px-4 py-4 border-b border-border/40">
+              <span className="font-serif text-h3 text-ink">导航</span>
+              <button onClick={close} aria-label="关闭">
+                <X className="h-5 w-5 text-ink-2" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
+              {/* 一级 */}
+              <section>
+                <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-3">主导航</p>
+                <div className="space-y-1">
+                  {PRIMARY_ITEMS.map((item) => {
+                    const active = item.match(pathname);
+                    const Icon = item.icon;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={close}
+                        className={cn(
+                          "flex items-center gap-3 rounded-[12px] px-3 py-2.5 text-[14px] font-medium transition-colors",
+                          active ? "bg-brand-soft text-brand-text" : "text-ink-2 hover:bg-surface-muted"
+                        )}
+                      >
+                        <Icon className="h-4 w-4" />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </section>
+
+              {/* 工作台二级 */}
+              {isWorkspace && (
+                <section>
+                  <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-3">工作台</p>
+                  <div className="space-y-1">
+                    {WORKSPACE_SEGMENTS.map((seg) => {
+                      const active = seg.match(pathname);
+                      const Icon = seg.icon;
+                      return (
+                        <Link
+                          key={seg.href}
+                          href={seg.href}
+                          onClick={close}
+                          className={cn(
+                            "flex items-center gap-3 rounded-[12px] px-3 py-2.5 text-[14px] font-medium transition-colors",
+                            active ? "bg-brand-soft text-brand-text" : "text-ink-2 hover:bg-surface-muted"
+                          )}
+                        >
+                          <Icon className="h-4 w-4" />
+                          {seg.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+
+              {/* 工具三级（仅 /tools） */}
+              {isTools && (
+                <section>
+                  <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-3">工具</p>
+                  <div className="space-y-1">
+                    {TOOL_PILLS.map((pill) => {
+                      const active = activeTool === pill.tool;
+                      const Icon = pill.icon;
+                      return (
+                        <Link
+                          key={pill.tool}
+                          href={`/tools?tool=${pill.tool}`}
+                          onClick={close}
+                          className={cn(
+                            "flex items-center gap-3 rounded-[12px] px-3 py-2.5 text-[14px] font-medium transition-colors",
+                            active ? "bg-accent-gradient text-white shadow-soft" : "text-ink-2 hover:bg-surface-muted"
+                          )}
+                        >
+                          <Icon className="h-4 w-4" />
+                          {pill.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+
+              {/* 工具按钮：更新 / 通知 */}
+              <section>
+                <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-3">其他</p>
+                <div className="space-y-1">
+                  <button className="relative flex w-full items-center gap-3 rounded-[12px] px-3 py-2.5 text-[14px] font-medium text-ink-2 hover:bg-surface-muted">
+                    <Download className="h-4 w-4" />
+                    检查更新
+                    <span className="absolute right-3 top-3 h-2 w-2 rounded-full bg-danger" />
+                  </button>
+                  <button className="flex w-full items-center gap-3 rounded-[12px] px-3 py-2.5 text-[14px] font-medium text-ink-2 hover:bg-surface-muted">
+                    <Bell className="h-4 w-4" />
+                    通知
+                  </button>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+    ),
+    document.body
+  ) : null;
   return (
     <>
       <button
@@ -247,34 +347,7 @@ function MobileMenu() {
       >
         <Menu className="h-4 w-4" />
       </button>
-      {open && (
-        <div className="fixed inset-0 z-50" onClick={() => setOpen(false)}>
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-          <div
-            className="absolute right-0 top-0 h-full w-[80%] max-w-[300px] glass-panel rounded-none p-4 shadow-float"
-            onClick={(e) => e.stopPropagation()}
-            style={{ paddingTop: "calc(env(safe-area-inset-top, 0) + 16px)" }}
-          >
-            <div className="flex items-center justify-between">
-              <span className="font-serif text-h3 text-ink">菜单</span>
-              <button onClick={() => setOpen(false)} aria-label="关闭">
-                <X className="h-5 w-5 text-ink-2" />
-              </button>
-            </div>
-            <div className="mt-4 space-y-2">
-              <button className="relative flex w-full items-center gap-2 rounded-[12px] border border-border/70 bg-surface px-3 py-2.5 text-data text-ink-2">
-                <Download className="h-4 w-4" />
-                检查更新
-                <span className="absolute right-3 top-3 h-2 w-2 rounded-full bg-danger" />
-              </button>
-              <button className="flex w-full items-center gap-2 rounded-[12px] border border-border/70 bg-surface px-3 py-2.5 text-data text-ink-2">
-                <Bell className="h-4 w-4" />
-                通知
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {overlay}
     </>
   );
 }
