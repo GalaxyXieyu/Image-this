@@ -60,7 +60,7 @@ if [ -f "$SHARED_DIR/.env.production" ]; then
   log "$BLUE" "ℹ️ 已套用 $SHARED_DIR/.env.production"
 else
   cat > "$NEW_RELEASE_DIR/.env.production" <<EOF
-DATABASE_URL=file:./data/app.db
+DATABASE_URL=file:../data/app.db
 NEXTAUTH_URL=http://localhost:${PORT}
 NEXTAUTH_SECRET=placeholder-please-set-${SHARED_DIR//\//_}-env-production
 EOF
@@ -76,7 +76,7 @@ log "$GREEN" "✅ 依赖安装完成"
 
 log "$YELLOW" "[4/8] 🗄️ Prisma generate + db push"
 ./node_modules/.bin/prisma generate
-DATABASE_URL="file:./data/app.db" ./node_modules/.bin/prisma db push --skip-generate
+DATABASE_URL="file:../data/app.db" ./node_modules/.bin/prisma db push --skip-generate
 log "$GREEN" "✅ Prisma 同步完成"
 
 log "$YELLOW" "[5/8] 🛠️ npm run build"

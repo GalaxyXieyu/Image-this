@@ -48,7 +48,10 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: String(port),
-        DATABASE_URL: 'file:./data/app.db',
+        // SQLite path is resolved relative to prisma/schema.prisma, so use
+        // ../data/app.db so prisma resolves it to <release>/data/app.db
+        // which is symlinked to shared/data/app.db (persistent across deploys).
+        DATABASE_URL: 'file:../data/app.db',
         ...envVars,
       },
       log_file: './logs/combined.log',
