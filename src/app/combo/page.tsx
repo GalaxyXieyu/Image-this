@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -14,10 +15,19 @@ import {
   DrawerFooter,
   DrawerClose,
 } from "@/components/ui/drawer";
-import { BottomSheetSelect } from "@/components/workbench/BottomSheetSelect";
+import { BottomSheetSelect, type BottomSheetSelectOption } from "@/components/workbench/BottomSheetSelect";
 import { useIsMobile } from "@/lib/use-is-mobile";
+import { useUpload } from "@/lib/use-upload";
 import { cn } from "@/lib/utils";
 import { apiPost, apiGet } from "@/lib/api-client";
+import type { InputAssetRef } from "@/types/workbench";
+import {
+  expandSteps,
+  CycleError,
+  DepthError,
+  StepsLimitError,
+  MissingTemplateError,
+} from "@/lib/workbench/expand-workflow";
 import {
   Trash2,
   GripVertical,
@@ -38,6 +48,8 @@ import {
   Loader2,
   Upload,
   Settings2,
+  Layers,
+  AlertTriangle,
 } from "lucide-react";
 
 /* ─── Data ───────────────────────────────────────────────────────── */
@@ -124,20 +136,25 @@ function getTemplatePreview(templateId: string, categoryId: string) {
   return TEMPLATE_PREVIEWS[templateId] ?? CATEGORY_FALLBACK_PREVIEWS[categoryId] ?? "/scene-presets/scene-elegant.webp";
 }
 
-type StepType = "scene" | "background" | "upscale" | "watermark" | "outpaint";
+type StepType = "scene" | "background" | "upscale" | "watermark" | "outpaint" | "workflow";
+
+// 可执行步骤类型（workflow 不是可执行的叶子，执行前需展开）
+type ExecutableStepType = Exclude<StepType, "workflow">;
 
 interface SceneParams { sceneStyle: string; candidateCount: number }
-interface BackgroundParams { bgType: string; featherEdge: number; keepShadow: boolean }
+interface BackgroundParams { bgType: string; featherEdge: number; keepShadow: boolean; referenceAsset?: InputAssetRef }
 interface UpscaleParams { factor: number; denoise: number }
 interface WatermarkParams { content: string; position: string; opacity: number }
 interface OutpaintParams { direction: string; ratio: number }
+interface WorkflowParams {} // workflow 步无参数
 
 type StepParams =
   | { type: "scene"; params: SceneParams }
   | { type: "background"; params: BackgroundParams }
   | { type: "upscale"; params: UpscaleParams }
   | { type: "watermark"; params: WatermarkParams }
-  | { type: "outpaint"; params: OutpaintParams };
+  | { type: "outpaint"; params: OutpaintParams }
+  | { type: "workflow"; params: WorkflowParams };
 
 interface WorkflowStep {
   id: string;
@@ -164,11 +181,15 @@ const STEP_META: Record<
   upscale: { icon: ZoomIn, name: "高清放大", description: "AI 超分辨率放大，提升清晰度" },
   watermark: { icon: Droplets, name: "水印与尺寸", description: "添加品牌水印，调整输出尺寸" },
   outpaint: { icon: Expand, name: "智能扩图", description: "智能扩展画布，补充画面内容" },
+  workflow: { icon: Layers, name: "嵌入工作流", description: "把一个已保存的工作流作为一步" },
 };
 
-function getStepOptions() {
-  const types: StepType[] = ["scene", "background", "upscale", "watermark", "outpaint"];
-  return types.map((type) => {
+function getStepOptions(
+  workflowTemplates: WorkflowTemplateType[],
+  currentEditingTemplateId?: string | null
+): BottomSheetSelectOption[] {
+  const executableTypes: ExecutableStepType[] = ["scene", "background", "upscale", "watermark", "outpaint"];
+  const options: BottomSheetSelectOption[] = executableTypes.map((type) => {
     const Icon = STEP_META[type].icon;
     return {
       id: type,
@@ -177,9 +198,31 @@ function getStepOptions() {
       icon: Icon,
     };
   });
+
+  // 加入嵌入工作流选项，支持二级选择
+  const workflowChildren: BottomSheetSelectOption[] = workflowTemplates
+    .filter((t) => t.id !== currentEditingTemplateId) // 排除当前正在编辑的模板（防自嵌）
+    .map((t) => ({
+      id: `wf:${t.id}`,
+      label: t.name,
+      description: `${t.steps.length} 步`,
+      icon: STEP_META.workflow.icon,
+    }));
+
+  if (workflowChildren.length > 0) {
+    options.push({
+      id: "workflow",
+      label: STEP_META.workflow.name,
+      description: STEP_META.workflow.description,
+      icon: STEP_META.workflow.icon,
+      children: workflowChildren,
+    });
+  }
+
+  return options;
 }
 
-const DEFAULT_PARAMS: Record<StepType, StepParams["params"]> = {
+const DEFAULT_PARAMS: Record<ExecutableStepType, StepParams["params"]> = {
   scene: { sceneStyle: "natural", candidateCount: 4 } as SceneParams,
   background: { bgType: "studio", featherEdge: 8, keepShadow: true } as BackgroundParams,
   upscale: { factor: 2, denoise: 30 } as UpscaleParams,
@@ -187,7 +230,7 @@ const DEFAULT_PARAMS: Record<StepType, StepParams["params"]> = {
   outpaint: { direction: "all", ratio: 25 } as OutpaintParams,
 };
 
-const TYPE_TO_API: Record<StepType, string> = {
+const TYPE_TO_API: Record<ExecutableStepType, string> = {
   scene: "SCENE_GENERATION",
   background: "BACKGROUND_REMOVAL",
   upscale: "IMAGE_UPSCALING",
@@ -258,6 +301,79 @@ interface PostWorkflowTemplateResponse {
   template: WorkflowTemplateType;
 }
 
+function normalizeStepTaskInput(
+  step: WorkflowStep,
+  global: {
+    batchCount: number;
+    aspectRatio: string;
+    resolution: string;
+    watermarkEnabled: boolean;
+    autoRetry: boolean;
+  }
+) {
+  const params = step.params as Record<string, unknown>;
+  const baseInput = {
+    stepType: step.type,
+    stepName: step.name,
+    stepParams: step.params,
+    global,
+  };
+
+  if (step.type === "background") {
+    const backgroundParams = step.params as BackgroundParams;
+    return {
+      ...baseInput,
+      referenceAsset: backgroundParams.referenceAsset,
+      customPrompt: buildBackgroundPrompt(backgroundParams),
+      aiModel: "gemini",
+      outputResolution: global.resolution,
+    };
+  }
+
+  if (step.type === "watermark") {
+    const watermarkParams = step.params as WatermarkParams;
+    return {
+      ...baseInput,
+      watermarkType: "text",
+      watermarkText: watermarkParams.content,
+      watermarkPosition: watermarkParams.position,
+      watermarkOpacity: watermarkParams.opacity / 100,
+      outputResolution: toOutputResolution(global.resolution),
+    };
+  }
+
+  return {
+    ...baseInput,
+    ...params,
+  };
+}
+
+function buildBackgroundPrompt(params: BackgroundParams) {
+  const bgTypeLabel: Record<string, string> = {
+    studio: "纯色棚拍背景，专业柔光",
+    scene: "参考图风格的电商场景背景",
+    white: "干净白底背景",
+    blur: "虚化景深背景",
+  };
+
+  return [
+    "保持商品主体完全不变，只替换背景",
+    bgTypeLabel[params.bgType] ?? "自然融合的电商背景",
+    `边缘羽化 ${params.featherEdge}px`,
+    params.keepShadow ? "保留自然接触阴影" : "弱化原始阴影",
+  ].join("，");
+}
+
+function toOutputResolution(resolution: string) {
+  const resolutionMap: Record<string, string> = {
+    "1k": "1024x1024",
+    "2k": "2048x2048",
+    "4k": "4096x4096",
+  };
+
+  return resolutionMap[resolution] ?? "original";
+}
+
 export default function ComboPage() {
   const [workflowTemplates, setWorkflowTemplates] = useState<WorkflowTemplateType[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
@@ -282,6 +398,10 @@ export default function ComboPage() {
   // Save template drawer
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [templateSaveData, setTemplateSaveData] = useState({ name: "", category: "" });
+
+  // Workflow preview drawer
+  const [workflowPreviewOpen, setWorkflowPreviewOpen] = useState(false);
+  const [previewingWorkflowId, setPreviewingWorkflowId] = useState<string | null>(null);
 
   // Load workflow templates on mount
   useEffect(() => {
@@ -308,20 +428,54 @@ export default function ComboPage() {
     if (steps.length === 0) return;
     setExecuting(true);
     try {
-      const tasks = steps.map((step) => ({
-        type: TYPE_TO_API[step.type],
-        inputData: JSON.stringify({
-          stepType: step.type,
-          stepName: step.name,
-          stepParams: step.params,
-          global: { batchCount, aspectRatio, resolution, watermarkEnabled, autoRetry },
-        }),
-        totalSteps: 1,
-      }));
+      // 重新获取最新的工作流模板（确保"实时引用"）
+      const templatesRes = await apiGet<GetWorkflowTemplatesResponse>(
+        "/api/workflow-templates"
+      );
+      const latestTemplates = templatesRes.templates || [];
+      const templatesById = Object.fromEntries(
+        latestTemplates.map((t) => [t.id, t])
+      );
+
+      // 展开所有嵌套工作流
+      let expandedSteps: WorkflowStep[];
+      try {
+        expandedSteps = expandSteps(steps, templatesById) as WorkflowStep[];
+      } catch (expandError) {
+        setExecuting(false);
+        if (expandError instanceof CycleError) {
+          alert(`工作流存在循环引用：${expandError.message}`);
+        } else if (expandError instanceof DepthError) {
+          alert(`嵌套工作流深度超过限制：${expandError.message}`);
+        } else if (expandError instanceof StepsLimitError) {
+          alert(`工作流步数超过限制：${expandError.message}`);
+        } else if (expandError instanceof MissingTemplateError) {
+          alert(`工作流引用错误：${expandError.message}`);
+        } else {
+          alert("工作流展开失败，请重试");
+        }
+        return;
+      }
+
+      const global = { batchCount, aspectRatio, resolution, watermarkEnabled, autoRetry };
+
+      // 映射展开后的步骤为任务（均为可执行叶子步骤）
+      const tasks = expandedSteps.map((step) => {
+        // 此时 step.type 不应为 "workflow"，因为已经展开
+        const execType = step.type as ExecutableStepType;
+        return {
+          type: TYPE_TO_API[execType],
+          inputData: JSON.stringify(normalizeStepTaskInput(step, global)),
+          totalSteps: 1,
+        };
+      });
+
       await apiPost("/api/tasks", tasks);
       window.location.href = "/tasks";
-    } catch {
+    } catch (error) {
       setExecuting(false);
+      console.error("执行批量处理失败:", error);
+      alert("执行批量处理失败，请重试");
     }
   };
 
@@ -391,7 +545,30 @@ export default function ComboPage() {
   };
 
   /* ---- step helpers ---- */
-  const addStep = (stepType: StepType) => {
+  const addStep = (stepTypeOrId: StepType | string) => {
+    // 处理 wf:<id> 格式（嵌入工作流）
+    if (typeof stepTypeOrId === "string" && stepTypeOrId.startsWith("wf:")) {
+      const refTemplateId = stepTypeOrId.slice(3);
+      const refTemplate = workflowTemplates.find((t) => t.id === refTemplateId);
+      if (!refTemplate) return;
+      setSteps((prev) => [
+        ...prev,
+        {
+          id: `s${Date.now()}`,
+          order: prev.length + 1,
+          type: "workflow",
+          name: refTemplate.name,
+          description: `嵌入工作流 · ${refTemplate.steps.length} 步`,
+          params: {},
+          refTemplateId,
+        },
+      ]);
+      setAddStepOpen(false);
+      return;
+    }
+
+    // 普通步骤类型
+    const stepType = stepTypeOrId as ExecutableStepType;
     const meta = STEP_META[stepType];
     setSteps((prev) => [
       ...prev,
@@ -536,29 +713,49 @@ export default function ComboPage() {
               {steps.map((step, index) => {
                 const Icon = STEP_META[step.type].icon;
                 const isSelected = selectedStepId === step.id;
+                const isWorkflow = step.type === "workflow";
+                const refTemplate = isWorkflow
+                  ? workflowTemplates.find((t) => t.id === step.refTemplateId)
+                  : undefined;
+                const isRefInvalid = isWorkflow && !refTemplate;
+
                 return (
                   <div
                     key={step.id}
                     className={cn(
                       "glass-panel flex min-h-[82px] w-full items-center gap-3 rounded-[18px] p-3 text-left transition-all",
-                      isSelected && "ring-2 ring-brand"
+                      isSelected && "ring-2 ring-brand",
+                      isRefInvalid && "opacity-60"
                     )}
                   >
                     <button
                       type="button"
-                      onClick={() => setSelectedStepId(step.id)}
+                      onClick={() => {
+                        if (isWorkflow && refTemplate) {
+                          setPreviewingWorkflowId(step.refTemplateId!);
+                          setWorkflowPreviewOpen(true);
+                        } else if (!isWorkflow) {
+                          setSelectedStepId(step.id);
+                        }
+                      }}
                       className="flex min-w-0 flex-1 items-center gap-3 text-left"
                     >
                       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-gradient text-[12px] font-bold text-white">
                         {step.order}
                       </span>
                       <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-brand-soft text-brand">
-                        <Icon className="h-5 w-5" />
+                        {isRefInvalid ? (
+                          <AlertTriangle className="h-5 w-5 text-danger" />
+                        ) : (
+                          <Icon className="h-5 w-5" />
+                        )}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block text-[14px] font-semibold text-ink">{step.name}</span>
+                        <span className="block text-[14px] font-semibold text-ink">
+                          {isRefInvalid ? `⚠ ${step.name}` : step.name}
+                        </span>
                         <span className="mt-0.5 hidden line-clamp-2 text-[12px] leading-4 text-ink-3 md:block">
-                          {step.description}
+                          {isRefInvalid ? "引用已失效" : step.description}
                         </span>
                       </span>
                     </button>
@@ -598,11 +795,11 @@ export default function ComboPage() {
                 );
               })}
               <BottomSheetSelect
-                options={getStepOptions()}
+                options={getStepOptions(workflowTemplates, selectedTemplate)}
                 value=""
                 onChange={(value) => {
                   if (typeof value === "string") {
-                    addStep(value as StepType);
+                    addStep(value);
                   }
                 }}
                 title="选择处理步骤"
@@ -650,7 +847,7 @@ export default function ComboPage() {
         </div>
 
         {/* 移动端：步骤参数抽屉 */}
-        {selectedStep && (
+        {selectedStep && selectedStep.type !== "workflow" && (
           <DrawerRoot
             open={isMobile && selectedStepId !== null}
             onOpenChange={(open: boolean) => {
@@ -760,6 +957,63 @@ export default function ComboPage() {
             </DrawerFooter>
           </DrawerContent>
         </DrawerRoot>
+
+        {/* 工作流预览抽屉 */}
+        {(() => {
+          const previewTemplate = previewingWorkflowId
+            ? workflowTemplates.find((t) => t.id === previewingWorkflowId)
+            : null;
+          return (
+            <DrawerRoot
+              open={workflowPreviewOpen}
+              onOpenChange={setWorkflowPreviewOpen}
+            >
+              <DrawerContent>
+                <DrawerHeader>
+                  <DrawerTitle>
+                    {previewTemplate ? `${previewTemplate.name} · 工作流预览` : "工作流预览"}
+                  </DrawerTitle>
+                </DrawerHeader>
+                {previewTemplate ? (
+                  <div className="flex-1 overflow-y-auto px-4 pb-4 pt-2">
+                    <div className="mb-3 rounded-[14px] bg-blue-50 p-3 text-[12px] text-blue-700">
+                      实时引用：执行时将按照该工作流的当前版本展开
+                    </div>
+                    <div className="space-y-2">
+                      {previewTemplate.steps.map((substep) => (
+                        <div
+                          key={substep.id}
+                          className="flex items-start gap-3 rounded-[14px] border border-line bg-surface p-3"
+                        >
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand text-[11px] font-bold text-white">
+                            {substep.order}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <p className="text-[13px] font-semibold text-ink">
+                              {substep.name}
+                            </p>
+                            <p className="mt-0.5 text-[12px] text-ink-3">
+                              {substep.description}
+                            </p>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-1 items-center justify-center py-8">
+                    <p className="text-[14px] text-ink-3">工作流信息不可用</p>
+                  </div>
+                )}
+                <DrawerFooter>
+                  <DrawerClose asChild>
+                    <Button className="w-full">关闭预览</Button>
+                  </DrawerClose>
+                </DrawerFooter>
+              </DrawerContent>
+            </DrawerRoot>
+          );
+        })()}
 
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface-glass px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+12px)] backdrop-blur-[18px] backdrop-saturate-150">
           <div className="flex items-center gap-2">
@@ -906,16 +1160,30 @@ export default function ComboPage() {
                 const meta = STEP_META[step.type];
                 const Icon = meta.icon;
                 const isSelected = selectedStepId === step.id;
+                const isWorkflow = step.type === "workflow";
+                const refTemplate = isWorkflow
+                  ? workflowTemplates.find((t) => t.id === step.refTemplateId)
+                  : undefined;
+                const isRefInvalid = isWorkflow && !refTemplate;
+
                 return (
                   <div key={step.id} className="relative">
                     <button
                       type="button"
-                      onClick={() => setSelectedStepId(step.id)}
+                      onClick={() => {
+                        if (isWorkflow && refTemplate) {
+                          setPreviewingWorkflowId(step.refTemplateId!);
+                          setWorkflowPreviewOpen(true);
+                        } else if (!isWorkflow) {
+                          setSelectedStepId(step.id);
+                        }
+                      }}
                       className={cn(
                         "group relative flex w-full items-center gap-3 rounded-[18px] border p-3.5 text-left transition-all",
                         isSelected
                           ? "glass-panel border-brand ring-2 ring-brand/40"
-                          : "border-line bg-surface hover:border-brand/30 hover:shadow-soft"
+                          : "border-line bg-surface hover:border-brand/30 hover:shadow-soft",
+                        isRefInvalid && "opacity-60"
                       )}
                     >
                       {/* Order badge */}
@@ -945,15 +1213,19 @@ export default function ComboPage() {
                             : "bg-brand-soft text-brand"
                         )}
                       >
-                        <Icon className="h-5 w-5" />
+                        {isRefInvalid ? (
+                          <AlertTriangle className="h-5 w-5 text-danger" />
+                        ) : (
+                          <Icon className="h-5 w-5" />
+                        )}
                       </span>
 
                       <span className="min-w-0 flex-1">
                         <span className="block text-[14px] font-semibold text-ink">
-                          {step.name}
+                          {isRefInvalid ? `⚠ ${step.name}` : step.name}
                         </span>
                         <span className="mt-0.5 block truncate text-[12px] text-ink-3">
-                          {step.description}
+                          {isRefInvalid ? "引用已失效" : step.description}
                         </span>
                       </span>
 
@@ -1012,11 +1284,11 @@ export default function ComboPage() {
               })}
 
               <BottomSheetSelect
-                options={getStepOptions()}
+                options={getStepOptions(workflowTemplates, selectedTemplate)}
                 value=""
                 onChange={(value) => {
                   if (typeof value === "string") {
-                    addStep(value as StepType);
+                    addStep(value);
                   }
                 }}
                 title="选择处理步骤"
@@ -1076,7 +1348,7 @@ export default function ComboPage() {
           />
         ) : (
           <aside className="flex w-[320px] shrink-0 flex-col overflow-y-auto border-l border-line bg-surface-glass backdrop-blur-[20px] backdrop-saturate-150">
-            {selectedStep ? (
+            {selectedStep && selectedStep.type !== "workflow" ? (
               <StepParamPanel
                 step={selectedStep}
                 onClose={() => setSelectedStepId(null)}
@@ -1391,6 +1663,11 @@ function StepParamPanel({
   onCollapse: () => void;
   onChange: (_patch: Partial<StepParams["params"]>) => void;
 }) {
+  // 仅用于非 workflow 步，类型保证由调用处进行
+  if (step.type === "workflow") {
+    return null;
+  }
+
   const Icon = STEP_META[step.type].icon;
   return (
     <div className="flex flex-col gap-5 p-5">
@@ -1565,8 +1842,86 @@ function BackgroundStepParams({
   params: BackgroundParams;
   onChange: (_patch: Partial<BackgroundParams>) => void;
 }) {
+  const referenceInputRef = useRef<HTMLInputElement>(null);
+  const { upload, uploading, error } = useUpload();
+
+  const handleReferenceUpload = async (file?: File) => {
+    if (!file) return;
+    try {
+      const result = await upload({ reference: file });
+      if (result.referenceAsset) {
+        onChange({ referenceAsset: result.referenceAsset });
+      }
+    } catch {
+      // useUpload exposes the message through error; keep this panel compact.
+    }
+  };
+
   return (
     <>
+      <section className="flex flex-col gap-2">
+        <FieldLabel>参考背景</FieldLabel>
+        <input
+          ref={referenceInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(event) => {
+            void handleReferenceUpload(event.target.files?.[0]);
+            event.currentTarget.value = "";
+          }}
+        />
+        {params.referenceAsset ? (
+          <div className="overflow-hidden rounded-[14px] border border-line bg-surface">
+            <div className="relative h-32 bg-surface-muted">
+              <Image
+                src={params.referenceAsset.clientUrl}
+                alt="参考背景预览"
+                fill
+                sizes="(max-width: 768px) 100vw, 320px"
+                unoptimized
+                className="h-full w-full object-cover"
+              />
+              <div className="absolute right-2 top-2 flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => referenceInputRef.current?.click()}
+                  disabled={uploading}
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-surface/90 text-ink shadow-soft backdrop-blur"
+                  aria-label="替换参考背景"
+                >
+                  {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onChange({ referenceAsset: undefined })}
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-surface/90 text-danger shadow-soft backdrop-blur"
+                  aria-label="移除参考背景"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-2 px-3 py-2">
+              <span className="min-w-0 truncate text-[12px] font-semibold text-ink">
+                {params.referenceAsset.originalFilename}
+              </span>
+              <span className="shrink-0 text-[11px] font-semibold text-brand-text">已添加</span>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => referenceInputRef.current?.click()}
+            disabled={uploading}
+            className="flex min-h-24 items-center justify-center gap-2 rounded-[14px] border border-dashed border-line-strong bg-surface text-[13px] font-semibold text-ink-2 transition-colors hover:border-brand hover:text-brand disabled:opacity-60"
+          >
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            {uploading ? "上传中..." : "上传参考图"}
+          </button>
+        )}
+        {error && <p className="text-[11px] text-danger">{error}</p>}
+      </section>
       <section className="flex flex-col gap-2">
         <FieldLabel>背景类型</FieldLabel>
         <ChipGroup
@@ -1642,6 +1997,7 @@ function WatermarkStepParams({
 }) {
   return (
     <>
+      <WatermarkPositionPreview params={params} />
       <section className="flex flex-col gap-2">
         <FieldLabel>水印内容</FieldLabel>
         <Input
@@ -1675,6 +2031,37 @@ function WatermarkStepParams({
         onChange={(opacity) => onChange({ opacity })}
       />
     </>
+  );
+}
+
+function WatermarkPositionPreview({ params }: { params: WatermarkParams }) {
+  const previewText = params.content.trim() || "@品牌名";
+  const positionClass: Record<string, string> = {
+    "top-left": "left-3 top-3",
+    "top-right": "right-3 top-3",
+    "bottom-left": "bottom-3 left-3",
+    "bottom-right": "bottom-3 right-3",
+    center: "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
+  };
+
+  return (
+    <section className="flex flex-col gap-2">
+      <FieldLabel>位置预览</FieldLabel>
+      <div className="relative aspect-[4/3] overflow-hidden rounded-[14px] border border-line bg-[linear-gradient(135deg,#f8fafc_0%,#e2e8f0_48%,#dbeafe_100%)]">
+        <div className="absolute inset-x-8 bottom-8 h-[44%] rounded-t-[40%] bg-white/70 shadow-soft" />
+        <div className="absolute left-1/2 top-[44%] h-16 w-16 -translate-x-1/2 rounded-[18px] bg-surface shadow-float ring-1 ring-line" />
+        <div className="absolute left-1/2 top-[47%] h-8 w-20 -translate-x-1/2 rounded-full bg-brand-soft/80" />
+        <span
+          className={cn(
+            "absolute max-w-[72%] rounded-full bg-ink px-2.5 py-1 text-[11px] font-semibold text-white shadow-soft",
+            positionClass[params.position] ?? positionClass["bottom-right"]
+          )}
+          style={{ opacity: Math.max(0.1, params.opacity / 100) }}
+        >
+          {previewText}
+        </span>
+      </div>
+    </section>
   );
 }
 
