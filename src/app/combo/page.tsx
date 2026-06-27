@@ -6,6 +6,14 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
+import {
+  DrawerRoot,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerFooter,
+  DrawerClose,
+} from "@/components/ui/drawer";
 import { BottomSheetSelect } from "@/components/workbench/BottomSheetSelect";
 import { useIsMobile } from "@/lib/use-is-mobile";
 import { cn } from "@/lib/utils";
@@ -225,6 +233,7 @@ export default function ComboPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [steps, setSteps] = useState<WorkflowStep[]>(INITIAL_STEPS);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
+  const isMobile = useIsMobile();
 
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
@@ -504,14 +513,8 @@ export default function ComboPage() {
             </div>
           </section>
 
-          <section className="mt-4 glass-panel rounded-[20px]">
-            {selectedStep ? (
-              <MobileStepSettings
-                step={selectedStep}
-                onClose={() => setSelectedStepId(null)}
-                onChange={(patch) => updateStepParams(selectedStep.id, patch)}
-              />
-            ) : (
+          {!selectedStep && (
+            <section className="mt-4 glass-panel rounded-[20px]">
               <MobileGlobalSettings
                 selectedTemplateName={
                   selectedTemplate
@@ -532,9 +535,67 @@ export default function ComboPage() {
                 autoRetry={autoRetry}
                 setAutoRetry={setAutoRetry}
               />
-            )}
-          </section>
+            </section>
+          )}
         </div>
+
+        {/* 移动端：步骤参数抽屉 */}
+        {selectedStep && (
+          <DrawerRoot
+            open={isMobile && selectedStepId !== null}
+            onOpenChange={(open: boolean) => {
+              if (!open) setSelectedStepId(null);
+            }}
+          >
+            <DrawerContent>
+              <DrawerHeader>
+                <DrawerTitle>{selectedStep.name}</DrawerTitle>
+              </DrawerHeader>
+              <div className="flex-1 overflow-y-auto px-4 pb-4">
+                {selectedStep.type === "scene" && (
+                  <SceneStepParams
+                    params={selectedStep.params as SceneParams}
+                    onChange={(patch) => updateStepParams(selectedStep.id, patch)}
+                  />
+                )}
+                {selectedStep.type === "background" && (
+                  <BackgroundStepParams
+                    params={selectedStep.params as BackgroundParams}
+                    onChange={(patch) => updateStepParams(selectedStep.id, patch)}
+                  />
+                )}
+                {selectedStep.type === "upscale" && (
+                  <UpscaleStepParams
+                    params={selectedStep.params as UpscaleParams}
+                    onChange={(patch) => updateStepParams(selectedStep.id, patch)}
+                  />
+                )}
+                {selectedStep.type === "watermark" && (
+                  <WatermarkStepParams
+                    params={selectedStep.params as WatermarkParams}
+                    onChange={(patch) => updateStepParams(selectedStep.id, patch)}
+                  />
+                )}
+                {selectedStep.type === "outpaint" && (
+                  <OutpaintStepParams
+                    params={selectedStep.params as OutpaintParams}
+                    onChange={(patch) => updateStepParams(selectedStep.id, patch)}
+                  />
+                )}
+              </div>
+              <DrawerFooter>
+                <DrawerClose asChild>
+                  <Button
+                    className="h-12 w-full rounded-full bg-accent-gradient text-[14px] font-semibold text-white"
+                    onClick={() => setSelectedStepId(null)}
+                  >
+                    完成
+                  </Button>
+                </DrawerClose>
+              </DrawerFooter>
+            </DrawerContent>
+          </DrawerRoot>
+        )}
 
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface-glass px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+12px)] backdrop-blur-[18px] backdrop-saturate-150">
           <div className="flex items-center gap-2">

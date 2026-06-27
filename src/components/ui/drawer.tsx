@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 
 const Drawer = DrawerPrimitive;
 
+const DrawerRoot = DrawerPrimitive.Root;
+
 const DrawerTrigger = DrawerPrimitive.Trigger;
 
 const DrawerPortal = DrawerPrimitive.Portal;
@@ -96,6 +98,7 @@ DrawerDescription.displayName = "DrawerDescription";
 
 export {
   Drawer,
+  DrawerRoot,
   DrawerPortal,
   DrawerOverlay,
   DrawerTrigger,
