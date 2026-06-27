@@ -168,22 +168,36 @@ export function BottomSheetSelect({
                   )}
                 >
                   {option.icon && (
-                    <span className="flex-shrink-0 text-ink">
+                    <span
+                      className={cn(
+                        "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[10px] transition-colors",
+                        isSelected
+                          ? "bg-brand text-white"
+                          : "bg-brand-soft text-brand"
+                      )}
+                    >
                       <OptionIcon icon={option.icon} />
                     </span>
                   )}
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[13px] font-medium text-ink">
+                    <span
+                      className={cn(
+                        "block text-[13px] font-semibold",
+                        isSelected ? "text-brand" : "text-ink"
+                      )}
+                    >
                       {option.label}
                     </span>
                     {option.description && (
-                      <span className="mt-0.5 block text-[12px] text-ink-3">
+                      <span className="mt-0.5 block text-[12px] leading-snug text-ink-3">
                         {option.description}
                       </span>
                     )}
                   </span>
                   {isSelected && (
-                    <Check className="h-4 w-4 flex-shrink-0 text-brand" />
+                    <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-brand text-white">
+                      <Check className="h-3 w-3" />
+                    </span>
                   )}
                   {hasChildren && !isSelected && (
                     <ChevronRight className="h-4 w-4 flex-shrink-0 text-ink-3" />
@@ -249,45 +263,52 @@ export function BottomSheetSelect({
                       }
                     }}
                     className={cn(
-                      "group flex items-center gap-3 rounded-[12px] p-3 transition-colors",
+                      "group flex items-center gap-3 rounded-[14px] border p-2.5 transition-all",
                       option.disabled
-                        ? "cursor-not-allowed opacity-50"
-                        : "cursor-pointer hover:bg-surface",
-                      isSelected && "bg-accent-gradient"
+                        ? "cursor-not-allowed border-transparent opacity-50"
+                        : "cursor-pointer",
+                      isSelected
+                        ? "border-brand/30 bg-brand-soft"
+                        : "border-transparent hover:bg-surface-muted"
                     )}
                   >
                     {option.icon && (
-                      <div className="flex-shrink-0 text-ink">
+                      <span
+                        className={cn(
+                          "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[12px] transition-colors",
+                          isSelected
+                            ? "bg-brand text-white"
+                            : "bg-brand-soft text-brand"
+                        )}
+                      >
                         <OptionIcon icon={option.icon} />
-                      </div>
+                      </span>
                     )}
 
                     <div className="flex-1 min-w-0">
                       <div
                         className={cn(
-                          "text-[14px] font-medium",
-                          isSelected ? "text-ink" : "text-ink"
+                          "text-[14px] font-semibold",
+                          isSelected ? "text-brand" : "text-ink"
                         )}
                       >
                         {option.label}
                       </div>
                       {option.description && (
-                        <div className="mt-0.5 text-[12px] text-ink-3">
+                        <div className="mt-0.5 text-[12px] leading-snug text-ink-3">
                           {option.description}
                         </div>
                       )}
                     </div>
 
                     {isSelected && (
-                      <div className="flex-shrink-0">
-                        <Check className="h-4 w-4 text-brand" />
-                      </div>
+                      <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-brand text-white">
+                        <Check className="h-3 w-3" />
+                      </span>
                     )}
 
                     {hasChildren && !isSelected && (
-                      <div className="flex-shrink-0">
-                        <ChevronRight className="h-4 w-4 text-ink-3 transition-transform group-hover:translate-x-0.5" />
-                      </div>
+                      <ChevronRight className="h-4 w-4 flex-shrink-0 text-ink-3 transition-transform group-hover:translate-x-0.5" />
                     )}
                   </div>
                 );
