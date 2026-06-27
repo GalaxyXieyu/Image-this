@@ -228,25 +228,37 @@ export default function TasksPage() {
     <div className="h-full flex flex-col bg-background">
 
       {/* Header */}
-      <div className="px-4 py-5 flex flex-col gap-3 shrink-0 sm:px-8 md:flex-row md:items-center md:justify-between">
+      <div className="px-4 py-2.5 flex items-center justify-between gap-3 shrink-0 sm:px-8 md:py-5 md:flex-row">
         <div>
-          <h1 className="font-serif text-[28px] leading-tight text-foreground tracking-tight sm:text-h2">
+          <h1 className="hidden font-serif text-[28px] leading-tight text-foreground tracking-tight sm:text-h2 md:block">
             任务中心
           </h1>
-          <p className="text-data text-muted-foreground mt-1">
+          <p className="hidden text-data text-muted-foreground mt-1 md:block">
             查看和管理你的生成任务
           </p>
+          <div className="md:hidden">
+            {isPolling ? (
+              <div className="flex min-h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-[12px] font-medium text-processing">
+                <Radio className="h-3.5 w-3.5 animate-pulse" />
+                实时更新
+              </div>
+            ) : (
+              <div className="min-h-9 rounded-full border border-line bg-surface px-3 py-2 text-[12px] font-medium text-muted-foreground">
+                {stats.total} 个任务
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-3">
           {isPolling && (
-            <div className="flex items-center gap-1.5 text-caption text-processing">
+            <div className="hidden items-center gap-1.5 text-caption text-processing md:flex">
               <Radio className="w-3.5 h-3.5 animate-pulse" />
               实时更新中
             </div>
           )}
-	          <Button variant="outline" size="sm" className="min-h-11" onClick={fetchTasks} disabled={loading}>
-            <RefreshCw className={cn("w-4 h-4 mr-2", loading && "animate-spin")} />
-            刷新
+	          <Button variant="outline" size="sm" className="min-h-10 rounded-full px-3 md:min-h-11" onClick={fetchTasks} disabled={loading}>
+            <RefreshCw className={cn("w-4 h-4 md:mr-2", loading && "animate-spin")} />
+            <span className="hidden md:inline">刷新</span>
           </Button>
         </div>
       </div>

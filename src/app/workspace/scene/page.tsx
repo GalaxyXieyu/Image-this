@@ -518,7 +518,7 @@ function ProductInfoStep({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-base font-bold text-ink">素材上传</h2>
-                <p className="mt-1 text-[13px] text-ink-2">
+                <p className="mt-1 hidden text-[13px] text-ink-2 sm:block">
                   先放商品图，参考图用于背景、构图和氛围。
                 </p>
               </div>
@@ -531,14 +531,14 @@ function ProductInfoStep({
             <div className="mt-3 grid grid-cols-2 gap-3 md:mt-3.5 md:gap-3.5">
               {uploadCards}
             </div>
-            <p className="mt-3 text-[12px] text-ink-3">
+            <p className="mt-3 hidden text-[12px] text-ink-3 sm:block">
               支持 PNG、JPG；素材会先登记为 input asset，任务只携带轻量引用。
             </p>
           </section>
 
           <section className="glass-panel rounded-[20px] p-4 md:rounded-[24px] md:p-[20px_22px]">
             <h2 className="text-base font-bold text-ink">基础描述</h2>
-            <p className="mt-1 text-[13px] text-ink-2 md:block">
+            <p className="mt-1 hidden text-[13px] text-ink-2 sm:block">
               名称、品类和场景就够继续。
             </p>
             <div className="mt-3.5 grid grid-cols-1 gap-x-3.5 gap-y-3 sm:grid-cols-2">

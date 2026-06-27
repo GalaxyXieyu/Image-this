@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-27T10:44:15+08:00",
+  "generated_at": "2026-06-27T15:09:51+08:00",
   "project": {
     "name": "Image-this",
     "repo_root": "/Volumes/DATABASE/code/business/Image-this",
@@ -60,13 +60,13 @@
     ]
   },
   "current_task": {
-    "task_id": "T5",
-    "summary": "[T5] 移动端全站适配排查与实施计划",
+    "task_id": "T10",
+    "summary": "[T10] 移动端顶部信息聚焦与操作区优化",
     "status": "todo",
-    "guid": "local-task-a813cc144e26",
-    "url": "local://task/local-task-a813cc144e26",
-    "description": "任务编号：T5\n创建时间：2026-06-27 10:43:54 CST\n类型：task\nRepo：/Volumes/DATABASE/code/business/Image-this\n\n需求：\n所有核心界面尚未完整适配移动端操作交互、视觉比例、换行与字号。需要先完整排查并制定计划，再按移动端好看的标准继续适配。覆盖核心路径：/、/workspace/scene、/combo、/tools、/tasks、/results、/templates、/settings、/auth/login、/auth/register、/prompt-studio。要求用移动端视口截图和可执行验收标准验证，记录问题、优先级、实施批次和证据。\n\n执行要求：\n- 以 task/doc 为主，不再依赖本地 task/context/state 文件。\n- 进度默认写评论，验收证据优先回填附件或评论。",
-    "updated_at": "2026-06-27T10:43:54+08:00",
+    "guid": "local-task-4f5f136fe763",
+    "url": "local://task/local-task-4f5f136fe763",
+    "description": "任务编号：T10\n创建时间：2026-06-27 15:09:39 CST\n类型：task\nRepo：/Volumes/DATABASE/code/business/Image-this\n\n需求：\n落实已确认计划：移动端隐藏解释型顶部大标题/副标题和重复二级导航，压缩 /combo /tools /tasks /results /settings /templates /workspace/scene 的首屏信息密度；移动端选择控件优先使用横向 pill；修正固定底部操作栏和 FAB 遮挡，按 390x844、375x667、430x932 等移动端标准验证。\n\n执行要求：\n- 以 task/doc 为主，不再依赖本地 task/context/state 文件。\n- 进度默认写评论，验收证据优先回填附件或评论。",
+    "updated_at": "2026-06-27T15:09:39+08:00",
     "completed_at": "",
     "attachments": [],
     "tasklists": [
@@ -76,15 +76,22 @@
     ]
   },
   "next_task": {
-    "task_id": "T5",
-    "summary": "[T5] 移动端全站适配排查与实施计划",
-    "status": "todo",
-    "guid": "local-task-a813cc144e26",
-    "url": "local://task/local-task-a813cc144e26",
-    "updated_at": "2026-06-27T10:43:54+08:00",
-    "created_at": "2026-06-27T10:43:54+08:00"
+    "task_id": "T9",
+    "summary": "[T9] 图片生成真实出图联调与模板导入",
+    "status": "in_progress",
+    "guid": "local-task-b65512c1abd2",
+    "url": "local://task/local-task-b65512c1abd2",
+    "updated_at": "2026-06-27T14:07:45+08:00",
+    "created_at": "2026-06-27T13:23:21+08:00"
   },
-  "recent_comments": [],
+  "recent_comments": [
+    {
+      "guid": "local-comment-cc04224b2d17",
+      "content": "开始实现：按已确认的强聚焦移动端策略，先压缩页面顶部说明/重复导航，再处理底部固定操作栏遮挡与移动端 pill 选择器验证。",
+      "resource_id": "local-task-4f5f136fe763",
+      "created_at": "2026-06-27T15:09:51+08:00"
+    }
+  ],
   "inputs": {
     "config": "/Volumes/DATABASE/code/business/Image-this/pm.json",
     "context_path": "/Volumes/DATABASE/code/business/Image-this/.planning/pm/current-context.json",
@@ -103,8 +110,8 @@
   ],
   "handoff_contract": {
     "active_task_source": "current_task",
-    "active_task_id": "T5",
-    "active_task_summary": "[T5] 移动端全站适配排查与实施计划",
+    "active_task_id": "T10",
+    "active_task_summary": "[T10] 移动端顶部信息聚焦与操作区优化",
     "task_description_present": true,
     "required_reads": [
       ".planning/pm/pm.json",

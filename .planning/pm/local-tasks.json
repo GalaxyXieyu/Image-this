@@ -366,6 +366,47 @@
           "tasklist_guid": "local:image-this"
         }
       ]
+    },
+    {
+      "guid": "local-task-4f5f136fe763",
+      "url": "local://task/local-task-4f5f136fe763",
+      "summary": "[T10] 移动端顶部信息聚焦与操作区优化",
+      "description": "任务编号：T10\n创建时间：2026-06-27 15:09:39 CST\n类型：task\nRepo：/Volumes/DATABASE/code/business/Image-this\n\n需求：\n落实已确认计划：移动端隐藏解释型顶部大标题/副标题和重复二级导航，压缩 /combo /tools /tasks /results /settings /templates /workspace/scene 的首屏信息密度；移动端选择控件优先使用横向 pill；修正固定底部操作栏和 FAB 遮挡，按 390x844、375x667、430x932 等移动端标准验证。\n\n执行要求：\n- 以 task/doc 为主，不再依赖本地 task/context/state 文件。\n- 进度默认写评论，验收证据优先回填附件或评论。",
+      "created_at": "2026-06-27T15:09:39+08:00",
+      "updated_at": "2026-06-27T15:22:49+08:00",
+      "completed_at": "2026-06-27T15:22:49+08:00",
+      "start": {
+        "timestamp": "2026-06-27T15:09:51+08:00",
+        "is_all_day": false
+      },
+      "due": {},
+      "members": [],
+      "attachments": [],
+      "comments": [
+        {
+          "guid": "local-comment-cc04224b2d17",
+          "content": "开始实现：按已确认的强聚焦移动端策略，先压缩页面顶部说明/重复导航，再处理底部固定操作栏遮挡与移动端 pill 选择器验证。",
+          "resource_id": "local-task-4f5f136fe763",
+          "created_at": "2026-06-27T15:09:51+08:00"
+        },
+        {
+          "guid": "local-comment-6c225322af67",
+          "content": "实现完成并验证：移动端压缩 /combo、/tools、/settings、/results、/tasks、/templates、/workspace/scene 的顶部介绍/重复导航；移动端下拉优先改为 pill 或横滚入口；/combo 固定底栏加入 safe-area 和内容底部留白。验证：npx tsc --noEmit PASS；npm run lint PASS（仅项目既有 warning）；npm run build PASS；Playwright 390x844、375x667、430x932 共 21 个页面/视口检查 PASS，无横向溢出，关键内容 max targetTop=69px，/combo 底部栏 clearance=32px。证据在 out/ui-ux-plan/mobile-focus-t10/report.md（out 已 gitignore）。",
+          "resource_id": "local-task-4f5f136fe763",
+          "created_at": "2026-06-27T15:22:40+08:00"
+        },
+        {
+          "guid": "local-comment-6214beab6ddb",
+          "content": "T10 完成：移动端强聚焦顶部信息优化已落地，覆盖 /combo、/tools、/settings、/results、/tasks、/templates、/workspace/scene。验证通过：tsc、lint、build；Playwright 移动端 3 个 viewport x 7 页面无横向溢出，首屏关键内容出现位置达标，/combo 底部固定栏不遮挡内容。\nCommit：https://github.com/GalaxyXieyu/Image-this/commit/ae4ebddccd604a1dbfa0f8ca4df01ca70b9561a9",
+          "resource_id": "local-task-4f5f136fe763",
+          "created_at": "2026-06-27T15:22:49+08:00"
+        }
+      ],
+      "tasklists": [
+        {
+          "tasklist_guid": "local:image-this"
+        }
+      ]
     }
   ]
 }

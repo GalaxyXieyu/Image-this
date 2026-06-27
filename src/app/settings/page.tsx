@@ -779,10 +779,10 @@ export default function SettingsPage() {
             {/* 统计行 */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
               <div>
-                <h2 className="font-serif text-[24px] leading-tight text-ink tracking-tight sm:text-h3">AI 模型配置</h2>
-                <p className="mt-1 text-data text-ink-3">每张卡片是一个模型，点击可配置其 Provider 的接口与密钥</p>
+                <h2 className="text-[17px] font-bold leading-tight text-ink sm:font-serif sm:text-h3 sm:tracking-tight">AI 模型配置</h2>
+                <p className="mt-1 hidden text-data text-ink-3 sm:block">每张卡片是一个模型，点击可配置其 Provider 的接口与密钥</p>
               </div>
-              <div className="text-data text-ink-3">
+              <div className="text-[12px] text-ink-3 sm:text-data">
                 <span className="inline-flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full bg-success" />
                   {providerCount} 个 Provider · {flatModels.length} 个模型
@@ -945,7 +945,7 @@ export default function SettingsPage() {
                       <FileText className="w-5 h-5 text-primary" />
                       提示词模板管理
                     </CardTitle>
-                    <CardDescription className="mt-1">
+                    <CardDescription className="mt-1 hidden sm:block">
                       管理您的 AI 提示词模板，包括背景替换、扩图、高清化和一键增强等场景
                     </CardDescription>
                   </div>
@@ -957,9 +957,29 @@ export default function SettingsPage() {
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-                  <Label className="text-data font-medium">筛选分类:</Label>
+                  <Label className="hidden text-data font-medium sm:block">筛选分类:</Label>
+                  <div className="flex gap-2 overflow-x-auto pb-0.5 sm:hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                    {[['ALL', '全部'], ...Object.entries(CATEGORY_LABELS)].map(([value, label]) => {
+                      const active = selectedCategory === value;
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setSelectedCategory(value)}
+                          className={cn(
+                            "min-h-11 shrink-0 rounded-full border px-3.5 text-[13px] font-semibold transition-colors",
+                            active
+                              ? "border-transparent bg-accent-gradient text-white shadow-soft"
+                              : "border-line bg-surface text-ink-2"
+                          )}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
                   <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                    <SelectTrigger className="min-h-11 w-full sm:w-[200px]">
+                    <SelectTrigger className="hidden min-h-11 w-full sm:flex sm:w-[200px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1162,8 +1182,8 @@ export default function SettingsPage() {
 
   return (
     <div className="h-full bg-background flex flex-col overflow-y-auto">
-      <div className="flex-1 bg-background px-4 py-5 sm:px-6 sm:py-8 lg:px-8">
-        <div className="mb-5 sm:mb-8">
+      <div className="flex-1 bg-background px-4 py-3 sm:px-6 sm:py-8 lg:px-8">
+        <div className="mb-5 hidden sm:mb-8 md:block">
           <h1 className="font-serif text-[28px] font-semibold leading-tight tracking-[-0.01em] text-ink sm:text-h2">设置</h1>
           <p className="mt-2 text-ink-2">管理 AI 服务配置、提示词、系统并发与账户信息</p>
         </div>
@@ -1178,9 +1198,9 @@ export default function SettingsPage() {
           ];
           const currentTab = tabGroups.find((g) => g.sections.includes(activeSection)) ?? tabGroups[0];
           return (
-            <div className="mb-6">
-              <div className="border-b border-line">
-                <nav className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <div className="mb-4 sm:mb-6">
+              <div className="sm:border-b sm:border-line">
+                <nav className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:gap-1">
                   {tabGroups.map((g) => {
                     const active = currentTab.id === g.id;
                     return (
@@ -1188,10 +1208,10 @@ export default function SettingsPage() {
                         key={g.id}
                         onClick={() => setActiveSection(g.sections[0])}
                         className={cn(
-                          "relative inline-flex min-h-11 shrink-0 items-center gap-2 px-4 py-2.5 text-[14px] font-medium transition-colors",
+                          "relative inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-semibold transition-colors sm:gap-2 sm:rounded-none sm:border-0 sm:px-4 sm:py-2.5 sm:text-[14px] sm:font-medium",
                           active
-                            ? "text-brand-text"
-                            : "text-ink-3 hover:text-ink"
+                            ? "border-transparent bg-accent-gradient text-white shadow-soft sm:bg-transparent sm:text-brand-text sm:shadow-none"
+                            : "border-line bg-surface text-ink-2 hover:text-ink sm:bg-transparent sm:text-ink-3"
                         )}
                       >
                         {(() => {
@@ -1200,7 +1220,7 @@ export default function SettingsPage() {
                         })()}
                         {g.label}
                         {active && (
-                          <span className="absolute inset-x-2 bottom-0 h-[2px] rounded-full bg-accent-gradient" />
+                          <span className="absolute inset-x-2 bottom-0 hidden h-[2px] rounded-full bg-accent-gradient sm:block" />
                         )}
                       </button>
                     );
@@ -1208,7 +1228,7 @@ export default function SettingsPage() {
                 </nav>
               </div>
               {currentTab.sections.length > 1 && (
-                <div className="mt-3 flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                <div className="mt-2 flex items-center gap-1.5 overflow-x-auto sm:mt-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                   {currentTab.sections.map((sid) => {
                     const item = menuItems.find((m) => m.id === sid);
                     if (!item) return null;

@@ -267,19 +267,12 @@ export default function ComboPage() {
   return (
     <div className="relative h-full flex flex-col bg-background">
       <div className="flex min-h-0 flex-1 flex-col md:hidden">
-        <div className="shrink-0 border-b border-line px-5 py-4">
-          <h1 className="font-serif text-[28px] font-semibold leading-tight text-ink">组合工作流</h1>
-          <p className="mt-1 text-[13px] leading-5 text-ink-2">
-            按顺序组合模板、处理步骤和输出参数，手机上也能提交批量流水线。
-          </p>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-4 pb-[116px] pt-4">
+        <div className="flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+104px)] pt-3">
           <section className="glass-panel rounded-[20px] p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-[15px] font-bold text-ink">场景模板</h2>
-                <p className="mt-0.5 text-[12px] text-ink-3">
+                <p className="hidden">
                   先选模板，再叠加后续处理步骤
                 </p>
               </div>
@@ -347,7 +340,7 @@ export default function ComboPage() {
               </span>
               <div className="min-w-0 flex-1">
                 <h2 className="text-[15px] font-bold text-ink">上传商品图片</h2>
-                <p className="mt-0.5 text-[12px] text-ink-3">
+                <p className="hidden">
                   作为流水线输入，稍后会进入任务队列
                 </p>
               </div>
@@ -361,7 +354,7 @@ export default function ComboPage() {
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <h2 className="text-[15px] font-bold text-ink">处理流水线</h2>
-                <p className="mt-0.5 text-[12px] text-ink-3">
+                <p className="hidden">
                   点击步骤可编辑参数，使用箭头调整顺序
                 </p>
               </div>
@@ -483,7 +476,7 @@ export default function ComboPage() {
           </section>
         </div>
 
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface-glass px-4 py-3 backdrop-blur-[18px] backdrop-saturate-150">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface-glass px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+12px)] backdrop-blur-[18px] backdrop-saturate-150">
           <div className="flex items-center gap-2">
             <Button
               variant="outline"

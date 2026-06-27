@@ -37,7 +37,7 @@ export function WorkbenchShell({
 
   return (
     <div
-      className={cn("min-h-screen bg-background flex flex-col overflow-hidden", className)}
+      className={cn("h-full bg-background flex flex-col overflow-hidden", className)}
     >
       {children}
     </div>

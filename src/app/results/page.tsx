@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { apiGet, apiPatch } from "@/lib/api-client";
 import { BrandEmptyState, BrandImageFallback } from "@/components/brands/SpriteImage";
@@ -181,7 +180,7 @@ export default function ResultsPage() {
   return (
     <div className="h-full flex flex-col bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-line px-4 py-4 shrink-0 sm:px-6">
+      <div className="hidden items-center justify-between border-b border-line px-4 py-4 shrink-0 sm:px-6 md:flex">
         <div>
           <h1 className="font-serif text-[28px] leading-tight text-ink tracking-tight sm:text-h2">图库</h1>
           <p className="mt-1 text-data text-ink-2">
@@ -251,7 +250,7 @@ export default function ResultsPage() {
         {/* Main area */}
         <main className="flex flex-1 flex-col overflow-hidden">
           {/* Single-row toolbar: select all + search + view mode + bulk */}
-          <div className="flex flex-col gap-3 border-b border-line glass-panel rounded-none px-4 py-3 shrink-0 sm:px-6 md:flex-row md:items-center md:justify-between md:py-2.5">
+          <div className="flex flex-col gap-2.5 border-b border-line glass-panel rounded-none px-4 py-2.5 shrink-0 sm:px-6 md:flex-row md:items-center md:justify-between md:py-2.5">
             <div className="flex flex-wrap items-center gap-2 md:gap-3">
               <button
                 onClick={toggleSelectAll}

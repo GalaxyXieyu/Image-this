@@ -267,18 +267,27 @@ function TemplatesPageInner() {
                   ? COMBO_PRESETS.find((combo) => combo.id === activeComboId)?.name ?? "组合模板"
                   : `${filteredPresets.length} 个模板`}
               </span>
-              <Select
-                value={sortBy}
-                onValueChange={(v) => setSortBy(v as SortOption)}
-              >
-	                <SelectTrigger className="h-11 w-[126px] rounded-full text-[13px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="newest">最新发布</SelectItem>
-                  <SelectItem value="popular">最受欢迎</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex shrink-0 items-center gap-1 rounded-full border border-border bg-surface p-0.5">
+                {[
+                  ["newest", "最新"],
+                  ["popular", "热门"],
+                ].map(([value, label]) => {
+                  const active = sortBy === value;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setSortBy(value as SortOption)}
+                      className={cn(
+                        "min-h-10 rounded-full px-3 text-[12px] font-semibold transition-colors",
+                        active ? "bg-brand-soft text-brand-text" : "text-muted-foreground"
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
           {/* Toolbar: search + sort */}

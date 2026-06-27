@@ -307,8 +307,8 @@ function ToolboxPageInner() {
   return (
     <div className="h-full flex flex-col bg-background">
 
-      <div className="flex flex-col gap-3 border-b border-line px-4 py-4 shrink-0 sm:px-6 md:flex-row md:items-center md:justify-between">
-        <div>
+      <div className="shrink-0 border-b border-line px-4 py-2.5 sm:px-6 md:flex md:flex-row md:items-center md:justify-between md:py-4">
+        <div className="hidden md:block">
           <h1 className="text-[24px] font-semibold leading-tight text-ink md:text-h3">单点工具箱</h1>
           <p className="mt-0.5 text-data text-ink-2">
             上传商品素材，选择工具能力，创建可追踪的 AI 处理任务
@@ -324,8 +324,44 @@ function ToolboxPageInner() {
             </div>
           )}
         </div>
+        <div className="space-y-2 md:hidden">
+          <div className="flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            {SUPPORTED_TOOLS.map((tool) => {
+              const Icon = tool.icon;
+              const active = draft.toolType === tool.id;
+              return (
+                <button
+                  key={tool.id}
+                  type="button"
+                  onClick={() => updateToolType(tool.id)}
+                  className={cn(
+                    "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[13px] font-semibold transition-colors",
+                    active
+                      ? "border-transparent bg-accent-gradient text-white shadow-soft"
+                      : "border-line bg-surface text-ink-2"
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {tool.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex min-h-9 items-center justify-between gap-3">
+            <span className="min-w-0 truncate text-[12px] text-ink-3">
+              {draft.activePresetName ? `模板：${draft.activePresetName}` : selectedTool.description}
+            </span>
+            <div className="flex min-h-9 shrink-0 items-center gap-2 rounded-full border border-line bg-surface px-3">
+              <Label className="cursor-pointer text-[12px] text-ink-2">批量</Label>
+              <Switch
+                checked={draft.batchMode}
+                onCheckedChange={(checked) => setDraft((prev) => ({ ...prev, batchMode: checked }))}
+              />
+            </div>
+          </div>
+        </div>
         {/* 工具切换由 AppShell 二级 nav 承担，此处不再重复，仅保留批量模式 toggle */}
-        <div className="flex items-center gap-2">
+        <div className="hidden items-center gap-2 md:flex">
           <div className="flex min-h-11 items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5">
             <Label className="cursor-pointer text-caption text-ink-2">批量模式</Label>
             <Switch
