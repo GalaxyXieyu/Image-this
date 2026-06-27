@@ -83,6 +83,7 @@ model User {
   processedImages ProcessedImage[]
   taskQueue     TaskQueue[]
   promptTemplates PromptTemplate[]
+  workflowTemplates WorkflowTemplate[]
 
   @@map("users")
 }
@@ -234,3 +235,35 @@ model PromptTemplate {
 // "OUTPAINT" - 扩图提示词
 // "UPSCALE" - 高清化提示词
 // "ONE_CLICK" - 一键增强提示词
+
+// 工作流模板模型
+model WorkflowTemplate {
+  id          String   @id @default(cuid())
+  name        String   // 模板名称
+  description String?  // 模板描述
+  category    String?  // 模板分类（可选，便于归组）
+  steps       String   // 工作流步骤数组（JSON 序列化的 WorkflowStep[]）
+  globalParams String?  // 全局参数（JSON：批量数/比例/清晰度/水印/重试等）
+  tags        String?  // 标签（JSON 数组）
+  usageCount  Int      @default(0) // 使用次数统计
+  isDefault   Boolean  @default(false) // 是否为默认模板
+  isSystem    Boolean  @default(false) // 是否为系统预设模板（不可删除）
+
+  // 时间戳
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关联
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, category])
+  @@index([userId, isDefault])
+  @@map("workflow_templates")
+}
+
+// WorkflowTemplate 字段说明:
+// - steps: JSON 数组，每个元素为 { id, order, type, name, description, params, refTemplateId? }
+//          type 包括: scene, background, upscale, watermark, outpaint，为 Phase 3 预留 workflow 类型
+// - globalParams: JSON 对象，包含 { batchCount?, aspectRatio?, resolution?, watermarkEnabled?, autoRetry? }
+// - tags: JSON 数组，便于用户分类和搜索

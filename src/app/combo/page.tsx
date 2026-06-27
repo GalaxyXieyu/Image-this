@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -17,7 +17,7 @@ import {
 import { BottomSheetSelect } from "@/components/workbench/BottomSheetSelect";
 import { useIsMobile } from "@/lib/use-is-mobile";
 import { cn } from "@/lib/utils";
-import { apiPost } from "@/lib/api-client";
+import { apiPost, apiGet } from "@/lib/api-client";
 import {
   Trash2,
   GripVertical,
@@ -228,8 +228,31 @@ const RESOLUTIONS = [
 
 /* ─── Page ───────────────────────────────────────────────────────── */
 
+// 工作流模板类型（与 API 返回对齐）
+interface WorkflowTemplateType {
+  id: string;
+  name: string;
+  description?: string;
+  category?: string;
+  steps: WorkflowStep[];
+  globalParams?: Record<string, any>;
+  tags?: string[];
+  usageCount: number;
+  isDefault: boolean;
+  isSystem: boolean;
+}
+
+// API 响应类型
+interface GetWorkflowTemplatesResponse {
+  templates: WorkflowTemplateType[];
+}
+
+interface PostWorkflowTemplateResponse {
+  template: WorkflowTemplateType;
+}
+
 export default function ComboPage() {
-  const [activeCategory, setActiveCategory] = useState("daily");
+  const [workflowTemplates, setWorkflowTemplates] = useState<WorkflowTemplateType[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [steps, setSteps] = useState<WorkflowStep[]>(INITIAL_STEPS);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
@@ -249,7 +272,26 @@ export default function ComboPage() {
   // Add step drawer
   const [addStepOpen, setAddStepOpen] = useState(false);
 
-  const templates = SCENE_TEMPLATES[activeCategory] ?? [];
+  // Save template drawer
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [templateSaveData, setTemplateSaveData] = useState({ name: "", category: "" });
+
+  // Load workflow templates on mount
+  useEffect(() => {
+    const loadTemplates = async () => {
+      try {
+        const res = await apiGet<GetWorkflowTemplatesResponse>(
+          "/api/workflow-templates"
+        );
+        setWorkflowTemplates(res.templates || []);
+      } catch (error) {
+        console.error("加载工作流模板失败:", error);
+      }
+    };
+    loadTemplates();
+  }, []);
+
+  const templates = workflowTemplates;
   const selectedStep = useMemo(
     () => steps.find((s) => s.id === selectedStepId) ?? null,
     [steps, selectedStepId]
@@ -266,7 +308,6 @@ export default function ComboPage() {
           stepName: step.name,
           stepParams: step.params,
           global: { batchCount, aspectRatio, resolution, watermarkEnabled, autoRetry },
-          templateId: selectedTemplate,
         }),
         totalSteps: 1,
       }));
@@ -274,6 +315,71 @@ export default function ComboPage() {
       window.location.href = "/tasks";
     } catch {
       setExecuting(false);
+    }
+  };
+
+  // Save current workflow as template
+  const handleSave = async () => {
+    if (!templateSaveData.name.trim()) {
+      alert("模板名称不能为空");
+      return;
+    }
+    try {
+      await apiPost<PostWorkflowTemplateResponse>("/api/workflow-templates", {
+        name: templateSaveData.name,
+        description: "",
+        category: templateSaveData.category || undefined,
+        steps: steps,
+        globalParams: {
+          batchCount,
+          aspectRatio,
+          resolution,
+          watermarkEnabled,
+          autoRetry,
+        },
+        tags: [],
+      });
+      // Reload templates
+      const res = await apiGet<GetWorkflowTemplatesResponse>(
+        "/api/workflow-templates"
+      );
+      setWorkflowTemplates(res.templates || []);
+      setSaveTemplateOpen(false);
+      setTemplateSaveData({ name: "", category: "" });
+    } catch (error) {
+      console.error("保存模板失败:", error);
+      alert("保存模板失败，请重试");
+    }
+  };
+
+  // Load template steps
+  const handleLoadTemplate = (templateId: string) => {
+    const template = workflowTemplates.find((t) => t.id === templateId);
+    if (template) {
+      setSteps(template.steps);
+      setBatchCount(template.globalParams?.batchCount ?? 10);
+      setAspectRatio(template.globalParams?.aspectRatio ?? "1:1");
+      setResolution(template.globalParams?.resolution ?? "2k");
+      setWatermarkEnabled(template.globalParams?.watermarkEnabled ?? true);
+      setAutoRetry(template.globalParams?.autoRetry ?? true);
+    }
+  };
+
+  // Delete template
+  const handleDeleteTemplate = async (templateId: string) => {
+    if (!confirm("确定要删除这个模板吗？")) return;
+    try {
+      await fetch(`/api/workflow-templates/${templateId}`, { method: "DELETE" });
+      const res = await apiGet<GetWorkflowTemplatesResponse>(
+        "/api/workflow-templates"
+      );
+      setWorkflowTemplates(res.templates || []);
+      if (selectedTemplate === templateId) {
+        setSelectedTemplate(null);
+      }
+    } catch (error) {
+      console.error("删除模板失败:", error);
+      alert("删除模板失败，请重试");
     }
   };
 
@@ -323,9 +429,9 @@ export default function ComboPage() {
           <section className="glass-panel rounded-[20px] p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-[15px] font-bold text-ink">场景模板</h2>
+                <h2 className="text-[15px] font-bold text-ink">工作流模板</h2>
                 <p className="hidden">
-                  先选模板，再叠加后续处理步骤
+                  选已有工作流或新建空白
                 </p>
               </div>
               {selectedTemplate && (
@@ -334,59 +440,59 @@ export default function ComboPage() {
                 </span>
               )}
             </div>
-            <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-              {SCENE_CATEGORIES.map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => {
-                    setActiveCategory(cat.id);
-                    setSelectedTemplate(null);
-                  }}
-                  className={cn(
-                    "min-h-11 shrink-0 rounded-full border px-3 text-[13px] font-semibold transition-colors",
-                    activeCategory === cat.id
-                      ? "border-transparent bg-accent-gradient text-white shadow-soft"
-                      : "border-line bg-surface text-ink-2"
-                  )}
-                >
-                  {cat.label}
-                </button>
-              ))}
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2.5">
-              {templates.map((tpl) => {
-                const active = selectedTemplate === tpl.id;
-                const preview = getTemplatePreview(tpl.id, activeCategory);
-                return (
-                  <button
-                    key={tpl.id}
-                    type="button"
-                    onClick={() => setSelectedTemplate(tpl.id)}
-                    className={cn(
-                      "relative aspect-[4/3] min-h-[92px] overflow-hidden rounded-[16px] border bg-surface-muted text-left transition-all",
-                      active
-                        ? "border-brand ring-2 ring-brand ring-offset-2 ring-offset-background"
-                        : "border-line"
-                    )}
-                  >
-                    <img
-                      src={preview}
-                      alt=""
-                      className="absolute inset-0 h-full w-full object-cover"
-                      loading="lazy"
-                    />
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 py-2">
-                      <span className="text-[13px] font-semibold text-white">{tpl.name}</span>
+            <div className="mt-3 flex flex-col gap-2">
+              {templates.length === 0 ? (
+                <p className="text-[13px] text-ink-3">暂无工作流模板，开始新建吧</p>
+              ) : (
+                templates.map((tpl) => {
+                  const active = selectedTemplate === tpl.id;
+                  return (
+                    <div
+                      key={tpl.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => {
+                        setSelectedTemplate(tpl.id);
+                        handleLoadTemplate(tpl.id);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setSelectedTemplate(tpl.id);
+                          handleLoadTemplate(tpl.id);
+                        }
+                      }}
+                      className={cn(
+                        "flex cursor-pointer items-center justify-between gap-2 rounded-[12px] border p-3 text-left transition-all",
+                        active
+                          ? "border-brand bg-brand-soft"
+                          : "border-line bg-surface-muted hover:border-brand/40"
+                      )}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <span className="block text-[13px] font-semibold text-ink">{tpl.name}</span>
+                        {tpl.description && (
+                          <span className="mt-0.5 block text-[11px] text-ink-3 line-clamp-1">
+                            {tpl.description}
+                          </span>
+                        )}
+                      </div>
+                      {!tpl.isSystem && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteTemplate(tpl.id);
+                          }}
+                          className="shrink-0 text-ink-3 hover:text-danger"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
-                    {active && (
-                      <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-accent-gradient">
-                        <Sparkles className="h-3.5 w-3.5 text-white" />
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </section>
 
@@ -521,9 +627,6 @@ export default function ComboPage() {
                     ? templates.find((t) => t.id === selectedTemplate)?.name ?? null
                     : null
                 }
-                activeCategoryLabel={
-                  SCENE_CATEGORIES.find((c) => c.id === activeCategory)?.label ?? ""
-                }
                 batchCount={batchCount}
                 setBatchCount={setBatchCount}
                 aspectRatio={aspectRatio}
@@ -551,7 +654,7 @@ export default function ComboPage() {
               <DrawerHeader>
                 <DrawerTitle>{selectedStep.name}</DrawerTitle>
               </DrawerHeader>
-              <div className="flex-1 overflow-y-auto px-4 pb-4">
+              <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-4 pt-2">
                 {selectedStep.type === "scene" && (
                   <SceneStepParams
                     params={selectedStep.params as SceneParams}
@@ -597,9 +700,64 @@ export default function ComboPage() {
           </DrawerRoot>
         )}
 
+        {/* 移动端：保存模板抽屉 */}
+        <DrawerRoot open={saveTemplateOpen} onOpenChange={setSaveTemplateOpen}>
+          <DrawerContent>
+            <DrawerHeader>
+              <DrawerTitle>保存为常用模板</DrawerTitle>
+            </DrawerHeader>
+            <div className="flex flex-col gap-4 px-4 pb-4">
+              <div className="space-y-2">
+                <Label className="text-[13px] font-semibold text-ink">模板名称</Label>
+                <Input
+                  placeholder="给你的工作流起个名字"
+                  value={templateSaveData.name}
+                  onChange={(e) =>
+                    setTemplateSaveData((prev) => ({
+                      ...prev,
+                      name: e.target.value,
+                    }))
+                  }
+                  className="h-12 rounded-[12px]"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[13px] font-semibold text-ink">分类（可选）</Label>
+                <Input
+                  placeholder="如：日常、营销、节日等"
+                  value={templateSaveData.category}
+                  onChange={(e) =>
+                    setTemplateSaveData((prev) => ({
+                      ...prev,
+                      category: e.target.value,
+                    }))
+                  }
+                  className="h-12 rounded-[12px]"
+                />
+              </div>
+            </div>
+            <DrawerFooter>
+              <div className="flex gap-2">
+                <DrawerClose asChild>
+                  <Button variant="outline" className="h-12 flex-1 rounded-full">
+                    取消
+                  </Button>
+                </DrawerClose>
+                <Button
+                  onClick={handleSave}
+                  className="h-12 flex-1 rounded-full bg-accent-gradient text-white font-semibold"
+                >
+                  保存
+                </Button>
+              </div>
+            </DrawerFooter>
+          </DrawerContent>
+        </DrawerRoot>
+
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface-glass px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+12px)] backdrop-blur-[18px] backdrop-saturate-150">
           <div className="flex items-center gap-2">
             <Button
+              onClick={() => setSaveTemplateOpen(true)}
               variant="outline"
               className="h-12 shrink-0 rounded-full border-line-strong bg-surface px-4 text-[13px] font-semibold"
             >
@@ -642,7 +800,7 @@ export default function ComboPage() {
         ) : (
           <aside className="flex w-[260px] shrink-0 flex-col border-r border-line bg-surface-glass backdrop-blur-[20px] backdrop-saturate-150">
             <div className="flex items-center justify-between px-4 pt-4 pb-2">
-              <span className="text-data font-semibold text-ink">场景模板</span>
+              <span className="text-data font-semibold text-ink">工作流模板</span>
               <button
                 type="button"
                 onClick={() => setLeftCollapsed(true)}
@@ -652,63 +810,59 @@ export default function ComboPage() {
                 <ChevronLeft className="h-4 w-4" />
               </button>
             </div>
-            <div className="px-3 pb-2">
-              <div className="flex flex-wrap gap-1.5">
-                {SCENE_CATEGORIES.map((cat) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => {
-                      setActiveCategory(cat.id);
-                      setSelectedTemplate(null);
-                    }}
-                    className={cn(
-                      "rounded-full px-2.5 py-1 text-caption font-medium transition-colors",
-                      activeCategory === cat.id
-                        ? "bg-accent-gradient text-white shadow-soft"
-                        : "bg-surface-muted text-ink-2 hover:text-ink"
-                    )}
-                  >
-                    {cat.label}
-                  </button>
-                ))}
-              </div>
-            </div>
             <div className="flex-1 overflow-y-auto px-3 pb-4">
-              <div className="grid grid-cols-2 gap-2">
-                {templates.map((tpl) => {
-                  const active = selectedTemplate === tpl.id;
-                  const preview = getTemplatePreview(tpl.id, activeCategory);
-                  return (
-                    <button
-                      key={tpl.id}
-                      onClick={() => setSelectedTemplate(tpl.id)}
-                      className={cn(
-                        "group relative aspect-square overflow-hidden rounded-[14px] border transition-all",
-                        active
-                          ? "border-brand ring-2 ring-brand ring-offset-2 ring-offset-background"
-                          : "border-line hover:border-brand/40"
-                      )}
-                    >
-                      <img
-                        src={preview}
-                        alt=""
-                        className="absolute inset-0 h-full w-full object-cover"
-                        loading="lazy"
-                      />
-                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/65 to-transparent px-2 py-1.5">
-                        <span className="block truncate text-[11px] font-medium text-white">
-                          {tpl.name}
+              {templates.length === 0 ? (
+                <p className="text-caption text-ink-3 px-1 py-2">暂无工作流模板</p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {templates.map((tpl) => {
+                    const active = selectedTemplate === tpl.id;
+                    return (
+                      <div
+                        key={tpl.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          setSelectedTemplate(tpl.id);
+                          handleLoadTemplate(tpl.id);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setSelectedTemplate(tpl.id);
+                            handleLoadTemplate(tpl.id);
+                          }
+                        }}
+                        className={cn(
+                          "group relative flex cursor-pointer items-center gap-2 rounded-[12px] border px-3 py-2 text-left transition-all",
+                          active
+                            ? "border-brand bg-brand-soft"
+                            : "border-line bg-surface-muted hover:border-brand/40"
+                        )}
+                        title={tpl.description || tpl.name}
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[12px] font-semibold text-ink">
+                            {tpl.name}
+                          </span>
                         </span>
+                        {!tpl.isSystem && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteTemplate(tpl.id);
+                            }}
+                            className="shrink-0 text-ink-3 hover:text-danger opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                       </div>
-                      {active && (
-                        <div className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent-gradient">
-                          <Sparkles className="h-2.5 w-2.5 text-white" />
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </aside>
         )}
@@ -883,6 +1037,7 @@ export default function ComboPage() {
           <div className="pointer-events-none absolute inset-x-0 bottom-5 z-30 flex justify-center">
             <div className="glass-panel pointer-events-auto flex items-center gap-2 rounded-full p-1.5 shadow-float">
               <Button
+                onClick={() => setSaveTemplateOpen(true)}
                 variant="ghost"
                 className="h-11 gap-1.5 rounded-full px-5 text-[14px] font-semibold text-ink-2 hover:bg-surface-muted"
               >
@@ -929,9 +1084,6 @@ export default function ComboPage() {
                     ? templates.find((t) => t.id === selectedTemplate)?.name ?? null
                     : null
                 }
-                activeCategoryLabel={
-                  SCENE_CATEGORIES.find((c) => c.id === activeCategory)?.label ?? ""
-                }
                 batchCount={batchCount}
                 setBatchCount={setBatchCount}
                 aspectRatio={aspectRatio}
@@ -956,7 +1108,6 @@ export default function ComboPage() {
 function GlobalSettingsPanel({
   onCollapse,
   selectedTemplateName,
-  activeCategoryLabel,
   batchCount,
   setBatchCount,
   aspectRatio,
@@ -970,7 +1121,6 @@ function GlobalSettingsPanel({
 }: {
   onCollapse: () => void;
   selectedTemplateName: string | null;
-  activeCategoryLabel: string;
   batchCount: number;
   setBatchCount: (_count: number) => void;
   aspectRatio: string;
@@ -1006,7 +1156,7 @@ function GlobalSettingsPanel({
             {selectedTemplateName ?? "未选择模板"}
           </p>
           <p className="mt-0.5 hidden text-[12px] text-ink-3 md:block">
-            {selectedTemplateName ? activeCategoryLabel : "从左侧选择一个场景模板"}
+            {selectedTemplateName ? "已加载该模板的步骤和参数" : "从左侧选择一个工作流模板"}
           </p>
         </div>
       </section>
@@ -1082,7 +1232,6 @@ function GlobalSettingsPanel({
 
 function MobileGlobalSettings({
   selectedTemplateName,
-  activeCategoryLabel,
   batchCount,
   setBatchCount,
   aspectRatio,
@@ -1095,7 +1244,6 @@ function MobileGlobalSettings({
   setAutoRetry,
 }: {
   selectedTemplateName: string | null;
-  activeCategoryLabel: string;
   batchCount: number;
   setBatchCount: (_count: number) => void;
   aspectRatio: string;
@@ -1121,7 +1269,7 @@ function MobileGlobalSettings({
             {selectedTemplateName ?? "未选择模板"}
           </p>
           <p className="mt-0.5 hidden text-[12px] text-ink-3 md:block">
-            {selectedTemplateName ? activeCategoryLabel : "可先从上方选择一个场景模板"}
+            {selectedTemplateName ? "已加载该模板的步骤和参数" : "可先从上方选择一个工作流模板"}
           </p>
         </div>
       </section>
