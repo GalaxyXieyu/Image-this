@@ -18,6 +18,8 @@ import { useWorkflowTaskPolling } from "@/hooks/workbench/useWorkflowTaskPolling
 import { mapProviderErrorMessage } from "@/lib/provider-error-utils";
 import { BrandEmptyState } from "@/components/brands/SpriteImage";
 import { ConicSpinner } from "@/components/ui/conic-spinner";
+import { BottomSheetSelect } from "@/components/workbench/BottomSheetSelect";
+import { useIsMobile } from "@/lib/use-is-mobile";
 import { getPresetById } from "@/lib/workbench/presets";
 import {
   buildDefaultToolParameters,
@@ -56,6 +58,33 @@ const SUPPORTED_TOOLS: Array<{ id: ToolType; label: string; description: string;
   { id: "upscale", label: "高清放大", description: "提升图片清晰度和尺寸", icon: ZoomIn },
   { id: "outpaint", label: "智能扩图", description: "向外延展画面边界", icon: Expand },
 ];
+
+const WATERMARK_POSITION_OPTIONS: Array<{ id: WatermarkParams["watermarkPosition"]; label: string }> = [
+  { id: "bottom-right", label: "右下" },
+  { id: "bottom-left", label: "左下" },
+  { id: "top-right", label: "右上" },
+  { id: "top-left", label: "左上" },
+  { id: "center", label: "居中" },
+];
+
+const WATERMARK_POSITION_LABELS: Record<WatermarkParams["watermarkPosition"], string> = WATERMARK_POSITION_OPTIONS.reduce(
+  (acc, item) => ({ ...acc, [item.id]: item.label }),
+  {} as Record<WatermarkParams["watermarkPosition"], string>
+);
+
+/** 移动端 BottomSheetSelect 统一触发器，复用设计 token，桌面端不使用。 */
+function SheetTrigger({ label, icon: Icon }: { label: string; icon?: typeof Wand2 }) {
+  return (
+    <button
+      type="button"
+      className="flex min-h-11 w-full items-center gap-2 rounded-[12px] border border-line-strong bg-surface px-3.5 text-left text-[14px] text-ink transition-colors hover:border-brand"
+    >
+      {Icon && <Icon className="h-4 w-4 shrink-0 text-brand" />}
+      <span className="flex-1 truncate font-medium">{label}</span>
+      <ChevronDown className="h-4 w-4 shrink-0 text-ink-3" />
+    </button>
+  );
+}
 
 type ToolTaskStatus = "idle" | "queued" | WorkflowTaskSummary["status"];
 
@@ -429,28 +458,22 @@ function ToolboxPageInner() {
           )}
         </div>
         <div className="space-y-2 md:hidden">
-          <div className="flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            {SUPPORTED_TOOLS.map((tool) => {
-              const Icon = tool.icon;
-              const active = draft.toolType === tool.id;
-              return (
-                <button
-                  key={tool.id}
-                  type="button"
-                  onClick={() => updateToolType(tool.id)}
-                  className={cn(
-                    "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[13px] font-semibold transition-colors",
-                    active
-                      ? "border-transparent bg-accent-gradient text-white shadow-soft"
-                      : "border-line bg-surface text-ink-2"
-                  )}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  {tool.label}
-                </button>
-              );
-            })}
-          </div>
+          <BottomSheetSelect
+            title="选择工具"
+            options={SUPPORTED_TOOLS.map((tool) => ({
+              id: tool.id,
+              label: tool.label,
+              description: tool.description,
+              icon: tool.icon,
+            }))}
+            value={draft.toolType}
+            onChange={(value) => {
+              if (typeof value === "string") {
+                updateToolType(value as ToolType);
+              }
+            }}
+            trigger={<SheetTrigger label={selectedTool.label} icon={selectedTool.icon} />}
+          />
           <div className={cn("flex min-h-9 items-center gap-3", draft.activePresetName ? "justify-between" : "justify-end")}>
             {draft.activePresetName && (
               <span className="min-w-0 truncate text-[12px] text-ink-3">
@@ -650,23 +673,41 @@ function ToolParameterPanel({
   logoInputRef: React.RefObject<HTMLInputElement | null>;
   onUploadAsset: UploadToolAsset;
 }) {
+  const isMobile = useIsMobile();
   if (draft.toolType === "watermark") {
     const params = draft.parameters as WatermarkParams;
     return (
       <div className="space-y-4">
         <div className="space-y-2">
           <Label>水印类型</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {(["text", "logo"] as WatermarkParams["watermarkType"][]).map((type) => (
-              <button
-                key={type}
+          {isMobile ? (
+            <BottomSheetSelect
+              title="水印类型"
+              options={[
+                { id: "text", label: "文字" },
+                { id: "logo", label: "Logo" },
+              ]}
+              value={params.watermarkType}
+              onChange={(value) => {
+                if (typeof value === "string") {
+                  updateParameters({ watermarkType: value as WatermarkParams["watermarkType"] } as Partial<WatermarkParams>);
+                }
+              }}
+              trigger={<SheetTrigger label={params.watermarkType === "logo" ? "Logo" : "文字"} />}
+            />
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              {(["text", "logo"] as WatermarkParams["watermarkType"][]).map((type) => (
+                <button
+                  key={type}
 	                className={cn("min-h-11 rounded-lg border px-3 py-2 text-data", params.watermarkType === type ? "border-primary bg-primary/5 text-primary" : "border-border")}
-                onClick={() => updateParameters({ watermarkType: type } as Partial<WatermarkParams>)}
-              >
-                {type === "text" ? "文字" : "Logo"}
-              </button>
-            ))}
-          </div>
+                  onClick={() => updateParameters({ watermarkType: type } as Partial<WatermarkParams>)}
+                >
+                  {type === "text" ? "文字" : "Logo"}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="space-y-2">
           <Label>水印文字</Label>
@@ -678,17 +719,31 @@ function ToolParameterPanel({
         </div>
         <div className="space-y-2">
           <Label>水印位置</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {(["bottom-right", "bottom-left", "top-right", "top-left", "center"] as WatermarkParams["watermarkPosition"][]).map((position) => (
-              <button
-                key={position}
+          {isMobile ? (
+            <BottomSheetSelect
+              title="水印位置"
+              options={WATERMARK_POSITION_OPTIONS.map((option) => ({ id: option.id, label: option.label }))}
+              value={params.watermarkPosition}
+              onChange={(value) => {
+                if (typeof value === "string") {
+                  updateParameters({ watermarkPosition: value as WatermarkParams["watermarkPosition"] } as Partial<WatermarkParams>);
+                }
+              }}
+              trigger={<SheetTrigger label={WATERMARK_POSITION_LABELS[params.watermarkPosition] ?? params.watermarkPosition} />}
+            />
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              {(["bottom-right", "bottom-left", "top-right", "top-left", "center"] as WatermarkParams["watermarkPosition"][]).map((position) => (
+                <button
+                  key={position}
 	                className={cn("min-h-11 rounded-lg border px-3 py-2 text-caption", params.watermarkPosition === position ? "border-primary bg-primary/5 text-primary" : "border-border")}
-                onClick={() => updateParameters({ watermarkPosition: position } as Partial<WatermarkParams>)}
-              >
-                {position}
-              </button>
-            ))}
-          </div>
+                  onClick={() => updateParameters({ watermarkPosition: position } as Partial<WatermarkParams>)}
+                >
+                  {position}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="space-y-2">
           <Label>输出尺寸</Label>
@@ -714,17 +769,32 @@ function ToolParameterPanel({
       <div className="space-y-4">
         <div className="space-y-2">
           <Label>放大倍数</Label>
-          <div className="grid grid-cols-3 gap-2">
-            {[2, 4, 8].map((factor) => (
-              <button
-                key={factor}
+          {isMobile ? (
+            <BottomSheetSelect
+              title="放大倍数"
+              options={[2, 4, 8].map((factor) => ({ id: String(factor), label: `${factor}x` }))}
+              value={String(params.upscaleFactor)}
+              onChange={(value) => {
+                if (typeof value === "string") {
+                  const factor = Number(value);
+                  updateParameters({ upscaleFactor: factor, outputResolution: `${factor}x` } as Partial<UpscaleParams>);
+                }
+              }}
+              trigger={<SheetTrigger label={`${params.upscaleFactor}x`} />}
+            />
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              {[2, 4, 8].map((factor) => (
+                <button
+                  key={factor}
 	                className={cn("min-h-11 rounded-lg border px-3 py-2 text-data", params.upscaleFactor === factor ? "border-primary bg-primary/5 text-primary" : "border-border")}
-                onClick={() => updateParameters({ upscaleFactor: factor, outputResolution: `${factor}x` } as Partial<UpscaleParams>)}
-              >
-                {factor}x
-              </button>
-            ))}
-          </div>
+                  onClick={() => updateParameters({ upscaleFactor: factor, outputResolution: `${factor}x` } as Partial<UpscaleParams>)}
+                >
+                  {factor}x
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <ModelAndResolutionFields
           aiModel={params.aiModel}
