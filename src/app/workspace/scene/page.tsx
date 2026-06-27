@@ -27,6 +27,8 @@ import { buildSceneLegacyTaskRequests } from "@/lib/workbench/scene-task-adapter
 import { getSceneGenerationModels } from "@/lib/ai-models";
 import type { InputAssetRef, SceneWorkflowDraft, TemplatePreset, WorkflowTaskStatus } from "@/types/workbench";
 import { BrandEmptyState, BrandImageFallback } from "@/components/brands/SpriteImage";
+import { HorizontalPillScroller } from "@/components/workbench/mobile/HorizontalPillScroller";
+import { MobileCollapsibleSection } from "@/components/workbench/mobile/MobileCollapsibleSection";
 import {
   ArrowLeft,
   ArrowRight,
@@ -328,37 +330,6 @@ const sceneStyleTemplates: SceneStyleTemplate[] = [
     stylePreference: "modern business office scene, executive desk surface, city window light, polished professional mood",
   },
 ];
-
-function HorizontalPillScroller({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-      {children}
-    </div>
-  );
-}
-
-function MobileCollapsibleSection({
-  title,
-  summary,
-  children,
-}: {
-  title: string;
-  summary: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <details className="group glass-panel rounded-[18px] md:hidden">
-      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
-        <div className="min-w-0">
-          <div className="text-[14px] font-bold text-ink">{title}</div>
-          <div className="mt-0.5 hidden truncate text-[12px] text-ink-3 sm:block">{summary}</div>
-        </div>
-        <ChevronDown className="h-4 w-4 shrink-0 text-ink-3 transition-transform group-open:rotate-180" />
-      </summary>
-      <div className="space-y-3 px-4 pb-4 pt-1">{children}</div>
-    </details>
-  );
-}
 
 function getOptionLabel(options: Array<{ id: string; label: string }>, value: string) {
   return options.find((option) => option.id === value)?.label ?? value;
