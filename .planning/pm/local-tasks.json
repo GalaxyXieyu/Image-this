@@ -344,7 +344,7 @@
       "summary": "[T9] 图片生成真实出图联调与模板导入",
       "description": "任务编号：T9\n创建时间：2026-06-27 13:23:21 CST\n类型：task\nRepo：/Volumes/DATABASE/code/business/Image-this\n\n需求：\n等待用户提供 provider key、base URL、图床 key、测试商品图/参考图和旧模板来源后，继续推进真实图片生成端到端联调。范围包括：按 main 分支校准 GPT 调用方式，修复 Jimeng Ark-only 前置检查，写入/验证 .env 或设置页配置，备份并同步本地 SQLite schema，运行 UIUX_REQUIRE_IMAGE=true 的登录到出图自动化，确认 provider 返回图片、本地存储落图、ProcessedImage 入库和页面展示；同时梳理并实现旧默认模板/测试图片的 seed/import，方便后续存储和复跑。\n\n执行要求：\n- 以 task/doc 为主，不再依赖本地 task/context/state 文件。\n- 进度默认写评论，验收证据优先回填附件或评论。",
       "created_at": "2026-06-27T13:23:21+08:00",
-      "updated_at": "2026-06-27T14:07:45+08:00",
+      "updated_at": "2026-06-27T19:54:13+08:00",
       "completed_at": "",
       "start": {
         "timestamp": "2026-06-27T14:07:45+08:00",
@@ -359,13 +359,24 @@
           "content": "已建立后续联调任务并保留配置清单：.planning/IMAGE-GENERATION-CONFIG-CHECKLIST.md。等待用户后续提供 provider key、base URL、图床 key、测试商品图/参考图和旧模板来源后再继续真实出图、模板导入与端到端验证。当前不在 PM 评论或计划文档中记录任何真实 key/token。",
           "resource_id": "local-task-b65512c1abd2",
           "created_at": "2026-06-27T14:07:45+08:00"
+        },
+        {
+          "guid": "local-comment-keys-provided-0627",
+          "content": "用户已提供 provider key 并写入 .env：更新 VOLCENGINE_ACCESS_KEY/SECRET_KEY、ARK_API_KEY、SUPERBED_TOKEN；GPT/Gemini key 与现有一致（toapis，sk-V1Hx…）；补全 GEMINI_MODEL_NAME、JIMENG_BASE_URL、JIMENG_MODEL 默认项以解锁 Ark 链路。base_url 用户给的是 https://toapis.com/v1，.env 保持 https://toapis.com（provider 代码内部拼 /v1/images/generations，避免重复）。任务解锁，待 /build 执行：按 main 校准 GPT 同步 image_urls 调用、修 Jimeng Ark-only 前置检查、跑 UIUX_REQUIRE_IMAGE=true 端到端验证。",
+          "created_at": "2026-06-27T19:27:05+08:00"
+        },
+        {
+          "guid": "local-comment-e2e-pass-0627",
+          "content": "【/build 完成 E2E 真实出图验证 — Gate: PASS】\n1) GPT/Gemini provider 经真实 toapis API 核验：gpt-image-2(reference_images)与 gemini-3.1-flash-image-preview(image_urls)均异步上传→生成→轮询成功；确认当前分支 toapis 异步实现是 toapis 的正确基准，不回退 main 的同步 image_urls（main 那套是给 yunwu.ai 用的）。GPT provider 代码无需改动。\n2) 修复 service.ts 即梦 Ark-only 前置检查 bug：原 25-26 行对 JIMENG 强制要火山 AK/SK，导致只填 ARK_API_KEY 进不到 Ark 调用；改为只对 VOLCENGINE 校验，JIMENG 走其专属 Ark/Legacy 分支。\n3) SQLite：已备份 prisma/app.db 并 prisma db push（schema 已同步，无变更）。\n4) 端到端走真实 worker 管线（UI→/api/tasks→worker→getUserConfig 读 .env→Gemini/toapis→落盘→入库）：task COMPLETED，processedImageUrl=/uploads/1782561114865-gemini-bg-replace-1782561114861.jpg（2.3MB 落盘✓），ProcessedImage 行 cmqwav303000a11urqcdwwd8t 入库✓，状态接口返回 resultImageUrl✓。\n5) 修复维护 UI/UX E2E 脚本 scripts/uiux/login-generate-image.mjs（移动端重设计导致的漂移）：登录 :visible 选择器、工作台就绪文案、上传触发与完成判据、最小必要字段、任务 ID 改从 POST /api/tasks 响应捕获。报告：out/ui-ux-plan/t9-e2e3-195106/（5/5 PASS，P0 100%）。\n附带发现（属移动端 T13 范畴，未改）：AuthShell 同时渲染移动/桌面两份 children，产生重复 id=email/password 的 a11y 问题，建议后续单渲染+CSS 布局。\n剩余未做：旧默认模板/测试图片的 seed/import（T9 次要范围），待确认来源后再做。",
+          "created_at": "2026-06-27T19:54:13+08:00"
         }
       ],
       "tasklists": [
         {
           "tasklist_guid": "local:image-this"
         }
-      ]
+      ],
+      "status": "in_progress"
     },
     {
       "guid": "local-task-4f5f136fe763",
@@ -454,6 +465,47 @@
           "content": "已完成 /workspace/scene 多商品图上传预览与批量生成适配：商品图输入支持一次多选、继续添加、横向缩略图预览和单张移除；参考图保持单张并提供预览；生成阶段按商品图数量 × 候选数量展开任务，结果卡片和保存 metadata 记录源商品图；同时修复 /api/files/input-assets 在 Web/自定义本地存储路径下的文件读取，保证上传后预览能返回真实图片。验证：npx tsc --noEmit 通过；npm run lint 通过（仅既有 warning）；npm run build 通过；Playwright 移动端 390x844 验证 3 张商品图 + 1 张参考图真实预览可见，并确认第三步显示将创建 12 个任务。截图：out/ui-ux-plan/t12-scene-multi-upload/scene-step1-mobile-real-preview.png、out/ui-ux-plan/t12-scene-multi-upload/scene-step3-mobile-real-preview.png。",
           "resource_id": "local-task-e7ea28634b8e",
           "created_at": "2026-06-27T17:09:54+08:00"
+        }
+      ],
+      "tasklists": [
+        {
+          "tasklist_guid": "local:image-this"
+        }
+      ]
+    },
+    {
+      "guid": "local-task-108808350b64",
+      "url": "local://task/local-task-108808350b64",
+      "summary": "[T13] 移动端 UX 全量适配与演示验收计划",
+      "description": "任务编号：T13\n创建时间：2026-06-27 19:10:41 CST\n类型：task\nRepo：/Volumes/DATABASE/code/business/Image-this\n\n需求：\n对 Image-this 全部主要界面做移动端 UX 全量适配规划，覆盖信息密度、顶部介绍/二级文本清理、FAB/底部操作遮挡、下拉改 pill/横向滚动、生成填写区域折叠、上传图片上置和预览、减少步骤、高级设置折叠、场景生成多图结果体验、工具/组合/任务/结果/模板/设置页移动端验收；先输出完整计划给用户确认，确认后再执行开发、验证、部署。\n\n执行要求：\n- 以 task/doc 为主，不再依赖本地 task/context/state 文件。\n- 进度默认写评论，验收证据优先回填附件或评论。\n\n规划方案：\n\n一、目标假设\n把移动端从“桌面界面缩小版”改成“手机上能连续完成生成任务”的工作台：首屏聚焦上传和关键动作，非必要解释文本收起或隐藏，下拉改为 pill/横向滚动，生成配置默认折叠为高级设置，底部操作不被 FAB 或内容遮挡。\n\n二、优先级批次\nP0 演示主路径：/workspace/scene。处理顶部说明、素材上置、多商品上传预览、参考图可选判断、高级设置折叠、候选数量文案、结果按商品图分组、保存/查看按钮不被遮挡。关联 T11 的二级文本清理。\nP1 工具主路径：/tools。上传区保持在移动端顶部，工具切换使用 pill 横滚，背景/扩图提示词和模型尺寸进入高级设置，参考背景/Logo 预览可见，任务结果操作固定在安全底部区域。\nP2 组合工作流：/combo。移动端保留上方模板横滚、步骤列表和一个明确执行按钮；步骤说明文本压缩；全局执行设置和单步参数做折叠/抽屉式编辑，避免页面过长。\nP3 管理页扫尾：/tasks、/results、/templates、/settings。移除移动端顶部介绍和卡片二级文本；筛选/排序统一成 pill 或横滚；结果/任务卡只显示标题、状态、关键操作；设置页把低频说明收进折叠区。\nP4 真实出图联调：继续保留 T9，等待用户提供 key/base URL/图床配置后再执行。\n\n三、不做范围\n本轮不改 provider 真实调用逻辑，不迁移数据库 schema，不重做品牌视觉大方向，不把所有桌面端说明删除；桌面端保留必要管理信息。\n\n四、验证标准\n移动端以 390x844、375x812、430x932 三档验收；每个主页面截图检查首屏信息密度、按钮安全区、横向滚动控件、文本不换行爆版；场景生成录制上传 2-3 张商品图、不传参考图也能进入生成准备；运行 npx tsc --noEmit、npm run lint、npm run build；需要上线时 push 后确认 GitHub Actions 和 /api/health。\n\n五、上线节奏\n建议先跑 P0+P1 并部署给远程演示；P2+P3 作为第二个提交；T9 等 key 到位后单独联调真实出图。",
+      "created_at": "2026-06-27T19:10:41+08:00",
+      "updated_at": "2026-06-27T19:46:27+08:00",
+      "completed_at": "",
+      "start": {
+        "timestamp": "2026-06-27T19:39:27+08:00",
+        "is_all_day": false
+      },
+      "due": {},
+      "members": [],
+      "attachments": [],
+      "comments": [
+        {
+          "guid": "local-comment-180c299af034",
+          "content": "已完成移动端 UX 第一轮实现并推送提交 60b13f1：场景生成参考图改为可选、生成结果按商品来源分组、工具箱移动端参数折叠/底部安全操作、任务/设置页二级文本压缩。验证通过：npx tsc --noEmit、npm run lint（仅既有 warnings）、npm run build；移动端截图证据在 out/ui-ux-plan/t13-mobile-ux-build/，包含 390x844/375x812/430x932。等待 GitHub Actions 部署完成后补健康检查。",
+          "resource_id": "local-task-108808350b64",
+          "created_at": "2026-06-27T19:39:27+08:00"
+        },
+        {
+          "guid": "local-comment-550576c0a7bb",
+          "content": "部署已完成并通过线上健康检查。\n\n部署信息：GitHub Actions run 28288091446，workflow「Deploy to Production (Source Build)」，headSha 60b13f1a41e4a228e627a005df0d0653b1d90144，deploy job 83815400609，结论 success，用时约 4m48s。\n线上验证：https://image.bojie.store/api/health 返回 HTTP 200，status=healthy，database=connected，application=running，environment=production，version=0.2.15。\n本次本地验证已完成：npx tsc --noEmit --pretty false、npm run lint（仅既有 warnings）、npm run build。\n演示入口：https://image.bojie.store。\n备注：当前工作树仍有 PM 本地缓存、scripts/uiux/login-generate-image.mjs、src/lib/image-processor/service.ts 和 prisma/app.db.bak-20260627-193418 等未提交/无关变更，未纳入本次移动端 UX 提交。",
+          "resource_id": "local-task-108808350b64",
+          "created_at": "2026-06-27T19:45:25+08:00"
+        },
+        {
+          "guid": "local-comment-cdd7f3ac931e",
+          "content": "新增产品流调整建议：场景生成移动端应从「素材 -> 风格 -> 结果」调整为「风格 -> 素材 -> 结果」。原因：用户先选择目标画面和风格预期，才知道应该上传哪些商品图/是否需要参考图；移动端先上传会增加认知负担。\n\n场景模板预览不能继续用占位/渐变：建议做一套静态高清场景封面资产，优先逐一生成并落到 public/static 目录，再绑定模板 id；也可先生成一张覆盖多场景的总图再裁切，但逐一生成在风格一致性和后续维护上更稳。\n\n下一轮执行方向：1）重排 stepper 与首屏，让风格卡片作为第一步；2）风格卡片增加真实预览图、横向滚动、选中即进入素材上传；3）素材上传根据已选风格展示最少必填项；4）参考图保持可选并靠后；5）补移动端截图验收。",
+          "resource_id": "local-task-108808350b64",
+          "created_at": "2026-06-27T19:46:27+08:00"
         }
       ],
       "tasklists": [

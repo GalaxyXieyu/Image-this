@@ -274,7 +274,7 @@ async function waitForWorkspaceReady(page, timeoutMs = 60_000) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     const bodyText = await page.evaluate(() => document.body?.innerText || '');
-    const reachedWorkspace = page.url().includes('/workspace/scene') && bodyText.includes('产品基础信息') && bodyText.includes('素材上传');
+    const reachedWorkspace = page.url().includes('/workspace/scene') && bodyText.includes('素材上传') && bodyText.includes('基础描述');
     if (reachedWorkspace) return bodyText;
 
     if (bodyText.includes('邮箱或密码错误') || bodyText.includes('登录失败，请稍后重试')) {
@@ -290,10 +290,12 @@ async function waitForWorkspaceReady(page, timeoutMs = 60_000) {
 async function loginThroughUi(page, credentials) {
   await page.goto(`${BASE_URL}/auth/login`, { waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => undefined);
-  await page.getByLabel('邮箱').fill(credentials.email);
-  await page.getByLabel('密码').fill(credentials.password);
+  // AuthShell 同时渲染移动端(md:hidden)与桌面端(hidden md:grid)两份表单，
+  // 桌面视口下移动端那份 #email/#password 不可见，需用 :visible 锁定当前可见的输入与提交按钮。
+  await page.locator('#email:visible').fill(credentials.email);
+  await page.locator('#password:visible').fill(credentials.password);
   const loginScreenshot = await screenshot(page, '01-login-filled.png');
-  await page.getByRole('button', { name: /^登录$/ }).click();
+  await page.locator('form:visible button[type="submit"]').click();
   await waitForWorkspaceReady(page, 60_000);
   const workspaceScreenshot = await screenshot(page, '02-workspace-after-login.png');
   addStep('login', 'PASS', `UI 登录成功：${credentials.email}`, workspaceScreenshot);
@@ -312,28 +314,27 @@ async function selectByText(page, triggerText, optionText) {
   await page.getByRole('option', { name: new RegExp(`^${optionText}`) }).click();
 }
 
-async function uploadAsset(page, triggerText, filePath) {
+async function uploadAsset(page, triggerLocator, filePath, doneText) {
   if (!(await fileExists(filePath))) {
     throw new Error(`测试素材不存在：${filePath}`);
   }
 
+  // 新版上传卡：点击按钮触发隐藏 file input 的 filechooser；完成后以状态文案（如“已选 1 张”）判定。
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.getByText(triggerText, { exact: true }).click(),
+    triggerLocator.click(),
   ]);
   await chooser.setFiles(filePath);
-  await page.locator('button').filter({ hasText: path.basename(filePath) }).first().waitFor({ timeout: 30_000 });
+  await page.getByText(doneText).first().waitFor({ timeout: 30_000 });
 }
 
 async function fillSceneForm(page) {
   await page.getByPlaceholder('例如：某某品牌保湿面霜').fill('LUMO UIUX 测试保湿面霜');
   await selectByText(page, '选择产品类型', '美妆护肤');
-  await page.getByPlaceholder('例如：25-35 岁女性').fill('25-35 岁电商用户');
-  await page.getByPlaceholder('例如：日常护肤').fill('清晨浴室台面自然光场景');
-  await page.getByPlaceholder('请列出产品的核心卖点...').fill('补水保湿、质地轻盈、适合日常通勤前快速护肤。');
-  await page.getByText('淘宝/天猫', { exact: true }).click();
-  await uploadAsset(page, '上传商品图', PRODUCT_IMAGE);
-  await uploadAsset(page, '上传场景参考图', REFERENCE_IMAGE);
+  await page.getByPlaceholder('例如：清晨浴室台面自然光').fill('清晨浴室台面自然光场景');
+  // 目标人群、核心卖点为可选项，且在桌面区与移动折叠区重复渲染；只填生成所需的最小字段以降低脆弱性。
+  await uploadAsset(page, page.getByRole('button').filter({ hasText: '添加商品图' }), PRODUCT_IMAGE, '已选 1 张');
+  await uploadAsset(page, page.getByRole('button').filter({ hasText: '场景参考图' }), REFERENCE_IMAGE, '已添加参考');
   const filledScreenshot = await screenshot(page, '03-scene-form-filled.png');
   addStep('fill-scene-form', 'PASS', '商品信息与两张素材已填写上传', filledScreenshot);
   addExecution({
@@ -373,11 +374,6 @@ async function setCandidateCountToOne(page) {
   } catch {
     addStep('set-candidate-count', 'WARN', '候选数量控件未能自动切到 1 张，继续按页面默认数量执行');
   }
-}
-
-function extractTaskIds(bodyText) {
-  const matches = bodyText.matchAll(/任务 ID：([\w-]+)/g);
-  return [...new Set(Array.from(matches, (match) => match[1]))];
 }
 
 async function triggerWorker(page, taskIds) {
@@ -422,17 +418,36 @@ async function pollTaskStatus(page, taskIds) {
 async function submitGeneration(page) {
   await setCandidateCountToOne(page);
   const beforeGenerateScreenshot = await screenshot(page, '05-before-generate.png');
+
+  // 新版结果区不再渲染“任务 ID：”文本，改为直接从 POST /api/tasks 响应体捕获任务 ID。
+  const tasksResponsePromise = page
+    .waitForResponse(
+      (response) => /\/api\/tasks(\?|$)/.test(response.url()) && response.request().method() === 'POST',
+      { timeout: 60_000 }
+    )
+    .catch(() => null);
   await page.getByRole('button', { name: /开始生成/ }).click();
 
-  let bodyText = '';
+  let taskIds = [];
+  const tasksResponse = await tasksResponsePromise;
+  if (tasksResponse) {
+    try {
+      const payload = await tasksResponse.json();
+      const tasks = payload.tasks ?? (payload.task ? [payload.task] : []);
+      taskIds = tasks.map((task) => task.id).filter(Boolean);
+    } catch {
+      taskIds = [];
+    }
+  }
+
   try {
-    bodyText = await waitUntilPageText(page, ['生成结果'], 60_000);
+    await waitUntilPageText(page, ['生成结果'], 60_000);
   } catch {
-    bodyText = await page.evaluate(() => document.body?.innerText || '');
+    // 结果区文案随状态变化，任务 ID 已从响应捕获，这里不阻塞。
   }
 
   const submittedScreenshot = await screenshot(page, '06-generate-submitted.png');
-  const taskIds = extractTaskIds(bodyText);
+  const bodyText = await page.evaluate(() => document.body?.innerText || '');
 
   if (taskIds.length === 0) {
     addStep('submit-generation', 'FAIL', '点击开始生成后未发现任务 ID', submittedScreenshot);

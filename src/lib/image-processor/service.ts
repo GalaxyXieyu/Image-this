@@ -22,7 +22,10 @@ async function initializeProvider(userId: string, provider: ImageProvider, overr
   console.log(`[initializeProvider] 初始化 ${provider}，图床配置:`, userConfig.imagehosting ? '已配置' : '未配置');
 
   // 检查配置是否存在
-  if (provider === ImageProvider.VOLCENGINE || provider === ImageProvider.JIMENG) {
+  // 注意：即梦(JIMENG)不在此处强制要求火山引擎 AK/SK，
+  // 其 Ark-only 与 Legacy 两种模式的校验在下方 JIMENG 专属分支处理；
+  // 否则只配 ARK_API_KEY 的 Ark 模式会被这里误拦。
+  if (provider === ImageProvider.VOLCENGINE) {
     if (!userConfig.volcengine?.accessKey || !userConfig.volcengine?.secretKey) {
       throw new Error('火山引擎配置未设置，请在设置页面配置火山引擎 AccessKey 和 SecretKey');
     }
