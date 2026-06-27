@@ -6,6 +6,8 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
+import { BottomSheetSelect } from "@/components/workbench/BottomSheetSelect";
+import { useIsMobile } from "@/lib/use-is-mobile";
 import { cn } from "@/lib/utils";
 import { apiPost } from "@/lib/api-client";
 import {
@@ -142,12 +144,25 @@ const STEP_META: Record<
   StepType,
   { icon: React.ElementType; name: string; description: string }
 > = {
-  scene: { icon: ImageIcon, name: "生成场景图", description: "基于模板自动生成商品场景图" },
+  scene: { icon: ImageIcon, name: "生成场景图", description: "流水线起点：先按场景模板生成底图，后续步骤在此基础上加工" },
   background: { icon: Wand2, name: "AI 换背景", description: "智能替换背景，融合光影" },
   upscale: { icon: ZoomIn, name: "高清放大", description: "AI 超分辨率放大，提升清晰度" },
   watermark: { icon: Droplets, name: "水印与尺寸", description: "添加品牌水印，调整输出尺寸" },
   outpaint: { icon: Expand, name: "智能扩图", description: "智能扩展画布，补充画面内容" },
 };
+
+function getStepOptions() {
+  const types: StepType[] = ["scene", "background", "upscale", "watermark", "outpaint"];
+  return types.map((type) => {
+    const Icon = STEP_META[type].icon;
+    return {
+      id: type,
+      label: STEP_META[type].name,
+      description: STEP_META[type].description,
+      icon: Icon,
+    };
+  });
+}
 
 const DEFAULT_PARAMS: Record<StepType, StepParams["params"]> = {
   scene: { sceneStyle: "natural", candidateCount: 4 } as SceneParams,
@@ -222,6 +237,9 @@ export default function ComboPage() {
   const [autoRetry, setAutoRetry] = useState(true);
   const [executing, setExecuting] = useState(false);
 
+  // Add step drawer
+  const [addStepOpen, setAddStepOpen] = useState(false);
+
   const templates = SCENE_TEMPLATES[activeCategory] ?? [];
   const selectedStep = useMemo(
     () => steps.find((s) => s.id === selectedStepId) ?? null,
@@ -251,22 +269,20 @@ export default function ComboPage() {
   };
 
   /* ---- step helpers ---- */
-  const addStep = () => {
-    const available: StepType[] = ["scene", "background", "upscale", "watermark", "outpaint"];
-    const used = new Set(steps.map((s) => s.type));
-    const nextType = available.find((t) => !used.has(t)) ?? "upscale";
-    const meta = STEP_META[nextType];
+  const addStep = (stepType: StepType) => {
+    const meta = STEP_META[stepType];
     setSteps((prev) => [
       ...prev,
       {
         id: `s${Date.now()}`,
         order: prev.length + 1,
-        type: nextType,
+        type: stepType,
         name: meta.name,
         description: meta.description,
-        params: { ...DEFAULT_PARAMS[nextType] },
+        params: { ...DEFAULT_PARAMS[stepType] },
       },
     ]);
+    setAddStepOpen(false);
   };
 
   const removeStep = (id: string) => {
@@ -459,20 +475,32 @@ export default function ComboPage() {
                   </div>
                 );
               })}
-              <button
-                type="button"
-                onClick={addStep}
-                disabled={steps.length >= 5}
-                className={cn(
-                  "flex min-h-12 w-full items-center justify-center gap-2 rounded-[18px] border-2 border-dashed text-[14px] font-semibold transition-colors",
-                  steps.length >= 5
-                    ? "cursor-not-allowed border-line text-ink-3"
-                    : "border-line-strong text-ink-2 hover:border-brand hover:text-brand"
-                )}
-              >
-                <Plus className="h-4 w-4" />
-                添加处理步骤
-              </button>
+              <BottomSheetSelect
+                options={getStepOptions()}
+                value=""
+                onChange={(value) => {
+                  if (typeof value === "string") {
+                    addStep(value as StepType);
+                  }
+                }}
+                title="选择处理步骤"
+                trigger={
+                  <button
+                    type="button"
+                    disabled={steps.length >= 5}
+                    className={cn(
+                      "flex min-h-12 w-full items-center justify-center gap-2 rounded-[18px] border-2 border-dashed text-[14px] font-semibold transition-colors",
+                      steps.length >= 5
+                        ? "cursor-not-allowed border-line text-ink-3"
+                        : "border-line-strong text-ink-2 hover:border-brand hover:text-brand"
+                    )}
+                  >
+                    <Plus className="h-4 w-4" />
+                    添加处理步骤
+                  </button>
+                }
+                onOpenChange={setAddStepOpen}
+              />
             </div>
           </section>
 
@@ -761,21 +789,32 @@ export default function ComboPage() {
                 );
               })}
 
-              <button
-                type="button"
-                onClick={addStep}
-                disabled={steps.length >= 5}
-                className={cn(
-                  "flex w-full items-center justify-center gap-2 rounded-[18px] border-2 border-dashed p-4 transition-all",
-                  steps.length >= 5
-                    ? "cursor-not-allowed border-line text-ink-3"
-                    : "border-line-strong text-ink-2 hover:border-brand hover:bg-brand-soft/30 hover:text-brand"
-                )}
-              >
-                <Plus className="h-4 w-4" />
-                <span className="text-[14px] font-semibold">添加处理步骤</span>
-                <span className="text-[12px] text-ink-3">({steps.length}/5)</span>
-              </button>
+              <BottomSheetSelect
+                options={getStepOptions()}
+                value=""
+                onChange={(value) => {
+                  if (typeof value === "string") {
+                    addStep(value as StepType);
+                  }
+                }}
+                title="选择处理步骤"
+                trigger={
+                  <button
+                    type="button"
+                    disabled={steps.length >= 5}
+                    className={cn(
+                      "flex w-full items-center justify-center gap-2 rounded-[18px] border-2 border-dashed p-4 transition-all",
+                      steps.length >= 5
+                        ? "cursor-not-allowed border-line text-ink-3"
+                        : "border-line-strong text-ink-2 hover:border-brand hover:bg-brand-soft/30 hover:text-brand"
+                    )}
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span className="text-[14px] font-semibold">添加处理步骤</span>
+                    <span className="text-[12px] text-ink-3">({steps.length}/5)</span>
+                  </button>
+                }
+              />
             </div>
           </div>
 
