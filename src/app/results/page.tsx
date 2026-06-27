@@ -429,7 +429,6 @@ export default function ResultsPage() {
                 )}
 
                 {filteredResults.length === 0 && (
-                  <div className="glass-panel rounded-card shadow-soft py-12">
                   <BrandEmptyState
                     pose="star"
                     title="暂无结果"
@@ -451,7 +450,6 @@ export default function ResultsPage() {
                       </div>
                     }
                   />
-                  </div>
                 )}
               </>
             )}
