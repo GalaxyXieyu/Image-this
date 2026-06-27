@@ -146,6 +146,13 @@ interface WorkflowStep {
   name: string;
   description: string;
   params: StepParams["params"];
+  /**
+   * Phase 3 扩展位（工作流嵌套）：未来支持把一个已保存的工作流模板作为一步嵌入。
+   * 届时 StepType 增加 "workflow"，本字段引用被嵌入的 WorkflowTemplate.id；
+   * 执行时递归展开为扁平步骤（需环检测/深度限制）。
+   * 当前未启用，仅预留数据形状，保证已保存模板的 steps(JSON) 向前兼容。
+   */
+  refTemplateId?: string;
 }
 
 const STEP_META: Record<
