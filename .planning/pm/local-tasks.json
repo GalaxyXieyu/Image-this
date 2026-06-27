@@ -255,6 +255,111 @@
           "tasklist_guid": "local:image-this"
         }
       ]
+    },
+    {
+      "guid": "local-task-7f0c99a44480",
+      "url": "local://task/local-task-7f0c99a44480",
+      "summary": "[T7] 移动端场景生成流程减负与折叠交互计划",
+      "description": "任务编号：T7\n创建时间：2026-06-27 13:06:10 CST\n类型：task\nRepo：/Volumes/DATABASE/code/business/Image-this\n\n需求：\n基于线上移动端反馈，重新规划 /workspace/scene 手机端交互：上传图片优先放到顶部，生成填写项尽量折叠，减少步骤和纵向滚动；下拉继续优先改为横向 pill/点选；保留高级设置但默认折叠，形成可执行改造计划后再实施。\n\n执行要求：\n- 以 task/doc 为主，不再依赖本地 task/context/state 文件。\n- 进度默认写评论，验收证据优先回填附件或评论。",
+      "created_at": "2026-06-27T13:06:10+08:00",
+      "updated_at": "2026-06-27T14:08:00+08:00",
+      "completed_at": "2026-06-27T14:08:00+08:00",
+      "start": {
+        "timestamp": "2026-06-27T13:06:54+08:00",
+        "is_all_day": false
+      },
+      "due": {},
+      "members": [],
+      "attachments": [],
+      "comments": [
+        {
+          "guid": "local-comment-148136896b30",
+          "content": "规划完成：已新增 .planning/MOBILE-SCENE-FLOW-REDESIGN-PLAN.md。核心方案：移动端 /workspace/scene 从上传商品图开始；默认展开素材上传和基础描述；目标人群、使用场景、核心卖点、平台放入更多产品信息折叠区；模型、尺寸、候选数量放入高级生成设置折叠区；手机端枚举选择继续用横向 pill；移动端弱化三步，目标主路径为上传商品图 -> 选风格 -> 少量描述 -> 直接生成。验收标准包括 390x844 首屏看到上传入口、FAB 隐藏、无 Select 触发器、折叠摘要、CTA 不遮挡、tsc/lint/build 与移动端 Playwright 验证。",
+          "resource_id": "local-task-7f0c99a44480",
+          "created_at": "2026-06-27T13:06:54+08:00"
+        },
+        {
+          "guid": "local-comment-624c6e6d0b4e",
+          "content": "移动端界面优化已实施：/workspace/scene 手机端改为上传素材优先；商品图/参考图置顶并列；产品类型、平台、生成模型/尺寸/候选数量在移动端使用横向 pill；目标人群/卖点/平台进入更多产品信息折叠区；高级生成设置默认折叠；底部 CTA 改为手机单行紧凑操作，避免右下角 FAB/底部按钮遮挡。验证：npx tsc --noEmit --pretty false 通过；npm run lint -- --quiet 通过；npm run build 通过；移动端 UI/UX run mobile-scene-20260627-134613 通过 5/5，报告 out/ui-ux-plan/mobile-scene-20260627-134613/ui-ux-test-report-mobile-scene-20260627-134613.md。验证中发现本地 SQLite 缺 users.*ModelsJson 列，已先备份 prisma/app.db 到 .planning/debug/db-backups/，再执行 npx prisma db push 同步本地开发 DB。",
+          "resource_id": "local-task-7f0c99a44480",
+          "created_at": "2026-06-27T14:07:45+08:00"
+        },
+        {
+          "guid": "local-comment-bd5f1719c4e5",
+          "content": "完成：/workspace/scene 移动端主流程已按 T7 方案上线实现。上传区置顶，移动端枚举切为横向 pill，更多产品信息和高级生成设置默认折叠，底部 CTA 改为紧凑单行，移动端全局 FAB 不遮挡。验证通过：tsc、lint、build；UI/UX mobile-scene-20260627-134613 5/5 PASS。\nCommit：https://github.com/GalaxyXieyu/Image-this/commit/0a19689ad91861650c4e5f582b45df28c20a3e79",
+          "resource_id": "local-task-7f0c99a44480",
+          "created_at": "2026-06-27T14:08:00+08:00"
+        }
+      ],
+      "tasklists": [
+        {
+          "tasklist_guid": "local:image-this"
+        }
+      ]
+    },
+    {
+      "guid": "local-task-39b977262e0f",
+      "url": "local://task/local-task-39b977262e0f",
+      "summary": "[T8] 图片生成端到端配置清单梳理",
+      "description": "任务编号：T8\n创建时间：2026-06-27 13:08:48 CST\n类型：task\nRepo：/Volumes/DATABASE/code/business/Image-this\n\n需求：\n梳理 ImageThis 当前要跑通图片生成端到端流程所需的 base URL、.env、AI provider key、模型名、图库/图床 key、本地存储配置和默认模板/测试图片准备项。目标是给出一次性配置清单，用户后续统一提供后即可继续开发并进行真实生成测试，避免开发完成但生成流程跑不通。\n\n执行要求：\n- 以 task/doc 为主，不再依赖本地 task/context/state 文件。\n- 进度默认写评论，验收证据优先回填附件或评论。",
+      "created_at": "2026-06-27T13:08:48+08:00",
+      "updated_at": "2026-06-27T13:19:08+08:00",
+      "completed_at": "2026-06-27T13:19:08+08:00",
+      "start": {
+        "timestamp": "2026-06-27T13:18:40+08:00",
+        "is_all_day": false
+      },
+      "due": {},
+      "members": [],
+      "attachments": [],
+      "comments": [
+        {
+          "guid": "local-comment-32982094c718",
+          "content": "已完成图片生成端到端配置清单梳理，并按用户补充要求对照 main 分支确认模型调用基准。文档路径：.planning/IMAGE-GENERATION-CONFIG-CHECKLIST.md。关键结论：GPT 调用以 main 的同步 /v1/images/generations + image_urls 为基准，当前分支新增 toapis 上传/轮询不作为默认正确路径；Gemini/Jimeng provider 与 main 基本一致；Jimeng Ark-only 前置检查阻塞在 main 和当前分支都存在，真实跑 Ark 前需修；Superbed 仅在火山/Legacy 需要公网输入图时必填，普通 GPT/Gemini/Ark 出图结果可直接本地保存。",
+          "resource_id": "local-task-39b977262e0f",
+          "created_at": "2026-06-27T13:18:40+08:00"
+        },
+        {
+          "guid": "local-comment-fee22ab9a9c4",
+          "content": "配置清单已完成：.planning/IMAGE-GENERATION-CONFIG-CHECKLIST.md。已按 main 分支确认模型调用基准：GPT 以 main 的同步 /v1/images/generations + image_urls 为准；当前分支 toapis 上传/轮询需在拿到 provider 信息后再确认或回退；Gemini/Jimeng provider 与 main 基本一致；Jimeng Ark-only 前置检查为 main 也存在的遗留阻塞，真实跑 Ark 前需修；Superbed 仅火山/Legacy 需公网输入图时必填。\nCommit：https://github.com/GalaxyXieyu/Image-this/commit/0a19689ad91861650c4e5f582b45df28c20a3e79",
+          "resource_id": "local-task-39b977262e0f",
+          "created_at": "2026-06-27T13:19:08+08:00"
+        }
+      ],
+      "tasklists": [
+        {
+          "tasklist_guid": "local:image-this"
+        }
+      ]
+    },
+    {
+      "guid": "local-task-b65512c1abd2",
+      "url": "local://task/local-task-b65512c1abd2",
+      "summary": "[T9] 图片生成真实出图联调与模板导入",
+      "description": "任务编号：T9\n创建时间：2026-06-27 13:23:21 CST\n类型：task\nRepo：/Volumes/DATABASE/code/business/Image-this\n\n需求：\n等待用户提供 provider key、base URL、图床 key、测试商品图/参考图和旧模板来源后，继续推进真实图片生成端到端联调。范围包括：按 main 分支校准 GPT 调用方式，修复 Jimeng Ark-only 前置检查，写入/验证 .env 或设置页配置，备份并同步本地 SQLite schema，运行 UIUX_REQUIRE_IMAGE=true 的登录到出图自动化，确认 provider 返回图片、本地存储落图、ProcessedImage 入库和页面展示；同时梳理并实现旧默认模板/测试图片的 seed/import，方便后续存储和复跑。\n\n执行要求：\n- 以 task/doc 为主，不再依赖本地 task/context/state 文件。\n- 进度默认写评论，验收证据优先回填附件或评论。",
+      "created_at": "2026-06-27T13:23:21+08:00",
+      "updated_at": "2026-06-27T14:07:45+08:00",
+      "completed_at": "",
+      "start": {
+        "timestamp": "2026-06-27T14:07:45+08:00",
+        "is_all_day": false
+      },
+      "due": {},
+      "members": [],
+      "attachments": [],
+      "comments": [
+        {
+          "guid": "local-comment-0fb469553b58",
+          "content": "已建立后续联调任务并保留配置清单：.planning/IMAGE-GENERATION-CONFIG-CHECKLIST.md。等待用户后续提供 provider key、base URL、图床 key、测试商品图/参考图和旧模板来源后再继续真实出图、模板导入与端到端验证。当前不在 PM 评论或计划文档中记录任何真实 key/token。",
+          "resource_id": "local-task-b65512c1abd2",
+          "created_at": "2026-06-27T14:07:45+08:00"
+        }
+      ],
+      "tasklists": [
+        {
+          "tasklist_guid": "local:image-this"
+        }
+      ]
     }
   ]
 }
