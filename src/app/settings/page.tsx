@@ -31,6 +31,8 @@ import {
 } from '@/components/ui/dialog';
 import { DesktopUpdateCard } from '@/components/settings/DesktopUpdateCard';
 import { LogDiagnosticsCard } from '@/components/settings/LogDiagnosticsCard';
+import { BottomSheetSelect } from '@/components/workbench/BottomSheetSelect';
+import { useIsMobile } from '@/lib/use-is-mobile';
 import { Save, Key, Sparkles, User, Image, FileText, Plus, Edit, Trash2, Star, StarOff, Cpu, HardDrive, FolderOpen, Folder, RefreshCw, Search, ChevronsUpDown, SlidersHorizontal, FileSearch, ChevronRight, X } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/use-toast';
@@ -191,7 +193,8 @@ export default function SettingsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const { toast } = useToast();
-  
+  const isMobile = useIsMobile();
+
   const [activeSection, setActiveSection] = useState<SettingSection>('models');
   
   // 提示词模板状态
@@ -958,39 +961,48 @@ export default function SettingsPage() {
               <CardContent>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
                   <Label className="hidden text-data font-medium sm:block">筛选分类:</Label>
-                  <div className="flex gap-2 overflow-x-auto pb-0.5 sm:hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                    {[['ALL', '全部'], ...Object.entries(CATEGORY_LABELS)].map(([value, label]) => {
-                      const active = selectedCategory === value;
-                      return (
+                  {isMobile ? (
+                    <BottomSheetSelect
+                      title="筛选分类"
+                      value={selectedCategory}
+                      onChange={(value) => {
+                        if (typeof value === 'string') setSelectedCategory(value);
+                      }}
+                      options={[
+                        { id: 'ALL', label: '全部分类' },
+                        ...Object.entries(CATEGORY_LABELS).map(([value, label]) => ({
+                          id: value,
+                          label,
+                        })),
+                      ]}
+                      trigger={
                         <button
-                          key={value}
                           type="button"
-                          onClick={() => setSelectedCategory(value)}
-                          className={cn(
-                            "min-h-11 shrink-0 rounded-full border px-3.5 text-[13px] font-semibold transition-colors",
-                            active
-                              ? "border-transparent bg-accent-gradient text-white shadow-soft"
-                              : "border-line bg-surface text-ink-2"
-                          )}
+                          className="flex min-h-11 w-full items-center justify-between gap-2 rounded-[10px] border border-line-strong bg-surface px-3.5 text-[14px] font-medium text-ink"
                         >
-                          {label}
+                          <span className="inline-flex items-center gap-2 text-ink-2">
+                            <FileText className="h-4 w-4 text-ink-3" />
+                            {selectedCategory === 'ALL' ? '全部分类' : CATEGORY_LABELS[selectedCategory]}
+                          </span>
+                          <ChevronsUpDown className="h-4 w-4 shrink-0 text-ink-3" />
                         </button>
-                      );
-                    })}
-                  </div>
-                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                    <SelectTrigger className="hidden min-h-11 w-full sm:flex sm:w-[200px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">全部分类</SelectItem>
-                      {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
-                        <SelectItem key={value} value={value}>
-                          {label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                      }
+                    />
+                  ) : (
+                    <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                      <SelectTrigger className="hidden min-h-11 w-full sm:flex sm:w-[200px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">全部分类</SelectItem>
+                        {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -1441,7 +1453,36 @@ export default function SettingsPage() {
                 {/* Provider 类型 3 选 1 */}
 	                <div>
 	                  <Label className="text-[12px] font-medium text-ink-2">Provider 类型</Label>
-	                  <div className="mt-1.5 grid grid-cols-1 gap-2 sm:grid-cols-3">
+	                  {isMobile ? (
+                    <div className="mt-1.5">
+                      <BottomSheetSelect
+                        title="Provider 类型"
+                        value={modalProvider}
+                        onChange={(value) => {
+                          if (typeof value === 'string') setModalProvider(value as ProviderId);
+                        }}
+                        options={(Object.keys(PROVIDER_META) as ProviderId[]).map((p) => ({
+                          id: p,
+                          label: PROVIDER_META[p].label,
+                          description: PROVIDER_META[p].subtitle,
+                          icon: Cpu,
+                        }))}
+                        trigger={
+                          <button
+                            type="button"
+                            className="flex min-h-11 w-full items-center justify-between gap-2 rounded-[12px] border border-brand bg-brand-soft px-3 py-2 text-[13px] font-medium text-brand-text"
+                          >
+                            <span className="inline-flex items-center gap-2">
+                              <Cpu className="h-4 w-4" />
+                              {PROVIDER_META[modalProvider].label}
+                            </span>
+                            <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-70" />
+                          </button>
+                        }
+                      />
+                    </div>
+                  ) : (
+                  <div className="mt-1.5 grid grid-cols-1 gap-2 sm:grid-cols-3">
                     {(Object.keys(PROVIDER_META) as ProviderId[]).map((p) => {
                       const active = p === modalProvider;
                       return (
@@ -1461,6 +1502,7 @@ export default function SettingsPage() {
                       );
                     })}
                   </div>
+                  )}
                 </div>
 
                 {/* API 地址 */}

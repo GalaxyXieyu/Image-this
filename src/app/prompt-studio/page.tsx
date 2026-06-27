@@ -12,10 +12,13 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ConicSpinner } from "@/components/ui/conic-spinner";
+import { BottomSheetSelect } from "@/components/workbench/BottomSheetSelect";
+import { useIsMobile } from "@/lib/use-is-mobile";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
   Bolt,
+  ChevronsUpDown,
   Clock,
   History,
   ImageIcon,
@@ -308,6 +311,7 @@ function GroupCard({
   onUpdate: (_patch: Partial<PromptGroup>) => void;
   onRemove: () => void;
 }) {
+  const isMobile = useIsMobile();
   return (
     <div className="glass-panel flex min-w-0 flex-col gap-4 rounded-[16px] p-4 md:p-[18px]">
       {/* Header */}
@@ -364,7 +368,18 @@ function GroupCard({
 
       {/* Model */}
       <FieldGroup label="模型">
-        <Select value={group.model} onValueChange={(v) => onUpdate({ model: v })}>
+        {isMobile ? (
+          <BottomSheetSelect
+            title="选择模型"
+            value={group.model}
+            onChange={(v) => {
+              if (typeof v === "string") onUpdate({ model: v });
+            }}
+            options={MODELS.map((m) => ({ id: m, label: m }))}
+            trigger={<MobileSelectTrigger value={group.model} />}
+          />
+        ) : (
+          <Select value={group.model} onValueChange={(v) => onUpdate({ model: v })}>
 	          <SelectTrigger className="h-11 rounded-[10px]">
             <SelectValue />
           </SelectTrigger>
@@ -376,6 +391,7 @@ function GroupCard({
             ))}
           </SelectContent>
         </Select>
+        )}
       </FieldGroup>
 
       {/* Inputs: 风格 / 比例 */}
@@ -383,7 +399,18 @@ function GroupCard({
         <div className="grid grid-cols-2 gap-2.5">
           <div className="flex flex-col gap-1.5">
             <span className="text-[11px] text-ink-3">风格</span>
-            <Select value={group.style} onValueChange={(v) => onUpdate({ style: v })}>
+            {isMobile ? (
+              <BottomSheetSelect
+                title="选择风格"
+                value={group.style}
+                onChange={(v) => {
+                  if (typeof v === "string") onUpdate({ style: v });
+                }}
+                options={STYLES.map((s) => ({ id: s, label: s }))}
+                trigger={<MobileSelectTrigger value={group.style} />}
+              />
+            ) : (
+              <Select value={group.style} onValueChange={(v) => onUpdate({ style: v })}>
 	              <SelectTrigger className="h-11 rounded-[9px]">
                 <SelectValue />
               </SelectTrigger>
@@ -395,10 +422,22 @@ function GroupCard({
                 ))}
               </SelectContent>
             </Select>
+            )}
           </div>
           <div className="flex flex-col gap-1.5">
             <span className="text-[11px] text-ink-3">比例</span>
-            <Select value={group.ratio} onValueChange={(v) => onUpdate({ ratio: v })}>
+            {isMobile ? (
+              <BottomSheetSelect
+                title="选择宽高比"
+                value={group.ratio}
+                onChange={(v) => {
+                  if (typeof v === "string") onUpdate({ ratio: v });
+                }}
+                options={RATIOS.map((r) => ({ id: r, label: r }))}
+                trigger={<MobileSelectTrigger value={group.ratio} />}
+              />
+            ) : (
+              <Select value={group.ratio} onValueChange={(v) => onUpdate({ ratio: v })}>
 	              <SelectTrigger className="h-11 rounded-[9px]">
                 <SelectValue />
               </SelectTrigger>
@@ -410,6 +449,7 @@ function GroupCard({
                 ))}
               </SelectContent>
             </Select>
+            )}
           </div>
         </div>
       </FieldGroup>
@@ -439,6 +479,18 @@ function GroupCard({
         <SampleArea status={group.status} model={group.model} />
       </FieldGroup>
     </div>
+  );
+}
+
+function MobileSelectTrigger({ value }: { value: string }) {
+  return (
+    <button
+      type="button"
+      className="flex h-11 w-full items-center justify-between gap-2 rounded-[10px] border border-line-strong bg-surface px-3 text-[13px] font-medium text-ink"
+    >
+      <span className="min-w-0 truncate">{value}</span>
+      <ChevronsUpDown className="h-4 w-4 shrink-0 text-ink-3" />
+    </button>
   );
 }
 
