@@ -13,7 +13,28 @@ import {
 } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Check, ChevronRight, ChevronLeft } from "lucide-react";
+
+/** 兼容渲染 icon：已实例化的元素直接渲染；函数 / forwardRef·memo 组件对象用 createElement 实例化；其余作为 ReactNode 渲染。 */
+function OptionIcon({
+  icon,
+}: {
+  icon?: React.ReactNode | React.ComponentType<{ className?: string }>;
+}) {
+  if (!icon) return null;
+  if (React.isValidElement(icon)) return <>{icon}</>;
+  if (
+    typeof icon === "function" ||
+    (typeof icon === "object" && icon !== null && "$$typeof" in icon)
+  ) {
+    return React.createElement(
+      icon as React.ComponentType<{ className?: string }>,
+      { className: "h-4 w-4" }
+    );
+  }
+  return <>{icon}</>;
+}
 
 export interface BottomSheetSelectOption {
   id: string;
@@ -91,9 +112,89 @@ export function BottomSheetSelect({
 
   const currentOptions = getCurrentOptions();
 
-  // Desktop fallback: render simple list or pass through trigger
+  // 桌面端：用 Popover 下拉浮层承载同一套选项（不使用底部抽屉），保证桌面可用且不回归。
   if (!isMobile) {
-    return <>{trigger}</>;
+    return (
+      <Popover open={open} onOpenChange={handleOpenChange}>
+        <PopoverTrigger asChild>
+          {trigger || (
+            <button
+              type="button"
+              className="rounded-full border border-line-strong bg-surface px-3 py-1.5 text-[14px] text-ink"
+            >
+              {selectedValues.length > 0
+                ? selectedValues.length === 1
+                  ? options.find((o) => o.id === selectedValues[0])?.label ||
+                    "未选择"
+                  : `已选择 ${selectedValues.length} 项`
+                : "选择选项"}
+            </button>
+          )}
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-72 p-1.5">
+          {currentLevel.length > 0 && (
+            <button
+              type="button"
+              onClick={handleGoBack}
+              className="mb-1 flex items-center gap-1 px-2 py-1 text-[12px] text-ink-3 transition-colors hover:text-ink"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+              返回上一层
+            </button>
+          )}
+          <div className="space-y-0.5">
+            {currentOptions.map((option) => {
+              const isSelected = selectedValues.includes(option.id);
+              const hasChildren = option.children && option.children.length > 0;
+
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  disabled={option.disabled}
+                  onClick={() => {
+                    if (hasChildren) {
+                      handleDrillIn(option);
+                    } else if (!option.disabled) {
+                      handleSelect(option.id);
+                    }
+                  }}
+                  className={cn(
+                    "flex w-full items-center gap-2.5 rounded-[10px] p-2 text-left transition-colors",
+                    option.disabled
+                      ? "cursor-not-allowed opacity-50"
+                      : "hover:bg-surface-muted",
+                    isSelected && "bg-brand-soft"
+                  )}
+                >
+                  {option.icon && (
+                    <span className="flex-shrink-0 text-ink">
+                      <OptionIcon icon={option.icon} />
+                    </span>
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13px] font-medium text-ink">
+                      {option.label}
+                    </span>
+                    {option.description && (
+                      <span className="mt-0.5 block text-[12px] text-ink-3">
+                        {option.description}
+                      </span>
+                    )}
+                  </span>
+                  {isSelected && (
+                    <Check className="h-4 w-4 flex-shrink-0 text-brand" />
+                  )}
+                  {hasChildren && !isSelected && (
+                    <ChevronRight className="h-4 w-4 flex-shrink-0 text-ink-3" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
   }
 
   // Mobile: render drawer with options
@@ -157,13 +258,7 @@ export function BottomSheetSelect({
                   >
                     {option.icon && (
                       <div className="flex-shrink-0 text-ink">
-                        {React.isValidElement(option.icon) ? (
-                          option.icon
-                        ) : typeof option.icon === "function" ? (
-                          React.createElement(option.icon, { className: "h-4 w-4" })
-                        ) : (
-                          option.icon
-                        )}
+                        <OptionIcon icon={option.icon} />
                       </div>
                     )}
 
