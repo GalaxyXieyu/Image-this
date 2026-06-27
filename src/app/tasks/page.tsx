@@ -306,7 +306,7 @@ export default function TasksPage() {
               <BrandEmptyState
                 pose="sleep"
                 title="暂无任务"
-                description="创建场景图或工具任务后，进度会集中显示在这里。"
+                description=""
               />
             </div>
           )}
@@ -325,11 +325,11 @@ export default function TasksPage() {
                     <h3 className="text-data font-medium text-foreground">
                       {task.name}
                     </h3>
-                    <p className="text-caption text-muted-foreground mt-0.5">
+                    <p className="mt-0.5 hidden text-caption text-muted-foreground sm:block">
                       {task.createdAt} · {task.completed}/{task.total} 张
                     </p>
                     {(task.status === "completed" || task.status === "failed") && task.usedModel && (
-                      <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                      <p className="mt-0.5 hidden text-[11px] text-muted-foreground/70 sm:block">
                         模型: {task.usedModel}
                       </p>
                     )}
@@ -340,7 +340,7 @@ export default function TasksPage() {
 
               {(task.status === "running" || task.status === "pending") && (
                 <div className="mt-4">
-                  <div className="flex items-center justify-between mb-1.5">
+                  <div className="mb-1.5 hidden items-center justify-between sm:flex">
                     <span className="text-caption text-muted-foreground">
                       进度 {task.progress}%
                     </span>

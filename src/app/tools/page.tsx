@@ -394,7 +394,7 @@ function ToolboxPageInner() {
                   <span className="text-data font-semibold text-ink">
                     {uploading ? "上传中…" : "点击或拖入图片"}
                   </span>
-                  <span className="text-[11px] text-ink-3">上传多张即自动进入批量处理</span>
+                  <span className="hidden text-[11px] text-ink-3 md:inline">上传多张即自动进入批量处理</span>
                 </button>
               ) : (
                 <div className="flex flex-col gap-3">
@@ -426,7 +426,7 @@ function ToolboxPageInner() {
             <BrandEmptyState
               pose="think"
               title="请先上传图片"
-              description="支持 JPG、PNG 格式，建议 1024×1024 以上。"
+              description=""
               className="glass-panel w-full max-w-[360px] rounded-[20px] px-5"
             />
           ) : (
@@ -455,20 +455,20 @@ function ToolboxPageInner() {
                   {getStatusLabel(runState.status)}
                 </Badge>
               </div>
-              <p className="text-caption text-muted-foreground mt-2">
+              <p className="hidden text-caption text-muted-foreground mt-2 md:block">
                 当前工具：{selectedTool.label}。{selectedTool.description}
               </p>
 
               {runState.taskId && (
                 <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3 space-y-2">
-                  <p className="text-caption text-muted-foreground truncate">任务 ID：{runState.taskId}</p>
-                  {runState.currentStep && <p className="text-caption text-muted-foreground">{runState.currentStep}</p>}
+                  <p className="hidden text-caption text-muted-foreground truncate md:block">任务 ID：{runState.taskId}</p>
+                  {runState.currentStep && <p className="hidden text-caption text-muted-foreground md:block">{runState.currentStep}</p>}
                   {(runState.status === "processing" || runState.status === "pending" || runState.status === "queued") && (
                     <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                       <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.max(0, Math.min(100, runState.progress))}%` }} />
                     </div>
                   )}
-                  {runState.usedModel && <p className="text-[11px] text-muted-foreground/70">模型：{runState.usedModel}</p>}
+                  {runState.usedModel && <p className="hidden text-[11px] text-muted-foreground/70 md:block">模型：{runState.usedModel}</p>}
                   {runState.errorMessage && (
                     <div className="flex items-start gap-2 text-caption text-destructive">
                       <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
@@ -605,7 +605,7 @@ function ToolParameterPanel({
           上传 Logo 水印（可选）
         </Button>
         {draft.watermarkLogoAsset && (
-          <p className="text-caption text-muted-foreground truncate">
+          <p className="hidden text-caption text-muted-foreground truncate md:block">
             Logo：{draft.watermarkLogoAsset.originalFilename}
           </p>
         )}
@@ -682,7 +682,7 @@ function ToolParameterPanel({
         上传参考背景（可选）
       </Button>
       {draft.referenceAsset && (
-        <p className="text-caption text-muted-foreground truncate">
+        <p className="hidden text-caption text-muted-foreground truncate md:block">
           参考图：{draft.referenceAsset.originalFilename}
         </p>
       )}

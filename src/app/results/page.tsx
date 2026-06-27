@@ -384,7 +384,7 @@ export default function ResultsPage() {
                         </div>
                         <div className="px-2.5 py-2">
                           <h3 className="truncate text-[12px] font-semibold text-ink">{item.name}</h3>
-                          <p className="mt-0.5 text-[11px] text-ink-3">{item.createdAt}</p>
+                          <p className="mt-0.5 hidden text-[11px] text-ink-3 sm:block">{item.createdAt}</p>
                         </div>
                       </div>
                     ))}
@@ -410,7 +410,7 @@ export default function ResultsPage() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <h3 className="truncate text-[13px] font-semibold text-ink">{item.name}</h3>
-                          <p className="text-[11px] text-ink-3">{item.createdAt}</p>
+                          <p className="hidden text-[11px] text-ink-3 sm:block">{item.createdAt}</p>
                         </div>
                         <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold text-brand-text">
                           {CATEGORY_LABELS[item.category] || "其他"}
@@ -433,7 +433,7 @@ export default function ResultsPage() {
                   <BrandEmptyState
                     pose="star"
                     title="暂无结果"
-                    description="去工作台生成你的第一张商品图吧。"
+                    description=""
                     action={
 	                      <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
 	                        <Button variant="brand" className="min-h-11" asChild>

@@ -837,7 +837,7 @@ export default function SettingsPage() {
             </div>
 
             {flatModels.length === 0 && (
-              <p className="text-data text-ink-3">尚未配置任何模型，点击右上「新增 Provider」开始</p>
+              <p className="hidden text-data text-ink-3 sm:block">尚未配置任何模型，点击右上「新增 Provider」开始</p>
             )}
           </div>
         );
@@ -1030,9 +1030,9 @@ export default function SettingsPage() {
                     </CardHeader>
                     <CardContent>
                       {template.description && (
-                        <p className="text-data text-muted-foreground mb-3">{template.description}</p>
+                        <p className="mb-3 hidden text-data text-muted-foreground sm:block">{template.description}</p>
                       )}
-                      <div className="bg-muted p-3 rounded-md border border-border mb-4">
+                      <div className="mb-4 hidden rounded-md border border-border bg-muted p-3 sm:block">
                         <p className="text-caption text-muted-foreground line-clamp-3">{template.prompt}</p>
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
@@ -1084,7 +1084,7 @@ export default function SettingsPage() {
                   <BrandEmptyState
                     pose="think"
                     title="暂无提示词模板"
-                    description="创建模板后，可在背景替换、扩图、高清化和一键增强场景中复用。"
+                    description=""
                     className="border-0 bg-transparent py-12"
                     action={
                       <Button onClick={() => setIsCreateDialogOpen(true)} className="min-h-11 gap-2">

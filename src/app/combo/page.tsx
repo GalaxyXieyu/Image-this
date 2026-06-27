@@ -387,7 +387,7 @@ export default function ComboPage() {
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block text-[14px] font-semibold text-ink">{step.name}</span>
-                        <span className="mt-0.5 line-clamp-2 block text-[12px] leading-4 text-ink-3">
+                        <span className="mt-0.5 hidden line-clamp-2 text-[12px] leading-4 text-ink-3 md:block">
                           {step.description}
                         </span>
                       </span>
@@ -868,7 +868,7 @@ function GlobalSettingsPanel({
           <p className="truncate text-[13px] font-semibold text-ink">
             {selectedTemplateName ?? "未选择模板"}
           </p>
-          <p className="mt-0.5 text-[12px] text-ink-3">
+          <p className="mt-0.5 hidden text-[12px] text-ink-3 md:block">
             {selectedTemplateName ? activeCategoryLabel : "从左侧选择一个场景模板"}
           </p>
         </div>
@@ -884,7 +884,7 @@ function GlobalSettingsPanel({
           onChange={(e) => setBatchCount(Number(e.target.value))}
           className="h-9 rounded-[11px]"
         />
-        <p className="text-[11px] text-ink-3">单次最多处理 100 张图片</p>
+        <p className="hidden text-[11px] text-ink-3 md:block">单次最多处理 100 张图片</p>
       </section>
 
       <section className="flex flex-col gap-2">
@@ -983,7 +983,7 @@ function MobileGlobalSettings({
           <p className="text-[13px] font-semibold text-ink">
             {selectedTemplateName ?? "未选择模板"}
           </p>
-          <p className="mt-0.5 text-[12px] text-ink-3">
+          <p className="mt-0.5 hidden text-[12px] text-ink-3 md:block">
             {selectedTemplateName ? activeCategoryLabel : "可先从上方选择一个场景模板"}
           </p>
         </div>
@@ -1055,7 +1055,7 @@ function MobileStepSettings({
           </span>
           <div className="min-w-0">
             <p className="text-[15px] font-bold text-ink">{step.name}</p>
-            <p className="text-[12px] text-ink-3">步骤 {step.order} 参数</p>
+            <p className="hidden text-[12px] text-ink-3 md:block">步骤 {step.order} 参数</p>
           </div>
         </div>
         <button

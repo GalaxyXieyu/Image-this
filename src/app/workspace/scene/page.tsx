@@ -263,7 +263,7 @@ function MobileCollapsibleSection({
       <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
         <div className="min-w-0">
           <div className="text-[14px] font-bold text-ink">{title}</div>
-          <div className="mt-0.5 truncate text-[12px] text-ink-3">{summary}</div>
+          <div className="mt-0.5 hidden truncate text-[12px] text-ink-3 sm:block">{summary}</div>
         </div>
         <ChevronDown className="h-4 w-4 shrink-0 text-ink-3 transition-transform group-open:rotate-180" />
       </summary>
@@ -363,7 +363,7 @@ function ProductInfoStep({
           <p className="max-w-full truncate text-[14px] font-semibold text-ink">
             {workflowData.inputAsset?.originalFilename ?? "上传商品图"}
           </p>
-          <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-ink-3 md:text-[12px]">
+          <p className="mt-1 hidden line-clamp-2 text-[11px] leading-snug text-ink-3 md:block md:text-[12px]">
             商品主体图，生成时保持主体稳定
           </p>
         </div>
@@ -397,7 +397,7 @@ function ProductInfoStep({
           <p className="max-w-full truncate text-[14px] font-semibold text-ink">
             {workflowData.referenceAsset?.originalFilename ?? "上传场景参考图"}
           </p>
-          <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-ink-3 md:text-[12px]">
+          <p className="mt-1 hidden line-clamp-2 text-[11px] leading-snug text-ink-3 md:block md:text-[12px]">
             参考背景、构图、光线与氛围
           </p>
         </div>
@@ -690,7 +690,7 @@ function StyleTemplateStep({
 		          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-[18px] font-bold text-ink md:text-[22px]">AI 生成预览</h2>
-              <p className="mt-1 text-[14px] text-ink-2">
+              <p className="mt-1 hidden text-[14px] text-ink-2 sm:block">
                 基于已提交的商品信息，选择想要的风格方向
               </p>
             </div>
@@ -740,7 +740,7 @@ function StyleTemplateStep({
                     )}
                   </div>
                   <div className="text-[14px] font-semibold text-ink">{template.name}</div>
-                  <p className="mt-1 text-[12px] text-ink-3">{template.desc}</p>
+                  <p className="mt-1 hidden text-[12px] text-ink-3 sm:block">{template.desc}</p>
                 </button>
               );
             })}
@@ -1094,7 +1094,7 @@ function GenerateAdjustStep({
               <BrandEmptyState
                 pose="think"
                 title="准备生成"
-                description="点击开始生成，AI 将创建真实任务并进入任务中心队列。"
+                description=""
                 className="w-full max-w-xl border-0 bg-transparent py-4 md:py-8"
               />
 
@@ -1123,7 +1123,7 @@ function GenerateAdjustStep({
                   <h2 className="text-h3 font-semibold text-foreground">
                     生成结果
                   </h2>
-                  <p className="text-data text-muted-foreground mt-1">
+                  <p className="hidden text-data text-muted-foreground mt-1 sm:block">
                     {generating
                       ? "正在创建任务，请稍候..."
                       : isPolling || activeCount > 0
@@ -1179,17 +1179,17 @@ function GenerateAdjustStep({
                         </Badge>
                       </div>
                       {result.currentStep && (
-                        <p className="mt-1 line-clamp-2 text-caption text-muted-foreground">
+                        <p className="mt-1 hidden line-clamp-2 text-caption text-muted-foreground sm:block">
                           {result.currentStep}
                         </p>
                       )}
                       {result.taskId && (
-                        <p className="mt-1 truncate text-caption text-muted-foreground">
+                        <p className="mt-1 hidden truncate text-caption text-muted-foreground sm:block">
                           任务 ID：{result.taskId}
                         </p>
                       )}
                       {(result.status === "completed" || result.status === "failed") && result.usedModel && (
-                        <p className="mt-1 truncate text-[11px] text-muted-foreground/70">
+                        <p className="mt-1 hidden truncate text-[11px] text-muted-foreground/70 sm:block">
                           模型：{result.usedModel}
                         </p>
                       )}

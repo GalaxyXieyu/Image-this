@@ -407,6 +407,25 @@
           "tasklist_guid": "local:image-this"
         }
       ]
+    },
+    {
+      "guid": "local-task-2c74a6b20f1b",
+      "url": "local://task/local-task-2c74a6b20f1b",
+      "summary": "[T11] 移动端二级文本完整清理",
+      "description": "任务编号：T11\n创建时间：2026-06-27 15:37:01 CST\n类型：task\nRepo：/Volumes/DATABASE/code/business/Image-this\n\n需求：\n根据线上截图反馈，完整梳理移动端二级说明文本：隐藏或移除手机端卡片说明、上传框小字、空状态描述、步骤描述、任务/结果元信息预览等非必要二级文本，只保留标题、控件、状态和关键错误提示；重新构建并推送部署用于远程演示。\n\n执行要求：\n- 以 task/doc 为主，不再依赖本地 task/context/state 文件。\n- 进度默认写评论，验收证据优先回填附件或评论。",
+      "created_at": "2026-06-27T15:37:01+08:00",
+      "updated_at": "2026-06-27T15:37:01+08:00",
+      "completed_at": "",
+      "start": {},
+      "due": {},
+      "members": [],
+      "attachments": [],
+      "comments": [],
+      "tasklists": [
+        {
+          "tasklist_guid": "local:image-this"
+        }
+      ]
     }
   ]
 }
