@@ -426,6 +426,41 @@
           "tasklist_guid": "local:image-this"
         }
       ]
+    },
+    {
+      "guid": "local-task-e7ea28634b8e",
+      "url": "local://task/local-task-e7ea28634b8e",
+      "summary": "[T12] 场景生成支持多商品图上传预览与批量生成",
+      "description": "任务编号：T12\n创建时间：2026-06-27 16:44:43 CST\n类型：task\nRepo：/Volumes/DATABASE/code/business/Image-this\n\n需求：\n根据线上演示反馈，/workspace/scene 的商品图上传需要支持一次选择多张商品图，移动端和桌面端都要能预览/管理已上传图片；生成时应按多张商品图批量创建场景生成任务，而不是只处理一张。保持参考图仍为可选单张参考；验证上传预览、继续选风格、生成任务创建数量与移动端布局。\n\n执行要求：\n- 以 task/doc 为主，不再依赖本地 task/context/state 文件。\n- 进度默认写评论，验收证据优先回填附件或评论。",
+      "created_at": "2026-06-27T16:44:43+08:00",
+      "updated_at": "2026-06-27T17:09:54+08:00",
+      "completed_at": "2026-06-27T17:09:54+08:00",
+      "start": {
+        "timestamp": "2026-06-27T17:00:00+08:00",
+        "is_all_day": false
+      },
+      "due": {},
+      "members": [],
+      "attachments": [],
+      "comments": [
+        {
+          "guid": "local-comment-420b148a67a3",
+          "content": "实现中：已完成 /workspace/scene 多商品图状态结构、移动端上传预览面板、批量任务展开适配器，并通过 npx tsc --noEmit、npm run lint、npm run build。移动端截图验证发现缩略图加载失败时会显示大号文件名，正在补预览兜底后复测。",
+          "resource_id": "local-task-e7ea28634b8e",
+          "created_at": "2026-06-27T17:00:00+08:00"
+        },
+        {
+          "guid": "local-comment-d6f0bea15aca",
+          "content": "已完成 /workspace/scene 多商品图上传预览与批量生成适配：商品图输入支持一次多选、继续添加、横向缩略图预览和单张移除；参考图保持单张并提供预览；生成阶段按商品图数量 × 候选数量展开任务，结果卡片和保存 metadata 记录源商品图；同时修复 /api/files/input-assets 在 Web/自定义本地存储路径下的文件读取，保证上传后预览能返回真实图片。验证：npx tsc --noEmit 通过；npm run lint 通过（仅既有 warning）；npm run build 通过；Playwright 移动端 390x844 验证 3 张商品图 + 1 张参考图真实预览可见，并确认第三步显示将创建 12 个任务。截图：out/ui-ux-plan/t12-scene-multi-upload/scene-step1-mobile-real-preview.png、out/ui-ux-plan/t12-scene-multi-upload/scene-step3-mobile-real-preview.png。",
+          "resource_id": "local-task-e7ea28634b8e",
+          "created_at": "2026-06-27T17:09:54+08:00"
+        }
+      ],
+      "tasklists": [
+        {
+          "tasklist_guid": "local:image-this"
+        }
+      ]
     }
   ]
 }

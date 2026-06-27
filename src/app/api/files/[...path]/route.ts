@@ -8,6 +8,25 @@ import { authOptions } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
+async function pathExists(filePath: string) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function resolveConfiguredPath(savePath: string): string {
+  if (savePath.startsWith('~')) {
+    return path.join(os.homedir(), savePath.slice(1));
+  }
+  if (path.isAbsolute(savePath)) {
+    return savePath;
+  }
+  return path.join(process.cwd(), savePath);
+}
+
 /**
  * 文件服务 API
  * 用于在 Electron 环境中提供本地文件访问
@@ -83,11 +102,31 @@ export async function GET(
         basePath = path.join(os.homedir(), 'ImagineThis');
       }
     } else {
-      // Web 环境：使用 public 目录
-      basePath = path.join(process.cwd(), 'public');
+      // Web 环境：输入素材的公开路径省略了 uploads 前缀。
+      // 若用户配置了本地存储路径，优先从该路径读取；否则回退到 public/uploads。
+      const pathParts = relativePath.split('/');
+      if (pathParts[0] === 'input-assets') {
+        const session = await getServerSession(authOptions);
+        if (session?.user?.id) {
+          const userConfig = await getUserConfig(session.user.id);
+          basePath = userConfig.localStorage?.savePath
+            ? resolveConfiguredPath(userConfig.localStorage.savePath)
+            : path.join(process.cwd(), 'public', 'uploads');
+        } else {
+          basePath = path.join(process.cwd(), 'public', 'uploads');
+        }
+      } else {
+        basePath = path.join(process.cwd(), 'public');
+      }
     }
     
-    const filePath = path.join(basePath, relativePath);
+    let filePath = path.join(basePath, relativePath);
+    if (relativePath.startsWith('input-assets/') && !(await pathExists(filePath))) {
+      const uploadsPath = path.join(basePath, 'uploads', relativePath);
+      if (await pathExists(uploadsPath)) {
+        filePath = uploadsPath;
+      }
+    }
     
     // 安全检查：确保文件在基础目录内
     const resolvedPath = path.resolve(filePath);

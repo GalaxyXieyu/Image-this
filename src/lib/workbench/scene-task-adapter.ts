@@ -5,6 +5,7 @@ import { getModelEntry, getFallbackChain } from '@/lib/ai-models';
 export interface SceneTaskDraftInput extends SceneWorkflowDraft {
   inputAsset?: InputAssetRef;
   referenceAsset?: InputAssetRef;
+  productAssets?: InputAssetRef[];
   styleTemplateIds?: string[];
   stylePreference?: string;
   sellingPoints?: string;
@@ -54,6 +55,34 @@ function buildScenePrompt(draft: SceneTaskDraftInput) {
   ].filter(Boolean).join('\n');
 }
 
+function uniqueAssets(assets: InputAssetRef[]) {
+  const seen = new Set<string>();
+  return assets.filter((asset) => {
+    if (seen.has(asset.assetId)) return false;
+    seen.add(asset.assetId);
+    return true;
+  });
+}
+
+function resolveReferenceAsset(input: SceneTaskDraftInput) {
+  if (input.referenceAsset) return input.referenceAsset;
+  const [, fallbackReferenceAsset] = input.inputAssets;
+  return fallbackReferenceAsset;
+}
+
+function resolveProductAssets(input: SceneTaskDraftInput) {
+  if (input.productAssets?.length) {
+    return uniqueAssets(input.productAssets);
+  }
+
+  if (input.inputAsset) {
+    return [input.inputAsset];
+  }
+
+  const [fallbackInputAsset] = input.inputAssets;
+  return fallbackInputAsset ? [fallbackInputAsset] : [];
+}
+
 export function buildSceneWorkflowDraft(input: SceneTaskDraftInput): SceneWorkflowDraft {
   return {
     productInfo: input.productInfo,
@@ -68,10 +97,14 @@ export function buildSceneWorkflowDraft(input: SceneTaskDraftInput): SceneWorkfl
  * Build a legacy task request (contract v1) for POST /api/tasks.
  * Kept for backward compatibility.
  */
-export function buildSceneLegacyTaskRequest(input: SceneTaskDraftInput, candidateIndex = 0): LegacySceneTaskRequest {
-  const [fallbackInputAsset, fallbackReferenceAsset] = input.inputAssets;
+export function buildSceneLegacyTaskRequest(
+  input: SceneTaskDraftInput,
+  candidateIndex = 0,
+  productAssetIndex = 0
+): LegacySceneTaskRequest {
+  const [fallbackInputAsset] = input.inputAssets;
   const inputAsset = input.inputAsset ?? fallbackInputAsset;
-  const referenceAsset = input.referenceAsset ?? fallbackReferenceAsset;
+  const referenceAsset = resolveReferenceAsset(input);
 
   if (!inputAsset) {
     throw new Error('请先上传商品图');
@@ -108,12 +141,18 @@ export function buildSceneLegacyTaskRequest(input: SceneTaskDraftInput, candidat
     inputData: JSON.stringify({
       ...parsedInput,
       workflowType: 'scene_generation',
-      sceneDraft: buildSceneWorkflowDraft(input),
+      sceneDraft: buildSceneWorkflowDraft({
+        ...input,
+        inputAssets: [inputAsset, referenceAsset].filter((asset): asset is InputAssetRef => Boolean(asset)),
+      }),
       selectedPresetId: input.selectedPresetId,
       styleTemplateIds: input.styleTemplateIds ?? [],
       stylePreference: input.stylePreference ?? input.productInfo.stylePreference,
       candidateCount: input.parameters.candidateCount,
       candidateIndex,
+      productAssetIndex,
+      productAssetId: inputAsset.assetId,
+      productAssetName: inputAsset.originalFilename,
       batchMode: input.batchMode,
       provider,
       modelName: selectedModel,
@@ -125,16 +164,32 @@ export function buildSceneLegacyTaskRequest(input: SceneTaskDraftInput, candidat
 
 export function buildSceneLegacyTaskRequests(input: SceneTaskDraftInput): LegacySceneTaskRequest[] {
   const count = Math.max(1, input.parameters.candidateCount || 1);
-  return Array.from({ length: count }, (_, index) => buildSceneLegacyTaskRequest(input, index));
+  const productAssets = resolveProductAssets(input);
+  if (productAssets.length === 0) {
+    return [buildSceneLegacyTaskRequest(input, 0)];
+  }
+
+  return productAssets.flatMap((asset, productIndex) =>
+    Array.from({ length: count }, (_, candidateIndex) =>
+      buildSceneLegacyTaskRequest(
+        {
+          ...input,
+          inputAsset: asset,
+        },
+        candidateIndex,
+        productIndex
+      )
+    )
+  );
 }
 
 /**
  * Build a typed workflow task request (contract v2) for POST /api/workflow/tasks.
  */
 export function buildSceneWorkflowTaskRequest(input: SceneTaskDraftInput): SceneWorkflowTaskRequest {
-  const [fallbackInputAsset, fallbackReferenceAsset] = input.inputAssets;
+  const [fallbackInputAsset] = input.inputAssets;
   const inputAsset = input.inputAsset ?? fallbackInputAsset;
-  const referenceAsset = input.referenceAsset ?? fallbackReferenceAsset;
+  const referenceAsset = resolveReferenceAsset(input);
 
   if (!inputAsset) {
     throw new Error('请先上传商品图');
@@ -163,7 +218,19 @@ export function buildSceneWorkflowTaskRequest(input: SceneTaskDraftInput): Scene
 
 export function buildSceneWorkflowTaskRequests(input: SceneTaskDraftInput): SceneWorkflowTaskRequest[] {
   const count = Math.max(1, input.parameters.candidateCount || 1);
-  return Array.from({ length: count }, () => buildSceneWorkflowTaskRequest(input));
+  const productAssets = resolveProductAssets(input);
+  if (productAssets.length === 0) {
+    return [buildSceneWorkflowTaskRequest(input)];
+  }
+
+  return productAssets.flatMap((asset) =>
+    Array.from({ length: count }, () =>
+      buildSceneWorkflowTaskRequest({
+        ...input,
+        inputAsset: asset,
+      })
+    )
+  );
 }
 
 export function appendInputAsset(assets: InputAssetRef[], role: 'input' | 'reference', asset: InputAssetRef) {

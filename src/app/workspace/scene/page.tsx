@@ -32,6 +32,9 @@ import {
   ArrowRight,
   CheckCircle2,
   ChevronDown,
+  ImagePlus,
+  Plus,
+  Trash2,
   Wand2,
   ShoppingBag,
 } from "lucide-react";
@@ -45,6 +48,9 @@ interface SceneCandidateResult {
   taskId?: string;
   savedImageId?: string;
   name: string;
+  sourceAsset?: InputAssetRef;
+  sourceIndex?: number;
+  candidateIndex?: number;
   status: CandidateStatus;
   progress: number;
   currentStep?: string;
@@ -89,6 +95,7 @@ interface WorkflowData {
   activePresetName?: string;
   activePresetDescription?: string;
   stylePreference?: string;
+  inputAssets: InputAssetRef[];
   inputAsset?: InputAssetRef;
   referenceAsset?: InputAssetRef;
   aiModel: string;
@@ -105,6 +112,7 @@ const EMPTY_WORKFLOW_DATA: WorkflowData = {
   sellingPoints: "",
   platforms: [],
   selectedTemplates: [],
+  inputAssets: [],
   aiModel: "gemini-3.1-flash-image-preview",
   outputResolution: "1024x1024",
   candidateCount: 4,
@@ -280,6 +288,62 @@ function getFilenameDraftName(filename?: string) {
   return filename?.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim() ?? "";
 }
 
+function getProductAssets(workflowData: WorkflowData) {
+  if (workflowData.inputAssets.length > 0) {
+    return workflowData.inputAssets;
+  }
+  return workflowData.inputAsset ? [workflowData.inputAsset] : [];
+}
+
+function getAssetPreviewUrl(asset?: InputAssetRef) {
+  return asset?.clientUrl || "";
+}
+
+function getCompactFilename(filename?: string) {
+  if (!filename) return "商品图";
+  const draftName = getFilenameDraftName(filename);
+  return draftName || filename;
+}
+
+function AssetPreviewImage({
+  asset,
+  className,
+  fallbackClassName,
+  fallbackPose = "cheer",
+}: {
+  asset?: InputAssetRef;
+  className?: string;
+  fallbackClassName?: string;
+  fallbackPose?: "cheer" | "sleep" | "think" | "star";
+}) {
+  const [failed, setFailed] = useState(false);
+  const previewUrl = getAssetPreviewUrl(asset);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [previewUrl]);
+
+  if (!previewUrl || failed) {
+    return (
+      <BrandImageFallback
+        title=""
+        description=""
+        pose={fallbackPose}
+        className={cn("[&_p]:hidden", fallbackClassName)}
+      />
+    );
+  }
+
+  return (
+    <img
+      src={previewUrl}
+      alt=""
+      className={className}
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 function ProductInfoStep({
   onNext,
   workflowData,
@@ -292,26 +356,71 @@ function ProductInfoStep({
   const inputFileRef = useRef<HTMLInputElement>(null);
   const referenceFileRef = useRef<HTMLInputElement>(null);
   const { upload, uploading } = useUpload();
+  const [uploadingProductAssets, setUploadingProductAssets] = useState(false);
   const { toast } = useToast();
+  const productAssets = getProductAssets(workflowData);
+  const isUploadingAsset = uploading || uploadingProductAssets;
 
-  const handleUploadAsset = async (role: "input" | "reference", file?: File) => {
-    if (!file) return;
+  const appendProductAssets = (assets: InputAssetRef[]) => {
+    if (assets.length === 0) return;
 
+    setWorkflowData((prev) => {
+      const nextAssets = [...getProductAssets(prev), ...assets];
+      return {
+        ...prev,
+        inputAssets: nextAssets,
+        inputAsset: nextAssets[0],
+        productName: prev.productName || getFilenameDraftName(nextAssets[0]?.originalFilename),
+      };
+    });
+  };
+
+  const handleUploadInputAssets = async (files?: FileList | File[]) => {
+    const selectedFiles = Array.from(files ?? []);
+    if (selectedFiles.length === 0) return;
+
+    const uploadedAssets: InputAssetRef[] = [];
+    setUploadingProductAssets(true);
     try {
-      const response = await upload(role === "input" ? { input: file } : { reference: file });
-      const asset = role === "input" ? response.inputAsset : response.referenceAsset;
+      for (const file of selectedFiles) {
+        const response = await upload({ input: file });
+        if (response.inputAsset) {
+          uploadedAssets.push(response.inputAsset);
+        }
+      }
+
+      appendProductAssets(uploadedAssets);
+      if (uploadedAssets.length > 0) {
+        toast({
+          title: "商品图已加入",
+          description: `已添加 ${uploadedAssets.length} 张商品图，共 ${productAssets.length + uploadedAssets.length} 张。`,
+        });
+      }
+    } catch (error) {
+      appendProductAssets(uploadedAssets);
+      toast({
+        title: "上传失败",
+        description: error instanceof Error ? error.message : "请稍后重试",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingProductAssets(false);
+    }
+  };
+
+  const handleUploadReferenceAsset = async (file?: File) => {
+    if (!file) return;
+    try {
+      const response = await upload({ reference: file });
+      const asset = response.referenceAsset;
       if (!asset) return;
 
       setWorkflowData((prev) => ({
         ...prev,
-        productName:
-          role === "input" && !prev.productName
-            ? getFilenameDraftName(asset.originalFilename)
-            : prev.productName,
-        [role === "input" ? "inputAsset" : "referenceAsset"]: asset,
+        referenceAsset: asset,
       }));
       toast({
-        title: role === "input" ? "商品图已上传" : "参考图已上传",
+        title: "参考图已上传",
         description: asset.originalFilename,
       });
     } catch (error) {
@@ -321,6 +430,17 @@ function ProductInfoStep({
         variant: "destructive",
       });
     }
+  };
+
+  const removeProductAsset = (assetId: string) => {
+    setWorkflowData((prev) => {
+      const nextAssets = getProductAssets(prev).filter((asset) => asset.assetId !== assetId);
+      return {
+        ...prev,
+        inputAssets: nextAssets,
+        inputAsset: nextAssets[0],
+      };
+    });
   };
 
   const moreInfoCount = [
@@ -339,67 +459,103 @@ function ProductInfoStep({
         ref={inputFileRef}
         type="file"
         accept="image/*"
+        multiple
         className="hidden"
-        onChange={(event) => handleUploadAsset("input", event.target.files?.[0])}
+        onChange={(event) => {
+          void handleUploadInputAssets(event.target.files ?? undefined);
+          event.currentTarget.value = "";
+        }}
       />
-      <button
-        type="button"
-        className={cn(
-          "flex min-h-[124px] flex-col items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-dashed bg-surface p-3 text-center transition-all hover:border-brand hover:bg-brand-soft/40 md:min-h-[132px] md:gap-2.5 md:p-4",
-          workflowData.inputAsset ? "border-brand/50 bg-brand-soft/30" : "border-line-strong"
+      <div className="min-w-0">
+        <button
+          type="button"
+          className={cn(
+            "flex min-h-[112px] w-full items-center gap-3 rounded-[14px] border-[1.5px] border-dashed bg-surface p-3 text-left transition-all hover:border-brand hover:bg-brand-soft/40 md:min-h-[120px]",
+            productAssets.length > 0 ? "border-brand/50 bg-brand-soft/25" : "border-line-strong"
+          )}
+          onClick={() => inputFileRef.current?.click()}
+          disabled={isUploadingAsset}
+        >
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] bg-brand-soft text-brand md:h-14 md:w-14">
+            <ImagePlus className="h-6 w-6" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[14px] font-semibold text-ink">
+              {productAssets.length > 0 ? "继续添加商品图" : "添加商品图"}
+            </span>
+            <span className="mt-1 inline-flex rounded-full bg-surface-muted px-2.5 py-1 text-[12px] font-semibold text-ink-2">
+              已选 {productAssets.length} 张
+            </span>
+          </span>
+          <Plus className="h-5 w-5 shrink-0 text-brand" />
+        </button>
+
+        {productAssets.length > 0 && (
+          <div className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] md:mx-0 md:grid md:grid-cols-5 md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden">
+            {productAssets.map((asset, index) => (
+              <div
+                key={asset.assetId}
+                className="group relative w-[104px] shrink-0 overflow-hidden rounded-[12px] border border-line bg-surface md:w-auto"
+              >
+                <div className="aspect-square bg-surface-muted">
+                  <AssetPreviewImage
+                    asset={asset}
+                    className="h-full w-full object-contain"
+                    fallbackClassName="h-full w-full"
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-ink-2 shadow-soft transition-colors hover:text-destructive"
+                  onClick={() => removeProductAsset(asset.assetId)}
+                  aria-label={`移除第 ${index + 1} 张商品图`}
+                  title="移除"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+                <div className="border-t border-line px-2 py-1.5">
+                  <p className="truncate text-[11px] font-semibold text-ink">
+                    {index + 1}. {getCompactFilename(asset.originalFilename)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
-        onClick={() => inputFileRef.current?.click()}
-        disabled={uploading}
-      >
-        <span className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-brand-soft md:h-[52px] md:w-[52px] md:rounded-[15px]">
-          <BrandImageFallback
-            title=""
-            description=""
-            pose={workflowData.inputAsset ? "cheer" : "think"}
-            className="[&_p]:hidden h-8 w-8 md:h-9 md:w-9"
-          />
-        </span>
-        <div className="min-w-0">
-          <p className="max-w-full truncate text-[14px] font-semibold text-ink">
-            {workflowData.inputAsset?.originalFilename ?? "上传商品图"}
-          </p>
-          <p className="mt-1 hidden line-clamp-2 text-[11px] leading-snug text-ink-3 md:block md:text-[12px]">
-            商品主体图，生成时保持主体稳定
-          </p>
-        </div>
-      </button>
+      </div>
 
       <input
         ref={referenceFileRef}
         type="file"
         accept="image/*"
         className="hidden"
-        onChange={(event) => handleUploadAsset("reference", event.target.files?.[0])}
+        onChange={(event) => {
+          void handleUploadReferenceAsset(event.target.files?.[0]);
+          event.currentTarget.value = "";
+        }}
       />
       <button
         type="button"
         className={cn(
-          "flex min-h-[124px] flex-col items-center justify-center gap-2 rounded-[14px] border-[1.5px] border-dashed bg-surface p-3 text-center transition-all hover:border-brand hover:bg-brand-soft/40 md:min-h-[132px] md:gap-2.5 md:p-4",
+          "flex min-h-[112px] items-center gap-3 rounded-[14px] border-[1.5px] border-dashed bg-surface p-3 text-left transition-all hover:border-brand hover:bg-brand-soft/40 md:min-h-[120px]",
           workflowData.referenceAsset ? "border-brand/40 bg-surface-muted/70" : "border-line-strong"
         )}
         onClick={() => referenceFileRef.current?.click()}
-        disabled={uploading}
+        disabled={isUploadingAsset}
       >
-        <span className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-surface-muted md:h-[52px] md:w-[52px] md:rounded-[15px]">
-          <BrandImageFallback
-            title=""
-            description=""
-            pose={workflowData.referenceAsset ? "star" : "sleep"}
-            className="[&_p]:hidden h-8 w-8 md:h-9 md:w-9"
+        <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[14px] bg-surface-muted md:h-20 md:w-20">
+          <AssetPreviewImage
+            asset={workflowData.referenceAsset}
+            className="h-full w-full object-cover"
+            fallbackClassName="h-10 w-10"
+            fallbackPose="sleep"
           />
         </span>
         <div className="min-w-0">
           <p className="max-w-full truncate text-[14px] font-semibold text-ink">
             {workflowData.referenceAsset?.originalFilename ?? "上传场景参考图"}
           </p>
-          <p className="mt-1 hidden line-clamp-2 text-[11px] leading-snug text-ink-3 md:block md:text-[12px]">
-            参考背景、构图、光线与氛围
-          </p>
+          <p className="mt-1 text-[12px] font-semibold text-ink-3">单张参考</p>
         </div>
       </button>
     </>
@@ -522,13 +678,13 @@ function ProductInfoStep({
                   先放商品图，参考图用于背景、构图和氛围。
                 </p>
               </div>
-              {uploading && (
+              {isUploadingAsset && (
                 <span className="shrink-0 rounded-full bg-surface-muted px-3 py-1 text-[12px] font-semibold text-ink-2">
                   上传中
                 </span>
               )}
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-3 md:mt-3.5 md:gap-3.5">
+            <div className="mt-3 grid grid-cols-1 gap-3 md:mt-3.5 md:grid-cols-[minmax(0,1.45fr)_minmax(240px,0.85fr)] md:gap-3.5">
               {uploadCards}
             </div>
             <p className="mt-3 hidden text-[12px] text-ink-3 sm:block">
@@ -810,9 +966,11 @@ function GenerateAdjustStep({
   const activeCount = results.filter((result) => !isTerminalCandidateStatus(result.status)).length;
   const [savingCandidateId, setSavingCandidateId] = useState<string | null>(null);
   const sceneModels = getSceneGenerationModels();
+  const productAssets = getProductAssets(workflowData);
+  const expectedTaskCount = productAssets.length * Math.max(1, workflowData.candidateCount || 1);
   const selectedModelLabel =
     sceneModels.find((model) => model.id === workflowData.aiModel)?.label ?? workflowData.aiModel;
-  const advancedSettingsSummary = `${selectedModelLabel} / ${getOptionLabel(outputResolutionOptions, workflowData.outputResolution)} / ${workflowData.candidateCount} 张`;
+  const advancedSettingsSummary = `${selectedModelLabel} / ${getOptionLabel(outputResolutionOptions, workflowData.outputResolution)} / ${workflowData.candidateCount} 张/商品`;
   const advancedSettingsControls = (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
       <div className="space-y-1.5">
@@ -971,7 +1129,7 @@ function GenerateAdjustStep({
 
     setSavingCandidateId(result.id);
     try {
-      const originalUrl = workflowData.inputAsset?.clientUrl ?? result.resultImageUrl;
+      const originalUrl = result.sourceAsset?.clientUrl ?? workflowData.inputAsset?.clientUrl ?? result.resultImageUrl;
       const response = await apiPost<{
         success: boolean;
         image: { id: string };
@@ -986,6 +1144,10 @@ function GenerateAdjustStep({
           workflowType: "scene_generation",
           taskId: result.taskId,
           candidateId: result.id,
+          sourceAssetId: result.sourceAsset?.assetId,
+          sourceAssetName: result.sourceAsset?.originalFilename,
+          sourceIndex: result.sourceIndex,
+          candidateIndex: result.candidateIndex,
           selectedPresetId: workflowData.selectedPresetId,
           presetName: workflowData.activePresetName,
           productName: workflowData.productName,
@@ -1025,6 +1187,7 @@ function GenerateAdjustStep({
   const handleGenerate = async () => {
     setGenerating(true);
     try {
+      const candidateCount = Math.max(1, workflowData.candidateCount || 1);
       const taskRequests = buildSceneLegacyTaskRequests({
         productInfo: {
           name: workflowData.productName,
@@ -1033,10 +1196,11 @@ function GenerateAdjustStep({
           targetPlatform: mapSelectionToTargetPlatform(workflowData.platforms[0]),
           stylePreference: workflowData.stylePreference || workflowData.usageScene,
         },
-        inputAssets: [workflowData.inputAsset, workflowData.referenceAsset].filter(
+        inputAssets: [...productAssets, workflowData.referenceAsset].filter(
           (asset): asset is InputAssetRef => Boolean(asset)
         ),
-        inputAsset: workflowData.inputAsset,
+        inputAsset: productAssets[0],
+        productAssets,
         referenceAsset: workflowData.referenceAsset,
         selectedPresetId: workflowData.selectedPresetId,
         styleTemplateIds: workflowData.selectedTemplates,
@@ -1046,7 +1210,7 @@ function GenerateAdjustStep({
         parameters: {
           aiModel: workflowData.aiModel,
           outputResolution: workflowData.outputResolution,
-          candidateCount: workflowData.candidateCount,
+          candidateCount,
         },
       });
 
@@ -1059,13 +1223,24 @@ function GenerateAdjustStep({
       const tasks = response.tasks ?? (response.task ? [response.task] : []);
       const createdTaskIds = tasks.map((task) => task.id);
       setResults(
-        tasks.map((task, index) => ({
-          id: String(index + 1),
+        tasks.map((task, index) => {
+          const sourceIndex = Math.floor(index / candidateCount);
+          const candidateIndex = (index % candidateCount) + 1;
+          const sourceAsset = productAssets[sourceIndex] ?? productAssets[0];
+          const sourceName = getCompactFilename(sourceAsset?.originalFilename);
+          return {
+          id: task.id,
           taskId: task.id,
-          name: `${workflowData.activePresetName ?? "场景图"}候选 ${index + 1}`,
+          name: productAssets.length > 1
+            ? `${sourceName} · 候选 ${candidateIndex}`
+            : `${workflowData.activePresetName ?? "场景图"}候选 ${candidateIndex}`,
+          sourceAsset,
+          sourceIndex: sourceIndex + 1,
+          candidateIndex,
           status: "queued",
           progress: 0,
-        }))
+          };
+        })
       );
       if (createdTaskIds.length > 0) {
         startPolling(createdTaskIds);
@@ -1106,9 +1281,14 @@ function GenerateAdjustStep({
                   {advancedSettingsControls}
                 </div>
               </div>
+              <div className="mb-4 rounded-full border border-line bg-surface px-3.5 py-2 text-[13px] font-semibold text-ink-2">
+                {productAssets.length > 0
+                  ? `${productAssets.length} 张商品图 · 将创建 ${expectedTaskCount} 个任务`
+                  : "请先上传商品图"}
+              </div>
               <Button
 	                onClick={handleGenerate}
-	                disabled={generating || !workflowData.inputAsset || !workflowData.referenceAsset}
+	                disabled={generating || productAssets.length === 0 || !workflowData.referenceAsset}
 	                variant="brand"
 	                className="min-h-11 px-6"
 	              >
@@ -1171,13 +1351,18 @@ function GenerateAdjustStep({
                     </div>
                     <div className="p-4">
                       <div className="flex items-center justify-between gap-2">
-                        <h3 className="text-data font-medium text-foreground">
+                        <h3 className="min-w-0 truncate text-data font-medium text-foreground">
                           {result.name}
                         </h3>
                         <Badge variant={getCandidateStatusVariant(result.status)}>
                           {getCandidateStatusLabel(result.status)}
                         </Badge>
                       </div>
+                      {result.sourceAsset && productAssets.length > 1 && (
+                        <p className="mt-1 truncate text-[11px] font-semibold text-brand-text">
+                          商品 {result.sourceIndex}/{productAssets.length}
+                        </p>
+                      )}
                       {result.currentStep && (
                         <p className="mt-1 hidden line-clamp-2 text-caption text-muted-foreground sm:block">
                           {result.currentStep}

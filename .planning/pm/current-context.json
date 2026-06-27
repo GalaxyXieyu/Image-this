@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-27T15:37:01+08:00",
+  "generated_at": "2026-06-27T17:09:54+08:00",
   "project": {
     "name": "Image-this",
     "repo_root": "/Volumes/DATABASE/code/business/Image-this",
@@ -102,13 +102,13 @@
     "created_at": "2026-06-27T13:23:21+08:00"
   },
   "current_task": {
-    "task_id": "T11",
-    "summary": "[T11] 移动端二级文本完整清理",
-    "status": "todo",
-    "guid": "local-task-2c74a6b20f1b",
-    "url": "local://task/local-task-2c74a6b20f1b",
-    "description": "任务编号：T11\n创建时间：2026-06-27 15:37:01 CST\n类型：task\nRepo：/Volumes/DATABASE/code/business/Image-this\n\n需求：\n根据线上截图反馈，完整梳理移动端二级说明文本：隐藏或移除手机端卡片说明、上传框小字、空状态描述、步骤描述、任务/结果元信息预览等非必要二级文本，只保留标题、控件、状态和关键错误提示；重新构建并推送部署用于远程演示。\n\n执行要求：\n- 以 task/doc 为主，不再依赖本地 task/context/state 文件。\n- 进度默认写评论，验收证据优先回填附件或评论。",
-    "updated_at": "2026-06-27T15:37:01+08:00",
+    "task_id": "T9",
+    "summary": "[T9] 图片生成真实出图联调与模板导入",
+    "status": "in_progress",
+    "guid": "local-task-b65512c1abd2",
+    "url": "local://task/local-task-b65512c1abd2",
+    "description": "任务编号：T9\n创建时间：2026-06-27 13:23:21 CST\n类型：task\nRepo：/Volumes/DATABASE/code/business/Image-this\n\n需求：\n等待用户提供 provider key、base URL、图床 key、测试商品图/参考图和旧模板来源后，继续推进真实图片生成端到端联调。范围包括：按 main 分支校准 GPT 调用方式，修复 Jimeng Ark-only 前置检查，写入/验证 .env 或设置页配置，备份并同步本地 SQLite schema，运行 UIUX_REQUIRE_IMAGE=true 的登录到出图自动化，确认 provider 返回图片、本地存储落图、ProcessedImage 入库和页面展示；同时梳理并实现旧默认模板/测试图片的 seed/import，方便后续存储和复跑。\n\n执行要求：\n- 以 task/doc 为主，不再依赖本地 task/context/state 文件。\n- 进度默认写评论，验收证据优先回填附件或评论。",
+    "updated_at": "2026-06-27T14:07:45+08:00",
     "completed_at": "",
     "attachments": [],
     "tasklists": [
@@ -117,5 +117,12 @@
       }
     ]
   },
-  "recent_comments": []
+  "recent_comments": [
+    {
+      "guid": "local-comment-0fb469553b58",
+      "content": "已建立后续联调任务并保留配置清单：.planning/IMAGE-GENERATION-CONFIG-CHECKLIST.md。等待用户后续提供 provider key、base URL、图床 key、测试商品图/参考图和旧模板来源后再继续真实出图、模板导入与端到端验证。当前不在 PM 评论或计划文档中记录任何真实 key/token。",
+      "resource_id": "local-task-b65512c1abd2",
+      "created_at": "2026-06-27T14:07:45+08:00"
+    }
+  ]
 }

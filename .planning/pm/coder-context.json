@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-27T15:09:51+08:00",
+  "generated_at": "2026-06-27T16:46:10+08:00",
   "project": {
     "name": "Image-this",
     "repo_root": "/Volumes/DATABASE/code/business/Image-this",
@@ -60,13 +60,13 @@
     ]
   },
   "current_task": {
-    "task_id": "T10",
-    "summary": "[T10] 移动端顶部信息聚焦与操作区优化",
+    "task_id": "T12",
+    "summary": "[T12] 场景生成支持多商品图上传预览与批量生成",
     "status": "todo",
-    "guid": "local-task-4f5f136fe763",
-    "url": "local://task/local-task-4f5f136fe763",
-    "description": "任务编号：T10\n创建时间：2026-06-27 15:09:39 CST\n类型：task\nRepo：/Volumes/DATABASE/code/business/Image-this\n\n需求：\n落实已确认计划：移动端隐藏解释型顶部大标题/副标题和重复二级导航，压缩 /combo /tools /tasks /results /settings /templates /workspace/scene 的首屏信息密度；移动端选择控件优先使用横向 pill；修正固定底部操作栏和 FAB 遮挡，按 390x844、375x667、430x932 等移动端标准验证。\n\n执行要求：\n- 以 task/doc 为主，不再依赖本地 task/context/state 文件。\n- 进度默认写评论，验收证据优先回填附件或评论。",
-    "updated_at": "2026-06-27T15:09:39+08:00",
+    "guid": "local-task-e7ea28634b8e",
+    "url": "local://task/local-task-e7ea28634b8e",
+    "description": "任务编号：T12\n创建时间：2026-06-27 16:44:43 CST\n类型：task\nRepo：/Volumes/DATABASE/code/business/Image-this\n\n需求：\n根据线上演示反馈，/workspace/scene 的商品图上传需要支持一次选择多张商品图，移动端和桌面端都要能预览/管理已上传图片；生成时应按多张商品图批量创建场景生成任务，而不是只处理一张。保持参考图仍为可选单张参考；验证上传预览、继续选风格、生成任务创建数量与移动端布局。\n\n执行要求：\n- 以 task/doc 为主，不再依赖本地 task/context/state 文件。\n- 进度默认写评论，验收证据优先回填附件或评论。",
+    "updated_at": "2026-06-27T16:44:43+08:00",
     "completed_at": "",
     "attachments": [],
     "tasklists": [
@@ -84,14 +84,7 @@
     "updated_at": "2026-06-27T14:07:45+08:00",
     "created_at": "2026-06-27T13:23:21+08:00"
   },
-  "recent_comments": [
-    {
-      "guid": "local-comment-cc04224b2d17",
-      "content": "开始实现：按已确认的强聚焦移动端策略，先压缩页面顶部说明/重复导航，再处理底部固定操作栏遮挡与移动端 pill 选择器验证。",
-      "resource_id": "local-task-4f5f136fe763",
-      "created_at": "2026-06-27T15:09:51+08:00"
-    }
-  ],
+  "recent_comments": [],
   "inputs": {
     "config": "/Volumes/DATABASE/code/business/Image-this/pm.json",
     "context_path": "/Volumes/DATABASE/code/business/Image-this/.planning/pm/current-context.json",
@@ -110,8 +103,8 @@
   ],
   "handoff_contract": {
     "active_task_source": "current_task",
-    "active_task_id": "T10",
-    "active_task_summary": "[T10] 移动端顶部信息聚焦与操作区优化",
+    "active_task_id": "T12",
+    "active_task_summary": "[T12] 场景生成支持多商品图上传预览与批量生成",
     "task_description_present": true,
     "required_reads": [
       ".planning/pm/pm.json",
