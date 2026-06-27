@@ -220,6 +220,41 @@
           "tasklist_guid": "local:image-this"
         }
       ]
+    },
+    {
+      "guid": "local-task-74ef3a286303",
+      "url": "local://task/local-task-74ef3a286303",
+      "summary": "[T6] 移动端任务 FAB 遮挡底部主按钮",
+      "description": "任务编号：T6\n创建时间：2026-06-27 12:40:54 CST\n类型：task\nRepo：/Volumes/DATABASE/code/business/Image-this\n\n需求：\n线上移动端 /workspace/scene 截图显示右下角全局任务 FAB 覆盖底部主 CTA（下一步：选择风格模板）。需要修复全局浮动按钮与移动端底部操作栏的层级/位置关系，确保 FAB 不遮挡主流程按钮，并用移动端视口验证。\n\n执行要求：\n- 以 task/doc 为主，不再依赖本地 task/context/state 文件。\n- 进度默认写评论，验收证据优先回填附件或评论。",
+      "created_at": "2026-06-27T12:40:54+08:00",
+      "updated_at": "2026-06-27T12:58:27+08:00",
+      "completed_at": "2026-06-27T12:58:27+08:00",
+      "start": {
+        "timestamp": "2026-06-27T12:58:16+08:00",
+        "is_all_day": false
+      },
+      "due": {},
+      "members": [],
+      "attachments": [],
+      "comments": [
+        {
+          "guid": "local-comment-19ccd93a39ed",
+          "content": "修复进展：移动端全局任务 FAB 已改为仅 md 及以上显示，手机端不再覆盖 /workspace/scene 底部主 CTA。/workspace/scene 手机端产品类型、平台、AI 模型、输出尺寸、候选数量已改为横向 pill 点选，桌面端保留下拉。验证：git diff --check、npx tsc --noEmit、npm run lint -- --quiet、npm run build 均通过；390x844 Playwright 验证 FAB display=none、CTA 无 overlap、overflowX=0，截图 out/mobile-fab-scene-390.png 与 out/mobile-step3-pills-390.png。备注：本地 34123 旧 next-server 返回 500，原因是本地 SQLite schema 缺 users.gptModelsJson；验证改用 34124 新 dev server 和临时 NextAuth 测试 cookie，未修改数据库。",
+          "resource_id": "local-task-74ef3a286303",
+          "created_at": "2026-06-27T12:58:16+08:00"
+        },
+        {
+          "guid": "local-comment-00b25ad83328",
+          "content": "T6 完成：移动端全局任务 FAB 已隐藏，避免覆盖底部主 CTA；/workspace/scene 移动端关键枚举选择已改为横向 pill 点选（产品类型、平台、AI 模型、输出尺寸、候选数量），减少纵向滚动和下拉操作。验证通过：git diff --check、npx tsc --noEmit、npm run lint -- --quiet、npm run build、390x844 Playwright 布局验证（FAB display=none、CTA overlap=0、overflowX=0、手机端无下拉触发器）。证据截图：out/mobile-fab-scene-390.png、out/mobile-step3-pills-390.png。\nCommit：https://github.com/GalaxyXieyu/Image-this/commit/35235216ec9ccf1bec84bfc61fbe6e7de27f4596",
+          "resource_id": "local-task-74ef3a286303",
+          "created_at": "2026-06-27T12:58:27+08:00"
+        }
+      ],
+      "tasklists": [
+        {
+          "tasklist_guid": "local:image-this"
+        }
+      ]
     }
   ]
 }

@@ -220,6 +220,34 @@ const platforms = [
   { id: "wechat", label: "微信小程序" },
 ];
 
+const productTypes = [
+  { id: "beauty", label: "美妆护肤" },
+  { id: "food", label: "食品饮料" },
+  { id: "clothing", label: "服装服饰" },
+  { id: "electronics", label: "3C 数码" },
+  { id: "home", label: "家居用品" },
+  { id: "baby", label: "母婴用品" },
+  { id: "other", label: "其他" },
+];
+
+const outputResolutionOptions = [
+  { id: "800x800", label: "800 方图" },
+  { id: "1024x1024", label: "1024 方图" },
+  { id: "1200x600", label: "横版 2:1" },
+  { id: "1080x1440", label: "竖版 3:4" },
+  { id: "1080x1920", label: "竖版 9:16" },
+];
+
+const candidateCountOptions = [1, 2, 3, 4, 5, 6];
+
+function HorizontalPillScroller({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+      {children}
+    </div>
+  );
+}
+
 function ProductInfoStep({
   onNext,
   workflowData,
@@ -304,23 +332,43 @@ function ProductInfoStep({
               </div>
               <div className="space-y-2">
                 <Label>产品类型</Label>
+                <div className="md:hidden">
+                  <HorizontalPillScroller>
+                    {productTypes.map((type) => {
+                      const selected = workflowData.productType === type.id;
+                      return (
+                        <button
+                          key={type.id}
+                          type="button"
+                          onClick={() => setWorkflowData((prev) => ({ ...prev, productType: type.id }))}
+                          className={cn(
+                            "min-h-11 shrink-0 rounded-full border px-3.5 text-[13px] font-semibold transition-colors",
+                            selected
+                              ? "border-transparent bg-accent-gradient text-white shadow-soft"
+                              : "border-line-strong bg-surface text-ink-2"
+                          )}
+                        >
+                          {type.label}
+                        </button>
+                      );
+                    })}
+                  </HorizontalPillScroller>
+                </div>
                 <Select
                   value={workflowData.productType}
                   onValueChange={(value) =>
                     setWorkflowData((prev) => ({ ...prev, productType: value }))
                   }
                 >
-	                  <SelectTrigger className="min-h-11">
+                  <SelectTrigger className="hidden min-h-11 md:flex">
                     <SelectValue placeholder="选择产品类型" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="beauty">美妆护肤</SelectItem>
-                    <SelectItem value="food">食品饮料</SelectItem>
-                    <SelectItem value="clothing">服装服饰</SelectItem>
-                    <SelectItem value="electronics">3C 数码</SelectItem>
-                    <SelectItem value="home">家居用品</SelectItem>
-                    <SelectItem value="baby">母婴用品</SelectItem>
-                    <SelectItem value="other">其他</SelectItem>
+                    {productTypes.map((type) => (
+                      <SelectItem key={type.id} value={type.id}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -365,7 +413,7 @@ function ProductInfoStep({
 
           <section className="glass-panel rounded-[20px] p-5 md:rounded-[24px] md:p-[20px_22px]">
             <h2 className="text-base font-bold text-ink">使用平台</h2>
-            <div className="mt-3.5 flex flex-wrap gap-2.5">
+            <div className="mt-3.5 flex gap-2.5 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] md:flex-wrap [&::-webkit-scrollbar]:hidden">
               {platforms.map((platform) => {
                 const selected = workflowData.platforms.includes(platform.id);
                 return (
@@ -381,7 +429,7 @@ function ProductInfoStep({
                       }));
                     }}
                     className={cn(
-	                      "inline-flex min-h-11 items-center gap-2 rounded-full border px-3.5 py-1.5 text-data transition-colors",
+                      "inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3.5 py-1.5 text-data transition-colors",
                       selected
                         ? "border-brand bg-brand-soft text-brand-text"
                         : "border-line-strong text-ink-2 hover:border-brand/40 hover:text-ink"
@@ -474,8 +522,8 @@ function ProductInfoStep({
         </div>
       </div>
 
-	      <div className="sticky bottom-0 z-30 flex shrink-0 flex-col gap-2 border-t border-line bg-surface-glass px-4 py-3.5 pb-[calc(env(safe-area-inset-bottom)+14px)] backdrop-blur-[18px] backdrop-saturate-150 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-	        <Button variant="ghost" asChild className="min-h-11 w-full text-ink-2 hover:bg-surface-muted sm:w-auto">
+      <div className="sticky bottom-0 z-30 flex shrink-0 flex-col gap-2 border-t border-line bg-surface-glass px-4 py-3.5 pb-[calc(env(safe-area-inset-bottom)+14px)] backdrop-blur-[18px] backdrop-saturate-150 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <Button variant="ghost" asChild className="min-h-11 w-full text-ink-2 hover:bg-surface-muted sm:w-auto">
           <Link href="/">
             <ArrowLeft className="mr-1.5 h-4 w-4" />
             返回首页
@@ -483,7 +531,7 @@ function ProductInfoStep({
         </Button>
         <Button
           onClick={onNext}
-	          className="h-12 w-full rounded-[14px] bg-accent-gradient px-6 text-[15px] font-semibold text-white shadow-float transition-transform hover:-translate-y-0.5 sm:w-auto"
+          className="h-12 w-full rounded-[14px] bg-accent-gradient px-6 text-[15px] font-semibold text-white shadow-float transition-transform hover:-translate-y-0.5 sm:w-auto"
         >
           下一步：选择风格模板
           <ArrowRight className="ml-2 h-4 w-4" />
@@ -590,15 +638,15 @@ function StyleTemplateStep({
         </div>
       </div>
 
-	      <div className="sticky bottom-0 z-30 flex shrink-0 flex-col gap-2 border-t border-line bg-surface-glass px-4 py-3.5 pb-[calc(env(safe-area-inset-bottom)+14px)] backdrop-blur-[18px] backdrop-saturate-150 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-	        <Button variant="ghost" onClick={onBack} className="min-h-11 w-full text-ink-2 hover:bg-surface-muted sm:w-auto">
+      <div className="sticky bottom-0 z-30 flex shrink-0 flex-col gap-2 border-t border-line bg-surface-glass px-4 py-3.5 pb-[calc(env(safe-area-inset-bottom)+14px)] backdrop-blur-[18px] backdrop-saturate-150 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <Button variant="ghost" onClick={onBack} className="min-h-11 w-full text-ink-2 hover:bg-surface-muted sm:w-auto">
           <ArrowLeft className="mr-1.5 h-4 w-4" />
           返回修改信息
         </Button>
         <Button
           onClick={onNext}
           disabled={selected.length === 0}
-	          className="h-12 w-full rounded-[14px] bg-accent-gradient px-6 text-[15px] font-semibold text-white shadow-float transition-transform hover:-translate-y-0.5 disabled:opacity-50 sm:w-auto"
+          className="h-12 w-full rounded-[14px] bg-accent-gradient px-6 text-[15px] font-semibold text-white shadow-float transition-transform hover:-translate-y-0.5 disabled:opacity-50 sm:w-auto"
         >
           下一步：生成并调整
           <ArrowRight className="ml-2 h-4 w-4" />
@@ -649,6 +697,7 @@ function GenerateAdjustStep({
   const failedCount = results.filter((result) => result.status === "failed" || result.status === "cancelled").length;
   const activeCount = results.filter((result) => !isTerminalCandidateStatus(result.status)).length;
   const [savingCandidateId, setSavingCandidateId] = useState<string | null>(null);
+  const sceneModels = getSceneGenerationModels();
 
   const handleSaveResult = async (result: SceneCandidateResult) => {
     if (result.status !== "completed" || !result.resultImageUrl) {
@@ -797,21 +846,43 @@ function GenerateAdjustStep({
                 className="w-full max-w-xl border-0 bg-transparent py-8"
               />
 
-              <div className="w-full max-w-xl space-y-4 mb-6">
-	                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+              <div className="mb-6 w-full max-w-xl space-y-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
                   <div className="space-y-1.5">
                     <Label className="text-caption text-muted-foreground">AI 模型</Label>
+                    <div className="md:hidden">
+                      <HorizontalPillScroller>
+                        {sceneModels.map((model) => {
+                          const selected = workflowData.aiModel === model.id;
+                          return (
+                            <button
+                              key={model.id}
+                              type="button"
+                              onClick={() => setWorkflowData((prev) => ({ ...prev, aiModel: model.id }))}
+                              className={cn(
+                                "min-h-11 max-w-[220px] shrink-0 rounded-full border px-3.5 text-[13px] font-semibold transition-colors",
+                                selected
+                                  ? "border-transparent bg-accent-gradient text-white shadow-soft"
+                                  : "border-line-strong bg-surface text-ink-2"
+                              )}
+                            >
+                              <span className="block truncate">{model.label}</span>
+                            </button>
+                          );
+                        })}
+                      </HorizontalPillScroller>
+                    </div>
                     <Select
                       value={workflowData.aiModel}
                       onValueChange={(value) =>
                         setWorkflowData((prev) => ({ ...prev, aiModel: value }))
                       }
                     >
-	                      <SelectTrigger className="min-h-11 text-data">
+                      <SelectTrigger className="hidden min-h-11 text-data md:flex">
                         <SelectValue placeholder="选择模型" />
                       </SelectTrigger>
                       <SelectContent>
-                        {getSceneGenerationModels().map((m) => (
+                        {sceneModels.map((m) => (
                           <SelectItem key={m.id} value={m.id}>
                             {m.label}
                             {m.priority === 'primary' && (
@@ -827,26 +898,70 @@ function GenerateAdjustStep({
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-caption text-muted-foreground">输出尺寸</Label>
+                    <div className="md:hidden">
+                      <HorizontalPillScroller>
+                        {outputResolutionOptions.map((option) => {
+                          const selected = workflowData.outputResolution === option.id;
+                          return (
+                            <button
+                              key={option.id}
+                              type="button"
+                              onClick={() => setWorkflowData((prev) => ({ ...prev, outputResolution: option.id }))}
+                              className={cn(
+                                "min-h-11 shrink-0 rounded-full border px-3.5 text-[13px] font-semibold transition-colors",
+                                selected
+                                  ? "border-transparent bg-accent-gradient text-white shadow-soft"
+                                  : "border-line-strong bg-surface text-ink-2"
+                              )}
+                            >
+                              {option.label}
+                            </button>
+                          );
+                        })}
+                      </HorizontalPillScroller>
+                    </div>
                     <Select
                       value={workflowData.outputResolution}
                       onValueChange={(value) =>
                         setWorkflowData((prev) => ({ ...prev, outputResolution: value }))
                       }
                     >
-	                      <SelectTrigger className="min-h-11 text-data">
+                      <SelectTrigger className="hidden min-h-11 text-data md:flex">
                         <SelectValue placeholder="选择尺寸" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="800x800">800 × 800</SelectItem>
-                        <SelectItem value="1024x1024">1024 × 1024</SelectItem>
-                        <SelectItem value="1200x600">1200 × 600</SelectItem>
-                        <SelectItem value="1080x1440">1080 × 1440</SelectItem>
-                        <SelectItem value="1080x1920">1080 × 1920</SelectItem>
+                        {outputResolutionOptions.map((option) => (
+                          <SelectItem key={option.id} value={option.id}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-caption text-muted-foreground">候选数量</Label>
+                    <div className="md:hidden">
+                      <HorizontalPillScroller>
+                        {candidateCountOptions.map((count) => {
+                          const selected = workflowData.candidateCount === count;
+                          return (
+                            <button
+                              key={count}
+                              type="button"
+                              onClick={() => setWorkflowData((prev) => ({ ...prev, candidateCount: count }))}
+                              className={cn(
+                                "min-h-11 shrink-0 rounded-full border px-4 text-[13px] font-semibold transition-colors",
+                                selected
+                                  ? "border-transparent bg-accent-gradient text-white shadow-soft"
+                                  : "border-line-strong bg-surface text-ink-2"
+                              )}
+                            >
+                              {count} 张
+                            </button>
+                          );
+                        })}
+                      </HorizontalPillScroller>
+                    </div>
                     <Select
                       value={String(workflowData.candidateCount)}
                       onValueChange={(value) =>
@@ -856,11 +971,11 @@ function GenerateAdjustStep({
                         }))
                       }
                     >
-	                      <SelectTrigger className="min-h-11 text-data">
+                      <SelectTrigger className="hidden min-h-11 text-data md:flex">
                         <SelectValue placeholder="选择数量" />
                       </SelectTrigger>
                       <SelectContent>
-                        {[1, 2, 3, 4, 5, 6].map((n) => (
+                        {candidateCountOptions.map((n) => (
                           <SelectItem key={n} value={String(n)}>{n} 张</SelectItem>
                         ))}
                       </SelectContent>
@@ -980,8 +1095,7 @@ function GenerateAdjustStep({
                           <Button
                             size="sm"
                             variant="brand"
-	                            className="min-h-10 flex-1"
-                           
+                            className="min-h-10 flex-1"
                             onClick={() => handleSaveResult(result)}
                             disabled={
                               result.status !== "completed"
@@ -1002,15 +1116,15 @@ function GenerateAdjustStep({
         </div>
       </div>
 
-	      <div className="sticky bottom-0 z-30 flex shrink-0 flex-col gap-2 border-t border-line bg-surface-glass px-4 py-3.5 pb-[calc(env(safe-area-inset-bottom)+14px)] backdrop-blur-[18px] backdrop-saturate-150 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-	        <Button variant="ghost" onClick={onBack} className="min-h-11 w-full text-ink-2 hover:bg-surface-muted sm:w-auto">
+      <div className="sticky bottom-0 z-30 flex shrink-0 flex-col gap-2 border-t border-line bg-surface-glass px-4 py-3.5 pb-[calc(env(safe-area-inset-bottom)+14px)] backdrop-blur-[18px] backdrop-saturate-150 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <Button variant="ghost" onClick={onBack} className="min-h-11 w-full text-ink-2 hover:bg-surface-muted sm:w-auto">
           <ArrowLeft className="mr-1.5 h-4 w-4" />
           返回预览
         </Button>
         <Button
           asChild
           variant="outline"
-	          className="h-12 w-full rounded-[14px] border-line-strong bg-surface px-6 text-[15px] font-semibold text-ink sm:w-auto"
+          className="h-12 w-full rounded-[14px] border-line-strong bg-surface px-6 text-[15px] font-semibold text-ink sm:w-auto"
         >
           <Link href="/results">完成,前往图库</Link>
         </Button>

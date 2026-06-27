@@ -121,9 +121,7 @@ export default function FloatingTaskButton() {
   }
 
   return (
-    <div
-      className="fixed right-4 z-30 md:right-6 bottom-[calc(env(safe-area-inset-bottom,0px)+16px)] md:bottom-6"
-    >
+    <div className="fixed bottom-6 right-6 z-30 hidden md:block">
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
           <Button 
