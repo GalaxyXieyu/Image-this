@@ -307,9 +307,9 @@ function ToolboxPageInner() {
   return (
     <div className="h-full flex flex-col bg-background">
 
-      <div className="flex items-center justify-between border-b border-line px-6 py-4 shrink-0">
+      <div className="flex flex-col gap-3 border-b border-line px-4 py-4 shrink-0 sm:px-6 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-h3 font-semibold text-ink">单点工具箱</h1>
+          <h1 className="text-[24px] font-semibold leading-tight text-ink md:text-h3">单点工具箱</h1>
           <p className="mt-0.5 text-data text-ink-2">
             上传商品素材，选择工具能力，创建可追踪的 AI 处理任务
           </p>
@@ -326,7 +326,7 @@ function ToolboxPageInner() {
         </div>
         {/* 工具切换由 AppShell 二级 nav 承担，此处不再重复，仅保留批量模式 toggle */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5">
+          <div className="flex min-h-11 items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5">
             <Label className="cursor-pointer text-caption text-ink-2">批量模式</Label>
             <Switch
               checked={draft.batchMode}
@@ -365,7 +365,7 @@ function ToolboxPageInner() {
                   <div className="flex aspect-square items-center justify-center overflow-hidden rounded-[14px] border border-line bg-surface">
                     <img src={draft.inputAsset.clientUrl} alt="输入图片" className="h-full w-full object-contain" />
                   </div>
-                  <Button variant="ghost" size="sm" className="w-full text-ink-2" onClick={() => fileInputRef.current?.click()}>
+                  <Button variant="ghost" size="sm" className="min-h-11 w-full text-ink-2" onClick={() => fileInputRef.current?.click()}>
                     重新上传
                   </Button>
                 </div>
@@ -391,7 +391,7 @@ function ToolboxPageInner() {
               pose="think"
               title="请先上传图片"
               description="支持 JPG、PNG 格式，建议 1024×1024 以上。"
-              className="glass-panel min-w-[360px] rounded-[20px]"
+              className="glass-panel w-full max-w-[360px] rounded-[20px] px-5"
             />
           ) : (
             <div className="glass-panel relative aspect-square w-full max-w-3xl overflow-hidden rounded-[24px]">
@@ -450,7 +450,7 @@ function ToolboxPageInner() {
             <div className="pt-2 space-y-3">
               <Button
                 variant="gradient"
-                className="w-full"
+                className="min-h-11 w-full"
                 disabled={!draft.inputAsset || creatingTask || uploading}
                 onClick={handleCreateTask}
                
@@ -458,17 +458,17 @@ function ToolboxPageInner() {
                 {creatingTask ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
                 {creatingTask ? "创建任务中..." : "创建工具任务"}
               </Button>
-              <Button variant="outline" className="w-full" disabled={!runState.resultImageUrl} onClick={() => downloadImage(runState.resultImageUrl)}>
+              <Button variant="outline" className="min-h-11 w-full" disabled={!runState.resultImageUrl} onClick={() => downloadImage(runState.resultImageUrl)}>
                 <Download className="w-4 h-4 mr-2" />
                 下载结果
               </Button>
-              <Button variant="outline" className="w-full" asChild>
+              <Button variant="outline" className="min-h-11 w-full" asChild>
                 <Link href="/tasks">
                   <ListTodo className="w-4 h-4 mr-2" />
                   查看任务中心
                 </Link>
               </Button>
-              <Button variant="outline" className="w-full" asChild>
+              <Button variant="outline" className="min-h-11 w-full" asChild>
                 <Link href="/results">
                   {runState.status === "completed" ? "查看结果管理" : "打开结果管理"}
                 </Link>
@@ -494,14 +494,14 @@ function ModelAndResolutionFields({
   onChange: (patch: { aiModel?: string; outputResolution?: string }) => void;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-3">
+	    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <div className="space-y-2">
         <Label>模型</Label>
-        <Input value={aiModel ?? ""} onChange={(event) => onChange({ aiModel: event.target.value })} placeholder="volcengine / gemini" />
+        <Input className="min-h-11" value={aiModel ?? ""} onChange={(event) => onChange({ aiModel: event.target.value })} placeholder="volcengine / gemini" />
       </div>
       <div className="space-y-2">
         <Label>输出尺寸</Label>
-        <Input value={outputResolution ?? ""} onChange={(event) => onChange({ outputResolution: event.target.value })} placeholder="1024x1024" />
+        <Input className="min-h-11" value={outputResolution ?? ""} onChange={(event) => onChange({ outputResolution: event.target.value })} placeholder="1024x1024" />
       </div>
     </div>
   );
@@ -530,7 +530,7 @@ function ToolParameterPanel({
             {(["text", "logo"] as WatermarkParams["watermarkType"][]).map((type) => (
               <button
                 key={type}
-                className={cn("rounded-lg border px-3 py-2 text-data", params.watermarkType === type ? "border-primary bg-primary/5 text-primary" : "border-border")}
+	                className={cn("min-h-11 rounded-lg border px-3 py-2 text-data", params.watermarkType === type ? "border-primary bg-primary/5 text-primary" : "border-border")}
                 onClick={() => updateParameters({ watermarkType: type } as Partial<WatermarkParams>)}
               >
                 {type === "text" ? "文字" : "Logo"}
@@ -540,7 +540,7 @@ function ToolParameterPanel({
         </div>
         <div className="space-y-2">
           <Label>水印文字</Label>
-          <Input value={params.watermarkText} onChange={(event) => updateParameters({ watermarkText: event.target.value } as Partial<WatermarkParams>)} />
+          <Input className="min-h-11" value={params.watermarkText} onChange={(event) => updateParameters({ watermarkText: event.target.value } as Partial<WatermarkParams>)} />
         </div>
         <div className="space-y-2">
           <Label>透明度：{Math.round(params.watermarkOpacity * 100)}%</Label>
@@ -552,7 +552,7 @@ function ToolParameterPanel({
             {(["bottom-right", "bottom-left", "top-right", "top-left", "center"] as WatermarkParams["watermarkPosition"][]).map((position) => (
               <button
                 key={position}
-                className={cn("rounded-lg border px-3 py-2 text-caption", params.watermarkPosition === position ? "border-primary bg-primary/5 text-primary" : "border-border")}
+	                className={cn("min-h-11 rounded-lg border px-3 py-2 text-caption", params.watermarkPosition === position ? "border-primary bg-primary/5 text-primary" : "border-border")}
                 onClick={() => updateParameters({ watermarkPosition: position } as Partial<WatermarkParams>)}
               >
                 {position}
@@ -562,10 +562,10 @@ function ToolParameterPanel({
         </div>
         <div className="space-y-2">
           <Label>输出尺寸</Label>
-          <Input value={params.outputResolution} onChange={(event) => updateParameters({ outputResolution: event.target.value } as Partial<WatermarkParams>)} placeholder="1024x1024" />
+          <Input className="min-h-11" value={params.outputResolution} onChange={(event) => updateParameters({ outputResolution: event.target.value } as Partial<WatermarkParams>)} placeholder="1024x1024" />
         </div>
         <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => onUploadAsset({ role: "logo", file: event.target.files?.[0] })} />
-        <Button variant="outline" size="sm" className="w-full" onClick={() => logoInputRef.current?.click()}>
+        <Button variant="outline" size="sm" className="min-h-11 w-full" onClick={() => logoInputRef.current?.click()}>
           上传 Logo 水印（可选）
         </Button>
         {draft.watermarkLogoAsset && (
@@ -587,7 +587,7 @@ function ToolParameterPanel({
             {[2, 4, 8].map((factor) => (
               <button
                 key={factor}
-                className={cn("rounded-lg border px-3 py-2 text-data", params.upscaleFactor === factor ? "border-primary bg-primary/5 text-primary" : "border-border")}
+	                className={cn("min-h-11 rounded-lg border px-3 py-2 text-data", params.upscaleFactor === factor ? "border-primary bg-primary/5 text-primary" : "border-border")}
                 onClick={() => updateParameters({ upscaleFactor: factor, outputResolution: `${factor}x` } as Partial<UpscaleParams>)}
               >
                 {factor}x
@@ -610,7 +610,7 @@ function ToolParameterPanel({
       <div className="space-y-4">
         <div className="space-y-2">
           <Label>扩图提示词</Label>
-          <Textarea value={params.prompt} onChange={(event) => updateParameters({ prompt: event.target.value } as Partial<OutpaintParams>)} rows={4} />
+          <Textarea className="min-h-[132px]" value={params.prompt} onChange={(event) => updateParameters({ prompt: event.target.value } as Partial<OutpaintParams>)} rows={4} />
         </div>
         <div className="space-y-2">
           <Label>横向扩展：{params.xScale.toFixed(1)}x</Label>
@@ -634,7 +634,7 @@ function ToolParameterPanel({
     <div className="space-y-4">
       <div className="space-y-2">
         <Label>背景提示词</Label>
-        <Textarea value={params.prompt} onChange={(event) => updateParameters({ prompt: event.target.value } as Partial<BackgroundReplaceParams>)} rows={4} />
+        <Textarea className="min-h-[132px]" value={params.prompt} onChange={(event) => updateParameters({ prompt: event.target.value } as Partial<BackgroundReplaceParams>)} rows={4} />
       </div>
       <ModelAndResolutionFields
         aiModel={params.aiModel}
@@ -642,7 +642,7 @@ function ToolParameterPanel({
         onChange={(patch) => updateParameters(patch as Partial<BackgroundReplaceParams>)}
       />
       <input ref={referenceInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => onUploadAsset({ role: "reference", file: event.target.files?.[0] })} />
-      <Button variant="outline" size="sm" className="w-full" onClick={() => referenceInputRef.current?.click()}>
+      <Button variant="outline" size="sm" className="min-h-11 w-full" onClick={() => referenceInputRef.current?.click()}>
         上传参考背景（可选）
       </Button>
       {draft.referenceAsset && (

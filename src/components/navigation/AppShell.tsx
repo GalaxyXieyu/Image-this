@@ -95,7 +95,7 @@ function TopNav({
     <header className="shrink-0 border-b border-border/60 bg-surface-glass backdrop-blur-[20px] backdrop-saturate-150">
       {/* Row 1: logo / 一级 nav(桌面) / 右上按钮(桌面) / 汉堡(移动) */}
       <div className="flex h-14 items-center gap-4 px-4 md:px-6">
-        <Link href="/" className="flex items-center transition-opacity hover:opacity-80">
+        <Link href="/" className="flex min-h-11 items-center transition-opacity hover:opacity-80">
           <BrandLogo iconClassName="h-7 w-7 rounded-lg" textClassName="tracking-tight" />
         </Link>
 
@@ -231,7 +231,11 @@ function MobileMenu({
           >
             <div className="flex items-center justify-between px-4 py-4 border-b border-border/40">
               <span className="font-serif text-h3 text-ink">导航</span>
-              <button onClick={close} aria-label="关闭">
+              <button
+                onClick={close}
+                aria-label="关闭"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full text-ink-2 hover:bg-surface-muted"
+              >
                 <X className="h-5 w-5 text-ink-2" />
               </button>
             </div>
@@ -343,9 +347,9 @@ function MobileMenu({
         type="button"
         onClick={() => setOpen(true)}
         aria-label="菜单"
-        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/70 bg-surface/80 text-muted-foreground"
+        className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border/70 bg-surface/80 text-muted-foreground"
       >
-        <Menu className="h-4 w-4" />
+        <Menu className="h-5 w-5" />
       </button>
       {overlay}
     </>
@@ -366,12 +370,12 @@ function ThemeToggle() {
       type="button"
       onClick={() => setTheme(isDark ? "light" : "dark")}
       aria-label="切换主题"
-      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/70 bg-surface/80 text-muted-foreground transition-colors hover:text-foreground"
+      className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border/70 bg-surface/80 text-muted-foreground transition-colors hover:text-foreground"
     >
       {mounted ? (
-        isDark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />
+        isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />
       ) : (
-        <Moon className="h-3.5 w-3.5" />
+        <Moon className="h-4 w-4" />
       )}
     </button>
   );

@@ -1,0 +1,123 @@
+{
+  "generated_at": "2026-06-27T10:44:15+08:00",
+  "project": {
+    "name": "Image-this",
+    "repo_root": "/Volumes/DATABASE/code/business/Image-this",
+    "config_path": "/Volumes/DATABASE/code/business/Image-this/pm.json",
+    "tasklist_name": "Image-this",
+    "tasklist_guid": "local:image-this",
+    "task_prefix": "T",
+    "kind": "task",
+    "task_backend": "local",
+    "doc_backend": "repo"
+  },
+  "repo_scan": {
+    "root": "/Volumes/DATABASE/code/business/Image-this",
+    "exists": true,
+    "name": "Image-this",
+    "markers": {
+      "git": true,
+      "package_json": true,
+      "pnpm_lock": false,
+      "yarn_lock": false,
+      "npm_lock": true,
+      "pyproject": false,
+      "requirements_txt": false,
+      "go_mod": false,
+      "cargo_toml": false,
+      "miniapp_app_json": false,
+      "miniapp_project_config": false,
+      "src_dir": true,
+      "pages_dir": false,
+      "components_dir": false
+    },
+    "package_manager": "npm",
+    "framework_hints": [
+      "nextjs",
+      "typescript"
+    ]
+  },
+  "bootstrap": {
+    "project_mode": "brownfield",
+    "recommended_action": "map-codebase",
+    "task_backend": "local",
+    "doc_backend": "repo",
+    "doc_folder_name": "Image-this",
+    "doc_folder_token": "",
+    "doc_folder_url": "",
+    "project_doc_token": "",
+    "project_doc_url": "",
+    "requirements_doc_token": "",
+    "requirements_doc_url": "",
+    "roadmap_doc_token": "",
+    "roadmap_doc_url": "",
+    "state_doc_token": "",
+    "state_doc_url": "",
+    "notes": [
+      "brownfield 项目优先做 map-codebase，再补项目/路线图/状态文档。",
+      "greenfield 项目优先做 new-project，再进入任务拆解。",
+      "当前 task backend=local，doc backend=repo。"
+    ]
+  },
+  "current_task": {
+    "task_id": "T5",
+    "summary": "[T5] 移动端全站适配排查与实施计划",
+    "status": "todo",
+    "guid": "local-task-a813cc144e26",
+    "url": "local://task/local-task-a813cc144e26",
+    "description": "任务编号：T5\n创建时间：2026-06-27 10:43:54 CST\n类型：task\nRepo：/Volumes/DATABASE/code/business/Image-this\n\n需求：\n所有核心界面尚未完整适配移动端操作交互、视觉比例、换行与字号。需要先完整排查并制定计划，再按移动端好看的标准继续适配。覆盖核心路径：/、/workspace/scene、/combo、/tools、/tasks、/results、/templates、/settings、/auth/login、/auth/register、/prompt-studio。要求用移动端视口截图和可执行验收标准验证，记录问题、优先级、实施批次和证据。\n\n执行要求：\n- 以 task/doc 为主，不再依赖本地 task/context/state 文件。\n- 进度默认写评论，验收证据优先回填附件或评论。",
+    "updated_at": "2026-06-27T10:43:54+08:00",
+    "completed_at": "",
+    "attachments": [],
+    "tasklists": [
+      {
+        "tasklist_guid": "local:image-this"
+      }
+    ]
+  },
+  "next_task": {
+    "task_id": "T5",
+    "summary": "[T5] 移动端全站适配排查与实施计划",
+    "status": "todo",
+    "guid": "local-task-a813cc144e26",
+    "url": "local://task/local-task-a813cc144e26",
+    "updated_at": "2026-06-27T10:43:54+08:00",
+    "created_at": "2026-06-27T10:43:54+08:00"
+  },
+  "recent_comments": [],
+  "inputs": {
+    "config": "/Volumes/DATABASE/code/business/Image-this/pm.json",
+    "context_path": "/Volumes/DATABASE/code/business/Image-this/.planning/pm/current-context.json",
+    "bootstrap_path": "/Volumes/DATABASE/code/business/Image-this/.planning/pm/bootstrap.json",
+    "plan_path": "/Volumes/DATABASE/code/business/Image-this/.planning/pm/plan-context.json",
+    "refine_path": "/Volumes/DATABASE/code/business/Image-this/.planning/pm/refine-context.json"
+  },
+  "recommended_flow": [
+    "Run brownfield mapping before broad code changes; build task/doc understanding first.",
+    "Implement the current task first and update progress through pm when done."
+  ],
+  "required_reads": [
+    ".planning/pm/pm.json",
+    ".planning/pm/current-context.json",
+    ".planning/pm/bootstrap.json"
+  ],
+  "handoff_contract": {
+    "active_task_source": "current_task",
+    "active_task_id": "T5",
+    "active_task_summary": "[T5] 移动端全站适配排查与实施计划",
+    "task_description_present": true,
+    "required_reads": [
+      ".planning/pm/pm.json",
+      ".planning/pm/current-context.json",
+      ".planning/pm/bootstrap.json"
+    ],
+    "source_of_truth": [
+      ".planning/pm/pm.json and .planning/pm/coder-context.json define runtime/config context.",
+      "current_task description is the execution index card."
+    ]
+  },
+  "source_of_truth": [
+    ".planning/pm/pm.json and .planning/pm/coder-context.json define runtime/config context.",
+    "current_task description is the execution index card."
+  ]
+}

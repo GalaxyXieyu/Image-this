@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { MobileDesktopOnly } from "@/components/navigation/MobileDesktopOnly";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -188,7 +187,7 @@ export default function ComboPage() {
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
 
-  /* global settings */
+  // Runtime settings
   const [batchCount, setBatchCount] = useState(10);
   const [aspectRatio, setAspectRatio] = useState("1:1");
   const [resolution, setResolution] = useState("2k");
@@ -267,7 +266,248 @@ export default function ComboPage() {
 
   return (
     <div className="relative h-full flex flex-col bg-background">
-      <MobileDesktopOnly title="组合工作流" reason="组合工作流需要同时管理左侧模板、中间流水线和右侧参数三栏，手机屏幕放不下。" />
+      <div className="flex min-h-0 flex-1 flex-col md:hidden">
+        <div className="shrink-0 border-b border-line px-5 py-4">
+          <h1 className="font-serif text-[28px] font-semibold leading-tight text-ink">组合工作流</h1>
+          <p className="mt-1 text-[13px] leading-5 text-ink-2">
+            按顺序组合模板、处理步骤和输出参数，手机上也能提交批量流水线。
+          </p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 pb-[116px] pt-4">
+          <section className="glass-panel rounded-[20px] p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-[15px] font-bold text-ink">场景模板</h2>
+                <p className="mt-0.5 text-[12px] text-ink-3">
+                  先选模板，再叠加后续处理步骤
+                </p>
+              </div>
+              {selectedTemplate && (
+                <span className="shrink-0 rounded-full bg-brand-soft px-2.5 py-1 text-[12px] font-semibold text-brand-text">
+                  已选
+                </span>
+              )}
+            </div>
+            <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              {SCENE_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveCategory(cat.id);
+                    setSelectedTemplate(null);
+                  }}
+                  className={cn(
+                    "min-h-11 shrink-0 rounded-full border px-3 text-[13px] font-semibold transition-colors",
+                    activeCategory === cat.id
+                      ? "border-transparent bg-accent-gradient text-white shadow-soft"
+                      : "border-line bg-surface text-ink-2"
+                  )}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2.5">
+              {templates.map((tpl, idx) => {
+                const active = selectedTemplate === tpl.id;
+                const gradient = TEMPLATE_GRADIENTS[(idx + tpl.id.charCodeAt(tpl.id.length - 1)) % TEMPLATE_GRADIENTS.length];
+                return (
+                  <button
+                    key={tpl.id}
+                    type="button"
+                    onClick={() => setSelectedTemplate(tpl.id)}
+                    className={cn(
+                      "relative min-h-[92px] overflow-hidden rounded-[16px] border text-left transition-all",
+                      active
+                        ? "border-brand ring-2 ring-brand ring-offset-2 ring-offset-background"
+                        : "border-line"
+                    )}
+                  >
+                    <div className="absolute inset-0" style={{ background: gradient }} />
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 py-2">
+                      <span className="text-[13px] font-semibold text-white">{tpl.name}</span>
+                    </div>
+                    {active && (
+                      <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-accent-gradient">
+                        <Sparkles className="h-3.5 w-3.5 text-white" />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="mt-4 glass-panel rounded-[20px] p-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-brand-soft text-brand">
+                <Upload className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-[15px] font-bold text-ink">上传商品图片</h2>
+                <p className="mt-0.5 text-[12px] text-ink-3">
+                  作为流水线输入，稍后会进入任务队列
+                </p>
+              </div>
+              <Button className="h-11 shrink-0 rounded-[12px] bg-accent-gradient px-4 text-[13px] font-semibold text-white">
+                选择
+              </Button>
+            </div>
+          </section>
+
+          <section className="mt-4">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h2 className="text-[15px] font-bold text-ink">处理流水线</h2>
+                <p className="mt-0.5 text-[12px] text-ink-3">
+                  点击步骤可编辑参数，使用箭头调整顺序
+                </p>
+              </div>
+              <span className="rounded-full border border-line bg-surface px-2.5 py-1 text-[12px] font-semibold text-ink-2">
+                {steps.length}/5
+              </span>
+            </div>
+            <div className="flex flex-col gap-3">
+              {steps.map((step, index) => {
+                const Icon = STEP_META[step.type].icon;
+                const isSelected = selectedStepId === step.id;
+                return (
+                  <div
+                    key={step.id}
+                    className={cn(
+                      "glass-panel flex min-h-[82px] w-full items-center gap-3 rounded-[18px] p-3 text-left transition-all",
+                      isSelected && "ring-2 ring-brand"
+                    )}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStepId(step.id)}
+                      className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                    >
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-gradient text-[12px] font-bold text-white">
+                        {step.order}
+                      </span>
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-brand-soft text-brand">
+                        <Icon className="h-5 w-5" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[14px] font-semibold text-ink">{step.name}</span>
+                        <span className="mt-0.5 line-clamp-2 block text-[12px] leading-4 text-ink-3">
+                          {step.description}
+                        </span>
+                      </span>
+                    </button>
+                    <span className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        aria-label={`上移 ${step.name}`}
+                        disabled={index === 0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          moveStep(index, -1);
+                        }}
+                        className={cn(
+                          "flex h-11 w-11 items-center justify-center rounded-full text-ink-3 disabled:opacity-35",
+                          index !== 0 && "bg-surface-muted"
+                        )}
+                      >
+                        <ChevronUp className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`下移 ${step.name}`}
+                        disabled={index === steps.length - 1}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          moveStep(index, 1);
+                        }}
+                        className={cn(
+                          "flex h-11 w-11 items-center justify-center rounded-full text-ink-3 disabled:opacity-35",
+                          index !== steps.length - 1 && "bg-surface-muted"
+                        )}
+                      >
+                        <ChevronDown className="h-4 w-4" />
+                      </button>
+                    </span>
+                  </div>
+                );
+              })}
+              <button
+                type="button"
+                onClick={addStep}
+                disabled={steps.length >= 5}
+                className={cn(
+                  "flex min-h-12 w-full items-center justify-center gap-2 rounded-[18px] border-2 border-dashed text-[14px] font-semibold transition-colors",
+                  steps.length >= 5
+                    ? "cursor-not-allowed border-line text-ink-3"
+                    : "border-line-strong text-ink-2 hover:border-brand hover:text-brand"
+                )}
+              >
+                <Plus className="h-4 w-4" />
+                添加处理步骤
+              </button>
+            </div>
+          </section>
+
+          <section className="mt-4 glass-panel rounded-[20px]">
+            {selectedStep ? (
+              <MobileStepSettings
+                step={selectedStep}
+                onClose={() => setSelectedStepId(null)}
+                onChange={(patch) => updateStepParams(selectedStep.id, patch)}
+              />
+            ) : (
+              <MobileGlobalSettings
+                selectedTemplateName={
+                  selectedTemplate
+                    ? templates.find((t) => t.id === selectedTemplate)?.name ?? null
+                    : null
+                }
+                activeCategoryLabel={
+                  SCENE_CATEGORIES.find((c) => c.id === activeCategory)?.label ?? ""
+                }
+                batchCount={batchCount}
+                setBatchCount={setBatchCount}
+                aspectRatio={aspectRatio}
+                setAspectRatio={setAspectRatio}
+                resolution={resolution}
+                setResolution={setResolution}
+                watermarkEnabled={watermarkEnabled}
+                setWatermarkEnabled={setWatermarkEnabled}
+                autoRetry={autoRetry}
+                setAutoRetry={setAutoRetry}
+              />
+            )}
+          </section>
+        </div>
+
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface-glass px-4 py-3 backdrop-blur-[18px] backdrop-saturate-150">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              className="h-12 shrink-0 rounded-full border-line-strong bg-surface px-4 text-[13px] font-semibold"
+            >
+              <Bookmark className="h-4 w-4" />
+              保存
+            </Button>
+            <Button
+              onClick={handleExecute}
+              disabled={executing || steps.length === 0}
+              className="h-12 flex-1 rounded-full bg-accent-gradient px-5 text-[14px] font-semibold text-white shadow-float disabled:opacity-50"
+            >
+              {executing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
+              {executing ? "提交中…" : "执行批量处理"}
+            </Button>
+          </div>
+        </div>
+      </div>
+
       {/* Page header — 桌面端 */}
       <div className="hidden md:block shrink-0 border-b border-line px-6 py-4">
         <h1 className="text-h3 font-semibold text-ink">组合工作流</h1>
@@ -602,15 +842,15 @@ function GlobalSettingsPanel({
   selectedTemplateName: string | null;
   activeCategoryLabel: string;
   batchCount: number;
-  setBatchCount: (n: number) => void;
+  setBatchCount: (_count: number) => void;
   aspectRatio: string;
-  setAspectRatio: (v: string) => void;
+  setAspectRatio: (_value: string) => void;
   resolution: string;
-  setResolution: (v: string) => void;
+  setResolution: (_value: string) => void;
   watermarkEnabled: boolean;
-  setWatermarkEnabled: (v: boolean) => void;
+  setWatermarkEnabled: (_value: boolean) => void;
   autoRetry: boolean;
-  setAutoRetry: (v: boolean) => void;
+  setAutoRetry: (_value: boolean) => void;
 }) {
   return (
     <div className="flex flex-col gap-5 p-5">
@@ -710,6 +950,149 @@ function GlobalSettingsPanel({
   );
 }
 
+function MobileGlobalSettings({
+  selectedTemplateName,
+  activeCategoryLabel,
+  batchCount,
+  setBatchCount,
+  aspectRatio,
+  setAspectRatio,
+  resolution,
+  setResolution,
+  watermarkEnabled,
+  setWatermarkEnabled,
+  autoRetry,
+  setAutoRetry,
+}: {
+  selectedTemplateName: string | null;
+  activeCategoryLabel: string;
+  batchCount: number;
+  setBatchCount: (_count: number) => void;
+  aspectRatio: string;
+  setAspectRatio: (_value: string) => void;
+  resolution: string;
+  setResolution: (_value: string) => void;
+  watermarkEnabled: boolean;
+  setWatermarkEnabled: (_value: boolean) => void;
+  autoRetry: boolean;
+  setAutoRetry: (_value: boolean) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-5 p-4">
+      <div className="flex items-center gap-2">
+        <Settings2 className="h-4 w-4 text-brand" />
+        <span className="text-[15px] font-bold text-ink">全局执行设置</span>
+      </div>
+
+      <section className="flex flex-col gap-2">
+        <FieldLabel>方案信息</FieldLabel>
+        <div className="rounded-[14px] border border-line bg-surface p-3">
+          <p className="text-[13px] font-semibold text-ink">
+            {selectedTemplateName ?? "未选择模板"}
+          </p>
+          <p className="mt-0.5 text-[12px] text-ink-3">
+            {selectedTemplateName ? activeCategoryLabel : "可先从上方选择一个场景模板"}
+          </p>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-2 gap-3">
+        <div className="flex flex-col gap-2">
+          <FieldLabel>批量数量</FieldLabel>
+          <Input
+            type="number"
+            min={1}
+            max={100}
+            value={batchCount}
+            onChange={(e) => setBatchCount(Number(e.target.value))}
+            className="h-11 rounded-[12px]"
+          />
+        </div>
+        <div className="flex flex-col gap-2">
+          <FieldLabel>输出清晰度</FieldLabel>
+          <ChipGroup
+            value={resolution}
+            onChange={setResolution}
+            options={RESOLUTIONS}
+            cols={3}
+          />
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <FieldLabel>画面比例</FieldLabel>
+        <ChipGroup
+          value={aspectRatio}
+          onChange={setAspectRatio}
+          options={ASPECT_RATIOS}
+          cols={5}
+        />
+      </section>
+
+      <div className="grid gap-3">
+        <div className="flex min-h-11 items-center justify-between rounded-[14px] border border-line bg-surface px-3">
+          <Label className="cursor-pointer text-data text-ink">自动添加水印</Label>
+          <Switch checked={watermarkEnabled} onCheckedChange={setWatermarkEnabled} />
+        </div>
+        <div className="flex min-h-11 items-center justify-between rounded-[14px] border border-line bg-surface px-3">
+          <Label className="cursor-pointer text-data text-ink">失败自动重试</Label>
+          <Switch checked={autoRetry} onCheckedChange={setAutoRetry} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MobileStepSettings({
+  step,
+  onClose,
+  onChange,
+}: {
+  step: WorkflowStep;
+  onClose: () => void;
+  onChange: (_patch: Partial<StepParams["params"]>) => void;
+}) {
+  const Icon = STEP_META[step.type].icon;
+  return (
+    <div className="flex flex-col gap-5 p-4">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-brand-soft text-brand">
+            <Icon className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[15px] font-bold text-ink">{step.name}</p>
+            <p className="text-[12px] text-ink-3">步骤 {step.order} 参数</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex h-10 shrink-0 items-center justify-center rounded-full px-3 text-[13px] font-semibold text-ink-2 hover:bg-surface-muted"
+        >
+          收起
+        </button>
+      </div>
+
+      {step.type === "scene" && (
+        <SceneStepParams params={step.params as SceneParams} onChange={onChange} />
+      )}
+      {step.type === "background" && (
+        <BackgroundStepParams params={step.params as BackgroundParams} onChange={onChange} />
+      )}
+      {step.type === "upscale" && (
+        <UpscaleStepParams params={step.params as UpscaleParams} onChange={onChange} />
+      )}
+      {step.type === "watermark" && (
+        <WatermarkStepParams params={step.params as WatermarkParams} onChange={onChange} />
+      )}
+      {step.type === "outpaint" && (
+        <OutpaintStepParams params={step.params as OutpaintParams} onChange={onChange} />
+      )}
+    </div>
+  );
+}
+
 /* ─── Right: per-step parameters ─────────────────────────────────── */
 
 function StepParamPanel({
@@ -721,7 +1104,7 @@ function StepParamPanel({
   step: WorkflowStep;
   onClose: () => void;
   onCollapse: () => void;
-  onChange: (patch: Partial<StepParams["params"]>) => void;
+  onChange: (_patch: Partial<StepParams["params"]>) => void;
 }) {
   const Icon = STEP_META[step.type].icon;
   return (
@@ -788,7 +1171,7 @@ function SliderRow({
   min: number;
   max: number;
   step?: number;
-  onChange: (v: number) => void;
+  onChange: (_value: number) => void;
 }) {
   return (
     <section className="flex flex-col gap-2">
@@ -818,7 +1201,7 @@ function ChipGroup<T extends string>({
 }: {
   options: { id: T; label: string }[];
   value: T;
-  onChange: (v: T) => void;
+  onChange: (_value: T) => void;
   cols?: number;
 }) {
   const colClass =
@@ -849,7 +1232,7 @@ function SceneStepParams({
   onChange,
 }: {
   params: SceneParams;
-  onChange: (patch: Partial<SceneParams>) => void;
+  onChange: (_patch: Partial<SceneParams>) => void;
 }) {
   return (
     <>
@@ -875,7 +1258,7 @@ function SceneStepParams({
               type="button"
               onClick={() => onChange({ candidateCount: n })}
               className={cn(
-                "h-8 w-8 rounded-[10px] border text-[12px] font-semibold transition-colors",
+	                "h-11 w-11 rounded-[12px] border text-[12px] font-semibold transition-colors",
                 params.candidateCount === n
                   ? "border-brand bg-brand-soft text-brand-text"
                   : "border-line-strong text-ink-2 hover:text-ink"
@@ -895,7 +1278,7 @@ function BackgroundStepParams({
   onChange,
 }: {
   params: BackgroundParams;
-  onChange: (patch: Partial<BackgroundParams>) => void;
+  onChange: (_patch: Partial<BackgroundParams>) => void;
 }) {
   return (
     <>
@@ -936,7 +1319,7 @@ function UpscaleStepParams({
   onChange,
 }: {
   params: UpscaleParams;
-  onChange: (patch: Partial<UpscaleParams>) => void;
+  onChange: (_patch: Partial<UpscaleParams>) => void;
 }) {
   return (
     <>
@@ -970,7 +1353,7 @@ function WatermarkStepParams({
   onChange,
 }: {
   params: WatermarkParams;
-  onChange: (patch: Partial<WatermarkParams>) => void;
+  onChange: (_patch: Partial<WatermarkParams>) => void;
 }) {
   return (
     <>
@@ -1015,7 +1398,7 @@ function OutpaintStepParams({
   onChange,
 }: {
   params: OutpaintParams;
-  onChange: (patch: Partial<OutpaintParams>) => void;
+  onChange: (_patch: Partial<OutpaintParams>) => void;
 }) {
   return (
     <>

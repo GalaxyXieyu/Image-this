@@ -17,7 +17,7 @@ export function AuthShell({ eyebrow, title, description, children }: AuthShellPr
         <header className="relative overflow-hidden bg-accent-gradient px-6 py-5 text-white">
           <div className="absolute -left-8 -top-8 h-24 w-24 rounded-full bg-white/10" />
           <div className="relative z-10 flex items-center justify-between gap-3">
-            <Link href="/" className="inline-flex hover:opacity-90">
+            <Link href="/" className="inline-flex min-h-11 items-center hover:opacity-90">
               <BrandLogo
                 className="gap-2 text-white"
                 iconClassName="h-7 w-7 rounded-lg bg-white/95 p-0.5"

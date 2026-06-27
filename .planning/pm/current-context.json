@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-25T20:03:58+08:00",
+  "generated_at": "2026-06-27T12:04:50+08:00",
   "project": {
     "name": "Image-this",
     "repo_root": "/Volumes/DATABASE/code/business/Image-this",
@@ -72,41 +72,8 @@
     "state_doc_token": "",
     "state_doc_url": ""
   },
-  "open_tasks": [
-    {
-      "task_id": "T1",
-      "summary": "[T1] 重设计 v2.0 整站 UI/UX 验收",
-      "status": "todo",
-      "guid": "local-task-32a4ac1eceb9",
-      "url": "local://task/local-task-32a4ac1eceb9",
-      "updated_at": "2026-06-25T20:03:58+08:00",
-      "created_at": "2026-06-25T20:03:58+08:00"
-    }
-  ],
-  "next_task": {
-    "task_id": "T1",
-    "summary": "[T1] 重设计 v2.0 整站 UI/UX 验收",
-    "status": "todo",
-    "guid": "local-task-32a4ac1eceb9",
-    "url": "local://task/local-task-32a4ac1eceb9",
-    "updated_at": "2026-06-25T20:03:58+08:00",
-    "created_at": "2026-06-25T20:03:58+08:00"
-  },
-  "current_task": {
-    "task_id": "T1",
-    "summary": "[T1] 重设计 v2.0 整站 UI/UX 验收",
-    "status": "todo",
-    "guid": "local-task-32a4ac1eceb9",
-    "url": "local://task/local-task-32a4ac1eceb9",
-    "description": "任务编号：T1\n创建时间：2026-06-25 20:03:58 CST\n类型：task\nRepo：/Volumes/DATABASE/code/business/Image-this\n\n需求：\nPhase 1-9 已落地。用 chrome-devtools MCP 逐屏验收 9 条页面路径（/、/workspace/scene、/combo、/tools、/results、/tasks、/settings、/prompt-studio、/auth/login），按测试计划检查:布局、玻璃质感、紫罗兰渐变 token、Newsreader 衬线、响应式 zoom、主题切换、关键交互(步骤切换/工具切换/选中态/折叠展开/运行调试 demo)。每屏截图存档 + 标注 PASS/FLAG/BLOCK，最终汇总到 .planning/UI-REVIEW.md 并回写 PM。\n\n执行要求：\n- 以 task/doc 为主，不再依赖本地 task/context/state 文件。\n- 进度默认写评论，验收证据优先回填附件或评论。",
-    "updated_at": "2026-06-25T20:03:58+08:00",
-    "completed_at": "",
-    "attachments": [],
-    "tasklists": [
-      {
-        "tasklist_guid": "local:image-this"
-      }
-    ]
-  },
+  "open_tasks": [],
+  "next_task": null,
+  "current_task": null,
   "recent_comments": []
 }

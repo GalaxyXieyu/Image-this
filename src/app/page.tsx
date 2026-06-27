@@ -14,7 +14,7 @@ import {
 /* ─── Hero ─────────────────────────────────────────────────────── */
 function HeroSection() {
   return (
-    <section className="relative w-full max-w-[1160px] px-2 pt-10 pb-12 animate-fade-up">
+    <section className="relative w-full max-w-[1160px] px-1 pt-8 pb-10 sm:px-2 sm:pt-10 sm:pb-12 animate-fade-up">
       {/* ambient glow behind hero */}
       <div className="pointer-events-none absolute -left-16 -top-20 h-[300px] w-[300px] rounded-full bg-brand-soft blur-[80px]" />
       <div className="pointer-events-none absolute -right-10 top-40 h-[260px] w-[260px] rounded-full bg-brand-soft blur-[90px]" />
@@ -26,19 +26,19 @@ function HeroSection() {
             <Sparkles className="h-3.5 w-3.5 text-brand" />
             AI 驱动的电商视觉引擎
           </div>
-          <h1 className="font-serif text-[46px] font-bold leading-[1.22] tracking-[-0.02em] text-ink">
+          <h1 className="font-serif text-[38px] font-bold leading-[1.16] tracking-normal text-ink sm:text-[44px] md:text-[46px] md:leading-[1.22]">
             让每件商品
             <br />
             都有一套
             <span className="text-accent-gradient pt-[0.08em] inline-block">专业视觉</span>
           </h1>
-          <p className="max-w-[480px] text-[17px] leading-[1.6] text-ink-2">
+          <p className="max-w-[480px] text-[15px] leading-[1.65] text-ink-2 sm:text-[17px]">
             上传商品图，AI 自动生成场景图、白底图、营销海报和全平台上架素材——从拍摄到上架，一套工具全搞定。
           </p>
-          <div className="mt-1 flex flex-wrap items-center gap-3">
+          <div className="mt-1 flex w-full max-w-[320px] flex-col items-stretch gap-3 sm:max-w-none sm:flex-row sm:flex-wrap sm:items-center">
             <Button
               asChild
-              className="h-[50px] gap-2 rounded-full bg-accent-gradient px-7 text-[15px] font-semibold text-white shadow-float transition-transform hover:-translate-y-0.5"
+              className="h-12 gap-2 rounded-full bg-accent-gradient px-6 text-[15px] font-semibold text-white shadow-float transition-transform hover:-translate-y-0.5 sm:h-[50px] sm:px-7"
             >
               <Link href="/workspace/scene">
                 开始生成场景图
@@ -48,7 +48,7 @@ function HeroSection() {
             <Button
               asChild
               variant="outline"
-              className="h-[50px] rounded-full border-line-strong bg-surface px-6 text-[15px] font-semibold text-ink hover:bg-surface-muted"
+              className="h-12 rounded-full border-line-strong bg-surface px-6 text-[15px] font-semibold text-ink hover:bg-surface-muted sm:h-[50px]"
             >
               <Link href="/tools">打开智能工具箱</Link>
             </Button>
@@ -121,11 +121,11 @@ function WorkflowSection() {
 
   return (
     <section className="w-full max-w-[1160px] px-2 py-7">
-      <div className="flex items-end justify-between gap-4 border-b border-line pb-4">
-        <h2 className="font-serif text-[34px] font-semibold tracking-[-0.01em] text-ink">
+      <div className="flex flex-col items-start justify-between gap-2 border-b border-line pb-4 sm:flex-row sm:items-end sm:gap-4">
+        <h2 className="font-serif text-[28px] font-semibold tracking-normal text-ink sm:text-[34px]">
           三步完成视觉生产
         </h2>
-        <p className="max-w-[260px] text-right text-data text-ink-3">
+        <p className="max-w-[260px] text-left text-data text-ink-3 sm:text-right">
           从一张商品原图，到可直接上架的全套素材
         </p>
       </div>
@@ -133,9 +133,9 @@ function WorkflowSection() {
         {steps.map((s) => (
           <div
             key={s.num}
-            className="glass-panel flex flex-col gap-3.5 rounded-[24px] p-[30px_28px] transition-transform hover:-translate-y-1"
+            className="glass-panel flex flex-col gap-3.5 rounded-[20px] p-5 transition-transform hover:-translate-y-1 sm:rounded-[24px] sm:p-[30px_28px]"
           >
-            <span className="font-serif text-[46px] font-semibold leading-none text-brand">
+            <span className="font-serif text-[40px] font-semibold leading-none text-brand sm:text-[46px]">
               {s.num}
             </span>
             <div>
@@ -162,11 +162,11 @@ function CategoriesSection() {
 
   return (
     <section className="w-full max-w-[1160px] px-2 py-10">
-      <div className="flex items-end justify-between gap-4 border-b border-line pb-4">
-        <h2 className="font-serif text-[34px] font-semibold tracking-[-0.01em] text-ink">
+      <div className="flex flex-col items-start justify-between gap-2 border-b border-line pb-4 sm:flex-row sm:items-end sm:gap-4">
+        <h2 className="font-serif text-[28px] font-semibold tracking-normal text-ink sm:text-[34px]">
           覆盖全品类场景
         </h2>
-        <p className="max-w-[320px] text-right text-data text-ink-3">
+        <p className="max-w-[320px] text-left text-data text-ink-3 sm:text-right">
           美妆 · 食品 · 服饰 · 家居 · 3C · 母婴，一键生成专业素材
         </p>
       </div>
@@ -197,21 +197,21 @@ function CategoriesSection() {
 function FinalCtaSection() {
   return (
     <section className="w-full max-w-[1160px] px-2 py-12">
-      <div className="glass-panel rounded-[28px] px-10 py-14 text-center shadow-soft">
+      <div className="glass-panel rounded-[22px] px-5 py-10 text-center shadow-soft sm:rounded-[28px] sm:px-10 sm:py-14">
         <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-brand-soft px-3.5 py-1.5 text-data text-brand-text">
           <MousePointerClick className="h-3.5 w-3.5" />
           立即体验 AI 视觉生产
         </div>
-        <h2 className="mx-auto mt-5 max-w-[720px] font-serif text-[34px] font-semibold leading-[1.3] tracking-[-0.01em] text-ink">
+        <h2 className="mx-auto mt-5 max-w-[720px] font-serif text-[28px] font-semibold leading-[1.28] tracking-normal text-ink sm:text-[34px] sm:leading-[1.3]">
           今天就开始，让 AI 为你的商品打造专业视觉
         </h2>
         <p className="mx-auto mt-3 max-w-[560px] text-[15px] leading-[1.6] text-ink-2">
           无需设计经验，上传商品图即可生成可直接上架的全套素材
         </p>
-        <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+        <div className="mx-auto mt-7 flex w-full max-w-[320px] flex-col items-stretch justify-center gap-3 sm:max-w-none sm:flex-row sm:flex-wrap sm:items-center">
           <Button
             asChild
-            className="h-[50px] gap-2 rounded-full bg-accent-gradient px-7 text-[15px] font-semibold text-white shadow-float transition-transform hover:-translate-y-0.5"
+            className="h-12 gap-2 rounded-full bg-accent-gradient px-6 text-[15px] font-semibold text-white shadow-float transition-transform hover:-translate-y-0.5 sm:h-[50px] sm:px-7"
           >
             <Link href="/workspace/scene">
               免费开始生成
@@ -221,7 +221,7 @@ function FinalCtaSection() {
           <Button
             asChild
             variant="outline"
-            className="h-[50px] rounded-full border-line-strong bg-surface px-6 text-[15px] font-semibold text-ink hover:bg-surface-muted"
+            className="h-12 rounded-full border-line-strong bg-surface px-6 text-[15px] font-semibold text-ink hover:bg-surface-muted sm:h-[50px]"
           >
             <Link href="/tools">浏览工具箱</Link>
           </Button>
@@ -235,7 +235,7 @@ function FinalCtaSection() {
 export default function HomePage() {
   return (
     <div className="h-full overflow-y-auto">
-      <main className="mx-auto flex w-full max-w-[1200px] flex-col items-center px-6 pb-16">
+      <main className="mx-auto flex w-full max-w-[1200px] flex-col items-center px-5 pb-16 sm:px-6">
         <HeroSection />
         <WorkflowSection />
         <CategoriesSection />

@@ -181,9 +181,9 @@ export default function ResultsPage() {
   return (
     <div className="h-full flex flex-col bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-line px-6 py-4 shrink-0">
+      <div className="flex items-center justify-between border-b border-line px-4 py-4 shrink-0 sm:px-6">
         <div>
-          <h1 className="font-serif text-h2 text-ink tracking-tight">图库</h1>
+          <h1 className="font-serif text-[28px] leading-tight text-ink tracking-tight sm:text-h2">图库</h1>
           <p className="mt-1 text-data text-ink-2">
             查看、筛选、批量下载已生成的商品图
           </p>
@@ -201,7 +201,7 @@ export default function ResultsPage() {
                 key={id}
                 onClick={() => setActiveCategory(id)}
                 className={cn(
-                  "shrink-0 rounded-full px-3 py-1 text-data transition-colors",
+	                  "min-h-11 shrink-0 rounded-full px-3 text-data transition-colors",
                   active ? "bg-accent-gradient text-white" : "border border-line bg-surface text-ink-2"
                 )}
               >
@@ -251,11 +251,11 @@ export default function ResultsPage() {
         {/* Main area */}
         <main className="flex flex-1 flex-col overflow-hidden">
           {/* Single-row toolbar: select all + search + view mode + bulk */}
-          <div className="flex items-center justify-between gap-3 border-b border-line glass-panel rounded-none px-6 py-2.5 shrink-0">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-3 border-b border-line glass-panel rounded-none px-4 py-3 shrink-0 sm:px-6 md:flex-row md:items-center md:justify-between md:py-2.5">
+            <div className="flex flex-wrap items-center gap-2 md:gap-3">
               <button
                 onClick={toggleSelectAll}
-                className="flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-data text-ink-2 transition-colors hover:text-ink"
+	                className="flex min-h-11 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-data text-ink-2 transition-colors hover:text-ink"
               >
                 <CheckSquare className={cn("h-3.5 w-3.5", isAllSelected && "text-brand")} />
                 全选
@@ -263,23 +263,23 @@ export default function ResultsPage() {
               {selectedIds.size > 0 && (
                 <span className="text-data text-brand-text">已选 {selectedIds.size} 项</span>
               )}
-              <div className="relative">
+              <div className="relative min-w-[180px] flex-1 md:flex-none">
                 <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-3" />
                 <Input
                   placeholder="搜索图片…"
-                  className="h-8 w-56 rounded-full pl-8 text-[13px]"
+	                  className="h-11 w-full rounded-full pl-8 text-[13px] md:h-8 md:w-56"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && fetchResults()}
                 />
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               <div className="flex items-center gap-0.5 rounded-full border border-line bg-surface p-0.5">
                 <button
                   onClick={() => setViewMode("grid")}
                   className={cn(
-                    "rounded-full p-1.5 transition-colors",
+	                    "flex h-11 w-11 items-center justify-center rounded-full transition-colors md:h-auto md:w-auto md:p-1.5",
                     viewMode === "grid"
                       ? "bg-accent-gradient text-white"
                       : "text-ink-3 hover:text-ink"
@@ -291,7 +291,7 @@ export default function ResultsPage() {
                 <button
                   onClick={() => setViewMode("list")}
                   className={cn(
-                    "rounded-full p-1.5 transition-colors",
+	                    "flex h-11 w-11 items-center justify-center rounded-full transition-colors md:h-auto md:w-auto md:p-1.5",
                     viewMode === "list"
                       ? "bg-accent-gradient text-white"
                       : "text-ink-3 hover:text-ink"
@@ -305,7 +305,7 @@ export default function ResultsPage() {
                 variant="outline"
                 size="sm"
                 disabled={selectedIds.size === 0}
-                className="h-8 rounded-full border-line-strong bg-surface text-[13px]"
+	                className="h-11 shrink-0 rounded-full border-line-strong bg-surface text-[13px] md:h-8"
               >
                 <Download className="mr-1 h-3.5 w-3.5" />
                 批量下载
@@ -314,7 +314,7 @@ export default function ResultsPage() {
                 variant="outline"
                 size="sm"
                 disabled={selectedIds.size === 0}
-                className="h-8 rounded-full border-line-strong bg-surface text-[13px] text-danger hover:text-danger"
+	                className="h-11 shrink-0 rounded-full border-line-strong bg-surface text-[13px] text-danger hover:text-danger md:h-8"
                 onClick={handleBulkDelete}
               >
                 <Trash2 className="mr-1 h-3.5 w-3.5" />
@@ -334,7 +334,7 @@ export default function ResultsPage() {
             {error && (
               <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-6 text-center">
                 <p className="text-data text-destructive">{error}</p>
-                <Button variant="outline" size="sm" className="mt-3" onClick={fetchResults}>
+	                <Button variant="outline" size="sm" className="mt-3 min-h-11" onClick={fetchResults}>
                   重试
                 </Button>
               </div>
@@ -362,9 +362,9 @@ export default function ResultsPage() {
                             {CATEGORY_LABELS[item.category] || "其他"}
                           </span>
                           {/* Checkbox overlay */}
-                          <div className={cn(
-                            "absolute right-2 top-2 transition-opacity",
-                            selectedIds.has(item.id) ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+	                          <div className={cn(
+	                            "absolute right-2 top-2 transition-opacity",
+	                            selectedIds.has(item.id) ? "opacity-100" : "opacity-100 md:opacity-0 md:group-hover:opacity-100"
                           )}>
                             <div className="rounded-md bg-surface/85 p-1 backdrop-blur-sm">
                               <Checkbox
@@ -374,13 +374,13 @@ export default function ResultsPage() {
                             </div>
                           </div>
                           {/* Hover actions */}
-                          <div className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
-                            <button className="rounded-full bg-white/90 p-1.5 text-ink-2 hover:text-ink" title="下载">
-                              <Download className="h-3.5 w-3.5" />
-                            </button>
-                            <button className="rounded-full bg-white/90 p-1.5 text-ink-2 hover:text-danger" title="删除">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+	                          <div className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+	                            <button className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-ink-2 hover:text-ink" title="下载">
+	                              <Download className="h-3.5 w-3.5" />
+	                            </button>
+	                            <button className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-ink-2 hover:text-danger" title="删除">
+	                              <Trash2 className="h-3.5 w-3.5" />
+	                            </button>
                           </div>
                         </div>
                         <div className="px-2.5 py-2">
@@ -417,10 +417,10 @@ export default function ResultsPage() {
                           {CATEGORY_LABELS[item.category] || "其他"}
                         </span>
                         <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-ink-2">
+	                          <Button variant="ghost" size="sm" className="h-10 w-10 p-0 text-ink-2">
                             <Download className="h-3.5 w-3.5" />
                           </Button>
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-ink-2 hover:text-danger">
+	                          <Button variant="ghost" size="sm" className="h-10 w-10 p-0 text-ink-2 hover:text-danger">
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
@@ -436,14 +436,14 @@ export default function ResultsPage() {
                     title="暂无结果"
                     description="去工作台生成你的第一张商品图吧。"
                     action={
-                      <div className="flex items-center gap-3">
-                        <Button variant="brand" asChild>
+	                      <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
+	                        <Button variant="brand" className="min-h-11" asChild>
                           <Link href="/workspace/scene">
                             <Wand2 className="w-4 h-4 mr-2" />
                             场景生成
                           </Link>
                         </Button>
-                        <Button variant="outline" asChild>
+	                        <Button variant="outline" className="min-h-11" asChild>
                           <Link href="/tools">
                             <ImageIcon className="w-4 h-4 mr-2" />
                             工具箱

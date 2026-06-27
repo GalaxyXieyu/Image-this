@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { MobileDesktopOnly } from "@/components/navigation/MobileDesktopOnly";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -142,16 +141,36 @@ export default function PromptStudioPage() {
   const gridStyle: React.CSSProperties = {
     display: "grid",
     gap: 16,
-    gridTemplateColumns:
-      groups.length === 1
-        ? "minmax(0, 720px)"
-        : `repeat(${groups.length}, minmax(280px, 1fr))`,
+    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
     justifyContent: groups.length === 1 ? "center" : "stretch",
   };
 
   return (
     <div className="flex h-[100dvh] flex-col bg-background app-bg-glow">
-      <MobileDesktopOnly title="提示词工作室" reason="提示词工作室需要并排多列对比和大段文本编辑，手机屏幕放不下。" />
+      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-surface px-4 py-3 md:hidden">
+        <Button
+          asChild
+          variant="outline"
+          className="h-11 w-11 rounded-full border-line-strong bg-surface p-0 text-ink"
+          aria-label="返回设置"
+        >
+          <Link href="/settings">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+        </Button>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-[16px] font-bold text-ink">提示词工作室</h1>
+          <p className="truncate text-[12px] text-ink-3">电商场景生成 · 多版本调试</p>
+        </div>
+        <Button
+          onClick={runAll}
+          disabled={running}
+          className="h-11 shrink-0 rounded-full bg-accent-gradient px-4 text-[13px] font-bold text-white shadow-soft disabled:opacity-70"
+        >
+          {running ? <ConicSpinner size={16} showPulse={false} /> : <Bolt className="h-4 w-4" />}
+          {running ? "生成中" : "调试"}
+        </Button>
+      </header>
       {/* Top bar — 桌面端 */}
       <header className="hidden md:flex shrink-0 items-center justify-between border-b border-line bg-surface px-6 py-3.5">
         <div className="flex items-center gap-3.5">
@@ -203,21 +222,21 @@ export default function PromptStudioPage() {
       </header>
 
       {/* Banner */}
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-surface px-6 py-2.5">
-        <div className="flex items-center gap-2">
+      <div className="flex shrink-0 flex-col gap-2 border-b border-line bg-surface px-4 py-3 md:flex-row md:items-center md:justify-between md:gap-3 md:px-6 md:py-2.5">
+        <div className="flex min-w-0 items-center gap-2">
           {warn ? (
             <Sparkles className="h-4 w-4 text-brand" />
           ) : (
             <Server className="h-4 w-4 text-ink-3" />
           )}
-          <span className="text-[12.5px] font-semibold text-ink-2">{bannerText}</span>
+          <span className="min-w-0 text-[12.5px] font-semibold leading-5 text-ink-2">{bannerText}</span>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center justify-between gap-2.5 md:justify-end">
           {canAdd ? (
             <button
               type="button"
               onClick={addGroup}
-              className="inline-flex h-[34px] items-center gap-1.5 rounded-[10px] border border-dashed border-line-strong bg-surface px-3.5 text-[12.5px] font-semibold text-ink transition-colors hover:border-brand hover:text-brand-text"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-dashed border-line-strong bg-surface px-3.5 text-[12.5px] font-semibold text-ink transition-colors hover:border-brand hover:text-brand-text md:min-h-[34px] md:rounded-[10px]"
             >
               <Plus className="h-4 w-4" />
               添加对比组
@@ -225,13 +244,13 @@ export default function PromptStudioPage() {
           ) : (
             <span className="text-[11.5px] text-ink-3">已达上限 · 最多 4 组</span>
           )}
-          <div className="flex items-center gap-1 rounded-[10px] border border-line bg-surface-muted/60 px-2 py-1">
+          <div className="flex min-h-11 items-center gap-1 rounded-full border border-line bg-surface-muted/60 px-2 py-1 md:min-h-0 md:rounded-[10px]">
             <span className="text-[11px] font-semibold text-ink-3">并发：</span>
             {CONCURRENCY_OPTIONS.map((n) => (
               <span
                 key={n}
                 className={cn(
-                  "rounded-md px-1.5 text-[11px] font-bold",
+                  "rounded-md px-1.5 py-1 text-[11px] font-bold",
                   concurrency === n
                     ? "bg-accent-gradient text-white"
                     : "text-ink-3"
@@ -245,8 +264,8 @@ export default function PromptStudioPage() {
       </div>
 
       {/* Groups grid */}
-      <div className="flex-1 overflow-auto px-6 py-5">
-        <div style={gridStyle}>
+      <div className="flex-1 overflow-auto px-4 pb-24 pt-4 md:px-6 md:py-5">
+        <div style={gridStyle} className="mx-auto w-full max-w-[720px] md:max-w-none">
           {groups.map((g) => (
             <GroupCard
               key={g.id}
@@ -255,6 +274,25 @@ export default function PromptStudioPage() {
               onRemove={() => removeGroup(g.id)}
             />
           ))}
+        </div>
+      </div>
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface-glass px-4 py-3 backdrop-blur-[18px] backdrop-saturate-150 md:hidden">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            className="h-12 shrink-0 rounded-full border-line-strong bg-surface px-4 text-[13px] font-semibold text-ink"
+          >
+            <Save className="h-4 w-4" />
+            保存
+          </Button>
+          <Button
+            onClick={runAll}
+            disabled={running}
+            className="h-12 flex-1 rounded-full bg-accent-gradient px-5 text-[14px] font-bold text-white shadow-float disabled:opacity-70"
+          >
+            {running ? <ConicSpinner size={16} showPulse={false} /> : <Bolt className="h-4 w-4" />}
+            {running ? "生成中…" : "运行调试"}
+          </Button>
         </div>
       </div>
     </div>
@@ -267,11 +305,11 @@ function GroupCard({
   onRemove,
 }: {
   group: PromptGroup;
-  onUpdate: (patch: Partial<PromptGroup>) => void;
+  onUpdate: (_patch: Partial<PromptGroup>) => void;
   onRemove: () => void;
 }) {
   return (
-    <div className="glass-panel flex min-w-0 flex-col gap-4 rounded-[16px] p-[18px]">
+    <div className="glass-panel flex min-w-0 flex-col gap-4 rounded-[16px] p-4 md:p-[18px]">
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
@@ -310,7 +348,7 @@ function GroupCard({
                   onUpdate({ activeVersion: v.label, content: v.content })
                 }
                 className={cn(
-                  "rounded-[8px] border px-2.5 py-1 text-[12px] font-semibold transition-colors",
+	                  "min-h-11 min-w-11 rounded-[8px] border px-3 py-1 text-[12px] font-semibold transition-colors md:min-h-0 md:min-w-0 md:px-2.5",
                   active
                     ? "border-brand bg-brand-soft text-brand-text"
                     : "border-line-strong text-ink-2 hover:text-ink"
@@ -327,7 +365,7 @@ function GroupCard({
       {/* Model */}
       <FieldGroup label="模型">
         <Select value={group.model} onValueChange={(v) => onUpdate({ model: v })}>
-          <SelectTrigger className="h-10 rounded-[10px]">
+	          <SelectTrigger className="h-11 rounded-[10px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -346,7 +384,7 @@ function GroupCard({
           <div className="flex flex-col gap-1.5">
             <span className="text-[11px] text-ink-3">风格</span>
             <Select value={group.style} onValueChange={(v) => onUpdate({ style: v })}>
-              <SelectTrigger className="h-9 rounded-[9px]">
+	              <SelectTrigger className="h-11 rounded-[9px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -361,7 +399,7 @@ function GroupCard({
           <div className="flex flex-col gap-1.5">
             <span className="text-[11px] text-ink-3">比例</span>
             <Select value={group.ratio} onValueChange={(v) => onUpdate({ ratio: v })}>
-              <SelectTrigger className="h-9 rounded-[9px]">
+	              <SelectTrigger className="h-11 rounded-[9px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

@@ -228,9 +228,9 @@ export default function TasksPage() {
     <div className="h-full flex flex-col bg-background">
 
       {/* Header */}
-      <div className="px-8 py-6 flex items-center justify-between shrink-0">
+      <div className="px-4 py-5 flex flex-col gap-3 shrink-0 sm:px-8 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="font-serif text-h2 text-foreground tracking-tight">
+          <h1 className="font-serif text-[28px] leading-tight text-foreground tracking-tight sm:text-h2">
             任务中心
           </h1>
           <p className="text-data text-muted-foreground mt-1">
@@ -244,7 +244,7 @@ export default function TasksPage() {
               实时更新中
             </div>
           )}
-          <Button variant="outline" size="sm" onClick={fetchTasks} disabled={loading}>
+	          <Button variant="outline" size="sm" className="min-h-11" onClick={fetchTasks} disabled={loading}>
             <RefreshCw className={cn("w-4 h-4 mr-2", loading && "animate-spin")} />
             刷新
           </Button>
@@ -252,14 +252,14 @@ export default function TasksPage() {
       </div>
 
       {/* Tabs — 紫罗兰胶囊组（对齐 /tools） */}
-      <div className="px-8 shrink-0">
-        <div className="inline-flex items-center gap-1 rounded-full glass-panel p-1">
+      <div className="px-4 shrink-0 sm:px-8">
+        <div className="flex max-w-full items-center gap-1 overflow-x-auto rounded-full glass-panel p-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden md:inline-flex">
           {tabLabels.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                "px-4 py-1.5 text-data font-medium rounded-full transition-all",
+	                "min-h-11 shrink-0 px-4 text-data font-medium rounded-full transition-all md:min-h-0 md:py-1.5",
                 activeTab === tab.id
                   ? "bg-accent-gradient text-white shadow-soft"
                   : "text-muted-foreground hover:text-foreground"
@@ -272,7 +272,7 @@ export default function TasksPage() {
       </div>
 
       {/* Task List */}
-      <div className="flex-1 overflow-auto p-8">
+      <div className="flex-1 overflow-auto p-4 sm:p-8">
         <div className="max-w-5xl mx-auto space-y-4">
           {loading && (
             <div className="flex items-center justify-center py-20">
@@ -283,7 +283,7 @@ export default function TasksPage() {
           {error && (
             <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-6 text-center">
               <p className="text-data text-destructive">{error}</p>
-              <Button variant="outline" size="sm" className="mt-3" onClick={fetchTasks}>
+	              <Button variant="outline" size="sm" className="mt-3 min-h-11" onClick={fetchTasks}>
                 重试
               </Button>
             </div>
@@ -302,10 +302,10 @@ export default function TasksPage() {
           {filteredTasks.map((task) => (
             <div
               key={task.id}
-              className="glass-panel rounded-card shadow-soft hover:shadow-float p-5 transition-shadow"
+              className="glass-panel rounded-card shadow-soft hover:shadow-float p-4 transition-shadow sm:p-5"
             >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-center gap-3 sm:gap-4">
                   <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
                     <ImageIcon className="w-5 h-5 text-muted-foreground" />
                   </div>
@@ -340,22 +340,22 @@ export default function TasksPage() {
                 </div>
               )}
 
-              <div className="flex items-center gap-2 mt-4 pt-4 border-t border-border">
+              <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-border">
                 {task.status === "failed" && (
-                  <Button variant="ghost" size="sm" onClick={() => alert("重试功能待实现")}>
+	                  <Button variant="ghost" size="sm" className="min-h-10" onClick={() => alert("重试功能待实现")}>
                     <RotateCcw className="w-4 h-4 mr-1.5" />
                     重试
                   </Button>
                 )}
                 {task.status === "completed" && (
-                  <Button variant="ghost" size="sm" asChild>
+	                  <Button variant="ghost" size="sm" className="min-h-10" asChild>
                     <Link href={`/results?task=${task.id}`}>查看结果</Link>
                   </Button>
                 )}
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-muted-foreground hover:text-destructive"
+	                  className="min-h-10 text-muted-foreground hover:text-destructive"
                   onClick={() => handleDelete(task.id)}
                 >
                   <Trash2 className="w-4 h-4 mr-1.5" />

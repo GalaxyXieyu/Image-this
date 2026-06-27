@@ -86,7 +86,7 @@ export default function LoginPage() {
               value={formData.email}
               onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
               required
-              className="h-9 rounded-sm border-[#e5e7eb] bg-white text-sm"
+              className="h-11 rounded-[10px] border-[#e5e7eb] bg-white text-sm md:h-9 md:rounded-sm"
             />
           </div>
           <div className="space-y-1.5">
@@ -98,7 +98,7 @@ export default function LoginPage() {
               value={formData.password}
               onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
               required
-              className="h-9 rounded-sm border-[#e5e7eb] bg-white text-sm"
+              className="h-11 rounded-[10px] border-[#e5e7eb] bg-white text-sm md:h-9 md:rounded-sm"
             />
           </div>
 
@@ -108,7 +108,7 @@ export default function LoginPage() {
 
           <Button
             type="submit"
-            className="h-9 w-full rounded-sm bg-accent-gradient text-sm font-medium text-white hover:opacity-90"
+            className="h-11 w-full rounded-[10px] bg-accent-gradient text-sm font-medium text-white hover:opacity-90 md:h-9 md:rounded-sm"
             disabled={isLoading}
           >
             {isLoading ? '登录中...' : '登录'}
@@ -126,7 +126,7 @@ export default function LoginPage() {
               variant="outline"
               onClick={() => handleSocialLogin('google')}
               disabled={isLoading}
-              className="h-9 rounded-sm text-xs"
+              className="h-11 rounded-[10px] text-xs md:h-9 md:rounded-sm"
             >
               <Mail className="mr-2 h-3.5 w-3.5" />
               Google
@@ -135,7 +135,7 @@ export default function LoginPage() {
               variant="outline"
               onClick={() => handleSocialLogin('github')}
               disabled={isLoading}
-              className="h-9 rounded-sm text-xs"
+              className="h-11 rounded-[10px] text-xs md:h-9 md:rounded-sm"
             >
               <Github className="mr-2 h-3.5 w-3.5" />
               GitHub
@@ -145,7 +145,7 @@ export default function LoginPage() {
 
         <div className="text-center text-xs text-muted-foreground">
           还没有账号？{' '}
-          <Link href={registerHref} className="font-medium text-primary hover:underline">
+          <Link href={registerHref} className="inline-flex min-h-11 items-center font-medium text-primary hover:underline">
             立即注册
           </Link>
         </div>

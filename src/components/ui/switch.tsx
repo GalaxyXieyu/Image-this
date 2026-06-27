@@ -19,17 +19,17 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
         disabled={disabled}
         onClick={() => onCheckedChange?.(!checked)}
         className={`
-          relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full
-          border-2 border-transparent transition-colors
+          relative inline-flex h-11 w-11 shrink-0 cursor-pointer items-center rounded-full
+          border-2 border-transparent transition-colors before:absolute before:left-0 before:top-1/2 before:h-6 before:w-11 before:-translate-y-1/2 before:rounded-full
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2
           disabled:cursor-not-allowed disabled:opacity-50
-          ${checked ? 'bg-primary' : 'bg-gray-200'}
+          ${checked ? 'before:bg-primary' : 'before:bg-gray-200'}
           ${className}
         `}
       >
         <span
           className={`
-            pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform
+            pointer-events-none relative z-10 block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform
             ${checked ? 'translate-x-5' : 'translate-x-0'}
           `}
         />

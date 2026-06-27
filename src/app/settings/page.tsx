@@ -146,7 +146,7 @@ function SearchableModelSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between"
+          className="min-h-11 w-full justify-between"
           disabled={disabled}
         >
           {value || placeholder || '选择模型...'}
@@ -160,7 +160,7 @@ function SearchableModelSelect({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="搜索模型..."
-            className="h-9 border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+            className="h-11 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 md:h-9"
           />
         </div>
         <div className="max-h-60 overflow-y-auto py-1">
@@ -175,7 +175,7 @@ function SearchableModelSelect({
                   setOpen(false);
                   setSearch('');
                 }}
-                className={`cursor-pointer px-3 py-2 text-data hover:bg-muted ${value === option ? 'bg-muted font-medium' : ''}`}
+                className={`min-h-11 cursor-pointer px-3 py-2.5 text-data hover:bg-muted ${value === option ? 'bg-muted font-medium' : ''}`}
               >
                 {option}
               </div>
@@ -489,7 +489,7 @@ export default function SettingsPage() {
       type="button"
       onClick={handleSave}
       disabled={isSaving}
-      className="min-w-[132px] bg-primary hover:bg-primary/90 text-primary-foreground"
+      className="min-h-11 w-full bg-primary hover:bg-primary/90 text-primary-foreground sm:w-auto sm:min-w-[132px]"
     >
       {isSaving ? (
         <>
@@ -777,9 +777,9 @@ export default function SettingsPage() {
         return (
           <div className="space-y-6">
             {/* 统计行 */}
-            <div className="flex items-baseline justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
               <div>
-                <h2 className="font-serif text-h3 text-ink tracking-tight">AI 模型配置</h2>
+                <h2 className="font-serif text-[24px] leading-tight text-ink tracking-tight sm:text-h3">AI 模型配置</h2>
                 <p className="mt-1 text-data text-ink-3">每张卡片是一个模型，点击可配置其 Provider 的接口与密钥</p>
               </div>
               <div className="text-data text-ink-3">
@@ -798,7 +798,7 @@ export default function SettingsPage() {
                   <button
                     key={`${m.provider}-${m.id}-${idx}`}
                     onClick={() => setModalProvider(m.provider)}
-                    className="glass-panel group flex flex-col gap-3 rounded-[16px] p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-float"
+                    className="glass-panel group flex min-h-[132px] flex-col gap-3 rounded-[16px] p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-float"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-muted px-2 py-0.5 text-[11px] font-medium text-ink-2">
@@ -848,8 +848,8 @@ export default function SettingsPage() {
         return (
           <div className="space-y-6">
             <Card>
-              <CardHeader className="flex flex-row items-start justify-between space-y-0">
-                <CardTitle className="flex items-center">
+              <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between">
+                <CardTitle className="flex items-center text-[18px] sm:text-body">
                   <Image className="w-5 h-5 mr-2 text-primary" />
                   图床服务
                 </CardTitle>
@@ -877,8 +877,8 @@ export default function SettingsPage() {
 
             {/* 本地存储配置 */}
             <Card>
-              <CardHeader className="flex flex-row items-start justify-between space-y-0">
-                <CardTitle className="flex items-center">
+              <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between">
+                <CardTitle className="flex items-center text-[18px] sm:text-body">
                   <div className="flex items-center">
                     <HardDrive className="w-5 h-5 mr-2 text-primary" />
                     本地存储配置
@@ -897,20 +897,20 @@ export default function SettingsPage() {
                       保存路径
                     </div>
                   </Label>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <Input
                       id="localStoragePath"
                       type="text"
                       placeholder="例如：/Users/yourname/Pictures/ai-images 或 ~/Pictures/ai-images"
                       value={apiSettings.localStoragePath}
                       onChange={(e) => handleInputChange('localStoragePath', e.target.value)}
-                      className="flex-1"
+                      className="min-h-11 flex-1"
                     />
                     <Button
                       type="button"
                       variant="outline"
                       onClick={handleSelectFolder}
-                      className="gap-2 whitespace-nowrap"
+                      className="min-h-11 gap-2 whitespace-nowrap"
                     >
                       <Folder className="w-4 h-4" />
                       浏览
@@ -939,9 +939,9 @@ export default function SettingsPage() {
             {/* 工具栏 */}
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <CardTitle className="flex items-center gap-2">
+                    <CardTitle className="flex items-center gap-2 text-[18px] sm:text-body">
                       <FileText className="w-5 h-5 text-primary" />
                       提示词模板管理
                     </CardTitle>
@@ -949,17 +949,17 @@ export default function SettingsPage() {
                       管理您的 AI 提示词模板，包括背景替换、扩图、高清化和一键增强等场景
                     </CardDescription>
                   </div>
-                  <Button onClick={() => setIsCreateDialogOpen(true)} className="gap-2">
+                  <Button onClick={() => setIsCreateDialogOpen(true)} className="min-h-11 w-full gap-2 sm:w-auto">
                     <Plus className="w-4 h-4" />
                     新建模板
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
                   <Label className="text-data font-medium">筛选分类:</Label>
                   <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                    <SelectTrigger className="w-[200px]">
+                    <SelectTrigger className="min-h-11 w-full sm:w-[200px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -987,20 +987,20 @@ export default function SettingsPage() {
                   <Card key={template.id} className="hover:shadow-lg transition-shadow">
                     <CardHeader>
                       <div className="flex items-start justify-between">
-                        <div className="flex-1">
+                        <div className="min-w-0 flex-1">
                           <CardTitle className="text-body flex items-center gap-2">
                             <FileText className="w-5 h-5 text-primary" />
                             {template.name}
                           </CardTitle>
-                          <CardDescription className="mt-1">
+                          <CardDescription className="mt-1 flex flex-wrap items-center gap-1">
                             {CATEGORY_LABELS[template.category]}
                             {template.isSystem && (
-                              <span className="ml-2 text-caption px-2 py-0.5 bg-primary/10 text-primary rounded">
+                              <span className="text-caption px-2 py-0.5 bg-primary/10 text-primary rounded">
                                 系统
                               </span>
                             )}
                             {template.isDefault && (
-                              <span className="ml-2 text-caption px-2 py-0.5 bg-secondary text-secondary-foreground rounded">
+                              <span className="text-caption px-2 py-0.5 bg-secondary text-secondary-foreground rounded">
                                 默认
                               </span>
                             )}
@@ -1020,7 +1020,7 @@ export default function SettingsPage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleSetDefault(template)}
-                          className="gap-1"
+                          className="min-h-10 gap-1"
                         >
                           {template.isDefault ? (
                             <>
@@ -1038,7 +1038,7 @@ export default function SettingsPage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => openEditDialog(template)}
-                          className="gap-1"
+                          className="min-h-10 gap-1"
                         >
                           <Edit className="w-4 h-4" />
                           编辑
@@ -1048,7 +1048,7 @@ export default function SettingsPage() {
                           size="sm"
                           onClick={() => openDeleteDialog(template)}
                           disabled={template.isSystem}
-                          className="gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          className="min-h-10 gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
                         >
                           <Trash2 className="w-4 h-4" />
                           删除
@@ -1067,7 +1067,7 @@ export default function SettingsPage() {
                     description="创建模板后，可在背景替换、扩图、高清化和一键增强场景中复用。"
                     className="border-0 bg-transparent py-12"
                     action={
-                      <Button onClick={() => setIsCreateDialogOpen(true)} className="gap-2">
+                      <Button onClick={() => setIsCreateDialogOpen(true)} className="min-h-11 gap-2">
                         <Plus className="w-4 h-4" />
                         创建第一个模板
                       </Button>
@@ -1083,9 +1083,9 @@ export default function SettingsPage() {
         return (
           <div className="space-y-6">
             <Card>
-              <CardHeader className="flex flex-row items-start justify-between space-y-0">
+              <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <CardTitle className="flex items-center">
+                  <CardTitle className="flex items-center text-[18px] sm:text-body">
                     <SlidersHorizontal className="w-5 h-5 mr-2 text-primary" />
                     后台任务并发
                   </CardTitle>
@@ -1108,7 +1108,7 @@ export default function SettingsPage() {
                       const value = Math.max(1, Math.min(10, Number(e.target.value) || 1));
                       handleInputChange('taskConcurrency', value);
                     }}
-                    className="max-w-xs"
+                    className="min-h-11 w-full sm:max-w-xs"
                   />
                   <div className="text-caption text-muted-foreground mt-2 space-y-1">
                     <div>建议保持 1-2，避免触发大模型或图床限流。</div>
@@ -1128,7 +1128,7 @@ export default function SettingsPage() {
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
+                <CardTitle className="flex items-center text-[18px] sm:text-body">
                   <User className="w-5 h-5 mr-2 text-muted-foreground" />
                   用户信息
                 </CardTitle>
@@ -1136,13 +1136,13 @@ export default function SettingsPage() {
               <CardContent className="space-y-4">
                 <div>
                   <Label>邮箱</Label>
-                  <div className="text-muted-foreground bg-muted px-3 py-2 rounded border">
+                  <div className="break-all rounded border bg-muted px-3 py-2.5 text-muted-foreground">
                     {session.user?.email}
                   </div>
                 </div>
                 <div>
                   <Label>用户ID</Label>
-                  <div className="text-muted-foreground bg-muted px-3 py-2 rounded border font-mono text-data">
+                  <div className="break-all rounded border bg-muted px-3 py-2.5 font-mono text-data text-muted-foreground">
                     {session.user?.id}
                   </div>
                 </div>
@@ -1162,9 +1162,9 @@ export default function SettingsPage() {
 
   return (
     <div className="h-full bg-background flex flex-col overflow-y-auto">
-      <div className="flex-1 px-4 sm:px-6 lg:px-8 py-8 bg-background">
-        <div className="mb-8">
-          <h1 className="font-serif text-h2 font-semibold tracking-[-0.01em] text-ink">设置</h1>
+      <div className="flex-1 bg-background px-4 py-5 sm:px-6 sm:py-8 lg:px-8">
+        <div className="mb-5 sm:mb-8">
+          <h1 className="font-serif text-[28px] font-semibold leading-tight tracking-[-0.01em] text-ink sm:text-h2">设置</h1>
           <p className="mt-2 text-ink-2">管理 AI 服务配置、提示词、系统并发与账户信息</p>
         </div>
 
@@ -1188,7 +1188,7 @@ export default function SettingsPage() {
                         key={g.id}
                         onClick={() => setActiveSection(g.sections[0])}
                         className={cn(
-                          "relative inline-flex items-center gap-2 px-4 py-3 text-[14px] font-medium transition-colors",
+                          "relative inline-flex min-h-11 shrink-0 items-center gap-2 px-4 py-2.5 text-[14px] font-medium transition-colors",
                           active
                             ? "text-brand-text"
                             : "text-ink-3 hover:text-ink"
@@ -1208,7 +1208,7 @@ export default function SettingsPage() {
                 </nav>
               </div>
               {currentTab.sections.length > 1 && (
-                <div className="mt-3 flex items-center gap-1.5">
+                <div className="mt-3 flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                   {currentTab.sections.map((sid) => {
                     const item = menuItems.find((m) => m.id === sid);
                     if (!item) return null;
@@ -1218,7 +1218,7 @@ export default function SettingsPage() {
                         key={sid}
                         onClick={() => setActiveSection(sid)}
                         className={cn(
-                          "rounded-full px-3 py-1 text-[12px] font-medium transition-colors",
+                          "min-h-10 shrink-0 rounded-full px-3 text-[12px] font-medium transition-colors",
                           active
                             ? "bg-brand-soft text-brand-text"
                             : "text-ink-3 hover:bg-surface-muted hover:text-ink"
@@ -1234,7 +1234,7 @@ export default function SettingsPage() {
           );
         })()}
 
-        <div className="flex gap-6 min-h-[calc(100vh-16rem)]">
+        <div className="flex min-h-0 gap-6 sm:min-h-[calc(100vh-16rem)]">
           {/* 右侧内容区域 */}
           <div className="flex-1 space-y-6">
             {renderContent()}
@@ -1245,7 +1245,7 @@ export default function SettingsPage() {
                 <Button 
                   onClick={handleSave} 
                   disabled={isSaving}
-                  className="min-w-[120px] bg-primary hover:bg-primary/90 text-primary-foreground"
+                  className="min-h-11 w-full bg-primary hover:bg-primary/90 text-primary-foreground sm:w-auto sm:min-w-[120px]"
                 >
                   {isSaving ? (
                     <>
@@ -1267,7 +1267,7 @@ export default function SettingsPage() {
 
       {/* 创建对话框 */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-sm:w-[calc(100vw-1.5rem)] max-sm:max-h-[calc(100dvh-1.5rem)] max-sm:overflow-y-auto">
           <DialogHeader>
             <DialogTitle>创建提示词模板</DialogTitle>
             <DialogDescription>
@@ -1282,6 +1282,7 @@ export default function SettingsPage() {
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="例如：产品背景替换"
+                className="min-h-11"
               />
             </div>
             <div className="space-y-2">
@@ -1290,7 +1291,7 @@ export default function SettingsPage() {
                 value={formData.category}
                 onValueChange={(value) => setFormData({ ...formData, category: value })}
               >
-                <SelectTrigger>
+                    <SelectTrigger className="min-h-11">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1309,6 +1310,7 @@ export default function SettingsPage() {
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="简短描述这个模板的用途"
+                className="min-h-11"
               />
             </div>
             <div className="space-y-2">
@@ -1322,18 +1324,18 @@ export default function SettingsPage() {
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" className="min-h-11" onClick={() => setIsCreateDialogOpen(false)}>
               取消
             </Button>
-            <Button onClick={handleCreateTemplate}>创建</Button>
+            <Button className="min-h-11" onClick={handleCreateTemplate}>创建</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* 编辑对话框 */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-sm:w-[calc(100vw-1.5rem)] max-sm:max-h-[calc(100dvh-1.5rem)] max-sm:overflow-y-auto">
           <DialogHeader>
             <DialogTitle>编辑提示词模板</DialogTitle>
             <DialogDescription>
@@ -1347,6 +1349,7 @@ export default function SettingsPage() {
                 id="edit-name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="min-h-11"
               />
             </div>
             <div className="space-y-2">
@@ -1355,6 +1358,7 @@ export default function SettingsPage() {
                 id="edit-description"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="min-h-11"
               />
             </div>
             <div className="space-y-2">
@@ -1367,29 +1371,29 @@ export default function SettingsPage() {
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" className="min-h-11" onClick={() => setIsEditDialogOpen(false)}>
               取消
             </Button>
-            <Button onClick={handleEditTemplate}>保存</Button>
+            <Button className="min-h-11" onClick={handleEditTemplate}>保存</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* 删除确认对话框 */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-sm:w-[calc(100vw-1.5rem)]">
           <DialogHeader>
             <DialogTitle>确认删除</DialogTitle>
             <DialogDescription>
               确定要删除提示词模板 “{currentTemplate?.name}” 吗？此操作无法撤销。
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" className="min-h-11" onClick={() => setIsDeleteDialogOpen(false)}>
               取消
             </Button>
-            <Button variant="destructive" onClick={handleDeleteTemplate}>
+            <Button variant="destructive" className="min-h-11" onClick={handleDeleteTemplate}>
               删除
             </Button>
           </DialogFooter>
@@ -1415,9 +1419,9 @@ export default function SettingsPage() {
 
               <div className="space-y-4 py-2">
                 {/* Provider 类型 3 选 1 */}
-                <div>
-                  <Label className="text-[12px] font-medium text-ink-2">Provider 类型</Label>
-                  <div className="mt-1.5 grid grid-cols-3 gap-2">
+	                <div>
+	                  <Label className="text-[12px] font-medium text-ink-2">Provider 类型</Label>
+	                  <div className="mt-1.5 grid grid-cols-1 gap-2 sm:grid-cols-3">
                     {(Object.keys(PROVIDER_META) as ProviderId[]).map((p) => {
                       const active = p === modalProvider;
                       return (
@@ -1425,8 +1429,8 @@ export default function SettingsPage() {
                           key={p}
                           type="button"
                           onClick={() => setModalProvider(p)}
-                          className={cn(
-                            "rounded-[12px] border px-3 py-2 text-[12px] font-medium transition-colors",
+	                          className={cn(
+	                            "min-h-11 rounded-[12px] border px-3 py-2 text-[12px] font-medium transition-colors",
                             active
                               ? "border-brand bg-brand-soft text-brand-text"
                               : "border-border bg-surface text-ink-2 hover:border-brand-soft"
@@ -1442,8 +1446,8 @@ export default function SettingsPage() {
                 {/* API 地址 */}
                 <div>
                   <Label className="text-[12px] font-medium text-ink-2">API 地址</Label>
-                  <Input
-                    className="mt-1.5"
+	                  <Input
+	                    className="mt-1.5 min-h-11"
                     value={modalProvider === 'gpt' ? apiSettings.gptApiUrl : modalProvider === 'gemini' ? apiSettings.geminiBaseUrl : apiSettings.jimengBaseUrl}
                     onChange={(e) => {
                       const v = e.target.value;
@@ -1467,7 +1471,7 @@ export default function SettingsPage() {
                           [modalProvider]: [...(prev[modalProvider] ?? []), { id: PROVIDER_META[modalProvider].defaultModel, enabled: true }],
                         }));
                       }}
-                      className="inline-flex items-center gap-1 text-[12px] font-medium text-brand-text hover:underline"
+	                      className="inline-flex min-h-10 items-center gap-1 px-1 text-[12px] font-medium text-brand-text hover:underline"
                     >
                       <Plus className="h-3 w-3" />
                       添加模型
@@ -1477,13 +1481,13 @@ export default function SettingsPage() {
                     {(providerModels[modalProvider] ?? []).map((m, idx) => (
                       <div
                         key={idx}
-                        className={cn(
-                          "flex items-center gap-2 rounded-[10px] border bg-surface px-2 py-1.5",
+	                        className={cn(
+	                          "flex items-center gap-2 rounded-[10px] border bg-surface px-2 py-2",
                           m.enabled ? "border-brand/40" : "border-border"
                         )}
                       >
                         <Input
-                          className="h-8 flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0"
+	                          className="h-9 flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0"
                           value={m.id}
                           onChange={(e) => {
                             const v = e.target.value;
@@ -1511,7 +1515,7 @@ export default function SettingsPage() {
                               [modalProvider]: prev[modalProvider].filter((_, i) => i !== idx),
                             }));
                           }}
-                          className="text-ink-3 hover:text-danger"
+	                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink-3 hover:bg-danger/10 hover:text-danger"
                           aria-label="删除模型"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -1528,7 +1532,7 @@ export default function SettingsPage() {
                 <div>
                   <Label className="text-[12px] font-medium text-ink-2">API 密钥</Label>
                   <Input
-                    className="mt-1.5"
+	                    className="mt-1.5 min-h-11"
                     type="password"
                     value={modalProvider === 'gpt' ? apiSettings.gptApiKey : modalProvider === 'gemini' ? apiSettings.geminiApiKey : apiSettings.arkApiKey}
                     onChange={(e) => {
@@ -1542,11 +1546,10 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <DialogFooter className="flex items-center justify-between gap-2 sm:justify-between">
+              <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <Button
                   variant="ghost"
-                  size="sm"
-                  className="text-danger hover:bg-danger/10 hover:text-danger"
+                  className="min-h-11 w-full justify-center text-danger hover:bg-danger/10 hover:text-danger sm:w-auto"
                   onClick={() => {
                     if (!modalProvider) return;
                     setProviderModels((prev) => ({ ...prev, [modalProvider]: [] }));
@@ -1562,11 +1565,10 @@ export default function SettingsPage() {
                   <Trash2 className="mr-1 h-3.5 w-3.5" />
                   删除 Provider
                 </Button>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setModalProvider(null)}>取消</Button>
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                  <Button variant="outline" className="min-h-11" onClick={() => setModalProvider(null)}>取消</Button>
                   <Button
-                    size="sm"
-                    className="bg-accent-gradient text-white hover:opacity-90"
+                    className="min-h-11 bg-accent-gradient text-white hover:opacity-90"
                     onClick={async () => {
                       await handleSave();
                       setModalProvider(null);

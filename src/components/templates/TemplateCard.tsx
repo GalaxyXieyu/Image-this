@@ -33,7 +33,7 @@ export function TemplateCard({
     <div
       onClick={onClick}
       className={cn(
-        "h-[280px] bg-card rounded-xl border border-border flex flex-col overflow-hidden cursor-pointer transition-all duration-200",
+        "h-[260px] bg-card rounded-xl border border-border flex flex-col overflow-hidden cursor-pointer transition-all duration-200 sm:h-[280px]",
         isSelected
           ? "ring-2 ring-primary border-primary shadow-md"
           : "hover:border-primary/50 hover:shadow-sm",
@@ -41,7 +41,7 @@ export function TemplateCard({
       )}
     >
       <div
-        className="h-[160px] shrink-0 overflow-hidden"
+        className="h-[140px] shrink-0 overflow-hidden sm:h-[160px]"
         style={{
           borderRadius: "12px 12px 0 0",
         }}
@@ -50,7 +50,7 @@ export function TemplateCard({
       </div>
 
       {/* Info area: padding 16px, vertical gap 4px */}
-      <div className="flex-1 p-4 flex flex-col gap-1 min-w-0">
+      <div className="flex-1 p-3.5 sm:p-4 flex flex-col gap-1 min-w-0">
         {/* Title: Inter 15px weight 500 */}
         <h4
           className="text-[15px] font-medium text-foreground truncate"
@@ -84,14 +84,13 @@ export function TemplateCard({
         </div>
 
         {/* Action row: "使用模板" (12px, primary) + "编辑" (12px, slate-500) */}
-        <div className="flex items-center gap-3 mt-1">
+        <div className="flex items-center gap-2 mt-1">
           <button
             onClick={(e) => {
               e.stopPropagation();
               onUse?.();
             }}
-            className="text-[12px] font-medium text-primary hover:underline"
-           
+            className="inline-flex min-h-11 items-center rounded-full pr-3 text-[12px] font-medium text-primary hover:underline"
           >
             使用模板
           </button>
@@ -100,8 +99,7 @@ export function TemplateCard({
               e.stopPropagation();
               onEdit?.();
             }}
-            className="text-[12px] text-muted-foreground hover:text-foreground transition-colors"
-           
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-3 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
           >
             编辑
           </button>

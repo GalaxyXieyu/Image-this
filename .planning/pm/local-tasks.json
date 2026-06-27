@@ -179,6 +179,47 @@
           "tasklist_guid": "local:image-this"
         }
       ]
+    },
+    {
+      "guid": "local-task-a813cc144e26",
+      "url": "local://task/local-task-a813cc144e26",
+      "summary": "[T5] 移动端全站适配排查与实施计划",
+      "description": "任务编号：T5\n创建时间：2026-06-27 10:43:54 CST\n类型：task\nRepo：/Volumes/DATABASE/code/business/Image-this\n\n需求：\n所有核心界面尚未完整适配移动端操作交互、视觉比例、换行与字号。需要先完整排查并制定计划，再按移动端好看的标准继续适配。覆盖核心路径：/、/workspace/scene、/combo、/tools、/tasks、/results、/templates、/settings、/auth/login、/auth/register、/prompt-studio。要求用移动端视口截图和可执行验收标准验证，记录问题、优先级、实施批次和证据。\n\n执行要求：\n- 以 task/doc 为主，不再依赖本地 task/context/state 文件。\n- 进度默认写评论，验收证据优先回填附件或评论。",
+      "created_at": "2026-06-27T10:43:54+08:00",
+      "updated_at": "2026-06-27T12:04:50+08:00",
+      "completed_at": "2026-06-27T12:04:50+08:00",
+      "start": {
+        "timestamp": "2026-06-27T11:16:37+08:00",
+        "is_all_day": false
+      },
+      "due": {},
+      "members": [],
+      "attachments": [],
+      "comments": [
+        {
+          "guid": "local-comment-ebc4ccbbc09d",
+          "content": "移动端适配 Batch 1 已完成：创建 .planning/MOBILE-ADAPTATION-PLAN.md；完成 390x844 移动端审计与截图证据；修复全局 AppShell 触控目标、首页移动端比例、登录/注册表单高度、模板库移动端布局；/combo 与 /prompt-studio 已从桌面限定阻断改为手机可操作的纵向工作台。验证：npx tsc --noEmit 通过；npm run lint -- --quiet 通过；复验 /templates、/auth/login、/auth/register 在 390px 下 overflowX=0、tinyTargets=0、tinyInputs=0；/combo 与 /prompt-studio 不再出现请用电脑端。证据：out/product-canvas/runs/mobile-audit-20260627/product-canvas-report-mobile-audit-20260627.md。下一步建议 Batch 2 深入 /workspace/scene、/tools、/tasks、/results、/settings 的移动交互细节。",
+          "resource_id": "local-task-a813cc144e26",
+          "created_at": "2026-06-27T11:16:37+08:00"
+        },
+        {
+          "guid": "local-comment-ff89773c4550",
+          "content": "移动端适配 Batch 2 与全量 390px 验收已完成：补齐 /workspace/scene、/tools、/tasks、/results、/settings 的移动端比例、单列布局、表单/按钮 44px 触控基线，并回归 /、/combo、/templates、/prompt-studio、/auth/login、/auth/register。最终 390x844 审计覆盖 11 个核心路径，全部满足 overflowX=0、tinyTargets=0、tinyInputs=0、desktopOnly=false。验证通过：npx tsc --noEmit；npm run lint -- --quiet。证据：out/product-canvas/runs/mobile-audit-20260627/mobile-audit-iab-390-batch2.json；out/product-canvas/runs/mobile-audit-20260627/mobile-audit-iab-390-batch2.csv；out/product-canvas/runs/mobile-audit-20260627/screenshots-iab-390-batch2/；out/product-canvas/runs/mobile-audit-20260627/product-canvas-report-mobile-audit-20260627.md。备注：少量 CDP navigation timeout 为浏览器工具等待噪声，最终 URL、截图和 DOM 指标均正确。",
+          "resource_id": "local-task-a813cc144e26",
+          "created_at": "2026-06-27T12:04:50+08:00"
+        },
+        {
+          "guid": "local-comment-e4d20038aa0a",
+          "content": "T5 完成：已制定移动端适配计划，完成 Batch 1 P0 阻断修复和 Batch 2 核心页面适配；最终 11 条核心路径在 390x844 移动视口下全部通过，无横向页面溢出、无小触控/小输入、无桌面端阻断文案。报告：out/product-canvas/runs/mobile-audit-20260627/product-canvas-report-mobile-audit-20260627.md。\nCommit：https://github.com/GalaxyXieyu/Image-this/commit/2d08d0edaebd18a80af7689da6a01ddcbbbe271e",
+          "resource_id": "local-task-a813cc144e26",
+          "created_at": "2026-06-27T12:04:50+08:00"
+        }
+      ],
+      "tasklists": [
+        {
+          "tasklist_guid": "local:image-this"
+        }
+      ]
     }
   ]
 }

@@ -15,6 +15,7 @@ import {
 import {
   ALL_PRESETS,
   COMBO_PRESETS,
+  PRESET_CATEGORY_LABELS,
   getPresetsByCategory,
   searchPresets,
 } from "@/lib/workbench/presets";
@@ -27,8 +28,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type SortOption = "newest" | "popular";
+
+const MOBILE_CATEGORY_ITEMS: PresetCategory[] = [
+  "all",
+  "listing",
+  "whitebg",
+  "scene",
+  "poster",
+  "video",
+  "image-process",
+];
 
 function TemplatesPageInner() {
   const router = useRouter();
@@ -169,7 +181,7 @@ function TemplatesPageInner() {
       <WorkbenchTopNav
         title="模板库"
         rightContent={
-          <nav className="flex items-center gap-6">
+          <nav className="hidden md:flex items-center gap-6">
             <Link
               href="/"
               className="text-data text-muted-foreground hover:text-foreground transition-colors"
@@ -208,8 +220,9 @@ function TemplatesPageInner() {
           </nav>
         }
       />
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
         <TemplateSidebar
+          className="hidden md:flex"
           activeCategory={activeCategory}
           activeComboId={activeComboId}
           activeFunctionNav={activeFunctionNav}
@@ -218,8 +231,58 @@ function TemplatesPageInner() {
           onFunctionNavClick={handleFunctionNavClick}
         />
         <main className="flex-1 overflow-auto bg-background flex flex-col">
+          <div className="md:hidden border-b border-border bg-background px-4 py-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="搜索模板..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-11 rounded-full pl-9 text-data"
+              />
+            </div>
+            <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              {MOBILE_CATEGORY_ITEMS.map((category) => {
+                const active = activeCategory === category && !activeComboId && !activeFunctionNav;
+                return (
+                  <button
+                    key={category}
+                    type="button"
+                    onClick={() => handleCategoryChange(category)}
+                    className={cn(
+	                      "min-h-11 shrink-0 rounded-full border px-3.5 text-[13px] font-semibold transition-colors",
+                      active
+                        ? "border-transparent bg-accent-gradient text-white shadow-soft"
+                        : "border-border bg-surface text-muted-foreground"
+                    )}
+                  >
+                    {PRESET_CATEGORY_LABELS[category]}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <span className="text-[12px] text-muted-foreground">
+                {activeComboId
+                  ? COMBO_PRESETS.find((combo) => combo.id === activeComboId)?.name ?? "组合模板"
+                  : `${filteredPresets.length} 个模板`}
+              </span>
+              <Select
+                value={sortBy}
+                onValueChange={(v) => setSortBy(v as SortOption)}
+              >
+	                <SelectTrigger className="h-11 w-[126px] rounded-full text-[13px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">最新发布</SelectItem>
+                  <SelectItem value="popular">最受欢迎</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           {/* Toolbar: search + sort */}
-          <div className="h-10 flex items-center justify-between px-8 py-6 shrink-0">
+          <div className="hidden h-10 items-center justify-between px-8 py-6 shrink-0 md:flex">
             <div className="relative w-72">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -245,18 +308,20 @@ function TemplatesPageInner() {
           </div>
 
           {/* Template grid */}
-          <div className="flex-1 px-8 pb-8">
+          <div className="flex-1 px-4 py-4 sm:px-5 md:px-8 md:pb-8 md:pt-0">
             <TemplateGrid
               presets={filteredPresets}
               selectedId={selectedPreset?.id}
               onSelect={handleSelectPreset}
               onUse={handleUsePreset}
+              className="gap-4 sm:gap-5"
             />
           </div>
         </main>
         <TemplateDetailPanel
           preset={selectedPreset}
           onUse={handleUsePreset}
+          className="hidden lg:flex"
         />
       </div>
     </WorkbenchShell>

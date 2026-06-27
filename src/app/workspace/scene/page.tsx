@@ -159,24 +159,24 @@ function createWorkflowDataFromPreset(preset?: TemplatePreset): WorkflowData {
 
 function StepBar({ currentStep }: { currentStep: Step }) {
   const steps = [
-    { num: 1, label: "填写产品信息" },
-    { num: 2, label: "选择风格模板" },
-    { num: 3, label: "生成与调整" },
+    { num: 1, label: "填写产品信息", mobileLabel: "产品" },
+    { num: 2, label: "选择风格模板", mobileLabel: "风格" },
+    { num: 3, label: "生成与调整", mobileLabel: "生成" },
   ];
 
   return (
-    <div className="px-6 pt-4 pb-2 shrink-0">
-      <div className="glass-panel shadow-soft mx-auto flex max-w-[860px] items-center justify-center gap-0 rounded-full px-3 md:px-6 py-2 md:py-2.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+    <div className="px-4 pt-3 pb-2 shrink-0 md:px-6 md:pt-4">
+      <div className="glass-panel shadow-soft mx-auto flex max-w-[860px] items-center justify-between rounded-[22px] px-3 py-2 md:justify-center md:rounded-full md:px-6 md:py-2.5">
         {steps.map((s, i) => {
           const isActive = currentStep === s.num;
           const isCompleted = currentStep > s.num;
           const reached = isActive || isCompleted;
           return (
-            <div key={s.num} className="flex items-center">
-              <div className="flex items-center gap-2.5">
+            <div key={s.num} className="flex min-w-0 items-center">
+              <div className="flex min-w-0 items-center gap-1.5 md:gap-2.5">
                 <div
                   className={cn(
-                    "flex h-7 w-7 items-center justify-center rounded-full text-[13px] font-semibold transition-colors",
+                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold transition-colors md:h-7 md:w-7",
                     reached
                       ? "bg-accent-gradient text-white shadow-soft"
                       : "bg-surface-muted text-ink-3"
@@ -186,20 +186,21 @@ function StepBar({ currentStep }: { currentStep: Step }) {
                 </div>
                 <span
                   className={cn(
-                    "text-data font-medium",
+                    "text-[12px] font-semibold md:text-data md:font-medium",
                     isActive ? "text-ink" : reached ? "text-ink-2" : "text-ink-3"
                   )}
                 >
-                  {s.label}
+                  <span className="md:hidden">{s.mobileLabel}</span>
+                  <span className="hidden md:inline">{s.label}</span>
                 </span>
               </div>
               {i < steps.length - 1 && (
-                <div
-                  className={cn(
-                    "mx-4 h-px w-12 transition-colors",
-                    currentStep > s.num ? "bg-brand" : "bg-line-strong"
-                  )}
-                />
+	                <div
+	                  className={cn(
+	                    "mx-2 h-px w-5 shrink-0 transition-colors md:mx-4 md:w-12",
+	                    currentStep > s.num ? "bg-brand" : "bg-line-strong"
+	                  )}
+		                />
               )}
             </div>
           );
@@ -260,7 +261,7 @@ function ProductInfoStep({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-auto px-6 pb-4 pt-2">
+      <div className="flex-1 overflow-auto px-4 pb-4 pt-2 md:px-6">
         <div className="max-w-[1100px] mx-auto flex flex-col gap-3.5">
           {workflowData.activePresetName && (
             <section className="glass-panel rounded-[20px] p-4">
@@ -284,22 +285,22 @@ function ProductInfoStep({
               </div>
             </section>
           )}
-          <section className="glass-panel rounded-[24px] p-[20px_22px]">
+          <section className="glass-panel rounded-[20px] p-5 md:rounded-[24px] md:p-[20px_22px]">
             <h2 className="text-base font-bold text-ink">产品基础信息</h2>
             <p className="mt-1 text-[13px] text-ink-2">
               请尽可能详细地描述你的产品，AI 会据此生成最合适的场景图
             </p>
-            <div className="mt-3.5 grid grid-cols-2 gap-x-3.5 gap-y-3">
+            <div className="mt-3.5 grid grid-cols-1 gap-x-3.5 gap-y-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>产品名称</Label>
-                <Input
-                  placeholder="例如：某某品牌保湿面霜"
-                  value={workflowData.productName}
-                  onChange={(e) =>
-                    setWorkflowData((prev) => ({ ...prev, productName: e.target.value }))
-                  }
-                 
-                />
+	                <Input
+	                  placeholder="例如：某某品牌保湿面霜"
+	                  value={workflowData.productName}
+	                  onChange={(e) =>
+	                    setWorkflowData((prev) => ({ ...prev, productName: e.target.value }))
+	                  }
+	                  className="min-h-11"
+	                />
               </div>
               <div className="space-y-2">
                 <Label>产品类型</Label>
@@ -309,7 +310,7 @@ function ProductInfoStep({
                     setWorkflowData((prev) => ({ ...prev, productType: value }))
                   }
                 >
-                  <SelectTrigger>
+	                  <SelectTrigger className="min-h-11">
                     <SelectValue placeholder="选择产品类型" />
                   </SelectTrigger>
                   <SelectContent>
@@ -332,7 +333,8 @@ function ProductInfoStep({
                     setWorkflowData((prev) => ({ ...prev, targetAudience: e.target.value }))
                   }
                  
-                />
+	                  className="min-h-11"
+	                />
               </div>
               <div className="space-y-2">
                 <Label>使用场景</Label>
@@ -343,7 +345,8 @@ function ProductInfoStep({
                     setWorkflowData((prev) => ({ ...prev, usageScene: e.target.value }))
                   }
                  
-                />
+	                  className="min-h-11"
+	                />
               </div>
             </div>
             <div className="mt-3 space-y-1.5">
@@ -355,12 +358,12 @@ function ProductInfoStep({
                 onChange={(e) =>
                   setWorkflowData((prev) => ({ ...prev, sellingPoints: e.target.value }))
                 }
-                className="resize-none rounded-[12px]"
+	                className="min-h-[96px] resize-none rounded-[12px]"
               />
             </div>
           </section>
 
-          <section className="glass-panel rounded-[24px] p-[20px_22px]">
+          <section className="glass-panel rounded-[20px] p-5 md:rounded-[24px] md:p-[20px_22px]">
             <h2 className="text-base font-bold text-ink">使用平台</h2>
             <div className="mt-3.5 flex flex-wrap gap-2.5">
               {platforms.map((platform) => {
@@ -378,7 +381,7 @@ function ProductInfoStep({
                       }));
                     }}
                     className={cn(
-                      "inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-data transition-colors",
+	                      "inline-flex min-h-11 items-center gap-2 rounded-full border px-3.5 py-1.5 text-data transition-colors",
                       selected
                         ? "border-brand bg-brand-soft text-brand-text"
                         : "border-line-strong text-ink-2 hover:border-brand/40 hover:text-ink"
@@ -399,9 +402,9 @@ function ProductInfoStep({
             </div>
           </section>
 
-          <section className="glass-panel rounded-[24px] p-[20px_22px]">
+          <section className="glass-panel rounded-[20px] p-5 md:rounded-[24px] md:p-[20px_22px]">
             <h2 className="text-base font-bold text-ink">素材上传</h2>
-            <div className="mt-3.5 grid grid-cols-2 gap-3.5">
+            <div className="mt-3.5 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
               <input
                 ref={inputFileRef}
                 type="file"
@@ -471,8 +474,8 @@ function ProductInfoStep({
         </div>
       </div>
 
-      <div className="sticky bottom-0 z-30 flex items-center justify-between border-t border-line bg-surface-glass px-6 py-3.5 backdrop-blur-[18px] backdrop-saturate-150 shrink-0">
-        <Button variant="ghost" asChild className="text-ink-2 hover:bg-surface-muted">
+	      <div className="sticky bottom-0 z-30 flex shrink-0 flex-col gap-2 border-t border-line bg-surface-glass px-4 py-3.5 pb-[calc(env(safe-area-inset-bottom)+14px)] backdrop-blur-[18px] backdrop-saturate-150 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+	        <Button variant="ghost" asChild className="min-h-11 w-full text-ink-2 hover:bg-surface-muted sm:w-auto">
           <Link href="/">
             <ArrowLeft className="mr-1.5 h-4 w-4" />
             返回首页
@@ -480,7 +483,7 @@ function ProductInfoStep({
         </Button>
         <Button
           onClick={onNext}
-          className="h-12 rounded-[14px] bg-accent-gradient px-6 text-[15px] font-semibold text-white shadow-float transition-transform hover:-translate-y-0.5"
+	          className="h-12 w-full rounded-[14px] bg-accent-gradient px-6 text-[15px] font-semibold text-white shadow-float transition-transform hover:-translate-y-0.5 sm:w-auto"
         >
           下一步：选择风格模板
           <ArrowRight className="ml-2 h-4 w-4" />
@@ -524,21 +527,21 @@ function StyleTemplateStep({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-auto px-6 pb-4 pt-2">
+	      <div className="flex-1 overflow-auto px-4 pb-4 pt-2 sm:px-6">
         <div className="max-w-[1100px] mx-auto flex flex-col gap-5">
-          <div className="flex items-center justify-between">
+	          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-[22px] font-bold text-ink">AI 生成预览</h2>
               <p className="mt-1 text-[14px] text-ink-2">
                 基于已提交的商品信息，选择想要的风格方向
               </p>
             </div>
-            <span className="rounded-full border border-line bg-surface px-3.5 py-1.5 text-[13px] font-semibold text-brand-text">
+	            <span className="inline-flex min-h-10 w-fit items-center rounded-full border border-line bg-surface px-3.5 py-1.5 text-[13px] font-semibold text-brand-text">
               已选 {selected.length} 张
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+	          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
             {templates.map((template) => {
               const isSelected = selected.includes(template.id);
               return (
@@ -587,15 +590,15 @@ function StyleTemplateStep({
         </div>
       </div>
 
-      <div className="sticky bottom-0 z-30 flex items-center justify-between border-t border-line bg-surface-glass px-6 py-3.5 backdrop-blur-[18px] backdrop-saturate-150 shrink-0">
-        <Button variant="ghost" onClick={onBack} className="text-ink-2 hover:bg-surface-muted">
+	      <div className="sticky bottom-0 z-30 flex shrink-0 flex-col gap-2 border-t border-line bg-surface-glass px-4 py-3.5 pb-[calc(env(safe-area-inset-bottom)+14px)] backdrop-blur-[18px] backdrop-saturate-150 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+	        <Button variant="ghost" onClick={onBack} className="min-h-11 w-full text-ink-2 hover:bg-surface-muted sm:w-auto">
           <ArrowLeft className="mr-1.5 h-4 w-4" />
           返回修改信息
         </Button>
         <Button
           onClick={onNext}
           disabled={selected.length === 0}
-          className="h-12 rounded-[14px] bg-accent-gradient px-6 text-[15px] font-semibold text-white shadow-float transition-transform hover:-translate-y-0.5 disabled:opacity-50"
+	          className="h-12 w-full rounded-[14px] bg-accent-gradient px-6 text-[15px] font-semibold text-white shadow-float transition-transform hover:-translate-y-0.5 disabled:opacity-50 sm:w-auto"
         >
           下一步：生成并调整
           <ArrowRight className="ml-2 h-4 w-4" />
@@ -783,7 +786,7 @@ function GenerateAdjustStep({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-auto p-8">
+	      <div className="flex-1 overflow-auto p-4 sm:p-8">
         <div className="max-w-5xl mx-auto space-y-6">
           {results.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
@@ -795,7 +798,7 @@ function GenerateAdjustStep({
               />
 
               <div className="w-full max-w-xl space-y-4 mb-6">
-                <div className="grid grid-cols-3 gap-4">
+	                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
                   <div className="space-y-1.5">
                     <Label className="text-caption text-muted-foreground">AI 模型</Label>
                     <Select
@@ -804,7 +807,7 @@ function GenerateAdjustStep({
                         setWorkflowData((prev) => ({ ...prev, aiModel: value }))
                       }
                     >
-                      <SelectTrigger className="text-data">
+	                      <SelectTrigger className="min-h-11 text-data">
                         <SelectValue placeholder="选择模型" />
                       </SelectTrigger>
                       <SelectContent>
@@ -830,7 +833,7 @@ function GenerateAdjustStep({
                         setWorkflowData((prev) => ({ ...prev, outputResolution: value }))
                       }
                     >
-                      <SelectTrigger className="text-data">
+	                      <SelectTrigger className="min-h-11 text-data">
                         <SelectValue placeholder="选择尺寸" />
                       </SelectTrigger>
                       <SelectContent>
@@ -853,7 +856,7 @@ function GenerateAdjustStep({
                         }))
                       }
                     >
-                      <SelectTrigger className="text-data">
+	                      <SelectTrigger className="min-h-11 text-data">
                         <SelectValue placeholder="选择数量" />
                       </SelectTrigger>
                       <SelectContent>
@@ -864,21 +867,20 @@ function GenerateAdjustStep({
                     </Select>
                   </div>
                 </div>
-              </div>
-
-              <Button
-                onClick={handleGenerate}
-                disabled={generating || !workflowData.inputAsset || !workflowData.referenceAsset}
-                variant="brand"
-               
-              >
+	              </div>
+	              <Button
+	                onClick={handleGenerate}
+	                disabled={generating || !workflowData.inputAsset || !workflowData.referenceAsset}
+	                variant="brand"
+	                className="min-h-11 px-6"
+	              >
                 <Wand2 className="w-4 h-4 mr-2" />
                 开始生成
               </Button>
             </div>
           ) : (
             <>
-              <div className="flex items-center justify-between">
+	              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-h3 font-semibold text-foreground">
                     生成结果
@@ -897,7 +899,7 @@ function GenerateAdjustStep({
                   )}
                 </div>
                 {!generating && (
-                  <Button variant="outline" onClick={handleGenerate}>
+	                  <Button variant="outline" className="min-h-11 w-full sm:w-auto" onClick={handleGenerate}>
                     <Wand2 className="w-4 h-4 mr-2" />
                     重新生成
                   </Button>
@@ -966,19 +968,19 @@ function GenerateAdjustStep({
                           />
                         </div>
                       )}
-                      <div className="flex items-center gap-2 mt-3">
-                        <Button size="sm" variant="outline" className="flex-1" asChild>
+	                      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+	                        <Button size="sm" variant="outline" className="min-h-10 flex-1" asChild>
                           <Link href="/tasks">查看任务</Link>
                         </Button>
                         {result.savedImageId ? (
-                          <Button size="sm" variant="brand" className="flex-1" asChild>
+	                          <Button size="sm" variant="brand" className="min-h-10 flex-1" asChild>
                             <Link href="/results">查看结果</Link>
                           </Button>
                         ) : (
                           <Button
                             size="sm"
                             variant="brand"
-                            className="flex-1"
+	                            className="min-h-10 flex-1"
                            
                             onClick={() => handleSaveResult(result)}
                             disabled={
@@ -1000,15 +1002,15 @@ function GenerateAdjustStep({
         </div>
       </div>
 
-      <div className="sticky bottom-0 z-30 flex items-center justify-between border-t border-line bg-surface-glass px-6 py-3.5 backdrop-blur-[18px] backdrop-saturate-150 shrink-0">
-        <Button variant="ghost" onClick={onBack} className="text-ink-2 hover:bg-surface-muted">
+	      <div className="sticky bottom-0 z-30 flex shrink-0 flex-col gap-2 border-t border-line bg-surface-glass px-4 py-3.5 pb-[calc(env(safe-area-inset-bottom)+14px)] backdrop-blur-[18px] backdrop-saturate-150 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+	        <Button variant="ghost" onClick={onBack} className="min-h-11 w-full text-ink-2 hover:bg-surface-muted sm:w-auto">
           <ArrowLeft className="mr-1.5 h-4 w-4" />
           返回预览
         </Button>
         <Button
           asChild
           variant="outline"
-          className="h-12 rounded-[14px] border-line-strong bg-surface px-6 text-[15px] font-semibold text-ink"
+	          className="h-12 w-full rounded-[14px] border-line-strong bg-surface px-6 text-[15px] font-semibold text-ink sm:w-auto"
         >
           <Link href="/results">完成,前往图库</Link>
         </Button>
