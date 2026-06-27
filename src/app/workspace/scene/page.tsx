@@ -27,8 +27,9 @@ import { buildSceneLegacyTaskRequests } from "@/lib/workbench/scene-task-adapter
 import { getSceneGenerationModels } from "@/lib/ai-models";
 import type { InputAssetRef, SceneWorkflowDraft, TemplatePreset, WorkflowTaskStatus } from "@/types/workbench";
 import { BrandEmptyState, BrandImageFallback } from "@/components/brands/SpriteImage";
-import { HorizontalPillScroller } from "@/components/workbench/mobile/HorizontalPillScroller";
 import { MobileCollapsibleSection } from "@/components/workbench/mobile/MobileCollapsibleSection";
+import { BottomSheetSelect } from "@/components/workbench/BottomSheetSelect";
+import { useIsMobile } from "@/lib/use-is-mobile";
 import {
   ArrowLeft,
   ArrowRight,
@@ -437,6 +438,7 @@ function ProductInfoStep({
   const { upload, uploading } = useUpload();
   const [uploadingProductAssets, setUploadingProductAssets] = useState(false);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const productAssets = getProductAssets(workflowData);
   const isUploadingAsset = uploading || uploadingProductAssets;
   const selectedTemplate = sceneStyleTemplates.find(
@@ -673,28 +675,31 @@ function ProductInfoStep({
 
   const productTypePicker = (
     <>
-      <div className="md:hidden">
-        <HorizontalPillScroller>
-          {productTypes.map((type) => {
-            const selected = workflowData.productType === type.id;
-            return (
-              <button
-                key={type.id}
-                type="button"
-                onClick={() => setWorkflowData((prev) => ({ ...prev, productType: type.id }))}
-                className={cn(
-                  "min-h-11 shrink-0 rounded-full border px-3.5 text-[13px] font-semibold transition-colors",
-                  selected
-                    ? "border-transparent bg-accent-gradient text-white shadow-soft"
-                    : "border-line-strong bg-surface text-ink-2"
-                )}
-              >
-                {type.label}
-              </button>
-            );
-          })}
-        </HorizontalPillScroller>
-      </div>
+      {isMobile && (
+        <BottomSheetSelect
+          title="选择产品类型"
+          options={productTypes}
+          value={workflowData.productType}
+          onChange={(value) => {
+            if (typeof value === "string") {
+              setWorkflowData((prev) => ({ ...prev, productType: value }));
+            }
+          }}
+          trigger={
+            <button
+              type="button"
+              className="flex min-h-11 w-full items-center justify-between gap-2 rounded-[12px] border border-line-strong bg-surface px-3.5 text-left text-[14px] text-ink"
+            >
+              <span className={cn("truncate", !workflowData.productType && "text-ink-3")}>
+                {workflowData.productType
+                  ? getOptionLabel(productTypes, workflowData.productType)
+                  : "选择产品类型"}
+              </span>
+              <ChevronDown className="h-4 w-4 shrink-0 text-ink-3" />
+            </button>
+          }
+        />
+      )}
       <Select
         value={workflowData.productType}
         onValueChange={(value) =>
@@ -887,7 +892,41 @@ function ProductInfoStep({
             </div>
             <div className="space-y-2">
               <Label>使用平台</Label>
-              {platformPicker}
+              {isMobile ? (
+                <BottomSheetSelect
+                  multiple
+                  title="选择使用平台"
+                  options={platforms}
+                  value={workflowData.platforms}
+                  onChange={(value) => {
+                    if (Array.isArray(value)) {
+                      setWorkflowData((prev) => ({ ...prev, platforms: value }));
+                    }
+                  }}
+                  trigger={
+                    <button
+                      type="button"
+                      className="flex min-h-11 w-full items-center justify-between gap-2 rounded-[12px] border border-line-strong bg-surface px-3.5 text-left text-[14px] text-ink"
+                    >
+                      <span
+                        className={cn(
+                          "truncate",
+                          workflowData.platforms.length === 0 && "text-ink-3"
+                        )}
+                      >
+                        {workflowData.platforms.length > 0
+                          ? workflowData.platforms
+                              .map((id) => getOptionLabel(platforms, id))
+                              .join("、")
+                          : "选择使用平台"}
+                      </span>
+                      <ChevronDown className="h-4 w-4 shrink-0 text-ink-3" />
+                    </button>
+                  }
+                />
+              ) : (
+                platformPicker
+              )}
             </div>
           </MobileCollapsibleSection>
 
@@ -1038,6 +1077,7 @@ function GenerateAdjustStep({
   const [generating, setGenerating] = useState(false);
   const [results, setResults] = useState<SceneCandidateResult[]>([]);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const { tasks: polledTasks, isPolling, startPolling, error: pollingError } = useWorkflowTaskPolling({
     interval: 3000,
     autoStart: false,
@@ -1089,28 +1129,36 @@ function GenerateAdjustStep({
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
       <div className="space-y-1.5">
         <Label className="text-caption text-muted-foreground">AI 模型</Label>
-        <div className="md:hidden">
-          <HorizontalPillScroller>
-            {sceneModels.map((model) => {
-              const selected = workflowData.aiModel === model.id;
-              return (
-                <button
-                  key={model.id}
-                  type="button"
-                  onClick={() => setWorkflowData((prev) => ({ ...prev, aiModel: model.id }))}
-                  className={cn(
-                    "min-h-11 max-w-[220px] shrink-0 rounded-full border px-3.5 text-[13px] font-semibold transition-colors",
-                    selected
-                      ? "border-transparent bg-accent-gradient text-white shadow-soft"
-                      : "border-line-strong bg-surface text-ink-2"
-                  )}
-                >
-                  <span className="block truncate">{model.label}</span>
-                </button>
-              );
-            })}
-          </HorizontalPillScroller>
-        </div>
+        {isMobile && (
+          <BottomSheetSelect
+            title="选择 AI 模型"
+            options={sceneModels.map((model) => ({
+              id: model.id,
+              label: model.label,
+              description:
+                model.priority === "primary"
+                  ? "推荐"
+                  : model.priority === "fallback"
+                    ? "兜底"
+                    : undefined,
+            }))}
+            value={workflowData.aiModel}
+            onChange={(value) => {
+              if (typeof value === "string") {
+                setWorkflowData((prev) => ({ ...prev, aiModel: value }));
+              }
+            }}
+            trigger={
+              <button
+                type="button"
+                className="flex min-h-11 w-full items-center justify-between gap-2 rounded-[12px] border border-line-strong bg-surface px-3.5 text-left text-[14px] text-ink"
+              >
+                <span className="truncate">{selectedModelLabel}</span>
+                <ChevronDown className="h-4 w-4 shrink-0 text-ink-3" />
+              </button>
+            }
+          />
+        )}
         <Select
           value={workflowData.aiModel}
           onValueChange={(value) =>
@@ -1137,28 +1185,29 @@ function GenerateAdjustStep({
       </div>
       <div className="space-y-1.5">
         <Label className="text-caption text-muted-foreground">输出尺寸</Label>
-        <div className="md:hidden">
-          <HorizontalPillScroller>
-            {outputResolutionOptions.map((option) => {
-              const selected = workflowData.outputResolution === option.id;
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => setWorkflowData((prev) => ({ ...prev, outputResolution: option.id }))}
-                  className={cn(
-                    "min-h-11 shrink-0 rounded-full border px-3.5 text-[13px] font-semibold transition-colors",
-                    selected
-                      ? "border-transparent bg-accent-gradient text-white shadow-soft"
-                      : "border-line-strong bg-surface text-ink-2"
-                  )}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
-          </HorizontalPillScroller>
-        </div>
+        {isMobile && (
+          <BottomSheetSelect
+            title="选择输出尺寸"
+            options={outputResolutionOptions}
+            value={workflowData.outputResolution}
+            onChange={(value) => {
+              if (typeof value === "string") {
+                setWorkflowData((prev) => ({ ...prev, outputResolution: value }));
+              }
+            }}
+            trigger={
+              <button
+                type="button"
+                className="flex min-h-11 w-full items-center justify-between gap-2 rounded-[12px] border border-line-strong bg-surface px-3.5 text-left text-[14px] text-ink"
+              >
+                <span className="truncate">
+                  {getOptionLabel(outputResolutionOptions, workflowData.outputResolution)}
+                </span>
+                <ChevronDown className="h-4 w-4 shrink-0 text-ink-3" />
+              </button>
+            }
+          />
+        )}
         <Select
           value={workflowData.outputResolution}
           onValueChange={(value) =>
@@ -1179,28 +1228,30 @@ function GenerateAdjustStep({
       </div>
       <div className="space-y-1.5">
         <Label className="text-caption text-muted-foreground">候选数量</Label>
-        <div className="md:hidden">
-          <HorizontalPillScroller>
-            {candidateCountOptions.map((count) => {
-              const selected = workflowData.candidateCount === count;
-              return (
-                <button
-                  key={count}
-                  type="button"
-                  onClick={() => setWorkflowData((prev) => ({ ...prev, candidateCount: count }))}
-                  className={cn(
-                    "min-h-11 shrink-0 rounded-full border px-4 text-[13px] font-semibold transition-colors",
-                    selected
-                      ? "border-transparent bg-accent-gradient text-white shadow-soft"
-                      : "border-line-strong bg-surface text-ink-2"
-                  )}
-                >
-                  {count} 张
-                </button>
-              );
-            })}
-          </HorizontalPillScroller>
-        </div>
+        {isMobile && (
+          <BottomSheetSelect
+            title="选择候选数量"
+            options={candidateCountOptions.map((count) => ({
+              id: String(count),
+              label: `${count} 张`,
+            }))}
+            value={String(workflowData.candidateCount)}
+            onChange={(value) => {
+              if (typeof value === "string") {
+                setWorkflowData((prev) => ({ ...prev, candidateCount: Number(value) }));
+              }
+            }}
+            trigger={
+              <button
+                type="button"
+                className="flex min-h-11 w-full items-center justify-between gap-2 rounded-[12px] border border-line-strong bg-surface px-3.5 text-left text-[14px] text-ink"
+              >
+                <span className="truncate">{workflowData.candidateCount} 张</span>
+                <ChevronDown className="h-4 w-4 shrink-0 text-ink-3" />
+              </button>
+            }
+          />
+        )}
         <Select
           value={String(workflowData.candidateCount)}
           onValueChange={(value) =>
