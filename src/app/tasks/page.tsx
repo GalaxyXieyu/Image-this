@@ -285,7 +285,7 @@ export default function TasksPage() {
 
       {/* Task List */}
       <div className="flex-1 overflow-auto p-4 sm:p-8">
-        <div className="max-w-5xl mx-auto space-y-4">
+        <div className="max-w-5xl mx-auto space-y-3 md:space-y-4">
           {loading && (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -314,15 +314,15 @@ export default function TasksPage() {
           {filteredTasks.map((task) => (
             <div
               key={task.id}
-              className="glass-panel rounded-card shadow-soft hover:shadow-float p-4 transition-shadow sm:p-5"
+              className="glass-panel rounded-[18px] p-3.5 shadow-soft transition-shadow hover:shadow-float sm:rounded-card sm:p-5"
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex items-center gap-3 sm:gap-4">
+                <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                   <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
                     <ImageIcon className="w-5 h-5 text-muted-foreground" />
                   </div>
-                  <div>
-                    <h3 className="text-data font-medium text-foreground">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-data font-medium text-foreground">
                       {task.name}
                     </h3>
                     <p className="mt-0.5 hidden text-caption text-muted-foreground sm:block">
@@ -352,7 +352,7 @@ export default function TasksPage() {
                 </div>
               )}
 
-              <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-border">
+              <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-border md:mt-4 md:pt-4">
                 {task.status === "failed" && (
 	                  <Button variant="ghost" size="sm" className="min-h-10" onClick={() => alert("重试功能待实现")}>
                     <RotateCcw className="w-4 h-4 mr-1.5" />
@@ -370,8 +370,8 @@ export default function TasksPage() {
 	                  className="min-h-10 text-muted-foreground hover:text-destructive"
                   onClick={() => handleDelete(task.id)}
                 >
-                  <Trash2 className="w-4 h-4 mr-1.5" />
-                  删除
+                  <Trash2 className="w-4 h-4 md:mr-1.5" />
+                  <span className="hidden md:inline">删除</span>
                 </Button>
               </div>
             </div>

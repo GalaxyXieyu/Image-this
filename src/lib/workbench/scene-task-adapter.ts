@@ -37,6 +37,7 @@ function joinText(parts: Array<string | undefined>) {
 function buildScenePrompt(draft: SceneTaskDraftInput) {
   const productInfo = draft.productInfo;
   const parameters = draft.parameters;
+  const hasReferenceAsset = Boolean(resolveReferenceAsset(draft));
   const sceneBrief = joinText([
     productInfo.name ? `商品：${productInfo.name}` : undefined,
     productInfo.category ? `品类：${productInfo.category}` : undefined,
@@ -49,7 +50,9 @@ function buildScenePrompt(draft: SceneTaskDraftInput) {
 
   return [
     '生成电商商品场景图，保持第一张商品主体的外观、比例、材质、品牌特征和数量稳定。',
-    '参考图只用于场景氛围、构图、光线和背景风格，不要替换或复制参考图中的商品主体。',
+    hasReferenceAsset
+      ? '参考图只用于场景氛围、构图、光线和背景风格，不要替换或复制参考图中的商品主体。'
+      : '没有额外参考图时，请根据商品信息自动生成干净、协调、可商用的场景背景。',
     sceneBrief,
     '画面需要适合商品详情页、主图或营销素材，专业摄影，高质量，干净可商用。',
   ].filter(Boolean).join('\n');
@@ -110,10 +113,6 @@ export function buildSceneLegacyTaskRequest(
     throw new Error('请先上传商品图');
   }
 
-  if (!referenceAsset) {
-    throw new Error('请先上传至少一张参考图');
-  }
-
   const selectedModel = input.parameters.aiModel;
   const modelEntry = getModelEntry(selectedModel);
   const provider = modelEntry?.provider ?? (selectedModel.startsWith('gpt') ? 'gpt' : selectedModel.startsWith('gemini') ? 'gemini' : 'jimeng');
@@ -121,10 +120,12 @@ export function buildSceneLegacyTaskRequest(
 
   const parameters: BackgroundReplaceParams = {
     prompt: buildScenePrompt(input),
-    referenceAsset,
     aiModel: selectedModel,
     outputResolution: input.parameters.outputResolution,
   };
+  if (referenceAsset) {
+    parameters.referenceAsset = referenceAsset;
+  }
 
   const workflowRequest: CreateWorkflowTaskRequest = {
     workflowType: 'scene_generation',
@@ -195,21 +196,19 @@ export function buildSceneWorkflowTaskRequest(input: SceneTaskDraftInput): Scene
     throw new Error('请先上传商品图');
   }
 
-  if (!referenceAsset) {
-    throw new Error('请先上传至少一张参考图');
-  }
-
   const parameters: BackgroundReplaceParams = {
     prompt: buildScenePrompt(input),
-    referenceAsset,
     aiModel: input.parameters.aiModel,
     outputResolution: input.parameters.outputResolution,
   };
+  if (referenceAsset) {
+    parameters.referenceAsset = referenceAsset;
+  }
 
   return {
     workflowType: 'scene_generation',
     parameters,
-    inputAssets: [inputAsset, referenceAsset],
+    inputAssets: [inputAsset, referenceAsset].filter((asset): asset is InputAssetRef => Boolean(asset)),
     priority: 2,
     selectedPresetId: input.selectedPresetId,
     batchMode: input.batchMode,

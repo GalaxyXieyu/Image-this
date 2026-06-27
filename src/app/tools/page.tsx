@@ -46,6 +46,8 @@ import {
   Droplets,
   ListTodo,
   AlertCircle,
+  ChevronDown,
+  Image as ImageIcon,
 } from "lucide-react";
 
 const SUPPORTED_TOOLS: Array<{ id: ToolType; label: string; description: string; icon: typeof Wand2 }> = [
@@ -158,6 +160,80 @@ function downloadImage(url?: string | null) {
   a.href = url;
   a.download = `tool-result-${Date.now()}.png`;
   a.click();
+}
+
+function getToolParameterSummary(draft: ToolDraftState) {
+  if (draft.toolType === "watermark") {
+    const params = draft.parameters as WatermarkParams;
+    return `${params.watermarkType === "logo" ? "Logo" : "文字"} / ${params.watermarkPosition}`;
+  }
+
+  if (draft.toolType === "upscale") {
+    const params = draft.parameters as UpscaleParams;
+    return `${params.upscaleFactor}x / ${params.outputResolution}`;
+  }
+
+  if (draft.toolType === "outpaint") {
+    const params = draft.parameters as OutpaintParams;
+    return `${params.xScale.toFixed(1)}x · ${params.yScale.toFixed(1)}x`;
+  }
+
+  const params = draft.parameters as BackgroundReplaceParams;
+  return `${params.aiModel || "默认模型"} / ${params.outputResolution}`;
+}
+
+function ToolMobileDisclosure({
+  title,
+  summary,
+  children,
+}: {
+  title: string;
+  summary: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="group rounded-[16px] border border-line bg-surface md:hidden">
+      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-3 [&::-webkit-details-marker]:hidden">
+        <div className="min-w-0">
+          <div className="text-[14px] font-bold text-ink">{title}</div>
+          <div className="mt-0.5 truncate text-[12px] text-ink-3">{summary}</div>
+        </div>
+        <ChevronDown className="h-4 w-4 shrink-0 text-ink-3 transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="space-y-4 px-3.5 pb-4 pt-1">{children}</div>
+    </details>
+  );
+}
+
+function InlineAssetPreview({ asset, label }: { asset?: InputAssetRef; label: string }) {
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [asset?.clientUrl]);
+
+  if (!asset) return null;
+
+  return (
+    <div className="flex min-h-12 items-center gap-2 rounded-[12px] border border-line bg-surface-muted/60 p-2">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-surface">
+        {asset.clientUrl && !failed ? (
+          <img
+            src={asset.clientUrl}
+            alt=""
+            className="h-full w-full object-cover"
+            onError={() => setFailed(true)}
+          />
+        ) : (
+          <ImageIcon className="h-4 w-4 text-ink-3" />
+        )}
+      </div>
+      <div className="min-w-0">
+        <p className="text-[12px] font-semibold text-ink">{label}</p>
+        <p className="truncate text-[11px] text-ink-3">{asset.originalFilename}</p>
+      </div>
+    </div>
+  );
 }
 
 function ToolboxPageInner() {
@@ -303,6 +379,34 @@ function ToolboxPageInner() {
 
   const resultPreviewUrl = runState.resultImageUrl ?? draft.inputAsset?.clientUrl;
   const isBusy = creatingTask || uploading || isPolling || runState.status === "processing" || runState.status === "pending" || runState.status === "queued";
+  const taskActions = (
+    <>
+      <Button
+        variant="gradient"
+        className="min-h-11 w-full"
+        disabled={!draft.inputAsset || creatingTask || uploading}
+        onClick={handleCreateTask}
+      >
+        {creatingTask ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
+        {creatingTask ? "创建中..." : "创建工具任务"}
+      </Button>
+      <Button variant="outline" className="min-h-11 w-full" disabled={!runState.resultImageUrl} onClick={() => downloadImage(runState.resultImageUrl)}>
+        <Download className="w-4 h-4 mr-2" />
+        下载结果
+      </Button>
+      <Button variant="outline" className="hidden min-h-11 w-full md:inline-flex" asChild>
+        <Link href="/tasks">
+          <ListTodo className="w-4 h-4 mr-2" />
+          查看任务中心
+        </Link>
+      </Button>
+      <Button variant="outline" className="hidden min-h-11 w-full md:inline-flex" asChild>
+        <Link href="/results">
+          {runState.status === "completed" ? "查看结果管理" : "打开结果管理"}
+        </Link>
+      </Button>
+    </>
+  );
 
   return (
     <div className="h-full flex flex-col bg-background">
@@ -347,10 +451,12 @@ function ToolboxPageInner() {
               );
             })}
           </div>
-          <div className="flex min-h-9 items-center justify-between gap-3">
-            <span className="min-w-0 truncate text-[12px] text-ink-3">
-              {draft.activePresetName ? `模板：${draft.activePresetName}` : selectedTool.description}
-            </span>
+          <div className={cn("flex min-h-9 items-center gap-3", draft.activePresetName ? "justify-between" : "justify-end")}>
+            {draft.activePresetName && (
+              <span className="min-w-0 truncate text-[12px] text-ink-3">
+                模板：{draft.activePresetName}
+              </span>
+            )}
             <div className="flex min-h-9 shrink-0 items-center gap-2 rounded-full border border-line bg-surface px-3">
               <Label className="cursor-pointer text-[12px] text-ink-2">批量</Label>
               <Switch
@@ -374,14 +480,14 @@ function ToolboxPageInner() {
 
       <div className="flex-1 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden">
         <aside className="flex md:w-[320px] md:shrink-0 flex-col md:overflow-y-auto border-b md:border-b-0 md:border-r border-line bg-surface-glass backdrop-blur-[20px] backdrop-saturate-150">
-          <div className="flex flex-col gap-5 p-5">
+          <div className="flex flex-col gap-3 p-4 md:gap-5 md:p-5">
             <section>
-              <h3 className="mb-3 text-data font-semibold text-ink">输入素材</h3>
+              <h3 className="mb-2 text-data font-semibold text-ink md:mb-3">输入素材</h3>
               <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => handleUploadAsset({ role: "input", file: event.target.files?.[0] })} />
               {!draft.inputAsset ? (
                 <button
                   type="button"
-                  className="flex w-full flex-col items-center justify-center gap-3 rounded-[14px] border-[1.5px] border-dashed border-line-strong bg-surface p-7 transition-all hover:border-brand hover:bg-brand-soft/30"
+                  className="flex min-h-[104px] w-full items-center justify-center gap-3 rounded-[14px] border-[1.5px] border-dashed border-line-strong bg-surface p-4 text-left transition-all hover:border-brand hover:bg-brand-soft/30 md:min-h-0 md:flex-col md:p-7 md:text-center"
                   onClick={() => fileInputRef.current?.click()}
                 >
                   {uploading ? (
@@ -391,14 +497,16 @@ function ToolboxPageInner() {
                       <Upload className="h-6 w-6 text-brand" />
                     </span>
                   )}
-                  <span className="text-data font-semibold text-ink">
-                    {uploading ? "上传中…" : "点击或拖入图片"}
+                  <span className="min-w-0">
+                    <span className="block text-data font-semibold text-ink">
+                      {uploading ? "上传中…" : "点击上传图片"}
+                    </span>
+                    <span className="hidden text-[11px] text-ink-3 md:inline">上传多张即自动进入批量处理</span>
                   </span>
-                  <span className="hidden text-[11px] text-ink-3 md:inline">上传多张即自动进入批量处理</span>
                 </button>
               ) : (
-                <div className="flex flex-col gap-3">
-                  <div className="flex aspect-square items-center justify-center overflow-hidden rounded-[14px] border border-line bg-surface">
+                <div className="flex flex-col gap-2.5 md:gap-3">
+                  <div className="flex aspect-[16/10] items-center justify-center overflow-hidden rounded-[14px] border border-line bg-surface md:aspect-square">
                     <img src={draft.inputAsset.clientUrl} alt="输入图片" className="h-full w-full object-contain" />
                   </div>
                   <Button variant="ghost" size="sm" className="min-h-11 w-full text-ink-2" onClick={() => fileInputRef.current?.click()}>
@@ -408,7 +516,7 @@ function ToolboxPageInner() {
               )}
             </section>
 
-            <section>
+            <section className="hidden md:block">
               <h3 className="mb-3 text-data font-semibold text-ink">工具参数</h3>
               <ToolParameterPanel
                 draft={draft}
@@ -418,10 +526,19 @@ function ToolboxPageInner() {
                 onUploadAsset={handleUploadAsset}
               />
             </section>
+            <ToolMobileDisclosure title="工具参数" summary={getToolParameterSummary(draft)}>
+              <ToolParameterPanel
+                draft={draft}
+                updateParameters={updateParameters}
+                referenceInputRef={referenceInputRef}
+                logoInputRef={logoInputRef}
+                onUploadAsset={handleUploadAsset}
+              />
+            </ToolMobileDisclosure>
           </div>
         </aside>
 
-        <main className="flex flex-1 items-center justify-center md:overflow-auto bg-surface-muted/40 p-4 md:p-8">
+        <main className="flex flex-1 items-center justify-center md:overflow-auto bg-surface-muted/40 p-4 pb-3 md:p-8">
           {!resultPreviewUrl ? (
             <BrandEmptyState
               pose="think"
@@ -483,35 +600,12 @@ function ToolboxPageInner() {
               )}
             </section>
 
-            <div className="pt-2 space-y-3">
-              <Button
-                variant="gradient"
-                className="min-h-11 w-full"
-                disabled={!draft.inputAsset || creatingTask || uploading}
-                onClick={handleCreateTask}
-               
-              >
-                {creatingTask ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
-                {creatingTask ? "创建任务中..." : "创建工具任务"}
-              </Button>
-              <Button variant="outline" className="min-h-11 w-full" disabled={!runState.resultImageUrl} onClick={() => downloadImage(runState.resultImageUrl)}>
-                <Download className="w-4 h-4 mr-2" />
-                下载结果
-              </Button>
-              <Button variant="outline" className="min-h-11 w-full" asChild>
-                <Link href="/tasks">
-                  <ListTodo className="w-4 h-4 mr-2" />
-                  查看任务中心
-                </Link>
-              </Button>
-              <Button variant="outline" className="min-h-11 w-full" asChild>
-                <Link href="/results">
-                  {runState.status === "completed" ? "查看结果管理" : "打开结果管理"}
-                </Link>
-              </Button>
-            </div>
+            <div className="hidden pt-2 space-y-3 md:block">{taskActions}</div>
           </div>
         </aside>
+      </div>
+      <div className="z-30 grid shrink-0 grid-cols-2 gap-2 border-t border-line bg-surface-glass px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+12px)] backdrop-blur-[18px] backdrop-saturate-150 md:hidden">
+        {taskActions}
       </div>
     </div>
   );
@@ -604,6 +698,7 @@ function ToolParameterPanel({
         <Button variant="outline" size="sm" className="min-h-11 w-full" onClick={() => logoInputRef.current?.click()}>
           上传 Logo 水印（可选）
         </Button>
+        <InlineAssetPreview asset={draft.watermarkLogoAsset} label="Logo 水印" />
         {draft.watermarkLogoAsset && (
           <p className="hidden text-caption text-muted-foreground truncate md:block">
             Logo：{draft.watermarkLogoAsset.originalFilename}
@@ -681,6 +776,7 @@ function ToolParameterPanel({
       <Button variant="outline" size="sm" className="min-h-11 w-full" onClick={() => referenceInputRef.current?.click()}>
         上传参考背景（可选）
       </Button>
+      <InlineAssetPreview asset={draft.referenceAsset} label="参考背景" />
       {draft.referenceAsset && (
         <p className="hidden text-caption text-muted-foreground truncate md:block">
           参考图：{draft.referenceAsset.originalFilename}

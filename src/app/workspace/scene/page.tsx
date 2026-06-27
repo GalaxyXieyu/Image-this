@@ -344,6 +344,32 @@ function AssetPreviewImage({
   );
 }
 
+function groupResultsBySource(results: SceneCandidateResult[]) {
+  const groups: Array<{
+    key: string;
+    sourceAsset?: InputAssetRef;
+    sourceIndex?: number;
+    items: SceneCandidateResult[];
+  }> = [];
+
+  results.forEach((result) => {
+    const key = result.sourceAsset?.assetId ?? `source-${result.sourceIndex ?? 0}`;
+    let group = groups.find((item) => item.key === key);
+    if (!group) {
+      group = {
+        key,
+        sourceAsset: result.sourceAsset,
+        sourceIndex: result.sourceIndex,
+        items: [],
+      };
+      groups.push(group);
+    }
+    group.items.push(result);
+  });
+
+  return groups;
+}
+
 function ProductInfoStep({
   onNext,
   workflowData,
@@ -390,12 +416,6 @@ function ProductInfoStep({
       }
 
       appendProductAssets(uploadedAssets);
-      if (uploadedAssets.length > 0) {
-        toast({
-          title: "商品图已加入",
-          description: `已添加 ${uploadedAssets.length} 张商品图，共 ${productAssets.length + uploadedAssets.length} 张。`,
-        });
-      }
     } catch (error) {
       appendProductAssets(uploadedAssets);
       toast({
@@ -419,10 +439,6 @@ function ProductInfoStep({
         ...prev,
         referenceAsset: asset,
       }));
-      toast({
-        title: "参考图已上传",
-        description: asset.originalFilename,
-      });
     } catch (error) {
       toast({
         title: "上传失败",
@@ -441,6 +457,12 @@ function ProductInfoStep({
         inputAsset: nextAssets[0],
       };
     });
+  };
+  const removeReferenceAsset = () => {
+    setWorkflowData((prev) => ({
+      ...prev,
+      referenceAsset: undefined,
+    }));
   };
 
   const moreInfoCount = [
@@ -553,10 +575,34 @@ function ProductInfoStep({
         </span>
         <div className="min-w-0">
           <p className="max-w-full truncate text-[14px] font-semibold text-ink">
-            {workflowData.referenceAsset?.originalFilename ?? "上传场景参考图"}
+            {workflowData.referenceAsset?.originalFilename ?? "场景参考图（可选）"}
           </p>
-          <p className="mt-1 text-[12px] font-semibold text-ink-3">单张参考</p>
+          <p className="mt-1 text-[12px] font-semibold text-ink-3">
+            {workflowData.referenceAsset ? "已添加参考" : "不传也可以生成"}
+          </p>
         </div>
+        {workflowData.referenceAsset && (
+          <span
+            role="button"
+            tabIndex={0}
+            className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/90 text-ink-2 shadow-soft transition-colors hover:text-destructive"
+            onClick={(event) => {
+              event.stopPropagation();
+              removeReferenceAsset();
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                event.stopPropagation();
+                removeReferenceAsset();
+              }
+            }}
+            aria-label="移除参考图"
+            title="移除"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </span>
+        )}
       </button>
     </>
   );
@@ -648,20 +694,20 @@ function ProductInfoStep({
       <div className="flex-1 overflow-auto px-4 pb-4 pt-2 md:px-6">
         <div className="mx-auto flex max-w-[1100px] flex-col gap-3.5">
           {workflowData.activePresetName && (
-            <section className="glass-panel rounded-[20px] p-4">
-              <div className="flex items-start justify-between gap-4">
+            <section className="glass-panel rounded-[18px] p-3 md:rounded-[20px] md:p-4">
+              <div className="flex items-center justify-between gap-3 md:items-start md:gap-4">
                 <div>
-                  <Badge variant="processing">已载入模板</Badge>
-                  <h2 className="mt-3 text-body font-semibold text-ink">
+                  <Badge variant="processing" className="hidden md:inline-flex">已载入模板</Badge>
+                  <h2 className="text-[14px] font-semibold text-ink md:mt-3 md:text-body">
                     {workflowData.activePresetName}
                   </h2>
                   {workflowData.activePresetDescription && (
-                    <p className="mt-1 text-data text-ink-2">
+                    <p className="mt-1 hidden text-data text-ink-2 md:block">
                       {workflowData.activePresetDescription}
                     </p>
                   )}
                 </div>
-                <div className="hidden text-right text-caption text-ink-3 sm:block">
+                <div className="hidden text-right text-caption text-ink-3 md:block">
                   <p>模型：{workflowData.aiModel}</p>
                   <p>尺寸：{workflowData.outputResolution}</p>
                   <p>候选：{workflowData.candidateCount} 张</p>
@@ -675,7 +721,7 @@ function ProductInfoStep({
               <div>
                 <h2 className="text-base font-bold text-ink">素材上传</h2>
                 <p className="mt-1 hidden text-[13px] text-ink-2 sm:block">
-                  先放商品图，参考图用于背景、构图和氛围。
+                  商品图必填，参考图可选。
                 </p>
               </div>
               {isUploadingAsset && (
@@ -968,6 +1014,7 @@ function GenerateAdjustStep({
   const sceneModels = getSceneGenerationModels();
   const productAssets = getProductAssets(workflowData);
   const expectedTaskCount = productAssets.length * Math.max(1, workflowData.candidateCount || 1);
+  const resultGroups = groupResultsBySource(results);
   const selectedModelLabel =
     sceneModels.find((model) => model.id === workflowData.aiModel)?.label ?? workflowData.aiModel;
   const advancedSettingsSummary = `${selectedModelLabel} / ${getOptionLabel(outputResolutionOptions, workflowData.outputResolution)} / ${workflowData.candidateCount} 张/商品`;
@@ -1283,12 +1330,12 @@ function GenerateAdjustStep({
               </div>
               <div className="mb-4 rounded-full border border-line bg-surface px-3.5 py-2 text-[13px] font-semibold text-ink-2">
                 {productAssets.length > 0
-                  ? `${productAssets.length} 张商品图 · 将创建 ${expectedTaskCount} 个任务`
+                  ? `${productAssets.length} 张商品图 · 每张 ${Math.max(1, workflowData.candidateCount || 1)} 张 · 共 ${expectedTaskCount} 个任务`
                   : "请先上传商品图"}
               </div>
               <Button
 	                onClick={handleGenerate}
-	                disabled={generating || productAssets.length === 0 || !workflowData.referenceAsset}
+	                disabled={generating || productAssets.length === 0}
 	                variant="brand"
 	                className="min-h-11 px-6"
 	              >
@@ -1324,100 +1371,121 @@ function GenerateAdjustStep({
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-5">
-                {results.map((result) => (
-                  <div key={result.id} className="flex flex-col rounded-xl border border-border overflow-hidden">
-                    <div className="h-40 bg-muted flex items-center justify-center overflow-hidden">
-                      {result.resultImageUrl ? (
-                        <img src={result.resultImageUrl} alt={result.name} className="h-full w-full object-cover" />
-                      ) : result.status === "processing" ? (
-                        <div className="flex flex-col items-center gap-3 text-ink-2">
-                          <ConicSpinner size={56} />
-                          <span className="text-[13px] font-semibold text-brand-text">
-                            {Math.max(0, result.progress)}%
-                          </span>
+              <div className="space-y-4 md:space-y-5">
+                {resultGroups.map((group) => {
+                  const groupTitle = group.sourceAsset
+                    ? getCompactFilename(group.sourceAsset.originalFilename)
+                    : "商品图";
+                  const groupCompletedCount = group.items.filter((item) => item.status === "completed").length;
+                  return (
+                    <section key={group.key} className="rounded-[18px] border border-border bg-surface p-3 md:rounded-[22px] md:p-4">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-[12px] border border-line bg-surface-muted">
+                            <AssetPreviewImage
+                              asset={group.sourceAsset}
+                              className="h-full w-full object-contain"
+                              fallbackClassName="h-full w-full"
+                            />
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="truncate text-[14px] font-bold text-ink">{groupTitle}</h3>
+                            <p className="text-[12px] font-semibold text-ink-3">
+                              {groupCompletedCount}/{group.items.length} 已完成
+                            </p>
+                          </div>
                         </div>
-                      ) : result.status === "failed" || result.status === "cancelled" ? (
-                        <div className="px-4 text-center text-caption text-destructive">
-                          {result.errorMessage ?? "任务处理失败"}
-                        </div>
-                      ) : (
-                        <BrandImageFallback
-                          title={result.name}
-                          description={getCandidateStatusLabel(result.status)}
-                          pose={result.status === "queued" || result.status === "pending" ? "think" : "sleep"}
-                        />
-                      )}
-                    </div>
-                    <div className="p-4">
-                      <div className="flex items-center justify-between gap-2">
-                        <h3 className="min-w-0 truncate text-data font-medium text-foreground">
-                          {result.name}
-                        </h3>
-                        <Badge variant={getCandidateStatusVariant(result.status)}>
-                          {getCandidateStatusLabel(result.status)}
-                        </Badge>
-                      </div>
-                      {result.sourceAsset && productAssets.length > 1 && (
-                        <p className="mt-1 truncate text-[11px] font-semibold text-brand-text">
-                          商品 {result.sourceIndex}/{productAssets.length}
-                        </p>
-                      )}
-                      {result.currentStep && (
-                        <p className="mt-1 hidden line-clamp-2 text-caption text-muted-foreground sm:block">
-                          {result.currentStep}
-                        </p>
-                      )}
-                      {result.taskId && (
-                        <p className="mt-1 hidden truncate text-caption text-muted-foreground sm:block">
-                          任务 ID：{result.taskId}
-                        </p>
-                      )}
-                      {(result.status === "completed" || result.status === "failed") && result.usedModel && (
-                        <p className="mt-1 hidden truncate text-[11px] text-muted-foreground/70 sm:block">
-                          模型：{result.usedModel}
-                        </p>
-                      )}
-                      {result.savedImageId && (
-                        <p className="mt-1 truncate text-[11px] text-green-600">
-                          已保存到结果管理
-                        </p>
-                      )}
-                      {result.status === "processing" && (
-                        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
-                          <div
-                            className="h-full rounded-full bg-primary transition-all"
-                            style={{ width: `${Math.max(0, Math.min(100, result.progress))}%` }}
-                          />
-                        </div>
-                      )}
-	                      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-	                        <Button size="sm" variant="outline" className="min-h-10 flex-1" asChild>
-                          <Link href="/tasks">查看任务</Link>
-                        </Button>
-                        {result.savedImageId ? (
-	                          <Button size="sm" variant="brand" className="min-h-10 flex-1" asChild>
-                            <Link href="/results">查看结果</Link>
-                          </Button>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="brand"
-                            className="min-h-10 flex-1"
-                            onClick={() => handleSaveResult(result)}
-                            disabled={
-                              result.status !== "completed"
-                              || !result.resultImageUrl
-                              || savingCandidateId === result.id
-                            }
-                          >
-                            {savingCandidateId === result.id ? "保存中..." : "保存结果"}
-                          </Button>
+                        {group.sourceIndex && productAssets.length > 1 && (
+                          <Badge variant="secondary">商品 {group.sourceIndex}</Badge>
                         )}
                       </div>
-                    </div>
-                  </div>
-                ))}
+
+                      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+                        {group.items.map((result) => (
+                          <div key={result.id} className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-background">
+                            <div className="flex aspect-square items-center justify-center overflow-hidden bg-muted">
+                              {result.resultImageUrl ? (
+                                <img src={result.resultImageUrl} alt={result.name} className="h-full w-full object-cover" />
+                              ) : result.status === "processing" ? (
+                                <div className="flex flex-col items-center gap-3 text-ink-2">
+                                  <ConicSpinner size={48} />
+                                  <span className="text-[13px] font-semibold text-brand-text">
+                                    {Math.max(0, result.progress)}%
+                                  </span>
+                                </div>
+                              ) : result.status === "failed" || result.status === "cancelled" ? (
+                                <div className="px-3 text-center text-[12px] text-destructive">
+                                  {result.errorMessage ?? "任务处理失败"}
+                                </div>
+                              ) : (
+                                <BrandImageFallback
+                                  title={`候选 ${result.candidateIndex ?? ""}`}
+                                  description={getCandidateStatusLabel(result.status)}
+                                  pose={result.status === "queued" || result.status === "pending" ? "think" : "sleep"}
+                                  className="[&_p]:hidden"
+                                />
+                              )}
+                            </div>
+                            <div className="p-3">
+                              <div className="flex items-center justify-between gap-2">
+                                <h4 className="min-w-0 truncate text-[13px] font-semibold text-foreground">
+                                  候选 {result.candidateIndex ?? 1}
+                                </h4>
+                                <Badge variant={getCandidateStatusVariant(result.status)}>
+                                  {getCandidateStatusLabel(result.status)}
+                                </Badge>
+                              </div>
+                              {result.currentStep && (
+                                <p className="mt-1 hidden line-clamp-2 text-caption text-muted-foreground sm:block">
+                                  {result.currentStep}
+                                </p>
+                              )}
+                              {(result.status === "completed" || result.status === "failed") && result.usedModel && (
+                                <p className="mt-1 hidden truncate text-[11px] text-muted-foreground/70 sm:block">
+                                  模型：{result.usedModel}
+                                </p>
+                              )}
+                              {result.savedImageId && (
+                                <p className="mt-1 truncate text-[11px] text-green-600">
+                                  已保存
+                                </p>
+                              )}
+                              {result.status === "processing" && (
+                                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
+                                  <div
+                                    className="h-full rounded-full bg-primary transition-all"
+                                    style={{ width: `${Math.max(0, Math.min(100, result.progress))}%` }}
+                                  />
+                                </div>
+                              )}
+                              <div className="mt-3 grid grid-cols-1 gap-2">
+                                {result.savedImageId ? (
+                                  <Button size="sm" variant="brand" className="min-h-10 w-full" asChild>
+                                    <Link href="/results">查看结果</Link>
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="brand"
+                                    className="min-h-10 w-full"
+                                    onClick={() => handleSaveResult(result)}
+                                    disabled={
+                                      result.status !== "completed"
+                                      || !result.resultImageUrl
+                                      || savingCandidateId === result.id
+                                    }
+                                  >
+                                    {savingCandidateId === result.id ? "保存中..." : "保存"}
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })}
               </div>
             </>
           )}

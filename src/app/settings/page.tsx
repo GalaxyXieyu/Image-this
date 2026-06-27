@@ -1109,7 +1109,7 @@ export default function SettingsPage() {
                     <SlidersHorizontal className="w-5 h-5 mr-2 text-primary" />
                     后台任务并发
                   </CardTitle>
-                  <CardDescription className="mt-1">
+                  <CardDescription className="mt-1 hidden sm:block">
                     控制同时调用大模型、视频和图床服务的任务数量
                   </CardDescription>
                 </div>
@@ -1130,7 +1130,7 @@ export default function SettingsPage() {
                     }}
                     className="min-h-11 w-full sm:max-w-xs"
                   />
-                  <div className="text-caption text-muted-foreground mt-2 space-y-1">
+                  <div className="hidden text-caption text-muted-foreground mt-2 space-y-1 sm:block">
                     <div>建议保持 1-2，避免触发大模型或图床限流。</div>
                     <div>修改后新触发的后台队列会按该值领取任务。</div>
                   </div>
