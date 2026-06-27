@@ -36,10 +36,19 @@ import {
   Plus,
   Trash2,
   Wand2,
-  ShoppingBag,
 } from "lucide-react";
 
 type Step = 1 | 2 | 3;
+
+interface SceneStyleTemplate {
+  id: string;
+  name: string;
+  desc: string;
+  image: string;
+  stylePreference: string;
+  productType?: string;
+  candidateCount?: number;
+}
 
 type CandidateStatus = WorkflowTaskStatus | "queued";
 
@@ -168,8 +177,8 @@ function createWorkflowDataFromPreset(preset?: TemplatePreset): WorkflowData {
 
 function StepBar({ currentStep }: { currentStep: Step }) {
   const steps = [
-    { num: 1, label: "素材与产品信息", mobileLabel: "素材" },
-    { num: 2, label: "选择风格模板", mobileLabel: "风格" },
+    { num: 1, label: "选择风格模板", mobileLabel: "风格" },
+    { num: 2, label: "素材与产品信息", mobileLabel: "素材" },
     { num: 3, label: "生成与结果", mobileLabel: "结果" },
   ];
 
@@ -248,6 +257,77 @@ const outputResolutionOptions = [
 ];
 
 const candidateCountOptions = [1, 2, 3, 4, 5, 6];
+
+const sceneStyleTemplates: SceneStyleTemplate[] = [
+  {
+    id: "elegant",
+    name: "简约自然",
+    desc: "干净自然光，适合美妆护肤",
+    image: "/scene-presets/scene-elegant.webp",
+    stylePreference: "minimal natural ecommerce scene, soft morning light, clean stone surface, premium skincare photography",
+    productType: "beauty",
+  },
+  {
+    id: "lifestyle",
+    name: "生活场景",
+    desc: "真实居家氛围，适合家居日用",
+    image: "/scene-presets/scene-lifestyle.webp",
+    stylePreference: "warm lifestyle home scene, modern living room table, natural daylight, comfortable commercial photography",
+    productType: "home",
+  },
+  {
+    id: "minimal",
+    name: "极简商务",
+    desc: "清爽留白，适合 3C 数码",
+    image: "/scene-presets/scene-minimal.webp",
+    stylePreference: "minimal technology product scene, matte white desk, acrylic geometry, cool studio lighting",
+    productType: "electronics",
+  },
+  {
+    id: "warm",
+    name: "温馨居家",
+    desc: "柔和暖光，适合母婴用品",
+    image: "/scene-presets/scene-warm.webp",
+    stylePreference: "cozy warm home scene, soft fabric, pale wood shelf, gentle lamp glow, family-friendly mood",
+    productType: "baby",
+  },
+  {
+    id: "outdoor",
+    name: "户外自然",
+    desc: "阳光绿植，适合运动户外",
+    image: "/scene-presets/scene-outdoor.webp",
+    stylePreference: "outdoor nature scene, stone platform, green foliage, bright daylight, fresh commercial photography",
+  },
+  {
+    id: "fresh",
+    name: "清新食品",
+    desc: "明亮餐厨，适合食品饮料",
+    image: "/scene-presets/scene-fresh.webp",
+    stylePreference: "fresh food and beverage scene, bright kitchen counter, citrus and herb accents, crisp morning light",
+    productType: "food",
+  },
+  {
+    id: "luxury",
+    name: "奢华高端",
+    desc: "暗调金边，适合珠宝配饰",
+    image: "/scene-presets/scene-luxury.webp",
+    stylePreference: "luxury premium product scene, dark stone plinth, satin fabric, champagne gold rim light",
+  },
+  {
+    id: "festival",
+    name: "节日氛围",
+    desc: "暖色促销，适合礼品节庆",
+    image: "/scene-presets/scene-festival.webp",
+    stylePreference: "festive promotional ecommerce scene, warm lights, red and gold accents, clean central display",
+  },
+  {
+    id: "business",
+    name: "商业办公",
+    desc: "专业办公，适合商务用品",
+    image: "/scene-presets/scene-business.webp",
+    stylePreference: "modern business office scene, executive desk surface, city window light, polished professional mood",
+  },
+];
 
 function HorizontalPillScroller({ children }: { children: React.ReactNode }) {
   return (
@@ -371,10 +451,12 @@ function groupResultsBySource(results: SceneCandidateResult[]) {
 }
 
 function ProductInfoStep({
+  onBack,
   onNext,
   workflowData,
   setWorkflowData,
 }: {
+  onBack: () => void;
   onNext: () => void;
   workflowData: WorkflowData;
   setWorkflowData: React.Dispatch<React.SetStateAction<WorkflowData>>;
@@ -386,6 +468,17 @@ function ProductInfoStep({
   const { toast } = useToast();
   const productAssets = getProductAssets(workflowData);
   const isUploadingAsset = uploading || uploadingProductAssets;
+  const selectedTemplate = sceneStyleTemplates.find(
+    (template) => template.id === workflowData.selectedTemplates[0]
+  ) ?? (workflowData.activePresetName
+    ? {
+        id: workflowData.selectedTemplates[0] ?? "preset",
+        name: workflowData.activePresetName,
+        desc: workflowData.activePresetDescription ?? "已选择的场景风格",
+        image: "/scene-presets/scene-elegant.webp",
+        stylePreference: workflowData.stylePreference || workflowData.usageScene,
+      }
+    : undefined);
 
   const appendProductAssets = (assets: InputAssetRef[]) => {
     if (assets.length === 0) return;
@@ -693,25 +786,35 @@ function ProductInfoStep({
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex-1 overflow-auto px-4 pb-4 pt-2 md:px-6">
         <div className="mx-auto flex max-w-[1100px] flex-col gap-3.5">
-          {workflowData.activePresetName && (
-            <section className="glass-panel rounded-[18px] p-3 md:rounded-[20px] md:p-4">
-              <div className="flex items-center justify-between gap-3 md:items-start md:gap-4">
-                <div>
-                  <Badge variant="processing" className="hidden md:inline-flex">已载入模板</Badge>
-                  <h2 className="text-[14px] font-semibold text-ink md:mt-3 md:text-body">
-                    {workflowData.activePresetName}
-                  </h2>
-                  {workflowData.activePresetDescription && (
-                    <p className="mt-1 hidden text-data text-ink-2 md:block">
-                      {workflowData.activePresetDescription}
-                    </p>
-                  )}
+          {selectedTemplate && (
+            <section className="glass-panel overflow-hidden rounded-[18px] p-2.5 md:rounded-[20px] md:p-3">
+              <div className="flex items-center gap-3">
+                <div className="h-16 w-16 shrink-0 overflow-hidden rounded-[14px] bg-surface-muted md:h-20 md:w-20">
+                  <img
+                    src={selectedTemplate.image}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
                 </div>
-                <div className="hidden text-right text-caption text-ink-3 md:block">
-                  <p>模型：{workflowData.aiModel}</p>
-                  <p>尺寸：{workflowData.outputResolution}</p>
-                  <p>候选：{workflowData.candidateCount} 张</p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="processing" className="hidden md:inline-flex">已选风格</Badge>
+                    <h2 className="truncate text-[14px] font-bold text-ink md:text-body">
+                      {selectedTemplate.name}
+                    </h2>
+                  </div>
+                  <p className="mt-1 line-clamp-1 text-[12px] text-ink-3 md:line-clamp-2 md:text-data">
+                    {selectedTemplate.desc}
+                  </p>
                 </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onBack}
+                  className="hidden min-h-10 shrink-0 rounded-full px-3 text-[13px] md:inline-flex"
+                >
+                  换风格
+                </Button>
               </div>
             </section>
           )}
@@ -720,9 +823,6 @@ function ProductInfoStep({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-base font-bold text-ink">素材上传</h2>
-                <p className="mt-1 hidden text-[13px] text-ink-2 sm:block">
-                  商品图必填，参考图可选。
-                </p>
               </div>
               {isUploadingAsset && (
                 <span className="shrink-0 rounded-full bg-surface-muted px-3 py-1 text-[12px] font-semibold text-ink-2">
@@ -733,16 +833,10 @@ function ProductInfoStep({
             <div className="mt-3 grid grid-cols-1 gap-3 md:mt-3.5 md:grid-cols-[minmax(0,1.45fr)_minmax(240px,0.85fr)] md:gap-3.5">
               {uploadCards}
             </div>
-            <p className="mt-3 hidden text-[12px] text-ink-3 sm:block">
-              支持 PNG、JPG；素材会先登记为 input asset，任务只携带轻量引用。
-            </p>
           </section>
 
           <section className="glass-panel rounded-[20px] p-4 md:rounded-[24px] md:p-[20px_22px]">
             <h2 className="text-base font-bold text-ink">基础描述</h2>
-            <p className="mt-1 hidden text-[13px] text-ink-2 sm:block">
-              名称、品类和场景就够继续。
-            </p>
             <div className="mt-3.5 grid grid-cols-1 gap-x-3.5 gap-y-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>产品名称</Label>
@@ -760,7 +854,7 @@ function ProductInfoStep({
                 {productTypePicker}
               </div>
               <div className="space-y-2 sm:col-span-2 md:col-span-1">
-                <Label>使用场景</Label>
+                <Label>补充场景</Label>
                 <Input
                   placeholder="例如：清晨浴室台面自然光"
                   value={workflowData.usageScene}
@@ -834,18 +928,18 @@ function ProductInfoStep({
       </div>
 
       <div className="z-30 flex shrink-0 items-center justify-end gap-2 border-t border-line bg-surface-glass px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+12px)] backdrop-blur-[18px] backdrop-saturate-150 sm:justify-between sm:px-6">
-        <Button variant="ghost" asChild className="hidden min-h-11 text-ink-2 hover:bg-surface-muted sm:inline-flex">
-          <Link href="/">
-            <ArrowLeft className="mr-1.5 h-4 w-4" />
-            返回首页
-          </Link>
+        <Button variant="ghost" onClick={onBack} className="min-h-11 shrink-0 px-3 text-ink-2 hover:bg-surface-muted sm:w-auto sm:px-4">
+          <ArrowLeft className="mr-1.5 h-4 w-4" />
+          <span className="sm:hidden">风格</span>
+          <span className="hidden sm:inline">返回选择风格</span>
         </Button>
         <Button
           onClick={onNext}
+          disabled={productAssets.length === 0}
           className="h-12 flex-1 rounded-[14px] bg-accent-gradient px-6 text-[15px] font-semibold text-white shadow-float transition-transform hover:-translate-y-0.5 sm:flex-none"
         >
-          <span className="sm:hidden">继续选风格</span>
-          <span className="hidden sm:inline">下一步：选择风格模板</span>
+          <span className="sm:hidden">确认生成</span>
+          <span className="hidden sm:inline">下一步：确认并生成</span>
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
@@ -854,95 +948,85 @@ function ProductInfoStep({
 }
 
 function StyleTemplateStep({
-  onBack,
   onNext,
   workflowData,
   setWorkflowData,
 }: {
-  onBack: () => void;
   onNext: () => void;
   workflowData: WorkflowData;
   setWorkflowData: React.Dispatch<React.SetStateAction<WorkflowData>>;
 }) {
-  const templates = [
+  const presetTemplate =
     workflowData.selectedPresetId && workflowData.activePresetName
       ? {
           id: workflowData.selectedPresetId,
           name: workflowData.activePresetName,
           desc: workflowData.activePresetDescription ?? "来自模板库的场景预设",
-          icon: ShoppingBag,
+          image: "/scene-presets/scene-elegant.webp",
+          stylePreference: workflowData.stylePreference || workflowData.usageScene || "professional ecommerce scene",
         }
-      : null,
-    { id: "elegant", name: "简约自然", desc: "适合美妆护肤", icon: ShoppingBag },
-    { id: "lifestyle", name: "生活场景", desc: "适合家居日用", icon: ShoppingBag },
-    { id: "minimal", name: "极简商务", desc: "适合3C数码", icon: ShoppingBag },
-    { id: "warm", name: "温馨居家", desc: "适合母婴用品", icon: ShoppingBag },
-    { id: "fresh", name: "清新自然", desc: "适合食品饮料", icon: ShoppingBag },
-    { id: "luxury", name: "奢华高端", desc: "适合珠宝配饰", icon: ShoppingBag },
-    { id: "tech", name: "科技感", desc: "适合数码产品", icon: ShoppingBag },
-    { id: "festival", name: "节日氛围", desc: "适合节日促销", icon: ShoppingBag },
-  ].filter((template): template is { id: string; name: string; desc: string; icon: typeof ShoppingBag } => Boolean(template));
+      : null;
+  const templates = presetTemplate
+    ? [presetTemplate, ...sceneStyleTemplates.filter((template) => template.id !== presetTemplate.id)]
+    : sceneStyleTemplates;
 
-  const selected = workflowData.selectedTemplates;
+  const selectedId = workflowData.selectedTemplates[0] ?? "";
+  const selectedTemplate = templates.find((template) => template.id === selectedId);
+
+  const selectTemplate = (template: SceneStyleTemplate) => {
+    setWorkflowData((prev) => ({
+      ...prev,
+      selectedTemplates: [template.id],
+      selectedPresetId: template.id,
+      activePresetName: template.name,
+      activePresetDescription: template.desc,
+      stylePreference: template.stylePreference,
+      productType: prev.productType || template.productType || "",
+      candidateCount: template.candidateCount ?? prev.candidateCount,
+    }));
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-		      <div className="flex-1 overflow-auto px-4 pb-4 pt-2 sm:px-6">
+      <div className="flex-1 overflow-auto px-4 pb-28 pt-2 sm:px-6 md:pb-6">
         <div className="mx-auto flex max-w-[1100px] flex-col gap-3.5 md:gap-5">
-		          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-[18px] font-bold text-ink md:text-[22px]">AI 生成预览</h2>
-              <p className="mt-1 hidden text-[14px] text-ink-2 sm:block">
-                基于已提交的商品信息，选择想要的风格方向
-              </p>
+              <h2 className="text-[18px] font-bold text-ink md:text-[22px]">先选场景风格</h2>
             </div>
-	            <span className="inline-flex min-h-10 w-fit items-center rounded-full border border-line bg-surface px-3.5 py-1.5 text-[13px] font-semibold text-brand-text">
-              已选 {selected.length} 张
+            <span className="inline-flex min-h-10 w-fit items-center rounded-full border border-line bg-surface px-3.5 py-1.5 text-[13px] font-semibold text-brand-text">
+              {selectedTemplate ? selectedTemplate.name : "未选择"}
             </span>
           </div>
 
-	          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {templates.map((template) => {
-              const isSelected = selected.includes(template.id);
+              const isSelected = selectedId === template.id;
               return (
                 <button
                   key={template.id}
-                  onClick={() => {
-                    if (isSelected) {
-                      setWorkflowData((prev) => ({
-                        ...prev,
-                        selectedTemplates: prev.selectedTemplates.filter(
-                          (s) => s !== template.id
-                        ),
-                      }));
-                    } else {
-                      setWorkflowData((prev) => ({
-                        ...prev,
-                        selectedTemplates: [...prev.selectedTemplates, template.id],
-                      }));
-                    }
-                  }}
+                  type="button"
+                  onClick={() => selectTemplate(template)}
                   className={cn(
-	                    "glass-panel relative flex flex-col items-start rounded-[16px] p-3 text-left transition-all hover:-translate-y-0.5 md:rounded-[20px] md:p-3.5",
+                    "glass-panel relative flex min-w-0 flex-col items-start overflow-hidden rounded-[16px] p-2.5 text-left transition-all hover:-translate-y-0.5 md:rounded-[20px]",
                     isSelected ? "ring-2 ring-brand ring-offset-2 ring-offset-background" : ""
                   )}
                 >
-                  <div
-	                    className="relative mb-3 flex h-[92px] w-full items-center justify-center rounded-[13px] md:h-[104px]"
-                    style={{
-                      background:
-                        "repeating-linear-gradient(45deg, var(--surface-2), var(--surface-2) 9px, transparent 9px, transparent 18px)",
-                    }}
-                  >
-                    <template.icon className="h-[30px] w-[30px] text-brand opacity-85" />
+                  <div className="relative mb-2.5 aspect-[4/3] w-full overflow-hidden rounded-[13px] bg-surface-muted md:aspect-square">
+                    <img
+                      src={template.image}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
                     {isSelected && (
-                      <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-accent-gradient">
-                        <CheckCircle2 className="h-3 w-3 text-white" />
+                      <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-accent-gradient shadow-soft">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-white" />
                       </span>
                     )}
                   </div>
                   <div className="text-[14px] font-semibold text-ink">{template.name}</div>
-                  <p className="mt-1 hidden text-[12px] text-ink-3 sm:block">{template.desc}</p>
+                  <p className="mt-1 line-clamp-2 min-h-[32px] text-[12px] leading-4 text-ink-3">{template.desc}</p>
                 </button>
               );
             })}
@@ -951,18 +1035,19 @@ function StyleTemplateStep({
       </div>
 
       <div className="z-30 flex shrink-0 items-center gap-2 border-t border-line bg-surface-glass px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+12px)] backdrop-blur-[18px] backdrop-saturate-150 sm:justify-between sm:px-6">
-        <Button variant="ghost" onClick={onBack} className="min-h-11 shrink-0 px-3 text-ink-2 hover:bg-surface-muted sm:w-auto sm:px-4">
-          <ArrowLeft className="mr-1.5 h-4 w-4" />
-          <span className="sm:hidden">返回</span>
-          <span className="hidden sm:inline">返回修改信息</span>
+        <Button variant="ghost" asChild className="hidden min-h-11 text-ink-2 hover:bg-surface-muted sm:inline-flex">
+          <Link href="/">
+            <ArrowLeft className="mr-1.5 h-4 w-4" />
+            返回首页
+          </Link>
         </Button>
         <Button
           onClick={onNext}
-          disabled={selected.length === 0}
+          disabled={!selectedTemplate}
           className="h-12 flex-1 rounded-[14px] bg-accent-gradient px-5 text-[15px] font-semibold text-white shadow-float transition-transform hover:-translate-y-0.5 disabled:opacity-50 sm:flex-none sm:px-6"
         >
-          <span className="sm:hidden">继续生成</span>
-          <span className="hidden sm:inline">下一步：生成并调整</span>
+          <span className="sm:hidden">继续上传素材</span>
+          <span className="hidden sm:inline">下一步：上传商品素材</span>
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
@@ -1013,6 +1098,17 @@ function GenerateAdjustStep({
   const [savingCandidateId, setSavingCandidateId] = useState<string | null>(null);
   const sceneModels = getSceneGenerationModels();
   const productAssets = getProductAssets(workflowData);
+  const selectedTemplate = sceneStyleTemplates.find(
+    (template) => template.id === workflowData.selectedTemplates[0]
+  ) ?? (workflowData.activePresetName
+    ? {
+        id: workflowData.selectedTemplates[0] ?? "preset",
+        name: workflowData.activePresetName,
+        desc: workflowData.activePresetDescription ?? "已选择的场景风格",
+        image: "/scene-presets/scene-elegant.webp",
+        stylePreference: workflowData.stylePreference || workflowData.usageScene,
+      }
+    : undefined);
   const expectedTaskCount = productAssets.length * Math.max(1, workflowData.candidateCount || 1);
   const resultGroups = groupResultsBySource(results);
   const selectedModelLabel =
@@ -1313,6 +1409,19 @@ function GenerateAdjustStep({
         <div className="mx-auto max-w-5xl space-y-6">
           {results.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-4 md:py-12">
+              {selectedTemplate && (
+                <div className="mb-3 flex w-full max-w-xl items-center gap-3 rounded-[18px] border border-line bg-surface p-2.5 shadow-soft">
+                  <div className="h-16 w-16 shrink-0 overflow-hidden rounded-[14px] bg-surface-muted">
+                    <img src={selectedTemplate.image} alt="" className="h-full w-full object-cover" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[14px] font-bold text-ink">{selectedTemplate.name}</p>
+                    <p className="mt-1 truncate text-[12px] font-semibold text-ink-3">
+                      {productAssets.length} 张商品图 · 每张 {Math.max(1, workflowData.candidateCount || 1)} 张
+                    </p>
+                  </div>
+                </div>
+              )}
               <BrandEmptyState
                 pose="think"
                 title="准备生成"
@@ -1496,7 +1605,7 @@ function GenerateAdjustStep({
         <Button variant="ghost" onClick={onBack} className="min-h-11 shrink-0 px-3 text-ink-2 hover:bg-surface-muted sm:w-auto sm:px-4">
           <ArrowLeft className="mr-1.5 h-4 w-4" />
           <span className="sm:hidden">返回</span>
-          <span className="hidden sm:inline">返回预览</span>
+          <span className="hidden sm:inline">返回素材</span>
         </Button>
         <Button
           asChild
@@ -1529,14 +1638,14 @@ function SceneWorkspacePageInner() {
     <div className="h-full flex flex-col bg-background">
       <StepBar currentStep={step} />
       {step === 1 && (
-        <ProductInfoStep
+        <StyleTemplateStep
           onNext={() => setStep(2)}
           workflowData={workflowData}
           setWorkflowData={setWorkflowData}
         />
       )}
       {step === 2 && (
-        <StyleTemplateStep
+        <ProductInfoStep
           onBack={() => setStep(1)}
           onNext={() => setStep(3)}
           workflowData={workflowData}
