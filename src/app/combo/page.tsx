@@ -40,16 +40,39 @@ const SCENE_CATEGORIES = [
   { id: "indoor", label: "室内" },
 ];
 
-const TEMPLATE_GRADIENTS: string[] = [
-  "linear-gradient(135deg, #f5f3ff 0%, #ddd6fe 100%)",
-  "linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)",
-  "linear-gradient(135deg, #fdf2f8 0%, #fbcfe8 100%)",
-  "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)",
-  "linear-gradient(135deg, #ecfeff 0%, #a5f3fc 100%)",
-  "linear-gradient(135deg, #f3e8ff 0%, #c084fc 100%)",
-  "linear-gradient(135deg, #fff7ed 0%, #fed7aa 100%)",
-  "linear-gradient(135deg, #f0fdf4 0%, #bbf7d0 100%)",
-];
+const TEMPLATE_PREVIEWS: Record<string, string> = {
+  t1: "/scene-presets/scene-elegant.webp",
+  t2: "/scene-presets/scene-minimal.webp",
+  t3: "/scene-presets/scene-lifestyle.webp",
+  t4: "/scene-presets/scene-luxury.webp",
+  t5: "/scene-presets/scene-fresh.webp",
+  t6: "/scene-presets/scene-elegant.webp",
+  m1: "/scene-presets/scene-festival.webp",
+  m2: "/scene-presets/scene-elegant.webp",
+  m3: "/scene-presets/scene-luxury.webp",
+  m4: "/scene-presets/scene-business.webp",
+  f1: "/scene-presets/scene-festival.webp",
+  f2: "/scene-presets/scene-luxury.webp",
+  f3: "/scene-presets/scene-warm.webp",
+  f4: "/scene-presets/scene-business.webp",
+  f5: "/scene-presets/scene-festival.webp",
+  o1: "/scene-presets/scene-outdoor.webp",
+  o2: "/scene-presets/scene-fresh.webp",
+  o3: "/scene-presets/scene-business.webp",
+  o4: "/scene-presets/scene-minimal.webp",
+  i1: "/scene-presets/scene-lifestyle.webp",
+  i2: "/scene-presets/scene-fresh.webp",
+  i3: "/scene-presets/scene-warm.webp",
+  i4: "/scene-presets/scene-business.webp",
+};
+
+const CATEGORY_FALLBACK_PREVIEWS: Record<string, string> = {
+  daily: "/scene-presets/scene-elegant.webp",
+  marketing: "/scene-presets/scene-business.webp",
+  festival: "/scene-presets/scene-festival.webp",
+  outdoor: "/scene-presets/scene-outdoor.webp",
+  indoor: "/scene-presets/scene-lifestyle.webp",
+};
 
 const SCENE_TEMPLATES: Record<string, { id: string; name: string }[]> = {
   daily: [
@@ -86,6 +109,10 @@ const SCENE_TEMPLATES: Record<string, { id: string; name: string }[]> = {
     { id: "i4", name: "书房办公" },
   ],
 };
+
+function getTemplatePreview(templateId: string, categoryId: string) {
+  return TEMPLATE_PREVIEWS[templateId] ?? CATEGORY_FALLBACK_PREVIEWS[categoryId] ?? "/scene-presets/scene-elegant.webp";
+}
 
 type StepType = "scene" | "background" | "upscale" | "watermark" | "outpaint";
 
@@ -303,22 +330,27 @@ export default function ComboPage() {
               ))}
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2.5">
-              {templates.map((tpl, idx) => {
+              {templates.map((tpl) => {
                 const active = selectedTemplate === tpl.id;
-                const gradient = TEMPLATE_GRADIENTS[(idx + tpl.id.charCodeAt(tpl.id.length - 1)) % TEMPLATE_GRADIENTS.length];
+                const preview = getTemplatePreview(tpl.id, activeCategory);
                 return (
                   <button
                     key={tpl.id}
                     type="button"
                     onClick={() => setSelectedTemplate(tpl.id)}
                     className={cn(
-                      "relative min-h-[92px] overflow-hidden rounded-[16px] border text-left transition-all",
+                      "relative aspect-[4/3] min-h-[92px] overflow-hidden rounded-[16px] border bg-surface-muted text-left transition-all",
                       active
                         ? "border-brand ring-2 ring-brand ring-offset-2 ring-offset-background"
                         : "border-line"
                     )}
                   >
-                    <div className="absolute inset-0" style={{ background: gradient }} />
+                    <img
+                      src={preview}
+                      alt=""
+                      className="absolute inset-0 h-full w-full object-cover"
+                      loading="lazy"
+                    />
                     <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-3 py-2">
                       <span className="text-[13px] font-semibold text-white">{tpl.name}</span>
                     </div>
@@ -554,9 +586,9 @@ export default function ComboPage() {
             </div>
             <div className="flex-1 overflow-y-auto px-3 pb-4">
               <div className="grid grid-cols-2 gap-2">
-                {templates.map((tpl, idx) => {
+                {templates.map((tpl) => {
                   const active = selectedTemplate === tpl.id;
-                  const gradient = TEMPLATE_GRADIENTS[(idx + tpl.id.charCodeAt(tpl.id.length - 1)) % TEMPLATE_GRADIENTS.length];
+                  const preview = getTemplatePreview(tpl.id, activeCategory);
                   return (
                     <button
                       key={tpl.id}
@@ -568,7 +600,12 @@ export default function ComboPage() {
                           : "border-line hover:border-brand/40"
                       )}
                     >
-                      <div className="absolute inset-0" style={{ background: gradient }} />
+                      <img
+                        src={preview}
+                        alt=""
+                        className="absolute inset-0 h-full w-full object-cover"
+                        loading="lazy"
+                      />
                       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/65 to-transparent px-2 py-1.5">
                         <span className="block truncate text-[11px] font-medium text-white">
                           {tpl.name}
