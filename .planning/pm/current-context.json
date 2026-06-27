@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-27T14:08:00+08:00",
+  "generated_at": "2026-06-27T14:10:17+08:00",
   "project": {
     "name": "Image-this",
     "repo_root": "/Volumes/DATABASE/code/business/Image-this",
@@ -93,14 +93,14 @@
     "created_at": "2026-06-27T13:23:21+08:00"
   },
   "current_task": {
-    "task_id": "T9",
-    "summary": "[T9] 图片生成真实出图联调与模板导入",
-    "status": "in_progress",
-    "guid": "local-task-b65512c1abd2",
-    "url": "local://task/local-task-b65512c1abd2",
-    "description": "任务编号：T9\n创建时间：2026-06-27 13:23:21 CST\n类型：task\nRepo：/Volumes/DATABASE/code/business/Image-this\n\n需求：\n等待用户提供 provider key、base URL、图床 key、测试商品图/参考图和旧模板来源后，继续推进真实图片生成端到端联调。范围包括：按 main 分支校准 GPT 调用方式，修复 Jimeng Ark-only 前置检查，写入/验证 .env 或设置页配置，备份并同步本地 SQLite schema，运行 UIUX_REQUIRE_IMAGE=true 的登录到出图自动化，确认 provider 返回图片、本地存储落图、ProcessedImage 入库和页面展示；同时梳理并实现旧默认模板/测试图片的 seed/import，方便后续存储和复跑。\n\n执行要求：\n- 以 task/doc 为主，不再依赖本地 task/context/state 文件。\n- 进度默认写评论，验收证据优先回填附件或评论。",
-    "updated_at": "2026-06-27T14:07:45+08:00",
-    "completed_at": "",
+    "task_id": "T7",
+    "summary": "[T7] 移动端场景生成流程减负与折叠交互计划",
+    "status": "completed",
+    "guid": "local-task-7f0c99a44480",
+    "url": "local://task/local-task-7f0c99a44480",
+    "description": "任务编号：T7\n创建时间：2026-06-27 13:06:10 CST\n类型：task\nRepo：/Volumes/DATABASE/code/business/Image-this\n\n需求：\n基于线上移动端反馈，重新规划 /workspace/scene 手机端交互：上传图片优先放到顶部，生成填写项尽量折叠，减少步骤和纵向滚动；下拉继续优先改为横向 pill/点选；保留高级设置但默认折叠，形成可执行改造计划后再实施。\n\n执行要求：\n- 以 task/doc 为主，不再依赖本地 task/context/state 文件。\n- 进度默认写评论，验收证据优先回填附件或评论。",
+    "updated_at": "2026-06-27T14:10:17+08:00",
+    "completed_at": "2026-06-27T14:08:00+08:00",
     "attachments": [],
     "tasklists": [
       {
@@ -110,10 +110,28 @@
   },
   "recent_comments": [
     {
-      "guid": "local-comment-0fb469553b58",
-      "content": "已建立后续联调任务并保留配置清单：.planning/IMAGE-GENERATION-CONFIG-CHECKLIST.md。等待用户后续提供 provider key、base URL、图床 key、测试商品图/参考图和旧模板来源后再继续真实出图、模板导入与端到端验证。当前不在 PM 评论或计划文档中记录任何真实 key/token。",
-      "resource_id": "local-task-b65512c1abd2",
+      "guid": "local-comment-5cacd1b3d038",
+      "content": "补充实际提交：本次 T7 移动端场景生成优化已提交为 40779f5 fix(mobile): streamline scene generation flow。此前 complete 自动附带的是执行时旧 HEAD 链接，以此条为准。",
+      "resource_id": "local-task-7f0c99a44480",
+      "created_at": "2026-06-27T14:10:17+08:00"
+    },
+    {
+      "guid": "local-comment-bd5f1719c4e5",
+      "content": "完成：/workspace/scene 移动端主流程已按 T7 方案上线实现。上传区置顶，移动端枚举切为横向 pill，更多产品信息和高级生成设置默认折叠，底部 CTA 改为紧凑单行，移动端全局 FAB 不遮挡。验证通过：tsc、lint、build；UI/UX mobile-scene-20260627-134613 5/5 PASS。\nCommit：https://github.com/GalaxyXieyu/Image-this/commit/0a19689ad91861650c4e5f582b45df28c20a3e79",
+      "resource_id": "local-task-7f0c99a44480",
+      "created_at": "2026-06-27T14:08:00+08:00"
+    },
+    {
+      "guid": "local-comment-624c6e6d0b4e",
+      "content": "移动端界面优化已实施：/workspace/scene 手机端改为上传素材优先；商品图/参考图置顶并列；产品类型、平台、生成模型/尺寸/候选数量在移动端使用横向 pill；目标人群/卖点/平台进入更多产品信息折叠区；高级生成设置默认折叠；底部 CTA 改为手机单行紧凑操作，避免右下角 FAB/底部按钮遮挡。验证：npx tsc --noEmit --pretty false 通过；npm run lint -- --quiet 通过；npm run build 通过；移动端 UI/UX run mobile-scene-20260627-134613 通过 5/5，报告 out/ui-ux-plan/mobile-scene-20260627-134613/ui-ux-test-report-mobile-scene-20260627-134613.md。验证中发现本地 SQLite 缺 users.*ModelsJson 列，已先备份 prisma/app.db 到 .planning/debug/db-backups/，再执行 npx prisma db push 同步本地开发 DB。",
+      "resource_id": "local-task-7f0c99a44480",
       "created_at": "2026-06-27T14:07:45+08:00"
+    },
+    {
+      "guid": "local-comment-148136896b30",
+      "content": "规划完成：已新增 .planning/MOBILE-SCENE-FLOW-REDESIGN-PLAN.md。核心方案：移动端 /workspace/scene 从上传商品图开始；默认展开素材上传和基础描述；目标人群、使用场景、核心卖点、平台放入更多产品信息折叠区；模型、尺寸、候选数量放入高级生成设置折叠区；手机端枚举选择继续用横向 pill；移动端弱化三步，目标主路径为上传商品图 -> 选风格 -> 少量描述 -> 直接生成。验收标准包括 390x844 首屏看到上传入口、FAB 隐藏、无 Select 触发器、折叠摘要、CTA 不遮挡、tsc/lint/build 与移动端 Playwright 验证。",
+      "resource_id": "local-task-7f0c99a44480",
+      "created_at": "2026-06-27T13:06:54+08:00"
     }
   ]
 }

@@ -262,7 +262,7 @@
       "summary": "[T7] 移动端场景生成流程减负与折叠交互计划",
       "description": "任务编号：T7\n创建时间：2026-06-27 13:06:10 CST\n类型：task\nRepo：/Volumes/DATABASE/code/business/Image-this\n\n需求：\n基于线上移动端反馈，重新规划 /workspace/scene 手机端交互：上传图片优先放到顶部，生成填写项尽量折叠，减少步骤和纵向滚动；下拉继续优先改为横向 pill/点选；保留高级设置但默认折叠，形成可执行改造计划后再实施。\n\n执行要求：\n- 以 task/doc 为主，不再依赖本地 task/context/state 文件。\n- 进度默认写评论，验收证据优先回填附件或评论。",
       "created_at": "2026-06-27T13:06:10+08:00",
-      "updated_at": "2026-06-27T14:08:00+08:00",
+      "updated_at": "2026-06-27T14:10:17+08:00",
       "completed_at": "2026-06-27T14:08:00+08:00",
       "start": {
         "timestamp": "2026-06-27T13:06:54+08:00",
@@ -289,6 +289,12 @@
           "content": "完成：/workspace/scene 移动端主流程已按 T7 方案上线实现。上传区置顶，移动端枚举切为横向 pill，更多产品信息和高级生成设置默认折叠，底部 CTA 改为紧凑单行，移动端全局 FAB 不遮挡。验证通过：tsc、lint、build；UI/UX mobile-scene-20260627-134613 5/5 PASS。\nCommit：https://github.com/GalaxyXieyu/Image-this/commit/0a19689ad91861650c4e5f582b45df28c20a3e79",
           "resource_id": "local-task-7f0c99a44480",
           "created_at": "2026-06-27T14:08:00+08:00"
+        },
+        {
+          "guid": "local-comment-5cacd1b3d038",
+          "content": "补充实际提交：本次 T7 移动端场景生成优化已提交为 40779f5 fix(mobile): streamline scene generation flow。此前 complete 自动附带的是执行时旧 HEAD 链接，以此条为准。",
+          "resource_id": "local-task-7f0c99a44480",
+          "created_at": "2026-06-27T14:10:17+08:00"
         }
       ],
       "tasklists": [
