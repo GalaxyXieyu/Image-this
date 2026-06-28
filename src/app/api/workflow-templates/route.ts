@@ -38,6 +38,34 @@ const updateWorkflowTemplateSchema = z.object({
 });
 
 /**
+ * 内置系统工作流模板（对齐 main 分支第一个组合「一键增强」：
+ * AI 换背景 → 智能扩图 → 高清放大 → 加水印）。
+ * 不入库：所有用户开箱即有、不可删除、可被嵌套引用；参数对齐 combo 的默认值。
+ */
+const SYSTEM_WORKFLOW_TEMPLATES = [
+  {
+    id: 'sys-one-click-enhance',
+    name: '一键增强',
+    description: '经典一键增强流水线：AI 换背景 → 智能扩图 → 高清放大 → 加水印',
+    category: '增强',
+    steps: [
+      { id: 'sys-s1', order: 1, type: 'background', name: 'AI 换背景', description: '智能替换背景，融合光影', params: { bgType: 'studio', featherEdge: 8, keepShadow: true } },
+      { id: 'sys-s2', order: 2, type: 'outpaint', name: '智能扩图', description: '智能扩展画布，补充画面内容', params: { direction: 'all', ratio: 25 } },
+      { id: 'sys-s3', order: 3, type: 'upscale', name: '高清放大', description: 'AI 超分辨率放大，提升清晰度', params: { factor: 2, denoise: 30 } },
+      { id: 'sys-s4', order: 4, type: 'watermark', name: '水印与尺寸', description: '添加品牌水印，调整输出尺寸', params: { content: '@品牌名', position: 'bottom-right', opacity: 70 } },
+    ] as WorkflowStep[],
+    globalParams: { batchCount: 10, aspectRatio: '1:1', resolution: '2k', watermarkEnabled: true, autoRetry: true },
+    tags: ['系统', '一键增强'],
+    usageCount: 0,
+    isDefault: true,
+    isSystem: true,
+    userId: 'system',
+    createdAt: new Date(0).toISOString(),
+    updatedAt: new Date(0).toISOString(),
+  },
+];
+
+/**
  * GET /api/workflow-templates
  * 获取用户的工作流模板列表
  * 查询参数:
@@ -90,7 +118,12 @@ export async function GET(request: NextRequest) {
       tags: t.tags ? JSON.parse(t.tags) : [],
     }));
 
-    return NextResponse.json({ templates: parsedTemplates });
+    // 前置内置系统模板（受 includeSystem 与 category 过滤约束）
+    const systemTemplates = includeSystem
+      ? SYSTEM_WORKFLOW_TEMPLATES.filter((t) => !category || t.category === category)
+      : [];
+
+    return NextResponse.json({ templates: [...systemTemplates, ...parsedTemplates] });
   } catch (error) {
     console.error('获取工作流模板失败:', error);
     return NextResponse.json(
