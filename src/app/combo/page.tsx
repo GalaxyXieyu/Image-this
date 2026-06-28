@@ -603,20 +603,22 @@ export default function ComboPage() {
 
       const global = { batchCount, aspectRatio, resolution, watermarkEnabled, autoRetry };
 
-      // 映射展开后的步骤为任务（均为可执行叶子步骤）
-      const tasks = expandedSteps.map((step) => {
-        // 此时 step.type 不应为 "workflow"，因为已经展开
-        const execType = step.type as ExecutableStepType;
-        const inputDataObj = {
-          ...JSON.parse(JSON.stringify(normalizeStepTaskInput(step, global))),
-          inputAsset: productAssets[0],
-        };
-        return {
-          type: TYPE_TO_API[execType],
-          inputData: JSON.stringify(inputDataObj),
-          totalSteps: 1,
-        };
-      });
+      // 按上传的每张商品图各跑一套工作流（多图即批量）
+      const tasks = productAssets.flatMap((asset) =>
+        expandedSteps.map((step) => {
+          // 此时 step.type 不应为 "workflow"，因为已经展开
+          const execType = step.type as ExecutableStepType;
+          const inputDataObj = {
+            ...JSON.parse(JSON.stringify(normalizeStepTaskInput(step, global))),
+            inputAsset: asset,
+          };
+          return {
+            type: TYPE_TO_API[execType],
+            inputData: JSON.stringify(inputDataObj),
+            totalSteps: 1,
+          };
+        })
+      );
 
       await apiPost("/api/tasks", tasks);
       window.location.href = "/tasks";
@@ -922,14 +924,6 @@ export default function ComboPage() {
                 })
               )}
             </div>
-            <Button
-              type="button"
-              onClick={() => setMobileStage("params")}
-              className="mt-4 h-12 w-full rounded-full bg-accent-gradient text-[14px] font-semibold text-white shadow-soft"
-            >
-              继续填写参数
-              <ChevronRight className="h-4 w-4" />
-            </Button>
           </section>
           )}
 
@@ -1007,20 +1001,11 @@ export default function ComboPage() {
           </section>
 
           <section className="mt-4">
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <h2 className="text-[15px] font-bold text-ink">步骤参数</h2>
-                <p className="hidden">
-                  系统按当前工作流汇总需要填写的参数
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setMobileStage("arrange")}
-                className="h-9 rounded-full bg-accent-gradient px-3 text-[12px] font-semibold text-white shadow-soft"
-              >
-                去编排
-              </button>
+            <div className="mb-3">
+              <h2 className="text-[15px] font-bold text-ink">步骤参数</h2>
+              <p className="hidden">
+                系统按当前工作流汇总需要填写的参数
+              </p>
             </div>
             <div className="grid gap-2">
               {steps.map((step) => {
@@ -1084,8 +1069,10 @@ export default function ComboPage() {
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <h2 className="text-[15px] font-bold text-ink">处理流水线</h2>
-                <p className="hidden">
-                  长按拖动排序，点击步骤可编辑参数
+                <p className="mt-0.5 text-[12px] text-ink-3">
+                  {productAssets.length > 0
+                    ? `共 ${productAssets.length} 张商品图 · 每张 ${steps.length} 步，将批量执行`
+                    : "请先在上一步上传商品图"}
                 </p>
               </div>
               <span className="rounded-full border border-line bg-surface px-2.5 py-1 text-[12px] font-semibold text-ink-2">
@@ -1379,28 +1366,50 @@ export default function ComboPage() {
         })()}
 
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface-glass px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+12px)] backdrop-blur-[18px] backdrop-saturate-150">
-          <div className="flex items-center gap-2">
+          {mobileStage === "workflow" && (
             <Button
-              onClick={() => setSaveTemplateOpen(true)}
-              variant="outline"
-              className="h-12 shrink-0 rounded-full border-line-strong bg-surface px-4 text-[13px] font-semibold"
+              onClick={() => setMobileStage("params")}
+              disabled={!selectedTemplate}
+              className="h-12 w-full rounded-full bg-accent-gradient px-5 text-[14px] font-semibold text-white shadow-float disabled:opacity-50"
             >
-              <Bookmark className="h-4 w-4" />
-              保存
+              下一步：填写参数
+              <ChevronRight className="h-4 w-4" />
             </Button>
+          )}
+          {mobileStage === "params" && (
             <Button
-              onClick={handleExecute}
-              disabled={executing || steps.length === 0}
-              className="h-12 flex-1 rounded-full bg-accent-gradient px-5 text-[14px] font-semibold text-white shadow-float disabled:opacity-50"
+              onClick={() => setMobileStage("arrange")}
+              disabled={productAssets.length === 0}
+              className="h-12 w-full rounded-full bg-accent-gradient px-5 text-[14px] font-semibold text-white shadow-float disabled:opacity-50"
             >
-              {executing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Play className="h-4 w-4" />
-              )}
-              {executing ? "提交中…" : "执行批量处理"}
+              下一步：编排流水线
+              <ChevronRight className="h-4 w-4" />
             </Button>
-          </div>
+          )}
+          {mobileStage === "arrange" && (
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => setSaveTemplateOpen(true)}
+                variant="outline"
+                className="h-12 shrink-0 rounded-full border-line-strong bg-surface px-4 text-[13px] font-semibold"
+              >
+                <Bookmark className="h-4 w-4" />
+                保存
+              </Button>
+              <Button
+                onClick={handleExecute}
+                disabled={executing || steps.length === 0 || productAssets.length === 0}
+                className="h-12 flex-1 rounded-full bg-accent-gradient px-5 text-[14px] font-semibold text-white shadow-float disabled:opacity-50"
+              >
+                {executing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
+                {executing ? "提交中…" : "执行批量处理"}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 

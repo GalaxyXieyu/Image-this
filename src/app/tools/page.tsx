@@ -4,7 +4,6 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
@@ -57,6 +56,7 @@ import {
   ListTodo,
   AlertCircle,
   ChevronDown,
+  Trash2,
   Image as ImageIcon,
 } from "lucide-react";
 
@@ -98,11 +98,10 @@ type ToolTaskStatus = "idle" | "queued" | WorkflowTaskSummary["status"];
 
 interface ToolDraftState {
   toolType: ToolType;
-  inputAsset?: InputAssetRef;
+  inputAssets: InputAssetRef[];
   referenceAsset?: InputAssetRef;
   watermarkLogoAsset?: InputAssetRef;
   parameters: ToolParameters;
-  batchMode: boolean;
   selectedPresetId?: string;
   activePresetName?: string;
   activePresetDescription?: string;
@@ -161,7 +160,7 @@ function createInitialDraft(presetId?: string, toolParam?: string): ToolDraftSta
         ...buildDefaultToolParameters(toolType),
         ...presetParams,
       } as ToolParameters,
-      batchMode: Boolean((preset.params as { batchMode?: boolean }).batchMode),
+      inputAssets: [],
       selectedPresetId: preset.id,
       activePresetName: preset.name,
       activePresetDescription: preset.description,
@@ -176,14 +175,14 @@ function createInitialDraft(presetId?: string, toolParam?: string): ToolDraftSta
     return {
       toolType,
       parameters: buildDefaultToolParameters(toolType),
-      batchMode: false,
+      inputAssets: [],
     };
   }
 
   return {
     toolType: "background_replace",
     parameters: buildDefaultToolParameters("background_replace"),
-    batchMode: false,
+    inputAssets: [],
   };
 }
 
@@ -304,7 +303,7 @@ function ToolboxPageInner() {
       const initialized = createInitialDraft(presetId, toolParam);
       return {
         ...initialized,
-        inputAsset: prev.inputAsset,
+        inputAssets: prev.inputAssets,
         referenceAsset: prev.referenceAsset ?? initialized.referenceAsset,
         watermarkLogoAsset: prev.watermarkLogoAsset ?? initialized.watermarkLogoAsset,
       };
@@ -347,21 +346,14 @@ function ToolboxPageInner() {
     }));
   };
 
-  const handleUploadAsset = async ({ role, file }: { role: "input" | "reference" | "logo"; file?: File }) => {
+  const handleUploadAsset = async ({ role, file }: { role: "reference" | "logo"; file?: File }) => {
     if (!file) return;
     try {
-      const result = await upload(
-        role === "input"
-          ? { input: file }
-          : role === "reference"
-            ? { reference: file }
-            : { watermarkLogo: file }
-      );
-      const asset = role === "input" ? result.inputAsset : role === "reference" ? result.referenceAsset : result.watermarkLogoAsset;
+      const result = await upload(role === "reference" ? { reference: file } : { watermarkLogo: file });
+      const asset = role === "reference" ? result.referenceAsset : result.watermarkLogoAsset;
       if (!asset) return;
       setDraft((prev) => ({
         ...prev,
-        inputAsset: role === "input" ? asset : prev.inputAsset,
         referenceAsset: role === "reference" ? asset : prev.referenceAsset,
         watermarkLogoAsset: role === "logo" ? asset : prev.watermarkLogoAsset,
       }));
@@ -375,24 +367,66 @@ function ToolboxPageInner() {
     }
   };
 
+  // 多张商品图上传：上传多张即批量处理，无需开关
+  const handleUploadInputAssets = async (files?: FileList | File[]) => {
+    const selectedFiles = Array.from(files ?? []);
+    if (selectedFiles.length === 0) return;
+    try {
+      const uploaded: InputAssetRef[] = [];
+      for (const file of selectedFiles) {
+        const result = await upload({ input: file });
+        if (result.inputAsset) uploaded.push(result.inputAsset);
+      }
+      if (uploaded.length === 0) return;
+      setDraft((prev) => ({ ...prev, inputAssets: [...prev.inputAssets, ...uploaded] }));
+      setRunState(EMPTY_RUN_STATE);
+    } catch (error) {
+      toast({
+        title: "上传失败",
+        description: error instanceof Error ? error.message : "请重新选择图片",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const removeInputAsset = (assetId: string) => {
+    setDraft((prev) => ({ ...prev, inputAssets: prev.inputAssets.filter((a) => a.assetId !== assetId) }));
+    setRunState(EMPTY_RUN_STATE);
+  };
+
   const handleCreateTask = async () => {
-    if (!draft.inputAsset) {
-      toast({ title: "请先上传图片", description: "工具任务需要一张输入图片。", variant: "destructive" });
+    if (draft.inputAssets.length === 0) {
+      toast({ title: "请先上传图片", description: "工具任务至少需要一张输入图片。", variant: "destructive" });
       return;
     }
 
+    const isBatch = draft.inputAssets.length > 1;
     setCreatingTask(true);
     try {
-      const request = buildToolLegacyTaskRequest({
-        toolType: draft.toolType,
-        inputAsset: draft.inputAsset,
-        referenceAsset: draft.referenceAsset,
-        watermarkLogoAsset: draft.watermarkLogoAsset,
-        parameters: draft.parameters,
-        selectedPresetId: draft.selectedPresetId,
-        batchMode: draft.batchMode,
-      });
-      const response = await apiPost<{ success: boolean; task: { id: string } }>("/api/tasks", request);
+      const requests = draft.inputAssets.map((inputAsset) =>
+        buildToolLegacyTaskRequest({
+          toolType: draft.toolType,
+          inputAsset,
+          referenceAsset: draft.referenceAsset,
+          watermarkLogoAsset: draft.watermarkLogoAsset,
+          parameters: draft.parameters,
+          selectedPresetId: draft.selectedPresetId,
+          batchMode: isBatch,
+        })
+      );
+
+      if (isBatch) {
+        // 多图即批量：一次创建多个任务，跳转任务中心查看进度
+        await apiPost("/api/tasks", requests);
+        toast({
+          title: "批量任务已创建",
+          description: `${TOOL_TYPE_LABELS[draft.toolType]} 已为 ${requests.length} 张图片入队。`,
+        });
+        window.location.href = "/tasks";
+        return;
+      }
+
+      const response = await apiPost<{ success: boolean; task: { id: string } }>("/api/tasks", requests[0]);
       setRunState({
         taskId: response.task.id,
         status: "queued",
@@ -415,18 +449,22 @@ function ToolboxPageInner() {
     }
   };
 
-  const resultPreviewUrl = runState.resultImageUrl ?? draft.inputAsset?.clientUrl;
+  const resultPreviewUrl = runState.resultImageUrl ?? draft.inputAssets[0]?.clientUrl;
   const isBusy = creatingTask || uploading || isPolling || runState.status === "processing" || runState.status === "pending" || runState.status === "queued";
   const taskActions = (
     <>
       <Button
         variant="gradient"
         className="min-h-11 w-full"
-        disabled={!draft.inputAsset || creatingTask || uploading}
+        disabled={draft.inputAssets.length === 0 || creatingTask || uploading}
         onClick={handleCreateTask}
       >
         {creatingTask ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
-        {creatingTask ? "创建中..." : "创建工具任务"}
+        {creatingTask
+          ? "创建中..."
+          : draft.inputAssets.length > 1
+            ? `批量处理 ${draft.inputAssets.length} 张`
+            : "创建工具任务"}
       </Button>
       <Button variant="outline" className="min-h-11 w-full" disabled={!runState.resultImageUrl} onClick={() => downloadImage(runState.resultImageUrl)}>
         <Download className="w-4 h-4 mr-2" />
@@ -483,30 +521,13 @@ function ToolboxPageInner() {
             }}
             trigger={<SheetTrigger label={selectedTool.label} icon={selectedTool.icon} />}
           />
-          <div className={cn("flex min-h-9 items-center gap-3", draft.activePresetName ? "justify-between" : "justify-end")}>
-            {draft.activePresetName && (
+          {draft.activePresetName && (
+            <div className="flex min-h-9 items-center">
               <span className="min-w-0 truncate text-[12px] text-ink-3">
                 模板：{draft.activePresetName}
               </span>
-            )}
-            <div className="flex min-h-9 shrink-0 items-center gap-2 rounded-full border border-line bg-surface px-3">
-              <Label className="cursor-pointer text-[12px] text-ink-2">批量</Label>
-              <Switch
-                checked={draft.batchMode}
-                onCheckedChange={(checked) => setDraft((prev) => ({ ...prev, batchMode: checked }))}
-              />
             </div>
-          </div>
-        </div>
-        {/* 工具切换由 AppShell 二级 nav 承担，此处不再重复，仅保留批量模式 toggle */}
-        <div className="hidden items-center gap-2 md:flex">
-          <div className="flex min-h-11 items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5">
-            <Label className="cursor-pointer text-caption text-ink-2">批量模式</Label>
-            <Switch
-              checked={draft.batchMode}
-              onCheckedChange={(checked) => setDraft((prev) => ({ ...prev, batchMode: checked }))}
-            />
-          </div>
+          )}
         </div>
       </div>
 
@@ -515,8 +536,18 @@ function ToolboxPageInner() {
           <div className="flex flex-col gap-3 p-4 md:gap-5 md:p-5">
             <section>
               <h3 className="mb-2 text-data font-semibold text-ink md:mb-3">输入素材</h3>
-              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => handleUploadAsset({ role: "input", file: event.target.files?.[0] })} />
-              {!draft.inputAsset ? (
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(event) => {
+                  void handleUploadInputAssets(event.target.files ?? undefined);
+                  event.currentTarget.value = "";
+                }}
+              />
+              {draft.inputAssets.length === 0 ? (
                 <button
                   type="button"
                   className="flex min-h-[104px] w-full items-center justify-center gap-3 rounded-[14px] border-[1.5px] border-dashed border-line-strong bg-surface p-4 text-left transition-all hover:border-brand hover:bg-brand-soft/30 md:min-h-0 md:flex-col md:p-7 md:text-center"
@@ -533,16 +564,38 @@ function ToolboxPageInner() {
                     <span className="block text-data font-semibold text-ink">
                       {uploading ? "上传中…" : "点击上传图片"}
                     </span>
-                    <span className="hidden text-[11px] text-ink-3 md:inline">上传多张即自动进入批量处理</span>
+                    <span className="block text-[11px] text-ink-3">支持多张，上传多张即批量处理</span>
                   </span>
                 </button>
               ) : (
                 <div className="flex flex-col gap-2.5 md:gap-3">
-                  <div className="flex aspect-[16/10] items-center justify-center overflow-hidden rounded-[14px] border border-line bg-surface md:aspect-square">
-                    <img src={draft.inputAsset.clientUrl} alt="输入图片" className="h-full w-full object-contain" />
+                  <div className="grid grid-cols-3 gap-2">
+                    {draft.inputAssets.map((asset, index) => (
+                      <div
+                        key={asset.assetId}
+                        className="group relative aspect-square overflow-hidden rounded-[12px] border border-line bg-surface-muted"
+                      >
+                        <img
+                          src={asset.clientUrl}
+                          alt={`输入图 ${index + 1}`}
+                          className="h-full w-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeInputAsset(asset.assetId)}
+                          className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-danger text-white shadow-soft opacity-0 transition-opacity group-hover:opacity-100"
+                          aria-label="移除"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                   <Button variant="ghost" size="sm" className="min-h-11 w-full text-ink-2" onClick={() => fileInputRef.current?.click()}>
-                    重新上传
+                    {draft.inputAssets.length > 1 ? `已选 ${draft.inputAssets.length} 张 · 添加更多` : "添加更多"}
                   </Button>
                 </div>
               )}
@@ -674,7 +727,7 @@ function ToolboxPageInner() {
 }
 
 type UpdateToolParameters = React.Dispatch<Partial<ToolParameters>>;
-type UploadToolAsset = React.Dispatch<{ role: "input" | "reference" | "logo"; file?: File }>;
+type UploadToolAsset = React.Dispatch<{ role: "reference" | "logo"; file?: File }>;
 
 function ModelAndResolutionFields({
   aiModel,
