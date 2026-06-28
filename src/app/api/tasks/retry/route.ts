@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getInternalWorkerUrl } from '@/lib/internal-worker-url';
 
 // 重试任务 - 支持单个和批量重试（包括已完成的任务）
 export async function POST(request: NextRequest) {
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
 
     // 自动触发任务处理器
     try {
-      await fetch(new URL('/api/tasks/worker', request.url).toString(), {
+      await fetch(getInternalWorkerUrl(request), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ batch: true })

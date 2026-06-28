@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { deleteImage } from '@/lib/storage';
 import { normalizeImageUrlForClient } from '@/lib/image-url';
 import { inferWorkflowTypeFromTask } from '@/lib/workbench/task-compat';
+import { getInternalWorkerUrl } from '@/lib/internal-worker-url';
 
 type TaskInputData = {
   inputAsset?: unknown;
@@ -157,7 +158,7 @@ function triggerWorkerAfterTaskCreation(request: NextRequest, taskIds: string[])
   const scopedTaskIds = taskIds.filter((id) => typeof id === 'string' && id.length > 0);
   if (scopedTaskIds.length === 0) return;
 
-  const workerUrl = new URL('/api/tasks/worker', request.url);
+  const workerUrl = getInternalWorkerUrl(request);
   const maxTasks = Math.max(1, scopedTaskIds.length);
 
   void fetch(workerUrl, {

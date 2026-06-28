@@ -13,6 +13,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { hasHandler, getHandlerByWorkflowType } from '@/lib/workbench/worker-handlers';
 import { adaptLegacyTaskToSummary } from '@/lib/workbench/api-contract';
+import { getInternalWorkerUrl } from '@/lib/internal-worker-url';
 import type {
   WorkflowType,
   ToolParameters,
@@ -266,7 +267,7 @@ function workflowTypeToLegacyType(workflowType: WorkflowType): string {
 }
 
 function triggerWorker(request: NextRequest) {
-  const workerUrl = new URL('/api/tasks/worker', request.url);
+  const workerUrl = getInternalWorkerUrl(request);
   void fetch(workerUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
