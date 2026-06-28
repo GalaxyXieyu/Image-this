@@ -1026,26 +1026,28 @@ export default function ComboPage() {
                 );
               })}
               {steps.length < 5 && (
-                <BottomSheetSelect
-                  options={getStepOptions(workflowTemplates, selectedTemplate)}
-                  value=""
-                  onChange={(value) => {
-                    if (typeof value === "string") {
-                      addStep(value);
+                <div className="aspect-square">
+                  <BottomSheetSelect
+                    options={getStepOptions(workflowTemplates, selectedTemplate)}
+                    value=""
+                    onChange={(value) => {
+                      if (typeof value === "string") {
+                        addStep(value);
+                      }
+                    }}
+                    title="选择处理步骤"
+                    trigger={
+                      <button
+                        type="button"
+                        className="flex h-full w-full flex-col items-center justify-center gap-1.5 rounded-[14px] border-2 border-dashed border-line-strong text-ink-2 transition-colors hover:border-brand hover:text-brand"
+                      >
+                        <Plus className="h-7 w-7" />
+                        <span className="text-[11px] font-semibold">添加</span>
+                      </button>
                     }
-                  }}
-                  title="选择处理步骤"
-                  trigger={
-                    <button
-                      type="button"
-                      className="flex aspect-square flex-col items-center justify-center gap-1 rounded-[14px] border-2 border-dashed border-line-strong text-ink-2 transition-colors hover:border-brand hover:text-brand"
-                    >
-                      <Plus className="h-5 w-5" />
-                      <span className="text-[11px] font-semibold">添加</span>
-                    </button>
-                  }
-                  onOpenChange={setAddStepOpen}
-                />
+                    onOpenChange={setAddStepOpen}
+                  />
+                </div>
               )}
             </div>
           </section>
@@ -1114,7 +1116,7 @@ export default function ComboPage() {
                         <p className="mt-2 text-[12px] text-danger">引用的工作流已失效，请在上方顺序条删除或重新选择</p>
                       )
                     ) : (
-                      <div className="mt-3 border-t border-line pt-3">
+                      <div className="mt-3 space-y-4 border-t border-line pt-3">
                         {step.type === "scene" && (
                           <SceneStepParams
                             params={step.params as SceneParams}
