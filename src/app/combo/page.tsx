@@ -291,12 +291,11 @@ const RESOLUTIONS = [
   { id: "4k", label: "4K · 超清" },
 ];
 
-type MobileWorkflowStage = "workflow" | "params" | "arrange";
+type MobileWorkflowStage = "workflow" | "params";
 
 const MOBILE_WORKFLOW_STAGES: { id: MobileWorkflowStage; label: string }[] = [
   { id: "workflow", label: "工作流" },
   { id: "params", label: "参数" },
-  { id: "arrange", label: "编排" },
 ];
 
 const SCENE_STYLE_LABELS: Record<string, string> = {
@@ -995,74 +994,9 @@ export default function ComboPage() {
           </section>
 
           <section className="mt-4">
-            <div className="mb-3">
-              <h2 className="text-[15px] font-bold text-ink">步骤参数</h2>
-              <p className="hidden">
-                系统按当前工作流汇总需要填写的参数
-              </p>
-            </div>
-            <div className="grid gap-2">
-              {steps.map((step) => {
-                const Icon = STEP_META[step.type].icon;
-                const isWorkflow = step.type === "workflow";
-                const refTemplate = isWorkflow
-                  ? workflowTemplates.find((t) => t.id === step.refTemplateId)
-                  : undefined;
-                const isRefInvalid = isWorkflow && !refTemplate;
-
-                return (
-                  <div
-                    key={step.id}
-                    className={cn(
-                      "glass-panel flex min-h-[76px] w-full items-center gap-3 rounded-[18px] p-3 text-left transition-all",
-                      isRefInvalid && "opacity-60"
-                    )}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (isWorkflow && refTemplate) {
-                          setPreviewingWorkflowId(step.refTemplateId!);
-                          setWorkflowPreviewOpen(true);
-                        } else if (!isWorkflow) {
-                          setSelectedStepId(step.id);
-                        }
-                      }}
-                      className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                    >
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-gradient text-[12px] font-bold text-white">
-                        {step.order}
-                      </span>
-                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-brand-soft text-brand">
-                        {isRefInvalid ? (
-                          <AlertTriangle className="h-5 w-5 text-danger" />
-                        ) : (
-                          <Icon className="h-5 w-5" />
-                        )}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[14px] font-semibold text-ink">
-                          {isRefInvalid ? `⚠ ${step.name}` : step.name}
-                        </span>
-                        <span className="mt-0.5 block truncate text-[12px] leading-4 text-ink-3">
-                          {isRefInvalid ? "引用已失效" : getStepParamSummary(step)}
-                        </span>
-                      </span>
-                    </button>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-ink-3" />
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-          </>
-          )}
-
-          {mobileStage === "arrange" && (
-          <section className="mt-1">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <h2 className="text-[15px] font-bold text-ink">处理流水线</h2>
+                <h2 className="text-[15px] font-bold text-ink">步骤参数</h2>
                 <p className="mt-0.5 text-[12px] text-ink-3">
                   {productAssets.length > 0
                     ? `共 ${productAssets.length} 张商品图 · 每张 ${steps.length} 步，将批量执行`
@@ -1186,6 +1120,7 @@ export default function ComboPage() {
               />
             </div>
           </section>
+          </>
           )}
         </div>
 
@@ -1371,16 +1306,6 @@ export default function ComboPage() {
             </Button>
           )}
           {mobileStage === "params" && (
-            <Button
-              onClick={() => setMobileStage("arrange")}
-              disabled={productAssets.length === 0}
-              className="h-12 w-full rounded-full bg-accent-gradient px-5 text-[14px] font-semibold text-white shadow-float disabled:opacity-50"
-            >
-              下一步：编排流水线
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          )}
-          {mobileStage === "arrange" && (
             <div className="flex items-center gap-2">
               <Button
                 onClick={() => setSaveTemplateOpen(true)}
