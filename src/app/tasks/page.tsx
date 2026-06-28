@@ -335,7 +335,7 @@ export default function TasksPage() {
           )}
 
           {!loading && !error && filteredTasks.length === 0 && (
-            <div className="glass-panel rounded-card shadow-soft py-16">
+            <div className="py-16">
               <BrandEmptyState
                 pose="sleep"
                 title="暂无任务"
