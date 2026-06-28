@@ -54,7 +54,7 @@ const SYSTEM_WORKFLOW_TEMPLATES = [
       { id: 'sys-s3', order: 3, type: 'upscale', name: '高清放大', description: 'AI 超分辨率放大，提升清晰度', params: { factor: 2, denoise: 30 } },
       { id: 'sys-s4', order: 4, type: 'watermark', name: '水印与尺寸', description: '添加品牌水印，调整输出尺寸', params: { content: '@品牌名', position: 'bottom-right', opacity: 70 } },
     ] as WorkflowStep[],
-    globalParams: { batchCount: 10, aspectRatio: '1:1', resolution: '2k', watermarkEnabled: true, autoRetry: true },
+    globalParams: { aspectRatio: '1:1', resolution: '2k', watermarkEnabled: true, autoRetry: true },
     tags: ['系统', '一键增强'],
     usageCount: 0,
     isDefault: true,

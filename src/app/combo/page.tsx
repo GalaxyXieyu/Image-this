@@ -356,7 +356,6 @@ interface PostWorkflowTemplateResponse {
 function normalizeStepTaskInput(
   step: WorkflowStep,
   global: {
-    batchCount: number;
     aspectRatio: string;
     resolution: string;
     watermarkEnabled: boolean;
@@ -476,7 +475,6 @@ export default function ComboPage() {
   const [rightCollapsed, setRightCollapsed] = useState(false);
 
   // Runtime settings
-  const [batchCount, setBatchCount] = useState(10);
   const [aspectRatio, setAspectRatio] = useState("1:1");
   const [resolution, setResolution] = useState("2k");
   const [watermarkEnabled, setWatermarkEnabled] = useState(true);
@@ -601,7 +599,7 @@ export default function ComboPage() {
         return;
       }
 
-      const global = { batchCount, aspectRatio, resolution, watermarkEnabled, autoRetry };
+      const global = { aspectRatio, resolution, watermarkEnabled, autoRetry };
 
       // 按上传的每张商品图各跑一套工作流（多图即批量）
       const tasks = productAssets.flatMap((asset) =>
@@ -642,7 +640,6 @@ export default function ComboPage() {
         category: templateSaveData.category || undefined,
         steps: steps,
         globalParams: {
-          batchCount,
           aspectRatio,
           resolution,
           watermarkEnabled,
@@ -668,7 +665,6 @@ export default function ComboPage() {
     const template = workflowTemplates.find((t) => t.id === templateId);
     if (template) {
       setSteps(template.steps);
-      setBatchCount(template.globalParams?.batchCount ?? 10);
       setAspectRatio(template.globalParams?.aspectRatio ?? "1:1");
       setResolution(template.globalParams?.resolution ?? "2k");
       setWatermarkEnabled(template.globalParams?.watermarkEnabled ?? true);
@@ -987,8 +983,6 @@ export default function ComboPage() {
           <section className="mt-4 glass-panel rounded-[20px]">
             <MobileGlobalSettings
               selectedTemplateName={selectedTemplateName}
-              batchCount={batchCount}
-              setBatchCount={setBatchCount}
               aspectRatio={aspectRatio}
               setAspectRatio={setAspectRatio}
               resolution={resolution}
@@ -1776,8 +1770,6 @@ export default function ComboPage() {
                     ? templates.find((t) => t.id === selectedTemplate)?.name ?? null
                     : null
                 }
-                batchCount={batchCount}
-                setBatchCount={setBatchCount}
                 aspectRatio={aspectRatio}
                 setAspectRatio={setAspectRatio}
                 resolution={resolution}
@@ -1800,8 +1792,6 @@ export default function ComboPage() {
 function GlobalSettingsPanel({
   onCollapse,
   selectedTemplateName,
-  batchCount,
-  setBatchCount,
   aspectRatio,
   setAspectRatio,
   resolution,
@@ -1813,8 +1803,6 @@ function GlobalSettingsPanel({
 }: {
   onCollapse: () => void;
   selectedTemplateName: string | null;
-  batchCount: number;
-  setBatchCount: (_count: number) => void;
   aspectRatio: string;
   setAspectRatio: (_value: string) => void;
   resolution: string;
@@ -1851,19 +1839,6 @@ function GlobalSettingsPanel({
             {selectedTemplateName ? "已加载该模板的步骤和参数" : "从左侧选择一个工作流模板"}
           </p>
         </div>
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <Label className="text-caption font-medium text-ink-3">批量数量</Label>
-        <Input
-          type="number"
-          min={1}
-          max={100}
-          value={batchCount}
-          onChange={(e) => setBatchCount(Number(e.target.value))}
-          className="h-9 rounded-[11px]"
-        />
-        <p className="hidden text-[11px] text-ink-3 md:block">单次最多处理 100 张图片</p>
       </section>
 
       <section className="flex flex-col gap-2">
@@ -1924,8 +1899,6 @@ function GlobalSettingsPanel({
 
 function MobileGlobalSettings({
   selectedTemplateName,
-  batchCount,
-  setBatchCount,
   aspectRatio,
   setAspectRatio,
   resolution,
@@ -1936,8 +1909,6 @@ function MobileGlobalSettings({
   setAutoRetry,
 }: {
   selectedTemplateName: string | null;
-  batchCount: number;
-  setBatchCount: (_count: number) => void;
   aspectRatio: string;
   setAspectRatio: (_value: string) => void;
   resolution: string;
@@ -1949,32 +1920,24 @@ function MobileGlobalSettings({
 }) {
   return (
     <div className="flex flex-col gap-3 p-4">
-      <div className="flex items-center gap-2">
-        <Settings2 className="h-4 w-4 text-brand" />
-        <span className="text-[15px] font-bold text-ink">全局执行设置</span>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Settings2 className="h-4 w-4 text-brand" />
+          <span className="text-[15px] font-bold text-ink">全局执行设置</span>
+        </div>
+        <span className="min-w-0 truncate text-[12px] text-ink-3">
+          {selectedTemplateName ?? "未选择模板"}
+        </span>
       </div>
 
-      <section className="grid grid-cols-2 gap-3">
-        <div className="flex flex-col gap-2">
-          <FieldLabel>{selectedTemplateName ?? "未选择模板"}</FieldLabel>
-          <Input
-            type="number"
-            min={1}
-            max={100}
-            value={batchCount}
-            onChange={(e) => setBatchCount(Number(e.target.value))}
-            className="h-11 rounded-[12px]"
-          />
-        </div>
-        <div className="flex flex-col gap-2">
-          <FieldLabel>输出清晰度</FieldLabel>
-          <ChipGroup
-            value={resolution}
-            onChange={setResolution}
-            options={RESOLUTIONS}
-            cols={3}
-          />
-        </div>
+      <section className="flex flex-col gap-2">
+        <FieldLabel>输出清晰度</FieldLabel>
+        <ChipGroup
+          value={resolution}
+          onChange={setResolution}
+          options={RESOLUTIONS}
+          cols={3}
+        />
       </section>
 
       <section className="flex flex-col gap-2">
