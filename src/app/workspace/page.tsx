@@ -15,7 +15,7 @@ const TOOLS = [
 ];
 
 const SCENE_PREVIEW_COUNT = 4;
-const WORKFLOW_PREVIEW_COUNT = 3;
+const WORKFLOW_PREVIEW_COUNT = 4;
 
 interface WorkflowTemplate {
   id: string;
@@ -46,23 +46,32 @@ function SectionHeader({ title, moreHref }: { title: string; moreHref: string })
   );
 }
 
+const WORKFLOW_PLACEHOLDER = "/scene-presets/scene-minimal.webp";
+
 export default function WorkbenchHubPage() {
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
+  const [latestImage, setLatestImage] = useState<string | null>(null);
 
   useEffect(() => {
     apiGet<{ templates: WorkflowTemplate[] }>("/api/workflow-templates")
       .then((res) => setTemplates(res.templates || []))
       .catch(() => setTemplates([]));
+    // 最新生成图：作为工作流卡片默认封面
+    apiGet<{ images: Array<{ processedUrl?: string | null; thumbnailUrl?: string | null }> }>(
+      "/api/images?limit=1&status=COMPLETED&includeFullSize=true"
+    )
+      .then((res) => {
+        const first = res.images?.[0];
+        setLatestImage(first?.processedUrl || first?.thumbnailUrl || null);
+      })
+      .catch(() => setLatestImage(null));
   }, []);
+
+  const workflowCover = latestImage || WORKFLOW_PLACEHOLDER;
 
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto w-full max-w-3xl px-4 py-5 md:px-6 md:py-8">
-        <div className="mb-5">
-          <h1 className="font-serif text-[26px] leading-tight tracking-tight text-ink md:text-h2">工作台</h1>
-          <p className="mt-1 text-data text-ink-2">选择一个能力开始创作</p>
-        </div>
-
         {/* 场景功能：直接铺场景风格卡片，点击进第二步 */}
         <section className="mb-6">
           <SectionHeader title="场景生成" moreHref="/workspace/scene" />
@@ -88,7 +97,7 @@ export default function WorkbenchHubPage() {
         {/* 工作流：铺工作流模板卡片，点击进参数步 */}
         <section className="mb-6">
           <SectionHeader title="工作流" moreHref="/combo" />
-          <div className="flex flex-col gap-2.5">
+          <div className="grid grid-cols-2 gap-3">
             {(templates.length > 0
               ? templates.slice(0, WORKFLOW_PREVIEW_COUNT)
               : [{ id: "__empty", name: "组合工作流", description: "多步骤链式流水线，一键批量处理", steps: [] }]
@@ -96,19 +105,21 @@ export default function WorkbenchHubPage() {
               <Link
                 key={t.id}
                 href={t.id === "__empty" ? "/combo" : `/combo?template=${t.id}&stage=params`}
-                className="glass-panel flex items-center gap-3.5 rounded-[18px] p-3.5 shadow-soft transition-transform hover:-translate-y-0.5"
+                className="glass-panel overflow-hidden rounded-[16px] shadow-soft transition-transform hover:-translate-y-0.5"
               >
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] bg-brand-soft text-brand">
-                  <Layers className="h-6 w-6" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px] font-bold text-ink">{t.name}</span>
-                  <span className="mt-0.5 block truncate text-[12px] text-ink-3">
-                    {t.steps.length > 0 ? `${t.steps.length} 步 · ` : ""}
-                    {t.description || "多步骤链式流水线"}
+                <div className="relative aspect-square overflow-hidden bg-surface-muted">
+                  <SceneThumb src={workflowCover} alt={t.name} />
+                  <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+                    <Layers className="h-3 w-3" />
+                    {t.steps.length > 0 ? `${t.steps.length} 步` : "工作流"}
                   </span>
-                </span>
-                <ChevronRight className="h-5 w-5 shrink-0 text-ink-3" />
+                </div>
+                <div className="px-2.5 py-2">
+                  <p className="truncate text-[13px] font-semibold text-ink">{t.name}</p>
+                  <p className="mt-0.5 truncate text-[11px] text-ink-3">
+                    {t.description || "多步骤链式流水线"}
+                  </p>
+                </div>
               </Link>
             ))}
           </div>

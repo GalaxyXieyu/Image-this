@@ -882,20 +882,17 @@ export default function SettingsPage() {
                   </button>
                 );
               })}
-              {/* 新增 Provider 卡 */}
-              {providerCount < 3 && (
-                <button
-                  onClick={() => {
-                    // 找到第一个未配置的 provider
-                    const empty = providerIds.find((p) => (providerModels[p] ?? []).length === 0);
-                    if (empty) setModalProvider(empty);
-                  }}
-                  className="flex min-h-[140px] flex-col items-center justify-center gap-2 rounded-[16px] border-2 border-dashed border-border/60 bg-transparent text-ink-3 transition-colors hover:border-brand hover:text-brand-text"
-                >
-                  <Plus className="h-6 w-6" />
-                  <span className="text-[13px] font-medium">新增 Provider</span>
-                </button>
-              )}
+              {/* 新增模型卡：常驻。优先打开未配置的 Provider，否则进入已有 Provider 继续加模型 */}
+              <button
+                onClick={() => {
+                  const empty = providerIds.find((p) => (providerModels[p] ?? []).length === 0);
+                  setModalProvider(empty || providerIds[0]);
+                }}
+                className="flex min-h-[140px] flex-col items-center justify-center gap-2 rounded-[16px] border-2 border-dashed border-border/60 bg-transparent text-ink-3 transition-colors hover:border-brand hover:text-brand-text"
+              >
+                <Plus className="h-6 w-6" />
+                <span className="text-[13px] font-medium">新增模型</span>
+              </button>
             </div>
 
             {flatModels.length === 0 && (
