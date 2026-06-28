@@ -32,6 +32,7 @@ import {
   Trash2,
   GripVertical,
   X,
+  Search,
   Plus,
   Play,
   Bookmark,
@@ -198,6 +199,15 @@ const STEP_META: Record<
   outpaint: { icon: Expand, name: "智能扩图", description: "智能扩展画布，补充画面内容" },
   workflow: { icon: Layers, name: "嵌入工作流", description: "把一个已保存的工作流作为一步" },
 };
+
+const WORKFLOW_COVERS = [
+  "from-violet-500 to-fuchsia-500",
+  "from-sky-500 to-cyan-400",
+  "from-amber-400 to-orange-500",
+  "from-emerald-400 to-teal-500",
+  "from-rose-400 to-pink-500",
+  "from-indigo-500 to-blue-500",
+];
 
 function getStepOptions(
   workflowTemplates: WorkflowTemplateType[],
@@ -393,6 +403,7 @@ function toOutputResolution(resolution: string) {
 export default function ComboPage() {
   const [workflowTemplates, setWorkflowTemplates] = useState<WorkflowTemplateType[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [templateSearch, setTemplateSearch] = useState("");
   const [steps, setSteps] = useState<WorkflowStep[]>(INITIAL_STEPS);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const { toast } = useToast();
@@ -786,80 +797,111 @@ export default function ComboPage() {
 
           {mobileStage === "workflow" && (
           <section className="glass-panel rounded-[20px] p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-[15px] font-bold text-ink">工作流模板</h2>
-                <p className="hidden">
-                  选已有工作流或新建空白
-                </p>
-              </div>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-[15px] font-bold text-ink">工作流模板</h2>
               {selectedTemplate && (
                 <span className="shrink-0 rounded-full bg-brand-soft px-2.5 py-1 text-[12px] font-semibold text-brand-text">
                   已选
                 </span>
               )}
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              {templates.length === 0 ? (
-                <p className="col-span-2 text-[13px] text-ink-3">暂无工作流模板，开始新建吧</p>
-              ) : (
-                templates.map((tpl) => {
-                  const active = selectedTemplate === tpl.id;
-                  return (
-                    <div
-                      key={tpl.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => {
-                        setSelectedTemplate(tpl.id);
-                        handleLoadTemplate(tpl.id);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
+
+            {/* 搜索 */}
+            <div className="relative mb-3">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-3" />
+              <input
+                value={templateSearch}
+                onChange={(e) => setTemplateSearch(e.target.value)}
+                placeholder="搜索工作流模板…"
+                className="h-10 w-full rounded-full border border-line bg-surface pl-9 pr-3 text-[13px] text-ink outline-none placeholder:text-ink-3 focus:border-brand"
+              />
+            </div>
+
+            {/* 封面卡片列表，可向下滚动 */}
+            {(() => {
+              const q = templateSearch.trim().toLowerCase();
+              const list = q ? templates.filter((t) => t.name.toLowerCase().includes(q)) : templates;
+              if (list.length === 0) {
+                return (
+                  <p className="py-6 text-center text-[13px] text-ink-3">
+                    {q ? "没有匹配的工作流" : "暂无工作流模板，开始新建吧"}
+                  </p>
+                );
+              }
+              return (
+                <div className="flex flex-col gap-3">
+                  {list.map((tpl, idx) => {
+                    const active = selectedTemplate === tpl.id;
+                    const cover = WORKFLOW_COVERS[idx % WORKFLOW_COVERS.length];
+                    return (
+                      <div
+                        key={tpl.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
                           setSelectedTemplate(tpl.id);
                           handleLoadTemplate(tpl.id);
-                        }
-                      }}
-                      className={cn(
-                        "relative flex min-h-[116px] cursor-pointer flex-col justify-between gap-3 rounded-[18px] border p-3 text-left transition-all",
-                        active
-                          ? "border-brand bg-brand-soft shadow-soft"
-                          : "border-line bg-surface hover:border-brand/40"
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-brand-soft text-brand">
-                          <Layers className="h-5 w-5" />
-                        </span>
-                        <span className="rounded-full bg-surface-muted px-2 py-1 text-[11px] font-semibold text-ink-3">
-                          {tpl.steps.length} 步
-                        </span>
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setSelectedTemplate(tpl.id);
+                            handleLoadTemplate(tpl.id);
+                          }
+                        }}
+                        className={cn(
+                          "relative cursor-pointer overflow-hidden rounded-[18px] border bg-surface text-left transition-all",
+                          active ? "border-brand ring-2 ring-brand" : "border-line hover:border-brand/40"
+                        )}
+                      >
+                        {/* 封面：渐变 + 步骤图标流水线预览 */}
+                        <div className={cn("relative flex h-24 items-center gap-0.5 overflow-hidden bg-gradient-to-br px-4", cover)}>
+                          {tpl.steps.slice(0, 5).map((s, i) => {
+                            const StepIcon = STEP_META[s.type]?.icon ?? Layers;
+                            return (
+                              <span key={s.id ?? i} className="flex items-center">
+                                {i > 0 && <span className="mx-0.5 text-white/60">›</span>}
+                                <span className="flex h-9 w-9 items-center justify-center rounded-[12px] bg-white/20 text-white backdrop-blur-sm">
+                                  <StepIcon className="h-5 w-5" />
+                                </span>
+                              </span>
+                            );
+                          })}
+                          <span className="absolute right-3 top-3 rounded-full bg-black/25 px-2 py-0.5 text-[11px] font-semibold text-white backdrop-blur-sm">
+                            {tpl.steps.length} 步
+                          </span>
+                          {active && (
+                            <span className="absolute bottom-3 right-3 rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-brand">
+                              已选
+                            </span>
+                          )}
+                        </div>
+                        {/* 内容 */}
+                        <div className="flex items-center justify-between gap-2 px-4 py-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-[15px] font-bold text-ink">{tpl.name}</p>
+                            <p className="mt-0.5 text-[12px] text-ink-3">{tpl.isSystem ? "系统模板" : "自定义模板"}</p>
+                          </div>
+                          {!tpl.isSystem && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteTemplate(tpl.id);
+                              }}
+                              className="shrink-0 text-ink-3 hover:text-danger"
+                              aria-label="删除模板"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <span className="block text-[14px] font-semibold leading-5 text-ink">{tpl.name}</span>
-                        <span className="mt-1 block text-[12px] text-ink-3">
-                          {tpl.isSystem ? "系统模板" : "自定义模板"}
-                        </span>
-                      </div>
-                      {!tpl.isSystem && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteTemplate(tpl.id);
-                          }}
-                          className="absolute right-3 top-14 text-ink-3 hover:text-danger"
-                          aria-label="删除模板"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </section>
           )}
 
@@ -960,7 +1002,7 @@ export default function ComboPage() {
                       onPointerMove={moveStepDragPointer}
                       onPointerUp={endStepDrag}
                       onPointerCancel={endStepDrag}
-                      className="absolute left-0.5 top-0.5 flex h-6 w-6 touch-none items-center justify-center rounded-full text-ink-3 active:bg-surface-muted"
+                      className="absolute left-1 top-1 flex h-5 w-5 touch-none items-center justify-center rounded-full text-ink-3/60 active:bg-surface-muted"
                     >
                       <GripVertical className="h-3.5 w-3.5" />
                     </button>
@@ -968,16 +1010,15 @@ export default function ComboPage() {
                       type="button"
                       aria-label={`删除 ${step.name}`}
                       onClick={() => removeStep(step.id)}
-                      className="absolute right-0.5 top-0.5 flex h-6 w-6 items-center justify-center rounded-full text-ink-3 hover:text-danger"
+                      className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full text-ink-3/60 hover:text-danger"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
-                    <span className="relative mt-1.5 flex h-9 w-9 items-center justify-center rounded-[12px] bg-brand-soft text-brand">
-                      {isRefInvalid ? <AlertTriangle className="h-5 w-5 text-danger" /> : <Icon className="h-5 w-5" />}
-                      <span className="absolute -left-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent-gradient text-[10px] font-bold text-white">
-                        {step.order}
-                      </span>
-                    </span>
+                    {isRefInvalid ? (
+                      <AlertTriangle className="mt-1 h-7 w-7 text-danger" />
+                    ) : (
+                      <Icon className="mt-1 h-7 w-7 text-brand" />
+                    )}
                     <span className="px-0.5 text-center text-[11px] font-medium leading-tight text-ink">
                       {isRefInvalid ? `⚠ ${step.name}` : step.name}
                     </span>
@@ -1043,17 +1084,15 @@ export default function ComboPage() {
                     key={step.id}
                     className={cn("glass-panel w-full rounded-[18px] p-3", isRefInvalid && "opacity-60")}
                   >
-                    <div className="flex items-center gap-2.5">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-gradient text-[12px] font-bold text-white">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[12px] font-bold text-brand">
                         {step.order}
                       </span>
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-brand-soft text-brand">
-                        {isRefInvalid ? (
-                          <AlertTriangle className="h-4.5 w-4.5 text-danger" />
-                        ) : (
-                          <Icon className="h-4.5 w-4.5" />
-                        )}
-                      </span>
+                      {isRefInvalid ? (
+                        <AlertTriangle className="h-4 w-4 shrink-0 text-danger" />
+                      ) : (
+                        <Icon className="h-4 w-4 shrink-0 text-brand" />
+                      )}
                       <span className="min-w-0 flex-1 text-[14px] font-semibold text-ink">
                         {isRefInvalid ? `⚠ ${step.name}` : step.name}
                       </span>
