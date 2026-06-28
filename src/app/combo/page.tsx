@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useCallback, useMemo, useRef, useState, useEffect, type PointerEvent } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -18,6 +18,7 @@ import {
 import { BottomSheetSelect, type BottomSheetSelectOption } from "@/components/workbench/BottomSheetSelect";
 import { useIsMobile } from "@/lib/use-is-mobile";
 import { useUpload } from "@/lib/use-upload";
+import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 import { apiPost, apiGet } from "@/lib/api-client";
 import type { InputAssetRef } from "@/types/workbench";
@@ -144,7 +145,21 @@ type ExecutableStepType = Exclude<StepType, "workflow">;
 interface SceneParams { sceneStyle: string; candidateCount: number }
 interface BackgroundParams { bgType: string; featherEdge: number; keepShadow: boolean; referenceAsset?: InputAssetRef }
 interface UpscaleParams { factor: number; denoise: number }
-interface WatermarkParams { content: string; position: string; opacity: number }
+type WatermarkPresetPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center";
+
+interface WatermarkCustomPosition {
+  x: number;
+  y: number;
+  editorWidth: number;
+  editorHeight: number;
+}
+
+interface WatermarkParams {
+  content: string;
+  position: WatermarkPresetPosition | "custom";
+  opacity: number;
+  customPosition?: WatermarkCustomPosition;
+}
 interface OutpaintParams { direction: string; ratio: number }
 interface WorkflowParams {} // workflow 步无参数
 
@@ -336,7 +351,10 @@ function normalizeStepTaskInput(
       ...baseInput,
       watermarkType: "text",
       watermarkText: watermarkParams.content,
-      watermarkPosition: watermarkParams.position,
+      watermarkPosition:
+        watermarkParams.position === "custom"
+          ? watermarkParams.customPosition ?? "bottom-right"
+          : watermarkParams.position,
       watermarkOpacity: watermarkParams.opacity / 100,
       outputResolution: toOutputResolution(global.resolution),
     };
@@ -380,6 +398,8 @@ export default function ComboPage() {
   const [steps, setSteps] = useState<WorkflowStep[]>(INITIAL_STEPS);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const isMobile = useIsMobile();
+  const { toast } = useToast();
+  const { upload, uploading } = useUpload();
 
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
@@ -391,6 +411,11 @@ export default function ComboPage() {
   const [watermarkEnabled, setWatermarkEnabled] = useState(true);
   const [autoRetry, setAutoRetry] = useState(true);
   const [executing, setExecuting] = useState(false);
+
+  // Product upload
+  const [productAssets, setProductAssets] = useState<InputAssetRef[]>([]);
+  const [uploadingProductAssets, setUploadingProductAssets] = useState(false);
+  const productInputRef = useRef<HTMLInputElement>(null);
 
   // Add step drawer
   const [addStepOpen, setAddStepOpen] = useState(false);
@@ -418,6 +443,42 @@ export default function ComboPage() {
     loadTemplates();
   }, []);
 
+  const handleUploadProductAssets = async (files?: FileList | File[]) => {
+    const selectedFiles = Array.from(files ?? []);
+    if (selectedFiles.length === 0) return;
+
+    const uploadedAssets: InputAssetRef[] = [];
+    setUploadingProductAssets(true);
+    try {
+      for (const file of selectedFiles) {
+        const response = await upload({ input: file });
+        if (response.inputAsset) {
+          uploadedAssets.push(response.inputAsset);
+        }
+      }
+
+      if (uploadedAssets.length > 0) {
+        setProductAssets((prev) => [...prev, ...uploadedAssets]);
+        toast({
+          title: "上传成功",
+          description: `已添加 ${uploadedAssets.length} 张商品图`,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "上传失败",
+        description: error instanceof Error ? error.message : "请稍后重试",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingProductAssets(false);
+    }
+  };
+
+  const removeProductAsset = (assetId: string) => {
+    setProductAssets((prev) => prev.filter((asset) => asset.assetId !== assetId));
+  };
+
   const templates = workflowTemplates;
   const selectedStep = useMemo(
     () => steps.find((s) => s.id === selectedStepId) ?? null,
@@ -426,6 +487,10 @@ export default function ComboPage() {
 
   const handleExecute = async () => {
     if (steps.length === 0) return;
+    if (productAssets.length === 0) {
+      alert("请先上传商品图片");
+      return;
+    }
     setExecuting(true);
     try {
       // 重新获取最新的工作流模板（确保"实时引用"）
@@ -463,9 +528,13 @@ export default function ComboPage() {
       const tasks = expandedSteps.map((step) => {
         // 此时 step.type 不应为 "workflow"，因为已经展开
         const execType = step.type as ExecutableStepType;
+        const inputDataObj = {
+          ...JSON.parse(JSON.stringify(normalizeStepTaskInput(step, global))),
+          inputAsset: productAssets[0],
+        };
         return {
           type: TYPE_TO_API[execType],
-          inputData: JSON.stringify(normalizeStepTaskInput(step, global)),
+          inputData: JSON.stringify(inputDataObj),
           totalSteps: 1,
         };
       });
@@ -608,6 +677,17 @@ export default function ComboPage() {
 
   return (
     <div className="relative h-full flex flex-col bg-background">
+      <input
+        ref={productInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(event) => {
+          void handleUploadProductAssets(event.target.files ?? undefined);
+          event.currentTarget.value = "";
+        }}
+      />
       <div className="flex min-h-0 flex-1 flex-col md:hidden">
         <div className="flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+104px)] pt-3">
           <section className="glass-panel rounded-[20px] p-4">
@@ -691,10 +771,48 @@ export default function ComboPage() {
                   作为流水线输入，稍后会进入任务队列
                 </p>
               </div>
-              <Button className="h-11 shrink-0 rounded-[12px] bg-accent-gradient px-4 text-[13px] font-semibold text-white">
+              <Button
+                onClick={() => productInputRef.current?.click()}
+                disabled={uploading || uploadingProductAssets}
+                className="h-11 shrink-0 rounded-[12px] bg-accent-gradient px-4 text-[13px] font-semibold text-white disabled:opacity-50"
+              >
                 选择
               </Button>
             </div>
+            {productAssets.length > 0 && (
+              <div className="mt-3 flex flex-col gap-2">
+                <p className="text-[12px] font-semibold text-ink-2">
+                  已选 {productAssets.length} 张
+                </p>
+                <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                  {productAssets.map((asset, index) => (
+                    <div
+                      key={asset.assetId}
+                      className="group relative w-20 shrink-0 overflow-hidden rounded-[10px] border border-line bg-surface-muted"
+                    >
+                      <div className="aspect-square bg-surface-muted">
+                        <img
+                          src={asset.clientUrl}
+                          alt={`商品图 ${index + 1}`}
+                          className="h-full w-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeProductAsset(asset.assetId)}
+                        className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-danger text-white shadow-soft opacity-0 transition-opacity group-hover:opacity-100"
+                        aria-label="移除"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
 
           <section className="mt-4">
@@ -880,6 +998,7 @@ export default function ComboPage() {
                 {selectedStep.type === "watermark" && (
                   <WatermarkStepParams
                     params={selectedStep.params as WatermarkParams}
+                    aspectRatio={aspectRatio}
                     onChange={(patch) => updateStepParams(selectedStep.id, patch)}
                   />
                 )}
@@ -1133,19 +1252,59 @@ export default function ComboPage() {
           <div className="flex-1 overflow-y-auto px-8 pb-24 pt-6">
             <div className="mx-auto flex max-w-[640px] flex-col gap-4">
               {/* Input area */}
-              <div className="glass-panel flex items-center gap-3 rounded-[18px] p-4">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-brand-soft text-brand">
-                  <Upload className="h-5 w-5" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[14px] font-bold text-ink">上传商品图片</p>
-                  <p className="mt-0.5 text-[12px] text-ink-3">
-                    拖入或点击上传，支持批量 · 作为流水线输入
-                  </p>
+              <div className="glass-panel flex flex-col gap-3 rounded-[18px] p-4">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-brand-soft text-brand">
+                    <Upload className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[14px] font-bold text-ink">上传商品图片</p>
+                    <p className="mt-0.5 text-[12px] text-ink-3">
+                      拖入或点击上传，支持批量 · 作为流水线输入
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => productInputRef.current?.click()}
+                    disabled={uploading || uploadingProductAssets}
+                    className="h-8 rounded-[10px] bg-accent-gradient px-3.5 text-[13px] font-semibold text-white disabled:opacity-50"
+                  >
+                    选择文件
+                  </Button>
                 </div>
-                <Button className="h-8 rounded-[10px] bg-accent-gradient px-3.5 text-[13px] font-semibold text-white">
-                  选择文件
-                </Button>
+                {productAssets.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-[12px] font-semibold text-ink-2">
+                      已选 {productAssets.length} 张
+                    </p>
+                    <div className="grid grid-cols-5 gap-2">
+                      {productAssets.map((asset, index) => (
+                        <div
+                          key={asset.assetId}
+                          className="group relative overflow-hidden rounded-[10px] border border-line bg-surface-muted"
+                        >
+                          <div className="aspect-square bg-surface-muted">
+                            <img
+                              src={asset.clientUrl}
+                              alt={`商品图 ${index + 1}`}
+                              className="h-full w-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.style.display = "none";
+                              }}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeProductAsset(asset.assetId)}
+                            className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-danger text-white shadow-soft opacity-0 transition-opacity group-hover:opacity-100"
+                            aria-label="移除"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Separator label */}
@@ -1354,6 +1513,7 @@ export default function ComboPage() {
                 onClose={() => setSelectedStepId(null)}
                 onCollapse={() => setRightCollapsed(true)}
                 onChange={(patch) => updateStepParams(selectedStep.id, patch)}
+                aspectRatio={aspectRatio}
               />
             ) : (
               <GlobalSettingsPanel
@@ -1604,10 +1764,12 @@ function MobileStepSettings({
   step,
   onClose,
   onChange,
+  aspectRatio,
 }: {
   step: WorkflowStep;
   onClose: () => void;
   onChange: (_patch: Partial<StepParams["params"]>) => void;
+  aspectRatio: string;
 }) {
   const Icon = STEP_META[step.type].icon;
   return (
@@ -1641,7 +1803,11 @@ function MobileStepSettings({
         <UpscaleStepParams params={step.params as UpscaleParams} onChange={onChange} />
       )}
       {step.type === "watermark" && (
-        <WatermarkStepParams params={step.params as WatermarkParams} onChange={onChange} />
+        <WatermarkStepParams
+          params={step.params as WatermarkParams}
+          aspectRatio={aspectRatio}
+          onChange={onChange}
+        />
       )}
       {step.type === "outpaint" && (
         <OutpaintStepParams params={step.params as OutpaintParams} onChange={onChange} />
@@ -1657,11 +1823,13 @@ function StepParamPanel({
   onClose,
   onCollapse,
   onChange,
+  aspectRatio,
 }: {
   step: WorkflowStep;
   onClose: () => void;
   onCollapse: () => void;
   onChange: (_patch: Partial<StepParams["params"]>) => void;
+  aspectRatio: string;
 }) {
   // 仅用于非 workflow 步，类型保证由调用处进行
   if (step.type === "workflow") {
@@ -1705,7 +1873,11 @@ function StepParamPanel({
         <UpscaleStepParams params={step.params as UpscaleParams} onChange={onChange} />
       )}
       {step.type === "watermark" && (
-        <WatermarkStepParams params={step.params as WatermarkParams} onChange={onChange} />
+        <WatermarkStepParams
+          params={step.params as WatermarkParams}
+          aspectRatio={aspectRatio}
+          onChange={onChange}
+        />
       )}
       {step.type === "outpaint" && (
         <OutpaintStepParams params={step.params as OutpaintParams} onChange={onChange} />
@@ -1990,14 +2162,20 @@ function UpscaleStepParams({
 
 function WatermarkStepParams({
   params,
+  aspectRatio,
   onChange,
 }: {
   params: WatermarkParams;
+  aspectRatio: string;
   onChange: (_patch: Partial<WatermarkParams>) => void;
 }) {
   return (
     <>
-      <WatermarkPositionPreview params={params} />
+      <WatermarkPositionPreview
+        params={params}
+        aspectRatio={aspectRatio}
+        onChange={onChange}
+      />
       <section className="flex flex-col gap-2">
         <FieldLabel>水印内容</FieldLabel>
         <Input
@@ -2011,13 +2189,19 @@ function WatermarkStepParams({
         <FieldLabel>水印位置</FieldLabel>
         <ChipGroup
           value={params.position}
-          onChange={(v) => onChange({ position: v })}
+          onChange={(v) =>
+            onChange({
+              position: v as WatermarkParams["position"],
+              customPosition: v === "custom" ? params.customPosition : undefined,
+            })
+          }
           options={[
             { id: "top-left", label: "左上" },
             { id: "top-right", label: "右上" },
             { id: "bottom-left", label: "左下" },
             { id: "bottom-right", label: "右下" },
             { id: "center", label: "居中" },
+            { id: "custom", label: "自定义" },
           ]}
           cols={3}
         />
@@ -2034,28 +2218,133 @@ function WatermarkStepParams({
   );
 }
 
-function WatermarkPositionPreview({ params }: { params: WatermarkParams }) {
+function WatermarkPositionPreview({
+  params,
+  aspectRatio,
+  onChange,
+}: {
+  params: WatermarkParams;
+  aspectRatio: string;
+  onChange: (_patch: Partial<WatermarkParams>) => void;
+}) {
+  const previewRef = useRef<HTMLDivElement>(null);
+  const watermarkRef = useRef<HTMLSpanElement>(null);
   const previewText = params.content.trim() || "@品牌名";
-  const positionClass: Record<string, string> = {
-    "top-left": "left-3 top-3",
-    "top-right": "right-3 top-3",
-    "bottom-left": "bottom-3 left-3",
-    "bottom-right": "bottom-3 right-3",
-    center: "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
+  const aspectStyle = useMemo(() => {
+    const [rawWidth, rawHeight] = aspectRatio.split(":").map(Number);
+    const width = Number.isFinite(rawWidth) && rawWidth > 0 ? rawWidth : 1;
+    const height = Number.isFinite(rawHeight) && rawHeight > 0 ? rawHeight : 1;
+    return {
+      aspectRatio: `${width} / ${height}`,
+      maxWidth: height > width ? `min(100%, ${(52 * width) / height}vh)` : "100%",
+    };
+  }, [aspectRatio]);
+
+  const getPresetPosition = useCallback((
+    position: WatermarkPresetPosition | "custom",
+    editorWidth: number,
+    editorHeight: number,
+    markWidth: number,
+    markHeight: number
+  ) => {
+    const padding = 12;
+    switch (position) {
+      case "top-left":
+        return { x: padding, y: padding };
+      case "top-right":
+        return { x: editorWidth - markWidth - padding, y: padding };
+      case "bottom-left":
+        return { x: padding, y: editorHeight - markHeight - padding };
+      case "center":
+        return {
+          x: (editorWidth - markWidth) / 2,
+          y: (editorHeight - markHeight) / 2,
+        };
+      case "bottom-right":
+      case "custom":
+      default:
+        return {
+          x: editorWidth - markWidth - padding,
+          y: editorHeight - markHeight - padding,
+        };
+    }
+  }, []);
+
+  const updateWatermarkElement = useCallback(() => {
+    const preview = previewRef.current;
+    const watermark = watermarkRef.current;
+    if (!preview || !watermark) return;
+
+    const editorWidth = preview.clientWidth;
+    const editorHeight = preview.clientHeight;
+    const markWidth = watermark.offsetWidth;
+    const markHeight = watermark.offsetHeight;
+    const raw =
+      params.position === "custom" && params.customPosition
+        ? {
+            x: (params.customPosition.x / params.customPosition.editorWidth) * editorWidth,
+            y: (params.customPosition.y / params.customPosition.editorHeight) * editorHeight,
+          }
+        : getPresetPosition(params.position, editorWidth, editorHeight, markWidth, markHeight);
+    const x = clamp(raw.x, 0, Math.max(0, editorWidth - markWidth));
+    const y = clamp(raw.y, 0, Math.max(0, editorHeight - markHeight));
+
+    watermark.style.left = `${x}px`;
+    watermark.style.top = `${y}px`;
+  }, [getPresetPosition, params.customPosition, params.position]);
+
+  useEffect(() => {
+    updateWatermarkElement();
+  }, [updateWatermarkElement, previewText, aspectRatio]);
+
+  const handlePointerMove = (event: PointerEvent<HTMLSpanElement>) => {
+    if (event.buttons !== 1) return;
+    updateCustomPosition(event);
+  };
+
+  const updateCustomPosition = (event: PointerEvent<HTMLSpanElement>) => {
+    const preview = previewRef.current;
+    const watermark = watermarkRef.current;
+    if (!preview || !watermark) return;
+
+    const rect = preview.getBoundingClientRect();
+    const markWidth = watermark.offsetWidth;
+    const markHeight = watermark.offsetHeight;
+    const x = clamp(event.clientX - rect.left - markWidth / 2, 0, Math.max(0, rect.width - markWidth));
+    const y = clamp(event.clientY - rect.top - markHeight / 2, 0, Math.max(0, rect.height - markHeight));
+
+    watermark.style.left = `${x}px`;
+    watermark.style.top = `${y}px`;
+    onChange({
+      position: "custom",
+      customPosition: {
+        x: Math.round(x),
+        y: Math.round(y),
+        editorWidth: Math.round(rect.width),
+        editorHeight: Math.round(rect.height),
+      },
+    });
   };
 
   return (
     <section className="flex flex-col gap-2">
       <FieldLabel>位置预览</FieldLabel>
-      <div className="relative aspect-[4/3] overflow-hidden rounded-[14px] border border-line bg-[linear-gradient(135deg,#f8fafc_0%,#e2e8f0_48%,#dbeafe_100%)]">
+      <div
+        ref={previewRef}
+        className="relative mx-auto max-h-[52vh] min-h-40 w-full touch-none overflow-hidden rounded-[14px] border border-line bg-[linear-gradient(135deg,#f8fafc_0%,#e2e8f0_48%,#dbeafe_100%)]"
+        style={aspectStyle}
+      >
         <div className="absolute inset-x-8 bottom-8 h-[44%] rounded-t-[40%] bg-white/70 shadow-soft" />
         <div className="absolute left-1/2 top-[44%] h-16 w-16 -translate-x-1/2 rounded-[18px] bg-surface shadow-float ring-1 ring-line" />
         <div className="absolute left-1/2 top-[47%] h-8 w-20 -translate-x-1/2 rounded-full bg-brand-soft/80" />
         <span
-          className={cn(
-            "absolute max-w-[72%] rounded-full bg-ink px-2.5 py-1 text-[11px] font-semibold text-white shadow-soft",
-            positionClass[params.position] ?? positionClass["bottom-right"]
-          )}
+          ref={watermarkRef}
+          onPointerDown={(event) => {
+            event.currentTarget.setPointerCapture(event.pointerId);
+            updateCustomPosition(event);
+          }}
+          onPointerMove={handlePointerMove}
+          className="absolute max-w-[72%] cursor-grab select-none rounded-full bg-ink px-2.5 py-1 text-[11px] font-semibold text-white shadow-soft active:cursor-grabbing"
           style={{ opacity: Math.max(0.1, params.opacity / 100) }}
         >
           {previewText}
@@ -2063,6 +2352,10 @@ function WatermarkPositionPreview({ params }: { params: WatermarkParams }) {
       </div>
     </section>
   );
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
 }
 
 function OutpaintStepParams({
