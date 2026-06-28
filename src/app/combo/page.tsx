@@ -796,7 +796,7 @@ export default function ComboPage() {
           </div>
 
           {mobileStage === "workflow" && (
-          <section className="glass-panel rounded-[20px] p-4">
+          <section className="mt-1">
             <div className="mb-3 flex items-center justify-between gap-3">
               <h2 className="text-[15px] font-bold text-ink">工作流模板</h2>
               {selectedTemplate && (
