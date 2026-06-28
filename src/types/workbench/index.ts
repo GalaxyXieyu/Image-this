@@ -309,6 +309,7 @@ export type WorkflowType =
   | 'outpaint'
   | 'one_click'
   | 'pipeline'
+  | 'inpaint'
   | 'video_generation';
 
 export type WorkflowTaskStatus =
@@ -379,6 +380,7 @@ export const WORKFLOW_TO_LEGACY_TYPE: Record<WorkflowType, string> = {
   outpaint: 'IMAGE_EXPANSION',
   one_click: 'ONE_CLICK_WORKFLOW',
   pipeline: 'PIPELINE_WORKFLOW',
+  inpaint: 'INPAINT',
   video_generation: 'VIDEO_GENERATION',
 };
 
@@ -391,6 +393,7 @@ export function legacyTypeToWorkflowType(legacyType: string): WorkflowType {
     IMAGE_EXPANSION: 'outpaint',
     ONE_CLICK_WORKFLOW: 'one_click',
     PIPELINE_WORKFLOW: 'pipeline',
+    INPAINT: 'inpaint',
     VIDEO_GENERATION: 'video_generation',
   };
   return map[legacyType] || 'background_replace';

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import { apiGet, apiPatch } from "@/lib/api-client";
+import { apiGet, apiPatch, apiPost } from "@/lib/api-client";
 import { BrandEmptyState, BrandImageFallback } from "@/components/brands/SpriteImage";
 import {
   Search,
@@ -18,8 +18,10 @@ import {
   CheckSquare,
   Loader2,
   Wand2,
+  Paintbrush,
   X,
 } from "lucide-react";
+import { InpaintDialog, type InpaintSubmitPayload } from "@/components/workbench/InpaintDialog";
 
 function ImageThumbnail({ src, alt, className }: { src?: string | null; alt: string; className?: string }) {
   const [error, setError] = useState(false);
@@ -156,6 +158,7 @@ export default function ResultsPage() {
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
   const [activeTasks, setActiveTasks] = useState<ActiveTask[]>([]);
   const [lightbox, setLightbox] = useState<{ url: string; name: string } | null>(null);
+  const [inpaintTarget, setInpaintTarget] = useState<{ id: string; url: string } | null>(null);
   const prevActiveCount = useRef(0);
 
   const fetchResults = useCallback(async () => {
@@ -273,6 +276,25 @@ export default function ResultsPage() {
       fetchResults();
     } catch (err) {
       alert(err instanceof Error ? err.message : "删除失败");
+    }
+  };
+
+  const handleInpaintSubmit = async (payload: InpaintSubmitPayload) => {
+    try {
+      await apiPost("/api/inpaint", {
+        imageDataUrl: payload.imageDataUrl,
+        maskDataUrl: payload.maskDataUrl,
+        sourceImageUrl: inpaintTarget?.url,
+        prompt: payload.prompt,
+        action: payload.action,
+        strength: payload.strength,
+      });
+      setInpaintTarget(null);
+      // 轮询拉取，等待 worker 产出结果
+      setTimeout(() => fetchResults(), 2500);
+      setTimeout(() => fetchResults(), 8000);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "提交局部重绘失败");
     }
   };
 
@@ -507,6 +529,9 @@ export default function ResultsPage() {
                           </div>
                           {/* Hover actions */}
 	                          <div className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+	                            <button type="button" onClick={(e) => { e.stopPropagation(); const u = item.processedUrl || item.thumbnail; if (u) setInpaintTarget({ id: item.id, url: u }); }} className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-ink-2 hover:text-brand" title="局部重绘">
+	                              <Paintbrush className="h-3.5 w-3.5" />
+	                            </button>
 	                            <button type="button" onClick={(e) => { e.stopPropagation(); const u = item.processedUrl || item.thumbnail; if (u) downloadFile(u, item.name); }} className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-ink-2 hover:text-ink" title="下载">
 	                              <Download className="h-3.5 w-3.5" />
 	                            </button>
@@ -549,6 +574,9 @@ export default function ResultsPage() {
                           {CATEGORY_LABELS[item.category] || "其他"}
                         </span>
                         <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+	                          <Button variant="ghost" size="sm" className="h-10 w-10 p-0 text-ink-2 hover:text-brand" title="局部重绘" onClick={() => { const u = item.processedUrl || item.thumbnail; if (u) setInpaintTarget({ id: item.id, url: u }); }}>
+                            <Paintbrush className="h-3.5 w-3.5" />
+                          </Button>
 	                          <Button variant="ghost" size="sm" className="h-10 w-10 p-0 text-ink-2" onClick={() => { const u = item.processedUrl || item.thumbnail; if (u) downloadFile(u, item.name); }}>
                             <Download className="h-3.5 w-3.5" />
                           </Button>
@@ -623,6 +651,15 @@ export default function ResultsPage() {
           </button>
         </div>
       )}
+
+      {/* 局部重绘弹窗 */}
+      <InpaintDialog
+        open={!!inpaintTarget}
+        imageUrl={inpaintTarget?.url || ""}
+        imageId={inpaintTarget?.id || ""}
+        onClose={() => setInpaintTarget(null)}
+        onSubmit={handleInpaintSubmit}
+      />
     </div>
   );
 }

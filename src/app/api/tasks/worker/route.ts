@@ -10,6 +10,7 @@ import '@/lib/workbench/handlers/upscale';
 import '@/lib/workbench/handlers/watermark';
 import '@/lib/workbench/handlers/one-click';
 import '@/lib/workbench/handlers/pipeline';
+import '@/lib/workbench/handlers/inpaint';
 import '@/lib/workbench/handlers/video-generation';
 import { validateTaskInput } from '@/lib/workbench/input-validation';
 import fs from 'fs/promises';
@@ -568,6 +569,9 @@ class TaskProcessor {
       case 'PIPELINE_WORKFLOW':
         result = await this.processPipeline(task);
         break;
+      case 'INPAINT':
+        result = await this.processInpaint(task);
+        break;
       case 'BACKGROUND_REMOVAL':
         result = await this.processBackgroundRemoval(task);
         break;
@@ -638,6 +642,40 @@ class TaskProcessor {
       processedImageUrl: result.processedUrl,
       processSteps: result.processSteps,
     };
+  }
+
+  private async processInpaint(task: { id: string; inputData: string; userId: string }) {
+    const inputData = await resolveTaskInputData(task.inputData);
+    const sourceImage =
+      (await readAssetAsDataUrl(inputData.inputAsset)) ||
+      inputData.imageUrl ||
+      getAssetClientUrl(inputData.inputAsset);
+    const maskImage =
+      (await readAssetAsDataUrl((inputData as Record<string, unknown>).maskAsset as Parameters<typeof readAssetAsDataUrl>[0])) ||
+      ((inputData as Record<string, unknown>).maskDataUrl as string) ||
+      '';
+    if (!sourceImage) throw new Error('缺少原图');
+    if (!maskImage) throw new Error('缺少蒙版');
+
+    const raw = inputData as Record<string, unknown>;
+    const { executeInpaint } = await import('@/lib/workbench/inpaint-service');
+    return executeInpaint({
+      userId: task.userId,
+      sourceImage,
+      maskImage,
+      prompt: raw.prompt as string | undefined,
+      action: (raw.action as 'inpaint' | 'remove' | 'enhance') || 'inpaint',
+      strength: (raw.strength as 'low' | 'medium' | 'high') || 'medium',
+      originalUrlForRecord: getAssetClientUrl(inputData.inputAsset) || (raw.imageUrl as string) || '',
+      provider: raw.provider as string | undefined,
+      modelName: raw.modelName as string | undefined,
+      onProgress: async (label: string, progress: number) => {
+        await prisma.taskQueue.update({
+          where: { id: task.id },
+          data: { currentStep: label, progress, completedSteps: progress >= 100 ? 1 : 0 },
+        });
+      },
+    });
   }
 
   private async processOneClickWorkflow(task: { id: string; inputData: string; userId: string }) {
