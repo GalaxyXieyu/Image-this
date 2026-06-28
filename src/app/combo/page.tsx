@@ -1067,10 +1067,6 @@ export default function ComboPage() {
                 setAspectRatio={setAspectRatio}
                 resolution={resolution}
                 setResolution={setResolution}
-                watermarkEnabled={watermarkEnabled}
-                setWatermarkEnabled={setWatermarkEnabled}
-                autoRetry={autoRetry}
-                setAutoRetry={setAutoRetry}
               />
             </div>
             <div className="mt-3 flex flex-col gap-3">
@@ -1675,10 +1671,6 @@ export default function ComboPage() {
                 setAspectRatio={setAspectRatio}
                 resolution={resolution}
                 setResolution={setResolution}
-                watermarkEnabled={watermarkEnabled}
-                setWatermarkEnabled={setWatermarkEnabled}
-                autoRetry={autoRetry}
-                setAutoRetry={setAutoRetry}
               />
             )}
           </aside>
@@ -1697,10 +1689,6 @@ function GlobalSettingsPanel({
   setAspectRatio,
   resolution,
   setResolution,
-  watermarkEnabled,
-  setWatermarkEnabled,
-  autoRetry,
-  setAutoRetry,
 }: {
   onCollapse: () => void;
   selectedTemplateName: string | null;
@@ -1708,10 +1696,6 @@ function GlobalSettingsPanel({
   setAspectRatio: (_value: string) => void;
   resolution: string;
   setResolution: (_value: string) => void;
-  watermarkEnabled: boolean;
-  setWatermarkEnabled: (_value: boolean) => void;
-  autoRetry: boolean;
-  setAutoRetry: (_value: boolean) => void;
 }) {
   return (
     <div className="flex flex-col gap-5 p-5">
@@ -1784,16 +1768,6 @@ function GlobalSettingsPanel({
         </div>
       </section>
 
-      <div className="border-t border-line" />
-
-      <div className="flex items-center justify-between">
-        <Label className="cursor-pointer text-data text-ink">自动添加水印</Label>
-        <Switch checked={watermarkEnabled} onCheckedChange={setWatermarkEnabled} />
-      </div>
-      <div className="flex items-center justify-between">
-        <Label className="cursor-pointer text-data text-ink">失败自动重试</Label>
-        <Switch checked={autoRetry} onCheckedChange={setAutoRetry} />
-      </div>
     </div>
   );
 }
@@ -1804,20 +1778,12 @@ function MobileGlobalSettings({
   setAspectRatio,
   resolution,
   setResolution,
-  watermarkEnabled,
-  setWatermarkEnabled,
-  autoRetry,
-  setAutoRetry,
 }: {
   selectedTemplateName: string | null;
   aspectRatio: string;
   setAspectRatio: (_value: string) => void;
   resolution: string;
   setResolution: (_value: string) => void;
-  watermarkEnabled: boolean;
-  setWatermarkEnabled: (_value: boolean) => void;
-  autoRetry: boolean;
-  setAutoRetry: (_value: boolean) => void;
 }) {
   return (
     <div className="flex flex-col gap-3 p-4">
@@ -1862,16 +1828,6 @@ function MobileGlobalSettings({
         </div>
       </section>
 
-      <div className="grid grid-cols-2 gap-2">
-        <div className="flex min-h-11 items-center justify-between gap-2 rounded-[14px] border border-line bg-surface px-3">
-          <Label className="cursor-pointer text-[12px] font-semibold text-ink">自动水印</Label>
-          <Switch checked={watermarkEnabled} onCheckedChange={setWatermarkEnabled} />
-        </div>
-        <div className="flex min-h-11 items-center justify-between gap-2 rounded-[14px] border border-line bg-surface px-3">
-          <Label className="cursor-pointer text-[12px] font-semibold text-ink">失败重试</Label>
-          <Switch checked={autoRetry} onCheckedChange={setAutoRetry} />
-        </div>
-      </div>
     </div>
   );
 }

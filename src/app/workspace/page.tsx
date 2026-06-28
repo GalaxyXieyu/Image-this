@@ -14,8 +14,8 @@ const TOOLS = [
   { label: "智能扩图", desc: "扩展画布", tool: "outpaint", icon: Expand },
 ];
 
-const SCENE_PREVIEW_COUNT = 4;
-const WORKFLOW_PREVIEW_COUNT = 4;
+const SCENE_PREVIEW_COUNT = 9;
+const WORKFLOW_PREVIEW_COUNT = 6;
 
 interface WorkflowTemplate {
   id: string;
@@ -75,12 +75,12 @@ export default function WorkbenchHubPage() {
         {/* 场景功能：直接铺场景风格卡片，点击进第二步 */}
         <section className="mb-6">
           <SectionHeader title="场景生成" moreHref="/workspace/scene" />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:px-0">
             {sceneStyleTemplates.slice(0, SCENE_PREVIEW_COUNT).map((s) => (
               <Link
                 key={s.id}
                 href={`/workspace/scene?sceneStyle=${s.id}`}
-                className="glass-panel overflow-hidden rounded-[16px] shadow-soft transition-transform hover:-translate-y-0.5"
+                className="glass-panel w-40 shrink-0 overflow-hidden rounded-[16px] shadow-soft transition-transform hover:-translate-y-0.5"
               >
                 <div className="aspect-[4/3] overflow-hidden bg-surface-muted">
                   <SceneThumb src={s.image} alt={s.name} />
@@ -97,7 +97,7 @@ export default function WorkbenchHubPage() {
         {/* 工作流：铺工作流模板卡片，点击进参数步 */}
         <section className="mb-6">
           <SectionHeader title="工作流" moreHref="/combo" />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:px-0">
             {(templates.length > 0
               ? templates.slice(0, WORKFLOW_PREVIEW_COUNT)
               : [{ id: "__empty", name: "组合工作流", description: "多步骤链式流水线，一键批量处理", steps: [] }]
@@ -105,7 +105,7 @@ export default function WorkbenchHubPage() {
               <Link
                 key={t.id}
                 href={t.id === "__empty" ? "/combo" : `/combo?template=${t.id}&stage=params`}
-                className="glass-panel overflow-hidden rounded-[16px] shadow-soft transition-transform hover:-translate-y-0.5"
+                className="glass-panel w-40 shrink-0 overflow-hidden rounded-[16px] shadow-soft transition-transform hover:-translate-y-0.5"
               >
                 <div className="relative aspect-square overflow-hidden bg-surface-muted">
                   <SceneThumb src={workflowCover} alt={t.name} />
