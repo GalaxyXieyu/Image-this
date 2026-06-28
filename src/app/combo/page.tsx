@@ -291,6 +291,43 @@ const RESOLUTIONS = [
   { id: "4k", label: "4K · 超清" },
 ];
 
+type MobileWorkflowStage = "workflow" | "params" | "arrange";
+
+const MOBILE_WORKFLOW_STAGES: { id: MobileWorkflowStage; label: string }[] = [
+  { id: "workflow", label: "工作流" },
+  { id: "params", label: "参数" },
+  { id: "arrange", label: "编排" },
+];
+
+const SCENE_STYLE_LABELS: Record<string, string> = {
+  natural: "自然光",
+  studio: "棚拍",
+  lifestyle: "生活场景",
+  minimal: "极简",
+};
+
+const BG_TYPE_LABELS: Record<string, string> = {
+  studio: "纯色棚拍",
+  scene: "AI 场景",
+  white: "白底",
+  blur: "虚化",
+};
+
+const WATERMARK_POSITION_LABELS: Record<WatermarkParams["position"], string> = {
+  "top-left": "左上",
+  "top-right": "右上",
+  "bottom-left": "左下",
+  "bottom-right": "右下",
+  center: "居中",
+  custom: "自定义",
+};
+
+const OUTPAINT_DIRECTION_LABELS: Record<string, string> = {
+  all: "四周",
+  horizontal: "左右",
+  vertical: "上下",
+};
+
 /* ─── Page ───────────────────────────────────────────────────────── */
 
 // 工作流模板类型（与 API 返回对齐）
@@ -392,6 +429,40 @@ function toOutputResolution(resolution: string) {
   return resolutionMap[resolution] ?? "original";
 }
 
+function getStepParamSummary(step: WorkflowStep) {
+  if (step.type === "workflow") {
+    return step.refTemplateId ? "执行时展开引用工作流" : "引用工作流";
+  }
+
+  if (step.type === "scene") {
+    const params = step.params as SceneParams;
+    return `${SCENE_STYLE_LABELS[params.sceneStyle] ?? params.sceneStyle} · ${params.candidateCount} 张候选`;
+  }
+
+  if (step.type === "background") {
+    const params = step.params as BackgroundParams;
+    const ref = params.referenceAsset ? "已传参考" : "无参考图";
+    return `${BG_TYPE_LABELS[params.bgType] ?? params.bgType} · ${ref}`;
+  }
+
+  if (step.type === "upscale") {
+    const params = step.params as UpscaleParams;
+    return `${params.factor}x 放大 · 降噪 ${params.denoise}%`;
+  }
+
+  if (step.type === "watermark") {
+    const params = step.params as WatermarkParams;
+    return `${params.content || "未填水印"} · ${WATERMARK_POSITION_LABELS[params.position]} · ${params.opacity}%`;
+  }
+
+  if (step.type === "outpaint") {
+    const params = step.params as OutpaintParams;
+    return `${OUTPAINT_DIRECTION_LABELS[params.direction] ?? params.direction}扩展 · ${params.ratio}%`;
+  }
+
+  return step.description;
+}
+
 export default function ComboPage() {
   const [workflowTemplates, setWorkflowTemplates] = useState<WorkflowTemplateType[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
@@ -427,6 +498,11 @@ export default function ComboPage() {
   // Workflow preview drawer
   const [workflowPreviewOpen, setWorkflowPreviewOpen] = useState(false);
   const [previewingWorkflowId, setPreviewingWorkflowId] = useState<string | null>(null);
+  const [mobileStage, setMobileStage] = useState<MobileWorkflowStage>("workflow");
+  const [draggingStepId, setDraggingStepId] = useState<string | null>(null);
+  const [dragOverStepId, setDragOverStepId] = useState<string | null>(null);
+  const draggingStepIdRef = useRef<string | null>(null);
+  const dragOverStepIdRef = useRef<string | null>(null);
 
   // Load workflow templates on mount
   useEffect(() => {
@@ -484,6 +560,9 @@ export default function ComboPage() {
     () => steps.find((s) => s.id === selectedStepId) ?? null,
     [steps, selectedStepId]
   );
+  const selectedTemplateName = selectedTemplate
+    ? templates.find((t) => t.id === selectedTemplate)?.name ?? null
+    : null;
 
   const handleExecute = async () => {
     if (steps.length === 0) return;
@@ -669,6 +748,52 @@ export default function ComboPage() {
     setSteps(copy.map((s, idx) => ({ ...s, order: idx + 1 })));
   };
 
+  const reorderStep = useCallback((activeId: string, overId: string) => {
+    if (activeId === overId) return;
+    setSteps((prev) => {
+      const fromIndex = prev.findIndex((step) => step.id === activeId);
+      const toIndex = prev.findIndex((step) => step.id === overId);
+      if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return prev;
+
+      const copy = [...prev];
+      const [removed] = copy.splice(fromIndex, 1);
+      copy.splice(toIndex, 0, removed);
+      return copy.map((step, idx) => ({ ...step, order: idx + 1 }));
+    });
+  }, []);
+
+  const startStepDrag = (stepId: string) => {
+    draggingStepIdRef.current = stepId;
+    dragOverStepIdRef.current = stepId;
+    setDraggingStepId(stepId);
+    setDragOverStepId(stepId);
+  };
+
+  const enterStepDropTarget = (stepId: string) => {
+    const activeId = draggingStepIdRef.current;
+    if (!activeId || activeId === stepId || dragOverStepIdRef.current === stepId) return;
+    dragOverStepIdRef.current = stepId;
+    setDragOverStepId(stepId);
+    reorderStep(activeId, stepId);
+  };
+
+  const moveStepDragPointer = (event: PointerEvent<HTMLElement>) => {
+    if (!draggingStepIdRef.current) return;
+    event.preventDefault();
+    const target = document
+      .elementFromPoint(event.clientX, event.clientY)
+      ?.closest<HTMLElement>("[data-step-drop-id]");
+    const overId = target?.dataset.stepDropId;
+    if (overId) enterStepDropTarget(overId);
+  };
+
+  const endStepDrag = () => {
+    draggingStepIdRef.current = null;
+    dragOverStepIdRef.current = null;
+    setDraggingStepId(null);
+    setDragOverStepId(null);
+  };
+
   const updateStepParams = (id: string, patch: Partial<StepParams["params"]>) => {
     setSteps((prev) =>
       prev.map((s) => (s.id === id ? { ...s, params: { ...s.params, ...patch } } : s))
@@ -690,6 +815,38 @@ export default function ComboPage() {
       />
       <div className="flex min-h-0 flex-1 flex-col md:hidden">
         <div className="flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+104px)] pt-3">
+          <div className="sticky top-0 z-20 -mx-4 bg-background/95 px-4 pb-3 pt-1 backdrop-blur">
+            <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              {MOBILE_WORKFLOW_STAGES.map((stage, index) => {
+                const active = mobileStage === stage.id;
+                return (
+                  <button
+                    key={stage.id}
+                    type="button"
+                    onClick={() => setMobileStage(stage.id)}
+                    className={cn(
+                      "flex h-11 shrink-0 items-center gap-2 rounded-full border px-3 text-[13px] font-semibold transition-all",
+                      active
+                        ? "border-transparent bg-accent-gradient text-white shadow-soft"
+                        : "border-line bg-surface text-ink-2"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold",
+                        active ? "bg-white/20 text-white" : "bg-surface-muted text-ink-2"
+                      )}
+                    >
+                      {index + 1}
+                    </span>
+                    {stage.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {mobileStage === "workflow" && (
           <section className="glass-panel rounded-[20px] p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -704,9 +861,9 @@ export default function ComboPage() {
                 </span>
               )}
             </div>
-            <div className="mt-3 flex flex-col gap-2">
+            <div className="mt-3 grid grid-cols-2 gap-3">
               {templates.length === 0 ? (
-                <p className="text-[13px] text-ink-3">暂无工作流模板，开始新建吧</p>
+                <p className="col-span-2 text-[13px] text-ink-3">暂无工作流模板，开始新建吧</p>
               ) : (
                 templates.map((tpl) => {
                   const active = selectedTemplate === tpl.id;
@@ -727,19 +884,25 @@ export default function ComboPage() {
                         }
                       }}
                       className={cn(
-                        "flex cursor-pointer items-center justify-between gap-2 rounded-[12px] border p-3 text-left transition-all",
+                        "relative flex min-h-[116px] cursor-pointer flex-col justify-between gap-3 rounded-[18px] border p-3 text-left transition-all",
                         active
-                          ? "border-brand bg-brand-soft"
-                          : "border-line bg-surface-muted hover:border-brand/40"
+                          ? "border-brand bg-brand-soft shadow-soft"
+                          : "border-line bg-surface hover:border-brand/40"
                       )}
                     >
-                      <div className="min-w-0 flex-1">
-                        <span className="block text-[13px] font-semibold text-ink">{tpl.name}</span>
-                        {tpl.description && (
-                          <span className="mt-0.5 block text-[11px] text-ink-3 line-clamp-1">
-                            {tpl.description}
-                          </span>
-                        )}
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-brand-soft text-brand">
+                          <Layers className="h-5 w-5" />
+                        </span>
+                        <span className="rounded-full bg-surface-muted px-2 py-1 text-[11px] font-semibold text-ink-3">
+                          {tpl.steps.length} 步
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <span className="block text-[14px] font-semibold leading-5 text-ink">{tpl.name}</span>
+                        <span className="mt-1 block text-[12px] text-ink-3">
+                          {tpl.isSystem ? "系统模板" : "自定义模板"}
+                        </span>
                       </div>
                       {!tpl.isSystem && (
                         <button
@@ -748,7 +911,8 @@ export default function ComboPage() {
                             e.stopPropagation();
                             handleDeleteTemplate(tpl.id);
                           }}
-                          className="shrink-0 text-ink-3 hover:text-danger"
+                          className="absolute right-3 top-14 text-ink-3 hover:text-danger"
+                          aria-label="删除模板"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -758,9 +922,20 @@ export default function ComboPage() {
                 })
               )}
             </div>
+            <Button
+              type="button"
+              onClick={() => setMobileStage("params")}
+              className="mt-4 h-12 w-full rounded-full bg-accent-gradient text-[14px] font-semibold text-white shadow-soft"
+            >
+              继续填写参数
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </section>
+          )}
 
-          <section className="mt-4 glass-panel rounded-[20px] p-4">
+          {mobileStage === "params" && (
+          <>
+          <section className="glass-panel rounded-[20px] p-4">
             <div className="flex items-center gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-brand-soft text-brand">
                 <Upload className="h-5 w-5" />
@@ -815,22 +990,41 @@ export default function ComboPage() {
             )}
           </section>
 
+          <section className="mt-4 glass-panel rounded-[20px]">
+            <MobileGlobalSettings
+              selectedTemplateName={selectedTemplateName}
+              batchCount={batchCount}
+              setBatchCount={setBatchCount}
+              aspectRatio={aspectRatio}
+              setAspectRatio={setAspectRatio}
+              resolution={resolution}
+              setResolution={setResolution}
+              watermarkEnabled={watermarkEnabled}
+              setWatermarkEnabled={setWatermarkEnabled}
+              autoRetry={autoRetry}
+              setAutoRetry={setAutoRetry}
+            />
+          </section>
+
           <section className="mt-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <h2 className="text-[15px] font-bold text-ink">处理流水线</h2>
+                <h2 className="text-[15px] font-bold text-ink">步骤参数</h2>
                 <p className="hidden">
-                  点击步骤可编辑参数，使用箭头调整顺序
+                  系统按当前工作流汇总需要填写的参数
                 </p>
               </div>
-              <span className="rounded-full border border-line bg-surface px-2.5 py-1 text-[12px] font-semibold text-ink-2">
-                {steps.length}/5
-              </span>
+              <button
+                type="button"
+                onClick={() => setMobileStage("arrange")}
+                className="h-9 rounded-full bg-accent-gradient px-3 text-[12px] font-semibold text-white shadow-soft"
+              >
+                去编排
+              </button>
             </div>
-            <div className="flex flex-col gap-3">
-              {steps.map((step, index) => {
+            <div className="grid gap-2">
+              {steps.map((step) => {
                 const Icon = STEP_META[step.type].icon;
-                const isSelected = selectedStepId === step.id;
                 const isWorkflow = step.type === "workflow";
                 const refTemplate = isWorkflow
                   ? workflowTemplates.find((t) => t.id === step.refTemplateId)
@@ -841,8 +1035,7 @@ export default function ComboPage() {
                   <div
                     key={step.id}
                     className={cn(
-                      "glass-panel flex min-h-[82px] w-full items-center gap-3 rounded-[18px] p-3 text-left transition-all",
-                      isSelected && "ring-2 ring-brand",
+                      "glass-panel flex min-h-[76px] w-full items-center gap-3 rounded-[18px] p-3 text-left transition-all",
                       isRefInvalid && "opacity-60"
                     )}
                   >
@@ -872,43 +1065,115 @@ export default function ComboPage() {
                         <span className="block text-[14px] font-semibold text-ink">
                           {isRefInvalid ? `⚠ ${step.name}` : step.name}
                         </span>
-                        <span className="mt-0.5 hidden line-clamp-2 text-[12px] leading-4 text-ink-3 md:block">
-                          {isRefInvalid ? "引用已失效" : step.description}
+                        <span className="mt-0.5 block truncate text-[12px] leading-4 text-ink-3">
+                          {isRefInvalid ? "引用已失效" : getStepParamSummary(step)}
                         </span>
                       </span>
                     </button>
-                    <span className="flex shrink-0 items-center gap-1">
-                      <button
-                        type="button"
-                        aria-label={`上移 ${step.name}`}
-                        disabled={index === 0}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          moveStep(index, -1);
-                        }}
-                        className={cn(
-                          "flex h-11 w-11 items-center justify-center rounded-full text-ink-3 disabled:opacity-35",
-                          index !== 0 && "bg-surface-muted"
+                    <ChevronRight className="h-4 w-4 shrink-0 text-ink-3" />
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+          </>
+          )}
+
+          {mobileStage === "arrange" && (
+          <section className="mt-1">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h2 className="text-[15px] font-bold text-ink">处理流水线</h2>
+                <p className="hidden">
+                  长按拖动排序，点击步骤可编辑参数
+                </p>
+              </div>
+              <span className="rounded-full border border-line bg-surface px-2.5 py-1 text-[12px] font-semibold text-ink-2">
+                {steps.length}/5
+              </span>
+            </div>
+            <div className="flex flex-col gap-3">
+              {steps.map((step) => {
+                const Icon = STEP_META[step.type].icon;
+                const isSelected = selectedStepId === step.id;
+                const isDragging = draggingStepId === step.id;
+                const isDragOver = dragOverStepId === step.id && draggingStepId !== step.id;
+                const isWorkflow = step.type === "workflow";
+                const refTemplate = isWorkflow
+                  ? workflowTemplates.find((t) => t.id === step.refTemplateId)
+                  : undefined;
+                const isRefInvalid = isWorkflow && !refTemplate;
+
+                return (
+                  <div
+                    key={step.id}
+                    data-step-drop-id={step.id}
+                    onPointerMove={moveStepDragPointer}
+                    className={cn(
+                      "glass-panel flex min-h-[82px] w-full items-center gap-3 rounded-[18px] p-3 text-left transition-all",
+                      isSelected && "ring-2 ring-brand",
+                      isDragging && "scale-[0.98] opacity-75 ring-2 ring-brand",
+                      isDragOver && "translate-y-0.5 border-brand",
+                      isRefInvalid && "opacity-60"
+                    )}
+                  >
+                    <button
+                      type="button"
+                      aria-label={`拖动 ${step.name}`}
+                      onPointerDown={(event) => {
+                        event.preventDefault();
+                        event.currentTarget.setPointerCapture(event.pointerId);
+                        startStepDrag(step.id);
+                      }}
+                      onPointerMove={moveStepDragPointer}
+                      onPointerUp={endStepDrag}
+                      onPointerCancel={endStepDrag}
+                      className="flex h-11 w-8 shrink-0 touch-none items-center justify-center rounded-full text-ink-3 active:bg-surface-muted"
+                    >
+                      <GripVertical className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isWorkflow && refTemplate) {
+                          setPreviewingWorkflowId(step.refTemplateId!);
+                          setWorkflowPreviewOpen(true);
+                        } else if (!isWorkflow) {
+                          setSelectedStepId(step.id);
+                        }
+                      }}
+                      className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                    >
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-gradient text-[12px] font-bold text-white">
+                        {step.order}
+                      </span>
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-brand-soft text-brand">
+                        {isRefInvalid ? (
+                          <AlertTriangle className="h-5 w-5 text-danger" />
+                        ) : (
+                          <Icon className="h-5 w-5" />
                         )}
-                      >
-                        <ChevronUp className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`下移 ${step.name}`}
-                        disabled={index === steps.length - 1}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          moveStep(index, 1);
-                        }}
-                        className={cn(
-                          "flex h-11 w-11 items-center justify-center rounded-full text-ink-3 disabled:opacity-35",
-                          index !== steps.length - 1 && "bg-surface-muted"
-                        )}
-                      >
-                        <ChevronDown className="h-4 w-4" />
-                      </button>
-                    </span>
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[14px] font-semibold text-ink">
+                          {isRefInvalid ? `⚠ ${step.name}` : step.name}
+                        </span>
+                        <span className="mt-0.5 block truncate text-[12px] leading-4 text-ink-3">
+                          {isRefInvalid ? "引用已失效" : getStepParamSummary(step)}
+                        </span>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`删除 ${step.name}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeStep(step.id);
+                      }}
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-muted text-ink-3 hover:text-danger"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                 );
               })}
@@ -940,27 +1205,6 @@ export default function ComboPage() {
               />
             </div>
           </section>
-
-          {!selectedStep && (
-            <section className="mt-4 glass-panel rounded-[20px]">
-              <MobileGlobalSettings
-                selectedTemplateName={
-                  selectedTemplate
-                    ? templates.find((t) => t.id === selectedTemplate)?.name ?? null
-                    : null
-                }
-                batchCount={batchCount}
-                setBatchCount={setBatchCount}
-                aspectRatio={aspectRatio}
-                setAspectRatio={setAspectRatio}
-                resolution={resolution}
-                setResolution={setResolution}
-                watermarkEnabled={watermarkEnabled}
-                setWatermarkEnabled={setWatermarkEnabled}
-                autoRetry={autoRetry}
-                setAutoRetry={setAutoRetry}
-              />
-            </section>
           )}
         </div>
 
@@ -1695,27 +1939,15 @@ function MobileGlobalSettings({
   setAutoRetry: (_value: boolean) => void;
 }) {
   return (
-    <div className="flex flex-col gap-5 p-4">
+    <div className="flex flex-col gap-3 p-4">
       <div className="flex items-center gap-2">
         <Settings2 className="h-4 w-4 text-brand" />
         <span className="text-[15px] font-bold text-ink">全局执行设置</span>
       </div>
 
-      <section className="flex flex-col gap-2">
-        <FieldLabel>方案信息</FieldLabel>
-        <div className="rounded-[14px] border border-line bg-surface p-3">
-          <p className="text-[13px] font-semibold text-ink">
-            {selectedTemplateName ?? "未选择模板"}
-          </p>
-          <p className="mt-0.5 hidden text-[12px] text-ink-3 md:block">
-            {selectedTemplateName ? "已加载该模板的步骤和参数" : "可先从上方选择一个工作流模板"}
-          </p>
-        </div>
-      </section>
-
       <section className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-2">
-          <FieldLabel>批量数量</FieldLabel>
+          <FieldLabel>{selectedTemplateName ?? "未选择模板"}</FieldLabel>
           <Input
             type="number"
             min={1}
@@ -1738,21 +1970,32 @@ function MobileGlobalSettings({
 
       <section className="flex flex-col gap-2">
         <FieldLabel>画面比例</FieldLabel>
-        <ChipGroup
-          value={aspectRatio}
-          onChange={setAspectRatio}
-          options={ASPECT_RATIOS}
-          cols={5}
-        />
+        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          {ASPECT_RATIOS.map((ratio) => (
+            <button
+              key={ratio.id}
+              type="button"
+              onClick={() => setAspectRatio(ratio.id)}
+              className={cn(
+                "h-9 min-w-14 shrink-0 rounded-full border px-3 text-[12px] font-semibold transition-colors",
+                aspectRatio === ratio.id
+                  ? "border-brand bg-brand-soft text-brand-text"
+                  : "border-line-strong text-ink-2"
+              )}
+            >
+              {ratio.label}
+            </button>
+          ))}
+        </div>
       </section>
 
-      <div className="grid gap-3">
-        <div className="flex min-h-11 items-center justify-between rounded-[14px] border border-line bg-surface px-3">
-          <Label className="cursor-pointer text-data text-ink">自动添加水印</Label>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex min-h-11 items-center justify-between gap-2 rounded-[14px] border border-line bg-surface px-3">
+          <Label className="cursor-pointer text-[12px] font-semibold text-ink">自动水印</Label>
           <Switch checked={watermarkEnabled} onCheckedChange={setWatermarkEnabled} />
         </div>
-        <div className="flex min-h-11 items-center justify-between rounded-[14px] border border-line bg-surface px-3">
-          <Label className="cursor-pointer text-data text-ink">失败自动重试</Label>
+        <div className="flex min-h-11 items-center justify-between gap-2 rounded-[14px] border border-line bg-surface px-3">
+          <Label className="cursor-pointer text-[12px] font-semibold text-ink">失败重试</Label>
           <Switch checked={autoRetry} onCheckedChange={setAutoRetry} />
         </div>
       </div>

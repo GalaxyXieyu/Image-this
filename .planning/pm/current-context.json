@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-28T08:58:39+08:00",
+  "generated_at": "2026-06-28T09:43:21+08:00",
   "project": {
     "name": "Image-this",
     "repo_root": "/Volumes/DATABASE/code/business/Image-this",
@@ -97,7 +97,7 @@
       "status": "in_progress",
       "guid": "local-task-108808350b64",
       "url": "local://task/local-task-108808350b64",
-      "updated_at": "2026-06-28T08:58:39+08:00",
+      "updated_at": "2026-06-28T09:43:21+08:00",
       "created_at": "2026-06-27T19:10:41+08:00"
     }
   ],
@@ -117,7 +117,7 @@
     "guid": "local-task-108808350b64",
     "url": "local://task/local-task-108808350b64",
     "description": "任务编号：T13\n创建时间：2026-06-27 19:10:41 CST\n类型：task\nRepo：/Volumes/DATABASE/code/business/Image-this\n\n需求：\n对 Image-this 全部主要界面做移动端 UX 全量适配规划，覆盖信息密度、顶部介绍/二级文本清理、FAB/底部操作遮挡、下拉改 pill/横向滚动、生成填写区域折叠、上传图片上置和预览、减少步骤、高级设置折叠、场景生成多图结果体验、工具/组合/任务/结果/模板/设置页移动端验收；先输出完整计划给用户确认，确认后再执行开发、验证、部署。\n\n执行要求：\n- 以 task/doc 为主，不再依赖本地 task/context/state 文件。\n- 进度默认写评论，验收证据优先回填附件或评论。\n\n规划方案：\n\n一、目标假设\n把移动端从“桌面界面缩小版”改成“手机上能连续完成生成任务”的工作台：首屏聚焦上传和关键动作，非必要解释文本收起或隐藏，下拉改为 pill/横向滚动，生成配置默认折叠为高级设置，底部操作不被 FAB 或内容遮挡。\n\n二、优先级批次\nP0 演示主路径：/workspace/scene。处理顶部说明、素材上置、多商品上传预览、参考图可选判断、高级设置折叠、候选数量文案、结果按商品图分组、保存/查看按钮不被遮挡。关联 T11 的二级文本清理。\nP1 工具主路径：/tools。上传区保持在移动端顶部，工具切换使用 pill 横滚，背景/扩图提示词和模型尺寸进入高级设置，参考背景/Logo 预览可见，任务结果操作固定在安全底部区域。\nP2 组合工作流：/combo。移动端保留上方模板横滚、步骤列表和一个明确执行按钮；步骤说明文本压缩；全局执行设置和单步参数做折叠/抽屉式编辑，避免页面过长。\nP3 管理页扫尾：/tasks、/results、/templates、/settings。移除移动端顶部介绍和卡片二级文本；筛选/排序统一成 pill 或横滚；结果/任务卡只显示标题、状态、关键操作；设置页把低频说明收进折叠区。\nP4 真实出图联调：继续保留 T9，等待用户提供 key/base URL/图床配置后再执行。\n\n三、不做范围\n本轮不改 provider 真实调用逻辑，不迁移数据库 schema，不重做品牌视觉大方向，不把所有桌面端说明删除；桌面端保留必要管理信息。\n\n四、验证标准\n移动端以 390x844、375x812、430x932 三档验收；每个主页面截图检查首屏信息密度、按钮安全区、横向滚动控件、文本不换行爆版；场景生成录制上传 2-3 张商品图、不传参考图也能进入生成准备；运行 npx tsc --noEmit、npm run lint、npm run build；需要上线时 push 后确认 GitHub Actions 和 /api/health。\n\n五、上线节奏\n建议先跑 P0+P1 并部署给远程演示；P2+P3 作为第二个提交；T9 等 key 到位后单独联调真实出图。",
-    "updated_at": "2026-06-28T08:58:39+08:00",
+    "updated_at": "2026-06-28T09:43:21+08:00",
     "completed_at": "",
     "attachments": [],
     "tasklists": [
@@ -127,6 +127,12 @@
     ]
   },
   "recent_comments": [
+    {
+      "guid": "local-comment-d1bfeede408a",
+      "content": "【/combo 工作流移动端交互升级】已按用户反馈把组合工作流移动端从单一步骤列表重构为三段式流程：1）工作流：顶部 pill 分段 + 两列工作流模板卡，先选模板再继续；2）参数：上传商品图放顶部，全局执行设置压缩成紧凑汇总，按当前工作流汇总每一步关键参数摘要，点击步骤打开原参数抽屉；3）编排：独立流水线视图，步骤卡显示摘要，提供触摸拖动手柄重排和删除，保留添加步骤抽屉。移动端 390x844 浏览器验证：工作流模板首屏可见、参数页能看到上传/全局设置/步骤摘要、编排页步骤卡信息宽度改善且固定底部操作不遮挡主流程。验证：npx tsc --noEmit --pretty false PASS；git diff --check PASS；npm run lint PASS（0 errors，既有 warnings）；npm run build PASS。",
+      "resource_id": "local-task-108808350b64",
+      "created_at": "2026-06-28T09:43:21+08:00"
+    },
     {
       "guid": "local-comment-09f89602bfd0",
       "content": "【/push --all】已完成当前可安全推送内容。提交 8036b17 chore(gitignore): 忽略 Prisma 本地数据库备份，新增 prisma/*.db.bak* 规则，防止本地 SQLite 备份误入仓库；提交 7fe21af docs(pm): 同步移动端 UX 任务状态，纳入已跟踪的 .planning/pm 上下文和 T13 评论缓存。排除项：prisma/app.db.bak-p2-232507 为本地数据库备份，已被 .gitignore 忽略，未提交。验证：git diff --check PASS；PM JSON 解析 PASS；敏感词扫描未发现真实密钥（仅说明文字 key/token）；此前同一 HEAD 上 npx tsc --noEmit --pretty false、npm run lint、npm run build 均 PASS。已推送到 origin/feature/ai-studio-2-commerce-workbench，远端更新到 7fe21af。",
