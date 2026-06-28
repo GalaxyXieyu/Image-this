@@ -9,11 +9,11 @@
   --color-primary-ring: #93C5FD;
 
   /* === AI Accent === */
-  --color-ai: #7C3AED;
+  --color-ai: #1A1A17;
   --color-ai-foreground: #FFFFFF;
-  --color-ai-hover: #6D28D9;
-  --color-ai-soft: #EDE9FE;
-  --color-ai-light: #DDD6FE;
+  --color-ai-hover: #000000;
+  --color-ai-soft: #F1F0EE;
+  --color-ai-light: #E5E4E1;
 
   /* === Status Colors (soft bg + solid text) === */
   --color-success: #10B981;
@@ -71,11 +71,11 @@
     --color-primary-soft: #1E3A5F;
     --color-primary-lighter: #0F172A;
 
-    --color-ai: #A78BFA;
+    --color-ai: #F2F2EF;
     --color-ai-foreground: #0F172A;
-    --color-ai-hover: #C4B5FD;
-    --color-ai-soft: #4C1D95;
-    --color-ai-light: #5B21B6;
+    --color-ai-hover: #FFFFFF;
+    --color-ai-soft: #2E2E34;
+    --color-ai-light: #3A3A42;
 
     --color-success: #34D399;
     --color-success-soft: #064E3B;

@@ -100,7 +100,7 @@
     --card-foreground: 48 7% 10%;
     --popover: 0 0% 100%;
     --popover-foreground: 48 7% 10%;
-    --primary: 251 100% 68%;        /* --accent #7B5CFF */
+    --primary: 48 8% 9%;            /* 单色黑主色 #1A1A17 */
     --primary-foreground: 0 0% 100%;
     --secondary: 240 9% 96%;        /* --surface-2 #F4F4F6 */
     --secondary-foreground: 48 7% 10%;
@@ -112,7 +112,7 @@
     --destructive-foreground: 0 0% 100%;
     --border: 240 6% 90%;
     --input: 240 6% 90%;
-    --ring: 251 100% 68%;
+    --ring: 48 7% 25%;
     --radius: 0.875rem;             /* 14px 控件圆角；卡片用 --radius-card */
 
     /* README 原始 token（玻璃 / 渐变 / 衬线层） */
@@ -124,15 +124,15 @@
     --ink: #1a1a17;
     --ink-2: #57574e;
     --ink-3: #8c8c82;
-    --brand: #7b5cff;
-    --brand-2: #b45cff;
-    --brand-soft: rgba(123, 92, 255, 0.12);
-    --brand-text: #6a48e8;
+    --brand: #1a1a17;
+    --brand-2: #33332e;
+    --brand-soft: rgba(26, 26, 23, 0.07);
+    --brand-text: #1a1a17;
     --ok: #3da76b;
     --warn: #d98a3d;
     --danger: #d9544b;
-    --shadow-soft: 0 2px 10px rgba(40, 32, 90, 0.07);
-    --shadow-float: 0 26px 64px rgba(70, 55, 140, 0.2);
+    --shadow-soft: 0 2px 10px rgba(20, 20, 24, 0.07);
+    --shadow-float: 0 26px 64px rgba(20, 20, 24, 0.18);
     --radius-card: 18px;
   }
   .dark {
@@ -142,7 +142,7 @@
     --card-foreground: 60 11% 94%;
     --popover: 240 8% 12%;
     --popover-foreground: 60 11% 94%;
-    --primary: 251 100% 76%;        /* --accent #9D86FF */
+    --primary: 60 11% 94%;          /* 深色模式单色主色：近白 #F2F2EF */
     --primary-foreground: 240 8% 8%;
     --secondary: 240 9% 16%;        /* --surface-2 #26262C */
     --secondary-foreground: 60 11% 94%;
@@ -154,7 +154,7 @@
     --destructive-foreground: 0 0% 100%;
     --border: 240 6% 22%;
     --input: 240 6% 22%;
-    --ring: 251 100% 76%;
+    --ring: 60 6% 64%;
 
     --surface: #1c1c21;
     --surface-2: #26262c;
@@ -164,10 +164,10 @@
     --ink: #f2f2ef;
     --ink-2: #a8a8a1;
     --ink-3: #74746c;
-    --brand: #9d86ff;
-    --brand-2: #c79bff;
-    --brand-soft: rgba(157, 134, 255, 0.2);
-    --brand-text: #c4aeff;
+    --brand: #2c2c33;
+    --brand-2: #3a3a44;
+    --brand-soft: rgba(255, 255, 255, 0.14);
+    --brand-text: #ebebe6;
     --ok: #4fb97d;
     --warn: #e0995a;
     --danger: #e0685f;
@@ -196,12 +196,12 @@
   --primary-orange-light: #FED7AA;
   --primary-orange-dark: #EA580C;
 
-  --primary-blue: #7B5CFF;
-  --primary-blue-hover: #6A48E8;
-  --primary-blue-light: rgba(123, 92, 255, 0.16);
-  --primary-blue-lighter: rgba(123, 92, 255, 0.08);
-  --primary-blue-border: rgba(123, 92, 255, 0.28);
-  --primary-blue-ring: rgba(123, 92, 255, 0.45);
+  --primary-blue: #1A1A17;
+  --primary-blue-hover: #000000;
+  --primary-blue-light: rgba(26, 26, 23, 0.12);
+  --primary-blue-lighter: rgba(26, 26, 23, 0.06);
+  --primary-blue-border: rgba(26, 26, 23, 0.22);
+  --primary-blue-ring: rgba(26, 26, 23, 0.4);
 
   --neutral-gray: #64748B;
   --neutral-gray-light: #F9FAFB;

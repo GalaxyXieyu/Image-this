@@ -120,7 +120,7 @@ export function BrandImageFallback({
           <div className="relative mb-1 h-16 w-24">
             <div className="absolute left-1 top-3 h-11 w-16 rounded-xl border border-[#D8E6EA] bg-white/85 shadow-sm" />
             <div className="absolute right-1 top-0 h-14 w-14 rounded-2xl border border-[#CFE3E7] bg-[#F7FBFC] shadow-sm" />
-            <div className="absolute bottom-0 left-9 h-7 w-12 rounded-full bg-[#DDD6FE]/80" />
+            <div className="absolute bottom-0 left-9 h-7 w-12 rounded-full bg-[#E5E4E1]/80" />
           </div>
         )}
         {title && <p className="text-data font-semibold text-foreground">{title}</p>}

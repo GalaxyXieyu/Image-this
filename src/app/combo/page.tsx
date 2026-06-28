@@ -201,7 +201,7 @@ const STEP_META: Record<
 };
 
 const WORKFLOW_COVERS = [
-  "from-violet-500 to-fuchsia-500",
+  "from-neutral-700 to-neutral-900",
   "from-sky-500 to-cyan-400",
   "from-amber-400 to-orange-500",
   "from-emerald-400 to-teal-500",
