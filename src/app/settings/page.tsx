@@ -415,6 +415,33 @@ export default function SettingsPage() {
     return null;
   }
 
+  // 令牌健康检查：调用 /api/models（会请求 /v1/models）验证密钥是否有效
+  const validateProviderToken = async (
+    provider: 'gpt' | 'gemini',
+    baseUrl: string,
+    apiKey: string
+  ): Promise<{ ok: boolean; message: string }> => {
+    if (!baseUrl || !apiKey) return { ok: false, message: '缺少 API 地址或密钥' };
+    try {
+      const res = await fetch('/api/models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, baseUrl, apiKey }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const raw = (data.error || '验证失败').replace(/^获取模型列表失败:\s*/, '');
+        return { ok: false, message: raw };
+      }
+      return { ok: true, message: `有效（${(data.models || []).length} 个模型可用）` };
+    } catch (error) {
+      return {
+        ok: false,
+        message: mapModelRequestError(provider, error instanceof Error ? error.message : '网络错误'),
+      };
+    }
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -470,10 +497,38 @@ export default function SettingsPage() {
       if (!response.ok) {
         throw new Error('保存失败');
       }
-      
-      alert('设置已保存！');
-    } catch (error) {
-      alert('保存失败，请重试');
+
+      // 保存成功后，对已填写密钥的 AI 提供商做令牌健康检查，避免错误令牌静默埋进任务里
+      const checks: { provider: 'gpt' | 'gemini'; baseUrl: string; apiKey: string }[] = [];
+      if (config.gemini.enabled && config.gemini.apiKey) {
+        checks.push({ provider: 'gemini', baseUrl: apiSettings.geminiBaseUrl, apiKey: apiSettings.geminiApiKey });
+      }
+      if (config.gpt.enabled && config.gpt.apiKey) {
+        checks.push({ provider: 'gpt', baseUrl: apiSettings.gptApiUrl, apiKey: apiSettings.gptApiKey });
+      }
+
+      const failures: string[] = [];
+      for (const check of checks) {
+        const result = await validateProviderToken(check.provider, check.baseUrl, check.apiKey);
+        if (!result.ok) {
+          failures.push(`${getProviderDisplayName(check.provider)}：${result.message}`);
+        }
+      }
+
+      if (failures.length > 0) {
+        toast({
+          title: '设置已保存，但令牌验证未通过',
+          description: `${failures.join('；')}。请检查 API Key 与 Base URL（toapis 的 Base URL 应为 https://toapis.com）。`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: '设置已保存',
+          description: checks.length > 0 ? '令牌验证通过，可正常生成图片' : undefined,
+        });
+      }
+    } catch {
+      toast({ title: '保存失败，请重试', variant: 'destructive' });
     } finally {
       setIsSaving(false);
     }
