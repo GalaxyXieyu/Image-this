@@ -93,7 +93,6 @@ interface WorkflowData {
   targetAudience: string;
   usageScene: string;
   sellingPoints: string;
-  platforms: string[];
   selectedTemplates: string[];
   selectedPresetId?: string;
   activePresetName?: string;
@@ -114,7 +113,6 @@ const EMPTY_WORKFLOW_DATA: WorkflowData = {
   targetAudience: "",
   usageScene: "",
   sellingPoints: "",
-  platforms: [],
   selectedTemplates: [],
   inputAssets: [],
   aiModel: "gemini-3.1-flash-image-preview",
@@ -129,20 +127,6 @@ function isSceneDraftParams(
   return "productInfo" in params || "selectedPresetId" in params;
 }
 
-function mapPlatformToSelection(platform?: string): string[] {
-  if (!platform) return [];
-  if (platform === "tmall") return ["taobao"];
-  if (["taobao", "jd", "pdd", "douyin"].includes(platform)) return [platform];
-  return [];
-}
-
-function mapSelectionToTargetPlatform(platform?: string): SceneWorkflowDraft["productInfo"]["targetPlatform"] {
-  if (!platform) return undefined;
-  if (["taobao", "jd", "pdd", "douyin"].includes(platform)) {
-    return platform as SceneWorkflowDraft["productInfo"]["targetPlatform"];
-  }
-  return "other";
-}
 
 function createWorkflowDataFromPreset(preset?: TemplatePreset): WorkflowData {
   if (!preset || !isSceneDraftParams(preset.params)) {
@@ -157,7 +141,6 @@ function createWorkflowDataFromPreset(preset?: TemplatePreset): WorkflowData {
     productName: productInfo?.name ?? "",
     productType: productInfo?.category ?? "",
     usageScene: productInfo?.stylePreference ?? "",
-    platforms: mapPlatformToSelection(productInfo?.targetPlatform),
     selectedTemplates: productInfo?.stylePreference ? [preset.id] : [],
     selectedPresetId: preset.id,
     activePresetName: preset.name,
@@ -223,15 +206,6 @@ function StepBar({ currentStep }: { currentStep: Step }) {
   );
 }
 
-
-const platforms = [
-  { id: "taobao", label: "淘宝/天猫" },
-  { id: "jd", label: "京东" },
-  { id: "pdd", label: "拼多多" },
-  { id: "douyin", label: "抖音" },
-  { id: "xiaohongshu", label: "小红书" },
-  { id: "wechat", label: "微信小程序" },
-];
 
 const productTypes = [
   { id: "beauty", label: "美妆护肤" },
@@ -456,12 +430,11 @@ function ProductInfoStep({
   const moreInfoCount = [
     workflowData.targetAudience,
     workflowData.sellingPoints,
-    workflowData.platforms.length > 0 ? "platforms" : "",
   ].filter(Boolean).length;
   const moreInfoSummary =
     moreInfoCount > 0
       ? `已填 ${moreInfoCount} 项`
-      : "可选：人群、卖点和平台";
+      : "可选：人群和卖点";
 
   const uploadCards = (
     <>
@@ -642,44 +615,6 @@ function ProductInfoStep({
     </>
   );
 
-  const platformPicker = (
-    <div className="flex gap-2.5 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] md:flex-wrap [&::-webkit-scrollbar]:hidden">
-      {platforms.map((platform) => {
-        const selected = workflowData.platforms.includes(platform.id);
-        return (
-          <button
-            key={platform.id}
-            type="button"
-            onClick={() => {
-              setWorkflowData((prev) => ({
-                ...prev,
-                platforms: selected
-                  ? prev.platforms.filter((p) => p !== platform.id)
-                  : [...prev.platforms, platform.id],
-              }));
-            }}
-            className={cn(
-              "inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3.5 py-1.5 text-data transition-colors",
-              selected
-                ? "border-brand bg-brand-soft text-brand-text"
-                : "border-line-strong text-ink-2 hover:border-brand/40 hover:text-ink"
-            )}
-          >
-            <span
-              className={cn(
-                "flex h-4 w-4 items-center justify-center rounded-[5px] border transition-colors",
-                selected ? "border-brand bg-brand text-white" : "border-line-strong"
-              )}
-            >
-              {selected && <CheckCircle2 className="h-3 w-3" />}
-            </span>
-            {platform.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex-1 overflow-auto px-4 pb-4 pt-2 md:px-6">
@@ -812,50 +747,7 @@ function ProductInfoStep({
                 className="min-h-[88px] resize-none rounded-[12px]"
               />
             </div>
-            <div className="space-y-2">
-              <Label>使用平台</Label>
-              {isMobile ? (
-                <BottomSheetSelect
-                  multiple
-                  title="选择使用平台"
-                  options={platforms}
-                  value={workflowData.platforms}
-                  onChange={(value) => {
-                    if (Array.isArray(value)) {
-                      setWorkflowData((prev) => ({ ...prev, platforms: value }));
-                    }
-                  }}
-                  trigger={
-                    <button
-                      type="button"
-                      className="flex min-h-11 w-full items-center justify-between gap-2 rounded-[12px] border border-line-strong bg-surface px-3.5 text-left text-[14px] text-ink"
-                    >
-                      <span
-                        className={cn(
-                          "truncate",
-                          workflowData.platforms.length === 0 && "text-ink-3"
-                        )}
-                      >
-                        {workflowData.platforms.length > 0
-                          ? workflowData.platforms
-                              .map((id) => getOptionLabel(platforms, id))
-                              .join("、")
-                          : "选择使用平台"}
-                      </span>
-                      <ChevronDown className="h-4 w-4 shrink-0 text-ink-3" />
-                    </button>
-                  }
-                />
-              ) : (
-                platformPicker
-              )}
-            </div>
           </MobileCollapsibleSection>
-
-          <section className="hidden glass-panel rounded-[20px] p-5 md:block md:rounded-[24px] md:p-[20px_22px]">
-            <h2 className="text-base font-bold text-ink">使用平台</h2>
-            <div className="mt-3.5">{platformPicker}</div>
-          </section>
         </div>
       </div>
 
@@ -1242,7 +1134,6 @@ function GenerateAdjustStep({
           targetAudience: workflowData.targetAudience,
           usageScene: workflowData.usageScene,
           sellingPoints: workflowData.sellingPoints,
-          platforms: workflowData.platforms,
           selectedTemplates: workflowData.selectedTemplates,
           aiModel: workflowData.aiModel,
           usedModel: result.usedModel,
@@ -1280,7 +1171,6 @@ function GenerateAdjustStep({
           name: workflowData.productName,
           category: workflowData.productType,
           description: workflowData.targetAudience,
-          targetPlatform: mapSelectionToTargetPlatform(workflowData.platforms[0]),
           stylePreference: workflowData.stylePreference || workflowData.usageScene,
         },
         inputAssets: [...productAssets, workflowData.referenceAsset].filter(

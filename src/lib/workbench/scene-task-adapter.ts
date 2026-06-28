@@ -1,6 +1,7 @@
 import type { BackgroundReplaceParams, InputAssetRef, SceneWorkflowDraft } from '@/types/workbench';
 import { adaptToLegacyTaskRequest, type CreateWorkflowTaskRequest } from '@/lib/workbench/api-contract';
 import { getModelEntry, getFallbackChain } from '@/lib/ai-models';
+import { detectSceneCategoryProfile } from '@/lib/workbench/scene-prompt';
 
 export interface SceneTaskDraftInput extends SceneWorkflowDraft {
   inputAsset?: InputAssetRef;
@@ -38,23 +39,26 @@ function buildScenePrompt(draft: SceneTaskDraftInput) {
   const productInfo = draft.productInfo;
   const parameters = draft.parameters;
   const hasReferenceAsset = Boolean(resolveReferenceAsset(draft));
+  const stylePreference = draft.stylePreference || productInfo.stylePreference;
+  // 品类感知：按商品名/品类/风格关键词匹配对应的场景风格画像
+  const profile = detectSceneCategoryProfile(productInfo.category, productInfo.name, stylePreference);
   const sceneBrief = joinText([
     productInfo.name ? `商品：${productInfo.name}` : undefined,
     productInfo.category ? `品类：${productInfo.category}` : undefined,
     productInfo.description,
-    productInfo.targetPlatform ? `目标平台：${productInfo.targetPlatform}` : undefined,
-    draft.stylePreference || productInfo.stylePreference ? `视觉风格：${draft.stylePreference || productInfo.stylePreference}` : undefined,
+    stylePreference ? `视觉风格：${stylePreference}` : undefined,
     draft.sellingPoints ? `核心卖点：${draft.sellingPoints}` : undefined,
     `输出尺寸：${parameters.outputResolution}`,
   ]);
 
   return [
-    '生成电商商品场景图，保持第一张商品主体的外观、比例、材质、品牌特征和数量稳定。',
+    '生成电商商品场景图。先分析上传的第一张商品图，识别其结构、比例、轮廓、主次颜色、材质质感、包装与品牌标识；生成时必须严格保持该商品主体的外观、比例、材质、品牌特征和数量稳定，不得改变或替换商品本身。',
     hasReferenceAsset
       ? '参考图只用于场景氛围、构图、光线和背景风格，不要替换或复制参考图中的商品主体。'
       : '没有额外参考图时，请根据商品信息自动生成干净、协调、可商用的场景背景。',
+    `场景风格指引（${profile.label}）：${profile.guidance}`,
     sceneBrief,
-    '画面需要适合商品详情页、主图或营销素材，专业摄影，高质量，干净可商用。',
+    '画面需适合商品详情页、主图或营销素材，专业摄影、真实光影、高质量、干净可商用，避免多余文字水印或道具喧宾夺主。',
   ].filter(Boolean).join('\n');
 }
 
