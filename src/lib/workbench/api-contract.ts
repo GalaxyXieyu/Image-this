@@ -18,6 +18,7 @@ import type {
 } from '@/types/workbench';
 import { WORKFLOW_TO_LEGACY_TYPE, buildLegacyInputData } from '@/types/workbench';
 import { inferWorkflowTypeFromTask, normalizeTaskStatus } from '@/lib/workbench/task-compat';
+import { normalizeImageUrlForClient } from '@/lib/image-url';
 
 // ---------------------------------------------------------------------------
 // Task Creation
@@ -288,9 +289,9 @@ export function adaptLegacyTaskToSummary(task: {
     totalSteps: task.totalSteps,
     completedSteps: task.completedSteps,
     errorMessage: task.errorMessage ?? undefined,
-    originalImageUrl,
-    resultImageUrl,
-    videoUrl,
+    originalImageUrl: normalizeImageUrlForClient(originalImageUrl),
+    resultImageUrl: normalizeImageUrlForClient(resultImageUrl),
+    videoUrl: normalizeImageUrlForClient(videoUrl),
     usedModel,
     projectId: task.projectId ?? undefined,
     processedImageId: task.processedImageId ?? undefined,
