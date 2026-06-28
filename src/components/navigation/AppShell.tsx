@@ -161,8 +161,8 @@ function TopNav({
         </div>
       </div>
 
-      {/* Row 2: 工作台二级 nav（移动端顶部横滚 + 桌面端） */}
-      {isWorkspace && (
+      {/* Row 2: 工作台二级 nav（移动端顶部横滚 + 桌面端）— hub 页本身不重复展示 */}
+      {isWorkspace && pathname !== "/workspace" && (
         <div className="flex h-12 items-center gap-3 border-t border-border/40 px-4 md:px-6 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           <div className="flex items-center gap-1 rounded-full border border-border/70 bg-surface-muted/70 p-1">
             {WORKSPACE_SEGMENTS.map((seg) => {

@@ -596,6 +596,21 @@ export default function ComboPage() {
     }
   };
 
+  // 从工作台 hub 深链进入：?template=<id>&stage=params 预加载模板并跳到参数步
+  const deepLinkAppliedRef = useRef(false);
+  useEffect(() => {
+    if (deepLinkAppliedRef.current || workflowTemplates.length === 0) return;
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const templateId = params.get("template");
+    if (!templateId) return;
+    if (!workflowTemplates.some((t) => t.id === templateId)) return;
+    deepLinkAppliedRef.current = true;
+    setSelectedTemplate(templateId);
+    handleLoadTemplate(templateId);
+    if (params.get("stage") === "params") setMobileStage("params");
+  }, [workflowTemplates]);
+
   // Delete template
   const handleDeleteTemplate = async (templateId: string) => {
     if (!confirm("确定要删除这个模板吗？")) return;

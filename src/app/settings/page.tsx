@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -33,7 +33,7 @@ import { DesktopUpdateCard } from '@/components/settings/DesktopUpdateCard';
 import { LogDiagnosticsCard } from '@/components/settings/LogDiagnosticsCard';
 import { BottomSheetSelect } from '@/components/workbench/BottomSheetSelect';
 import { useIsMobile } from '@/lib/use-is-mobile';
-import { Save, Key, Sparkles, User, Image, FileText, Plus, Edit, Trash2, Star, StarOff, Cpu, HardDrive, FolderOpen, Folder, RefreshCw, Search, ChevronsUpDown, SlidersHorizontal, FileSearch, ChevronRight, X } from 'lucide-react';
+import { Key, Sparkles, User, Image, FileText, Plus, Edit, Trash2, Star, StarOff, Cpu, HardDrive, FolderOpen, Folder, RefreshCw, Search, ChevronsUpDown, SlidersHorizontal, FileSearch, ChevronRight, X } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/use-toast';
 import { BrandEmptyState } from '@/components/brands/SpriteImage';
@@ -237,6 +237,8 @@ export default function SettingsPage() {
   });
 
   const [isSaving, setIsSaving] = useState(false);
+  const [initialLoaded, setInitialLoaded] = useState(false);
+  const lastSavedRef = useRef<string | null>(null);
 
   // 每 provider 的模型列表（新设计：一张卡 = 一个模型）
   const [providerModels, setProviderModels] = useState<Record<ProviderId, ProviderModel[]>>({
@@ -390,8 +392,25 @@ export default function SettingsPage() {
         console.error('Failed to load settings:', error);
       }
     };
-    loadSettings();
+    loadSettings().finally(() => setInitialLoaded(true));
   }, []);
+
+  // 修改即保存：配置变化后防抖自动保存（首次加载建立基线，不触发保存）
+  useEffect(() => {
+    if (!initialLoaded) return;
+    const snapshot = JSON.stringify({ apiSettings, providerModels });
+    if (lastSavedRef.current === null) {
+      lastSavedRef.current = snapshot;
+      return;
+    }
+    if (snapshot === lastSavedRef.current) return;
+    const timer = setTimeout(() => {
+      lastSavedRef.current = snapshot;
+      void handleSave({ silent: true });
+    }, 1200);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiSettings, providerModels, initialLoaded]);
 
   // Load prompt templates when switching to prompts section
   useEffect(() => {
@@ -442,7 +461,8 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
     setIsSaving(true);
     try {
       // 转换为标准配置格式，根据是否填写了必要字段自动判断是否启用
@@ -517,10 +537,12 @@ export default function SettingsPage() {
 
       if (failures.length > 0) {
         toast({
-          title: '设置已保存，但令牌验证未通过',
+          title: '已保存，但令牌验证未通过',
           description: `${failures.join('；')}。请检查 API Key 与 Base URL（toapis 的 Base URL 应为 https://toapis.com）。`,
           variant: 'destructive',
         });
+      } else if (silent) {
+        toast({ title: '已自动保存' });
       } else {
         toast({
           title: '设置已保存',
@@ -528,7 +550,7 @@ export default function SettingsPage() {
         });
       }
     } catch {
-      toast({ title: '保存失败，请重试', variant: 'destructive' });
+      toast({ title: silent ? '自动保存失败，请重试' : '保存失败，请重试', variant: 'destructive' });
     } finally {
       setIsSaving(false);
     }
@@ -542,26 +564,8 @@ export default function SettingsPage() {
   };
 
   // 获取模型列表
-  const renderInlineSaveButton = () => (
-    <Button
-      type="button"
-      onClick={handleSave}
-      disabled={isSaving}
-      className="min-h-11 w-full bg-primary hover:bg-primary/90 text-primary-foreground sm:w-auto sm:min-w-[132px]"
-    >
-      {isSaving ? (
-        <>
-          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-          保存中...
-        </>
-      ) : (
-        <>
-          <Save className="w-4 h-4 mr-2" />
-          保存本区配置
-        </>
-      )}
-    </Button>
-  );
+  // 改为自动保存后不再需要分区保存按钮
+  const renderInlineSaveButton = () => null;
 
   const fetchModels = async (provider: 'gpt' | 'gemini' | 'jimeng') => {
     const baseUrlField = provider === 'gpt' ? 'gptApiUrl' : provider === 'gemini' ? 'geminiBaseUrl' : 'jimengBaseUrl';
@@ -1326,27 +1330,11 @@ export default function SettingsPage() {
           <div className="flex-1 space-y-6">
             {renderContent()}
 
-            {/* 保存按钮 */}
+            {/* 修改即保存：改动后自动保存，无需手动点按钮 */}
             {activeSection !== 'profile' && activeSection !== 'prompts' && activeSection !== 'updates' && activeSection !== 'runtime' && (
-              <div className="flex justify-end">
-                <Button 
-                  onClick={handleSave} 
-                  disabled={isSaving}
-                  className="min-h-11 w-full bg-primary hover:bg-primary/90 text-primary-foreground sm:w-auto sm:min-w-[120px]"
-                >
-                  {isSaving ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                      保存中...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 mr-2" />
-                      保存设置
-                    </>
-                  )}
-                </Button>
-              </div>
+              <p className="text-center text-[12px] text-muted-foreground">
+                {isSaving ? '保存中…' : '改动会自动保存'}
+              </p>
             )}
           </div>
         </div>
