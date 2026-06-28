@@ -14,6 +14,7 @@ export const WORKFLOW_TYPE_LABELS: Record<WorkflowType, string> = {
   upscale: '高清放大',
   outpaint: '智能扩图',
   one_click: '一键处理',
+  pipeline: '组合流水线',
   video_generation: '视频生成',
 };
 
@@ -34,6 +35,9 @@ const LEGACY_TYPE_ALIASES: Record<string, WorkflowType> = {
   ONE_CLICK_WORKFLOW: 'one_click',
   ONE_CLICK: 'one_click',
   one_click: 'one_click',
+  PIPELINE_WORKFLOW: 'pipeline',
+  PIPELINE: 'pipeline',
+  pipeline: 'pipeline',
   VIDEO_GENERATION: 'video_generation',
   video_generation: 'video_generation',
 };

@@ -9,6 +9,7 @@ import '@/lib/workbench/handlers/outpaint';
 import '@/lib/workbench/handlers/upscale';
 import '@/lib/workbench/handlers/watermark';
 import '@/lib/workbench/handlers/one-click';
+import '@/lib/workbench/handlers/pipeline';
 import '@/lib/workbench/handlers/video-generation';
 import { validateTaskInput } from '@/lib/workbench/input-validation';
 import fs from 'fs/promises';
@@ -564,6 +565,9 @@ class TaskProcessor {
       case 'ONE_CLICK_WORKFLOW':
         result = await this.processOneClickWorkflow(task);
         break;
+      case 'PIPELINE_WORKFLOW':
+        result = await this.processPipeline(task);
+        break;
       case 'BACKGROUND_REMOVAL':
         result = await this.processBackgroundRemoval(task);
         break;
@@ -583,6 +587,57 @@ class TaskProcessor {
         throw new Error(`不支持的任务类型: ${task.type}`);
     }
     return result;
+  }
+
+  private async processPipeline(task: { id: string; inputData: string; userId: string }) {
+    const inputData = await resolveTaskInputData(task.inputData);
+    const imageUrl =
+      (await readAssetAsDataUrl(inputData.inputAsset)) ||
+      inputData.imageUrl ||
+      getAssetClientUrl(inputData.inputAsset);
+    const originalImageUrlForRecord = getAssetClientUrl(inputData.inputAsset) || '';
+
+    const global = ((inputData as Record<string, unknown>).global as Record<string, unknown>) || {};
+    const rawSteps = Array.isArray((inputData as Record<string, unknown>).steps)
+      ? ((inputData as Record<string, unknown>).steps as Array<Record<string, unknown>>)
+      : [];
+
+    const steps = [];
+    for (const s of rawSteps) {
+      const stepType = (s.stepType as string) || (s.type as string) || '';
+      let referenceImageUrl = (s.referenceImageUrl as string) || undefined;
+      const refAsset = s.referenceAsset as Parameters<typeof readAssetAsDataUrl>[0];
+      if (!referenceImageUrl && refAsset) {
+        referenceImageUrl = (await readAssetAsDataUrl(refAsset)) || getAssetClientUrl(refAsset) || undefined;
+      }
+      steps.push({ ...s, stepType, referenceImageUrl });
+    }
+
+    const { executeOrderedPipeline } = await import(
+      '@/app/api/images-process/workflow/one-click/service'
+    );
+    const result = await executeOrderedPipeline({
+      imageUrl,
+      steps,
+      userId: task.userId,
+      aiModel: (global.aiModel as string) || 'gemini',
+      outputResolution: (global.resolution as string) || (global.outputResolution as string),
+      originalImageUrlForRecord,
+      volcengineConfig: inputData.volcengineConfig,
+      imagehostingConfig: inputData.imagehostingConfig,
+      onProgress: async (label: string, progress: number, completed: number) => {
+        await prisma.taskQueue.update({
+          where: { id: task.id },
+          data: { currentStep: label, progress, completedSteps: completed },
+        });
+      },
+    });
+
+    return {
+      processedImageId: result.id,
+      processedImageUrl: result.processedUrl,
+      processSteps: result.processSteps,
+    };
   }
 
   private async processOneClickWorkflow(task: { id: string; inputData: string; userId: string }) {

@@ -117,6 +117,24 @@ function formatDate(dateStr: string | Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+// 下载图片：拉成 blob 强制下载，失败则新标签打开
+async function downloadFile(url: string, name: string) {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = name || "image";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(objectUrl);
+  } catch {
+    window.open(url, "_blank");
+  }
+}
+
 const CATEGORY_LABELS: Record<string, string> = {
   all: "全部",
   scene: "场景图",
@@ -243,6 +261,21 @@ export default function ResultsPage() {
 
   const isAllSelected = filteredResults.length > 0 && selectedIds.size === filteredResults.length;
 
+  const handleDeleteOne = async (id: string) => {
+    if (!confirm("确定删除这张图片吗？")) return;
+    try {
+      await apiPatch("/api/images", { imageIds: [id], action: "delete" });
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      fetchResults();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "删除失败");
+    }
+  };
+
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
     if (!confirm(`确定要删除选中的 ${selectedIds.size} 张图片吗？`)) return;
@@ -281,7 +314,7 @@ export default function ResultsPage() {
                 key={id}
                 onClick={() => setActiveCategory(id)}
                 className={cn(
-	                  "min-h-11 shrink-0 rounded-full px-3 text-data transition-colors",
+	                  "min-h-9 shrink-0 rounded-full px-2.5 text-[12px] font-medium transition-colors",
                   active ? "bg-accent-gradient text-white" : "border border-line bg-surface text-ink-2"
                 )}
               >
@@ -475,10 +508,10 @@ export default function ResultsPage() {
                           </div>
                           {/* Hover actions */}
 	                          <div className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
-	                            <button className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-ink-2 hover:text-ink" title="下载">
+	                            <button type="button" onClick={(e) => { e.stopPropagation(); const u = item.processedUrl || item.thumbnail; if (u) downloadFile(u, item.name); }} className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-ink-2 hover:text-ink" title="下载">
 	                              <Download className="h-3.5 w-3.5" />
 	                            </button>
-	                            <button className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-ink-2 hover:text-danger" title="删除">
+	                            <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteOne(item.id); }} className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-ink-2 hover:text-danger" title="删除">
 	                              <Trash2 className="h-3.5 w-3.5" />
 	                            </button>
                           </div>
@@ -517,10 +550,10 @@ export default function ResultsPage() {
                           {CATEGORY_LABELS[item.category] || "其他"}
                         </span>
                         <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-	                          <Button variant="ghost" size="sm" className="h-10 w-10 p-0 text-ink-2">
+	                          <Button variant="ghost" size="sm" className="h-10 w-10 p-0 text-ink-2" onClick={() => { const u = item.processedUrl || item.thumbnail; if (u) downloadFile(u, item.name); }}>
                             <Download className="h-3.5 w-3.5" />
                           </Button>
-	                          <Button variant="ghost" size="sm" className="h-10 w-10 p-0 text-ink-2 hover:text-danger">
+	                          <Button variant="ghost" size="sm" className="h-10 w-10 p-0 text-ink-2 hover:text-danger" onClick={() => handleDeleteOne(item.id)}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
@@ -578,15 +611,17 @@ export default function ResultsPage() {
           >
             <X className="h-5 w-5" />
           </button>
-          <a
-            href={lightbox.url}
-            download
-            onClick={(e) => e.stopPropagation()}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              downloadFile(lightbox.url, lightbox.name);
+            }}
             className="absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-[13px] font-semibold text-ink transition-colors hover:bg-white"
           >
             <Download className="h-4 w-4" />
-            下载原图
-          </a>
+            下载图片
+          </button>
         </div>
       )}
     </div>

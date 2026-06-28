@@ -13,6 +13,191 @@ function stopWorkflow(stepName: string, error: unknown): never {
   throw new Error(`${stepName}失败，已停止后续步骤：${getErrorMessage(error)}`);
 }
 
+// ---------------------------------------------------------------------------
+// 通用有序流水线：按 steps 顺序逐步处理，上一步输出作为下一步输入
+// ---------------------------------------------------------------------------
+
+export interface OrderedPipelineStep {
+  stepType: 'scene' | 'background' | 'outpaint' | 'upscale' | 'watermark' | string;
+  customPrompt?: string;
+  referenceImageUrl?: string;
+  aiModel?: string;
+  // outpaint
+  ratio?: number;
+  xScale?: number;
+  yScale?: number;
+  outpaintPrompt?: string;
+  // watermark
+  watermarkText?: string;
+  watermarkOpacity?: number;
+  watermarkPosition?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center' | string;
+  watermarkType?: 'text' | 'logo' | string;
+  watermarkLogoUrl?: string;
+  outputResolution?: string;
+}
+
+export interface OrderedPipelineParams {
+  imageUrl: string;
+  steps: OrderedPipelineStep[];
+  userId: string;
+  aiModel?: string;
+  outputResolution?: string;
+  originalImageUrlForRecord?: string;
+  volcengineConfig?: { accessKey: string; secretKey: string };
+  imagehostingConfig?: { superbedToken: string };
+  onProgress?: (label: string, progress: number, completedSteps: number) => Promise<void>;
+}
+
+const STEP_LABELS: Record<string, string> = {
+  scene: '生成场景图',
+  background: 'AI 换背景',
+  outpaint: '智能扩图',
+  upscale: '高清放大',
+  watermark: '水印与尺寸',
+};
+
+export async function executeOrderedPipeline(params: OrderedPipelineParams) {
+  const {
+    imageUrl,
+    steps,
+    userId,
+    aiModel: globalAiModel = 'gemini',
+    outputResolution,
+    originalImageUrlForRecord,
+    volcengineConfig,
+    imagehostingConfig,
+    onProgress,
+  } = params;
+
+  if (!imageUrl) throw new Error('缺少必要参数：imageUrl');
+  if (!Array.isArray(steps) || steps.length === 0) throw new Error('流水线没有可执行步骤');
+
+  const processedImage = await prisma.processedImage.create({
+    data: {
+      filename: `pipeline-${Date.now()}.jpg`,
+      userId,
+      originalUrl: originalImageUrlForRecord || (imageUrl.startsWith('data:') ? '' : imageUrl),
+      processType: 'ONE_CLICK_WORKFLOW',
+      status: 'PROCESSING',
+      metadata: JSON.stringify({ pipeline: steps.map((s) => s.stepType) }),
+    },
+  });
+
+  try {
+    let current = imageUrl;
+    const done: string[] = [];
+    const total = steps.length;
+
+    for (let i = 0; i < total; i++) {
+      const step = steps[i];
+      const label = `第 ${i + 1}/${total} 步：${STEP_LABELS[step.stepType] || step.stepType}`;
+      if (onProgress) await onProgress(label, Math.round((i / total) * 100) + 2, i);
+
+      try {
+        if (step.stepType === 'background' || step.stepType === 'scene') {
+          const prompt = step.customPrompt || DEFAULT_BACKGROUND_PROMPT;
+          // 无参考图（如纯色棚拍/白底）时，用输入图自身占位，避免向 provider 传空 URL
+          const ref = step.referenceImageUrl || current;
+          const model = step.aiModel || globalAiModel;
+          let out: string | undefined;
+          if (model === 'gpt') {
+            out = (await processWithGPT(current, ref, prompt, userId)).imageData;
+          } else if (model === 'jimeng') {
+            out = (await processWithJimeng(current, ref, prompt, userId)).imageData;
+          } else {
+            const r = await processWithGemini(current, ref, prompt, userId);
+            out = r || undefined;
+          }
+          if (!out) throw new Error('返回结果为空');
+          current = out;
+        } else if (step.stepType === 'outpaint') {
+          const each = Math.min(0.5, Math.max(0.05, (step.ratio ?? 25) / 100));
+          const r = await outpaintWithVolcengine(
+            userId,
+            current,
+            step.outpaintPrompt || step.customPrompt || DEFAULT_OUTPAINT_PROMPT,
+            each,
+            each,
+            each,
+            each,
+            2048,
+            2048,
+            volcengineConfig,
+            imagehostingConfig
+          );
+          current = r.imageData;
+        } else if (step.stepType === 'upscale') {
+          const r = await enhanceWithVolcengine(
+            userId,
+            current,
+            '720p',
+            false,
+            false,
+            1,
+            95,
+            true,
+            volcengineConfig,
+            imagehostingConfig
+          );
+          current = r.imageData;
+        } else if (step.stepType === 'watermark') {
+          const { addWatermarkToImage } = await import('@/lib/watermark');
+          current = await addWatermarkToImage({
+            imageUrl: current,
+            watermarkText: step.watermarkText || '@品牌名',
+            watermarkOpacity: step.watermarkOpacity ?? 0.7,
+            watermarkPosition:
+              (step.watermarkPosition as 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center') ||
+              'bottom-right',
+            watermarkType: (step.watermarkType as 'text' | 'logo') || 'text',
+            watermarkLogoUrl: step.watermarkLogoUrl,
+            outputResolution: step.outputResolution || outputResolution,
+          });
+        } else {
+          continue; // 未知步骤跳过
+        }
+      } catch (error) {
+        stopWorkflow(STEP_LABELS[step.stepType] || step.stepType, error);
+      }
+
+      done.push(step.stepType);
+    }
+
+    if (onProgress) await onProgress('处理完成', 100, total);
+
+    const imageSize = current.startsWith('data:')
+      ? Math.floor(current.split(',')[1].length * 0.75)
+      : 0;
+    const savedUrl = current.startsWith('data:')
+      ? await uploadBase64Image(current, `pipeline-${processedImage.id}.jpg`, userId)
+      : current;
+
+    const updated = await prisma.processedImage.update({
+      where: { id: processedImage.id },
+      data: {
+        processedUrl: savedUrl,
+        status: 'COMPLETED',
+        fileSize: imageSize,
+        metadata: JSON.stringify({
+          pipeline: done,
+          processingCompletedAt: new Date().toISOString(),
+        }),
+      },
+    });
+
+    return { id: updated.id, processedUrl: savedUrl, imageData: current, processSteps: done };
+  } catch (error) {
+    await prisma.processedImage.update({
+      where: { id: processedImage.id },
+      data: {
+        status: 'FAILED',
+        errorMessage: error instanceof Error ? error.message : 'pipeline error',
+      },
+    });
+    throw error;
+  }
+}
+
 export interface OneClickWorkflowParams {
   imageUrl: string;
   referenceImageUrl?: string;

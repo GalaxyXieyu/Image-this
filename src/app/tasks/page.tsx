@@ -271,7 +271,7 @@ export default function TasksPage() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-	                "min-h-11 shrink-0 px-4 text-data font-medium rounded-full transition-all md:min-h-0 md:py-1.5",
+	                "min-h-9 shrink-0 px-3 text-[12px] font-medium rounded-full transition-all md:min-h-0 md:py-1.5",
                 activeTab === tab.id
                   ? "bg-accent-gradient text-white shadow-soft"
                   : "text-muted-foreground hover:text-foreground"

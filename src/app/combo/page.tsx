@@ -16,7 +16,6 @@ import {
   DrawerClose,
 } from "@/components/ui/drawer";
 import { BottomSheetSelect, type BottomSheetSelectOption } from "@/components/workbench/BottomSheetSelect";
-import { useIsMobile } from "@/lib/use-is-mobile";
 import { useUpload } from "@/lib/use-upload";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
@@ -245,14 +244,6 @@ const DEFAULT_PARAMS: Record<ExecutableStepType, StepParams["params"]> = {
   outpaint: { direction: "all", ratio: 25 } as OutpaintParams,
 };
 
-const TYPE_TO_API: Record<ExecutableStepType, string> = {
-  scene: "SCENE_GENERATION",
-  background: "BACKGROUND_REMOVAL",
-  upscale: "IMAGE_UPSCALING",
-  watermark: "WATERMARK",
-  outpaint: "IMAGE_EXPANSION",
-};
-
 const INITIAL_STEPS: WorkflowStep[] = [
   {
     id: "s1",
@@ -297,35 +288,6 @@ const MOBILE_WORKFLOW_STAGES: { id: MobileWorkflowStage; label: string }[] = [
   { id: "workflow", label: "工作流" },
   { id: "params", label: "参数" },
 ];
-
-const SCENE_STYLE_LABELS: Record<string, string> = {
-  natural: "自然光",
-  studio: "棚拍",
-  lifestyle: "生活场景",
-  minimal: "极简",
-};
-
-const BG_TYPE_LABELS: Record<string, string> = {
-  studio: "纯色棚拍",
-  scene: "AI 场景",
-  white: "白底",
-  blur: "虚化",
-};
-
-const WATERMARK_POSITION_LABELS: Record<WatermarkParams["position"], string> = {
-  "top-left": "左上",
-  "top-right": "右上",
-  "bottom-left": "左下",
-  "bottom-right": "右下",
-  center: "居中",
-  custom: "自定义",
-};
-
-const OUTPAINT_DIRECTION_LABELS: Record<string, string> = {
-  all: "四周",
-  horizontal: "左右",
-  vertical: "上下",
-};
 
 /* ─── Page ───────────────────────────────────────────────────────── */
 
@@ -427,46 +389,11 @@ function toOutputResolution(resolution: string) {
   return resolutionMap[resolution] ?? "original";
 }
 
-function getStepParamSummary(step: WorkflowStep) {
-  if (step.type === "workflow") {
-    return step.refTemplateId ? "执行时展开引用工作流" : "引用工作流";
-  }
-
-  if (step.type === "scene") {
-    const params = step.params as SceneParams;
-    return `${SCENE_STYLE_LABELS[params.sceneStyle] ?? params.sceneStyle} · ${params.candidateCount} 张候选`;
-  }
-
-  if (step.type === "background") {
-    const params = step.params as BackgroundParams;
-    const ref = params.referenceAsset ? "已传参考" : "无参考图";
-    return `${BG_TYPE_LABELS[params.bgType] ?? params.bgType} · ${ref}`;
-  }
-
-  if (step.type === "upscale") {
-    const params = step.params as UpscaleParams;
-    return `${params.factor}x 放大 · 降噪 ${params.denoise}%`;
-  }
-
-  if (step.type === "watermark") {
-    const params = step.params as WatermarkParams;
-    return `${params.content || "未填水印"} · ${WATERMARK_POSITION_LABELS[params.position]} · ${params.opacity}%`;
-  }
-
-  if (step.type === "outpaint") {
-    const params = step.params as OutpaintParams;
-    return `${OUTPAINT_DIRECTION_LABELS[params.direction] ?? params.direction}扩展 · ${params.ratio}%`;
-  }
-
-  return step.description;
-}
-
 export default function ComboPage() {
   const [workflowTemplates, setWorkflowTemplates] = useState<WorkflowTemplateType[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [steps, setSteps] = useState<WorkflowStep[]>(INITIAL_STEPS);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
-  const isMobile = useIsMobile();
   const { toast } = useToast();
   const { upload, uploading } = useUpload();
 
@@ -600,22 +527,20 @@ export default function ComboPage() {
 
       const global = { aspectRatio, resolution, watermarkEnabled, autoRetry };
 
-      // 按上传的每张商品图各跑一套工作流（多图即批量）
-      const tasks = productAssets.flatMap((asset) =>
-        expandedSteps.map((step) => {
-          // 此时 step.type 不应为 "workflow"，因为已经展开
-          const execType = step.type as ExecutableStepType;
-          const inputDataObj = {
-            ...JSON.parse(JSON.stringify(normalizeStepTaskInput(step, global))),
-            inputAsset: asset,
-          };
-          return {
-            type: TYPE_TO_API[execType],
-            inputData: JSON.stringify(inputDataObj),
-            totalSteps: 1,
-          };
-        })
+      // 每个步骤的归一化参数（含 stepType），整条链共用，按上传的每张图各创建一个链式任务
+      const pipelineSteps = expandedSteps.map((step) =>
+        JSON.parse(JSON.stringify(normalizeStepTaskInput(step, global)))
       );
+
+      // 多图即批量：每张图一个有序流水线任务（步骤 1→2→3… 依次执行，上一步输出喂下一步）
+      const tasks = productAssets.map((asset) => ({
+        type: "PIPELINE_WORKFLOW",
+        workflowType: "pipeline",
+        handlerName: "pipeline",
+        contractVersion: 2,
+        inputData: JSON.stringify({ inputAsset: asset, global, steps: pipelineSteps }),
+        totalSteps: pipelineSteps.length,
+      }));
 
       await apiPost("/api/tasks", tasks);
       window.location.href = "/tasks";
@@ -1010,7 +935,6 @@ export default function ComboPage() {
             <div className="flex flex-col gap-3">
               {steps.map((step) => {
                 const Icon = STEP_META[step.type].icon;
-                const isSelected = selectedStepId === step.id;
                 const isDragging = draggingStepId === step.id;
                 const isDragOver = dragOverStepId === step.id && draggingStepId !== step.id;
                 const isWorkflow = step.type === "workflow";
@@ -1025,70 +949,107 @@ export default function ComboPage() {
                     data-step-drop-id={step.id}
                     onPointerMove={moveStepDragPointer}
                     className={cn(
-                      "glass-panel flex min-h-[82px] w-full items-center gap-3 rounded-[18px] p-3 text-left transition-all",
-                      isSelected && "ring-2 ring-brand",
+                      "glass-panel w-full rounded-[18px] p-3 transition-all",
                       isDragging && "scale-[0.98] opacity-75 ring-2 ring-brand",
                       isDragOver && "translate-y-0.5 border-brand",
                       isRefInvalid && "opacity-60"
                     )}
                   >
-                    <button
-                      type="button"
-                      aria-label={`拖动 ${step.name}`}
-                      onPointerDown={(event) => {
-                        event.preventDefault();
-                        event.currentTarget.setPointerCapture(event.pointerId);
-                        startStepDrag(step.id);
-                      }}
-                      onPointerMove={moveStepDragPointer}
-                      onPointerUp={endStepDrag}
-                      onPointerCancel={endStepDrag}
-                      className="flex h-11 w-8 shrink-0 touch-none items-center justify-center rounded-full text-ink-3 active:bg-surface-muted"
-                    >
-                      <GripVertical className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (isWorkflow && refTemplate) {
-                          setPreviewingWorkflowId(step.refTemplateId!);
-                          setWorkflowPreviewOpen(true);
-                        } else if (!isWorkflow) {
-                          setSelectedStepId(step.id);
-                        }
-                      }}
-                      className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                    >
+                    {/* 标题栏：拖拽手柄 + 序号/名称 + 删除 */}
+                    <div className="flex items-center gap-2.5">
+                      <button
+                        type="button"
+                        aria-label={`拖动 ${step.name}`}
+                        onPointerDown={(event) => {
+                          event.preventDefault();
+                          event.currentTarget.setPointerCapture(event.pointerId);
+                          startStepDrag(step.id);
+                        }}
+                        onPointerMove={moveStepDragPointer}
+                        onPointerUp={endStepDrag}
+                        onPointerCancel={endStepDrag}
+                        className="flex h-9 w-6 shrink-0 touch-none items-center justify-center rounded-full text-ink-3 active:bg-surface-muted"
+                      >
+                        <GripVertical className="h-4 w-4" />
+                      </button>
                       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-gradient text-[12px] font-bold text-white">
                         {step.order}
                       </span>
-                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-brand-soft text-brand">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-brand-soft text-brand">
                         {isRefInvalid ? (
-                          <AlertTriangle className="h-5 w-5 text-danger" />
+                          <AlertTriangle className="h-4.5 w-4.5 text-danger" />
                         ) : (
-                          <Icon className="h-5 w-5" />
+                          <Icon className="h-4.5 w-4.5" />
                         )}
                       </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[14px] font-semibold text-ink">
-                          {isRefInvalid ? `⚠ ${step.name}` : step.name}
-                        </span>
-                        <span className="mt-0.5 block truncate text-[12px] leading-4 text-ink-3">
-                          {isRefInvalid ? "引用已失效" : getStepParamSummary(step)}
-                        </span>
+                      <span className="min-w-0 flex-1 text-[14px] font-semibold text-ink">
+                        {isRefInvalid ? `⚠ ${step.name}` : step.name}
                       </span>
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`删除 ${step.name}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeStep(step.id);
-                      }}
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-muted text-ink-3 hover:text-danger"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                      {isWorkflow && refTemplate && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPreviewingWorkflowId(step.refTemplateId!);
+                            setWorkflowPreviewOpen(true);
+                          }}
+                          className="shrink-0 rounded-full border border-line px-2.5 py-1 text-[12px] font-semibold text-ink-2"
+                        >
+                          预览
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        aria-label={`删除 ${step.name}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeStep(step.id);
+                        }}
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-muted text-ink-3 hover:text-danger"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    {/* 内联参数：直接展开，无需打开抽屉 */}
+                    {isWorkflow ? (
+                      isRefInvalid && (
+                        <p className="mt-2 text-[12px] text-danger">引用的工作流已失效，请删除或重新选择</p>
+                      )
+                    ) : (
+                      <div className="mt-3 border-t border-line pt-3">
+                        {step.type === "scene" && (
+                          <SceneStepParams
+                            params={step.params as SceneParams}
+                            onChange={(patch) => updateStepParams(step.id, patch)}
+                          />
+                        )}
+                        {step.type === "background" && (
+                          <BackgroundStepParams
+                            params={step.params as BackgroundParams}
+                            onChange={(patch) => updateStepParams(step.id, patch)}
+                          />
+                        )}
+                        {step.type === "upscale" && (
+                          <UpscaleStepParams
+                            params={step.params as UpscaleParams}
+                            onChange={(patch) => updateStepParams(step.id, patch)}
+                          />
+                        )}
+                        {step.type === "watermark" && (
+                          <WatermarkStepParams
+                            params={step.params as WatermarkParams}
+                            aspectRatio={aspectRatio}
+                            onChange={(patch) => updateStepParams(step.id, patch)}
+                          />
+                        )}
+                        {step.type === "outpaint" && (
+                          <OutpaintStepParams
+                            params={step.params as OutpaintParams}
+                            onChange={(patch) => updateStepParams(step.id, patch)}
+                          />
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -1123,65 +1084,6 @@ export default function ComboPage() {
           </>
           )}
         </div>
-
-        {/* 移动端：步骤参数抽屉 */}
-        {selectedStep && selectedStep.type !== "workflow" && (
-          <DrawerRoot
-            open={isMobile && selectedStepId !== null}
-            onOpenChange={(open: boolean) => {
-              if (!open) setSelectedStepId(null);
-            }}
-          >
-            <DrawerContent>
-              <DrawerHeader>
-                <DrawerTitle>{selectedStep.name}</DrawerTitle>
-              </DrawerHeader>
-              <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-4 pt-2">
-                {selectedStep.type === "scene" && (
-                  <SceneStepParams
-                    params={selectedStep.params as SceneParams}
-                    onChange={(patch) => updateStepParams(selectedStep.id, patch)}
-                  />
-                )}
-                {selectedStep.type === "background" && (
-                  <BackgroundStepParams
-                    params={selectedStep.params as BackgroundParams}
-                    onChange={(patch) => updateStepParams(selectedStep.id, patch)}
-                  />
-                )}
-                {selectedStep.type === "upscale" && (
-                  <UpscaleStepParams
-                    params={selectedStep.params as UpscaleParams}
-                    onChange={(patch) => updateStepParams(selectedStep.id, patch)}
-                  />
-                )}
-                {selectedStep.type === "watermark" && (
-                  <WatermarkStepParams
-                    params={selectedStep.params as WatermarkParams}
-                    aspectRatio={aspectRatio}
-                    onChange={(patch) => updateStepParams(selectedStep.id, patch)}
-                  />
-                )}
-                {selectedStep.type === "outpaint" && (
-                  <OutpaintStepParams
-                    params={selectedStep.params as OutpaintParams}
-                    onChange={(patch) => updateStepParams(selectedStep.id, patch)}
-                  />
-                )}
-              </div>
-              <DrawerFooter>
-                <DrawerClose asChild>
-                  <Button
-                    className="h-12 w-full rounded-full bg-accent-gradient text-[14px] font-semibold text-white"
-                    onClick={() => setSelectedStepId(null)}
-                  >
-                    完成
-                  </Button>
-                </DrawerClose>
-              </DrawerFooter>
-            </DrawerContent>
-          </DrawerRoot>
-        )}
 
         {/* 移动端：保存模板抽屉 */}
         <DrawerRoot open={saveTemplateOpen} onOpenChange={setSaveTemplateOpen}>
