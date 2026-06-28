@@ -30,7 +30,7 @@ function mapModelProviderLabel(provider: string) {
   switch (provider) {
     case 'gpt':
     case 'openai':
-      return 'GPT';
+      return 'OpenAI';
     case 'gemini':
       return 'Gemini';
     case 'jimeng':
