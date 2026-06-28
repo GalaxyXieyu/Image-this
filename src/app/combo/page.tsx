@@ -920,21 +920,7 @@ export default function ComboPage() {
             )}
           </section>
 
-          <section className="mt-4 glass-panel rounded-[20px]">
-            <MobileGlobalSettings
-              selectedTemplateName={selectedTemplateName}
-              aspectRatio={aspectRatio}
-              setAspectRatio={setAspectRatio}
-              resolution={resolution}
-              setResolution={setResolution}
-              watermarkEnabled={watermarkEnabled}
-              setWatermarkEnabled={setWatermarkEnabled}
-              autoRetry={autoRetry}
-              setAutoRetry={setAutoRetry}
-            />
-          </section>
-
-          {/* 处理顺序：紧凑横向 chip，拖动排序 + 删除 + 添加 */}
+          {/* 处理顺序：方形卡片网格，手柄拖动排序 + 删除 + 添加（网格内换行，不横滑） */}
           <section className="mt-4">
             <div className="mb-2.5 flex items-center justify-between">
               <h2 className="text-[15px] font-bold text-ink">处理顺序</h2>
@@ -942,7 +928,7 @@ export default function ComboPage() {
                 {steps.length}/5
               </span>
             </div>
-            <div className="-mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <div className="grid max-h-[260px] grid-cols-4 gap-2 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               {steps.map((step) => {
                 const Icon = STEP_META[step.type].icon;
                 const isDragging = draggingStepId === step.id;
@@ -956,82 +942,95 @@ export default function ComboPage() {
                   <div
                     key={step.id}
                     data-step-drop-id={step.id}
-                    onPointerDown={(event) => {
-                      event.currentTarget.setPointerCapture(event.pointerId);
-                      startStepDrag(step.id);
-                    }}
-                    onPointerMove={moveStepDragPointer}
-                    onPointerUp={endStepDrag}
-                    onPointerCancel={endStepDrag}
                     className={cn(
-                      "flex shrink-0 touch-none items-center gap-1.5 rounded-full border bg-surface py-1.5 pl-2 pr-1 transition-all",
+                      "relative flex aspect-square flex-col items-center justify-center gap-1 rounded-[14px] border bg-surface p-1 transition-all",
                       isDragging ? "scale-95 border-brand opacity-70 ring-2 ring-brand" : "border-line",
                       isDragOver && "border-brand",
                       isRefInvalid && "opacity-60"
                     )}
                   >
-                    <GripVertical className="h-3.5 w-3.5 shrink-0 text-ink-3" />
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-gradient text-[11px] font-bold text-white">
-                      {step.order}
-                    </span>
-                    {isRefInvalid ? (
-                      <AlertTriangle className="h-4 w-4 shrink-0 text-danger" />
-                    ) : (
-                      <Icon className="h-4 w-4 shrink-0 text-brand" />
-                    )}
-                    <span className="whitespace-nowrap text-[13px] font-semibold text-ink">
-                      {isRefInvalid ? `⚠ ${step.name}` : step.name}
-                    </span>
+                    {/* 拖拽手柄：只此处可拖，卡片其余区域可正常滚动 */}
+                    <button
+                      type="button"
+                      aria-label={`拖动 ${step.name}`}
+                      onPointerDown={(event) => {
+                        event.currentTarget.setPointerCapture(event.pointerId);
+                        startStepDrag(step.id);
+                      }}
+                      onPointerMove={moveStepDragPointer}
+                      onPointerUp={endStepDrag}
+                      onPointerCancel={endStepDrag}
+                      className="absolute left-0.5 top-0.5 flex h-6 w-6 touch-none items-center justify-center rounded-full text-ink-3 active:bg-surface-muted"
+                    >
+                      <GripVertical className="h-3.5 w-3.5" />
+                    </button>
                     <button
                       type="button"
                       aria-label={`删除 ${step.name}`}
-                      onPointerDown={(e) => e.stopPropagation()}
                       onClick={() => removeStep(step.id)}
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-3 hover:text-danger"
+                      className="absolute right-0.5 top-0.5 flex h-6 w-6 items-center justify-center rounded-full text-ink-3 hover:text-danger"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
+                    <span className="relative mt-1.5 flex h-9 w-9 items-center justify-center rounded-[12px] bg-brand-soft text-brand">
+                      {isRefInvalid ? <AlertTriangle className="h-5 w-5 text-danger" /> : <Icon className="h-5 w-5" />}
+                      <span className="absolute -left-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent-gradient text-[10px] font-bold text-white">
+                        {step.order}
+                      </span>
+                    </span>
+                    <span className="px-0.5 text-center text-[11px] font-medium leading-tight text-ink">
+                      {isRefInvalid ? `⚠ ${step.name}` : step.name}
+                    </span>
                   </div>
                 );
               })}
-              <BottomSheetSelect
-                options={getStepOptions(workflowTemplates, selectedTemplate)}
-                value=""
-                onChange={(value) => {
-                  if (typeof value === "string") {
-                    addStep(value);
+              {steps.length < 5 && (
+                <BottomSheetSelect
+                  options={getStepOptions(workflowTemplates, selectedTemplate)}
+                  value=""
+                  onChange={(value) => {
+                    if (typeof value === "string") {
+                      addStep(value);
+                    }
+                  }}
+                  title="选择处理步骤"
+                  trigger={
+                    <button
+                      type="button"
+                      className="flex aspect-square flex-col items-center justify-center gap-1 rounded-[14px] border-2 border-dashed border-line-strong text-ink-2 transition-colors hover:border-brand hover:text-brand"
+                    >
+                      <Plus className="h-5 w-5" />
+                      <span className="text-[11px] font-semibold">添加</span>
+                    </button>
                   }
-                }}
-                title="选择处理步骤"
-                trigger={
-                  <button
-                    type="button"
-                    disabled={steps.length >= 5}
-                    className={cn(
-                      "flex h-9 shrink-0 items-center gap-1 rounded-full border-2 border-dashed px-3 text-[13px] font-semibold transition-colors",
-                      steps.length >= 5
-                        ? "cursor-not-allowed border-line text-ink-3"
-                        : "border-line-strong text-ink-2 hover:border-brand hover:text-brand"
-                    )}
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    添加
-                  </button>
-                }
-                onOpenChange={setAddStepOpen}
-              />
+                  onOpenChange={setAddStepOpen}
+                />
+              )}
             </div>
           </section>
 
-          {/* 步骤参数：全部摊开，顺序/增删在上方完成 */}
+          {/* 参数：全局设置 + 各步参数 合并在一处 */}
           <section className="mt-4">
-            <h2 className="text-[15px] font-bold text-ink">步骤参数</h2>
+            <h2 className="text-[15px] font-bold text-ink">参数</h2>
             <p className="mt-0.5 mb-3 text-[12px] text-ink-3">
               {productAssets.length > 0
                 ? `共 ${productAssets.length} 张商品图 · 每张 ${steps.length} 步，将批量执行`
                 : "请先在上一步上传商品图"}
             </p>
-            <div className="flex flex-col gap-3">
+            <div className="glass-panel rounded-[20px]">
+              <MobileGlobalSettings
+                selectedTemplateName={selectedTemplateName}
+                aspectRatio={aspectRatio}
+                setAspectRatio={setAspectRatio}
+                resolution={resolution}
+                setResolution={setResolution}
+                watermarkEnabled={watermarkEnabled}
+                setWatermarkEnabled={setWatermarkEnabled}
+                autoRetry={autoRetry}
+                setAutoRetry={setAutoRetry}
+              />
+            </div>
+            <div className="mt-3 flex flex-col gap-3">
               {steps.map((step) => {
                 const Icon = STEP_META[step.type].icon;
                 const isWorkflow = step.type === "workflow";
