@@ -276,6 +276,15 @@ export default function ResultsPage() {
     }
   };
 
+  const handleBulkDownload = async () => {
+    if (selectedIds.size === 0) return;
+    const targets = filteredResults.filter((r) => selectedIds.has(r.id));
+    for (const item of targets) {
+      const url = item.processedUrl || item.thumbnail;
+      if (url) await downloadFile(url, item.name);
+    }
+  };
+
   const handleBulkDelete = async () => {
     if (selectedIds.size === 0) return;
     if (!confirm(`确定要删除选中的 ${selectedIds.size} 张图片吗？`)) return;
@@ -363,77 +372,67 @@ export default function ResultsPage() {
 
         {/* Main area */}
         <main className="flex flex-1 flex-col overflow-hidden">
-          {/* Single-row toolbar: select all + search + view mode + bulk */}
-          <div className="flex flex-col gap-2.5 border-b border-line glass-panel rounded-none px-4 py-2.5 shrink-0 sm:px-6 md:flex-row md:items-center md:justify-between md:py-2.5">
-            <div className="flex flex-wrap items-center gap-2 md:gap-3">
-              <button
-                onClick={toggleSelectAll}
-	                className="flex min-h-11 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-data text-ink-2 transition-colors hover:text-ink"
-              >
-                <CheckSquare className={cn("h-3.5 w-3.5", isAllSelected && "text-brand")} />
-                全选
-              </button>
-              {selectedIds.size > 0 && (
-                <span className="text-data text-brand-text">已选 {selectedIds.size} 项</span>
-              )}
-              <div className="relative min-w-[180px] flex-1 md:flex-none">
-                <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-3" />
-                <Input
-                  placeholder="搜索图片…"
-	                  className="h-11 w-full rounded-full pl-8 text-[13px] md:h-8 md:w-56"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && fetchResults()}
-                />
-              </div>
-            </div>
-            <div className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-              <div className="flex items-center gap-0.5 rounded-full border border-line bg-surface p-0.5">
+          {/* 上下文工具栏：默认仅搜索+视图；选中后整行切换为批量操作 */}
+          <div className="flex items-center gap-2 border-b border-line glass-panel rounded-none px-4 py-2 shrink-0 sm:px-6">
+            {selectedIds.size > 0 ? (
+              <>
                 <button
-                  onClick={() => setViewMode("grid")}
-                  className={cn(
-	                    "flex h-11 w-11 items-center justify-center rounded-full transition-colors md:h-auto md:w-auto md:p-1.5",
-                    viewMode === "grid"
-                      ? "bg-accent-gradient text-white"
-                      : "text-ink-3 hover:text-ink"
-                  )}
-                  aria-label="网格视图"
+                  onClick={toggleSelectAll}
+                  className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-[13px] text-ink-2 transition-colors hover:text-ink"
                 >
-                  <Grid className="h-3.5 w-3.5" />
+                  <CheckSquare className={cn("h-3.5 w-3.5", isAllSelected && "text-brand")} />
+                  {isAllSelected ? "取消全选" : "全选"}
                 </button>
+                <span className="text-[13px] font-medium text-brand-text">已选 {selectedIds.size}</span>
+                <div className="ml-auto flex items-center gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 shrink-0 rounded-full border-line-strong bg-surface px-3 text-[13px]"
+                    onClick={handleBulkDownload}
+                  >
+                    <Download className="mr-1 h-3.5 w-3.5" />
+                    下载
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 shrink-0 rounded-full border-line-strong bg-surface px-3 text-[13px] text-danger hover:text-danger"
+                    onClick={handleBulkDelete}
+                  >
+                    <Trash2 className="mr-1 h-3.5 w-3.5" />
+                    删除
+                  </Button>
+                  <button
+                    onClick={() => setSelectedIds(new Set())}
+                    className="flex h-9 shrink-0 items-center rounded-full px-2.5 text-[13px] text-ink-3 transition-colors hover:text-ink"
+                  >
+                    取消
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-3" />
+                  <Input
+                    placeholder="搜索图片…"
+                    className="h-9 w-full rounded-full pl-8 text-[13px]"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && fetchResults()}
+                  />
+                </div>
                 <button
-                  onClick={() => setViewMode("list")}
-                  className={cn(
-	                    "flex h-11 w-11 items-center justify-center rounded-full transition-colors md:h-auto md:w-auto md:p-1.5",
-                    viewMode === "list"
-                      ? "bg-accent-gradient text-white"
-                      : "text-ink-3 hover:text-ink"
-                  )}
-                  aria-label="列表视图"
+                  onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-ink-3 transition-colors hover:text-ink"
+                  aria-label={viewMode === "grid" ? "切换为列表视图" : "切换为网格视图"}
+                  title={viewMode === "grid" ? "列表视图" : "网格视图"}
                 >
-                  <List className="h-3.5 w-3.5" />
+                  {viewMode === "grid" ? <List className="h-4 w-4" /> : <Grid className="h-4 w-4" />}
                 </button>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={selectedIds.size === 0}
-	                className="h-11 shrink-0 rounded-full border-line-strong bg-surface text-[13px] md:h-8"
-              >
-                <Download className="mr-1 h-3.5 w-3.5" />
-                批量下载
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={selectedIds.size === 0}
-	                className="h-11 shrink-0 rounded-full border-line-strong bg-surface text-[13px] text-danger hover:text-danger md:h-8"
-                onClick={handleBulkDelete}
-              >
-                <Trash2 className="mr-1 h-3.5 w-3.5" />
-                批量删除
-              </Button>
-            </div>
+              </>
+            )}
           </div>
 
           {/* Results grid */}
