@@ -1,14 +1,14 @@
 {
-  "generated_at": "2026-06-28T09:43:21+08:00",
+  "generated_at": "2026-06-29T00:01:52+08:00",
   "project": {
     "name": "Image-this",
     "repo_root": "/Volumes/DATABASE/code/business/Image-this",
-    "config_path": "/Volumes/DATABASE/code/business/Image-this/pm.json",
+    "config_path": ".planning/pm/pm.json",
     "tasklist_name": "Image-this",
-    "tasklist_guid": "local:image-this",
+    "tasklist_guid": "2db08bb6-ee2f-4600-b324-89bade570efd",
     "task_prefix": "T",
     "kind": "task",
-    "task_backend": "local",
+    "task_backend": "feishu",
     "doc_backend": "repo"
   },
   "repo_scan": {
@@ -40,146 +40,40 @@
   "bootstrap": {
     "project_mode": "brownfield",
     "recommended_action": "map-codebase",
-    "task_backend": "local",
+    "task_backend": "feishu",
     "doc_backend": "repo",
-    "doc_folder_name": "Image-this",
+    "doc_folder_name": ".planning",
     "doc_folder_token": "",
-    "doc_folder_url": "",
-    "project_doc_token": "",
-    "project_doc_url": "",
-    "requirements_doc_token": "",
-    "requirements_doc_url": "",
-    "roadmap_doc_token": "",
-    "roadmap_doc_url": "",
-    "state_doc_token": "",
-    "state_doc_url": "",
+    "doc_folder_url": "repo://.planning",
+    "project_doc_token": "repo:.planning/PROJECT.md",
+    "project_doc_url": "repo://.planning/PROJECT.md",
+    "requirements_doc_token": "repo:.planning/REQUIREMENTS.md",
+    "requirements_doc_url": "repo://.planning/REQUIREMENTS.md",
+    "roadmap_doc_token": "repo:.planning/ROADMAP.md",
+    "roadmap_doc_url": "repo://.planning/ROADMAP.md",
+    "state_doc_token": "repo:.planning/STATE.md",
+    "state_doc_url": "repo://.planning/STATE.md",
     "notes": [
       "brownfield 项目优先做 map-codebase，再补项目/路线图/状态文档。",
       "greenfield 项目优先做 new-project，再进入任务拆解。",
-      "当前 task backend=local，doc backend=repo。"
+      "当前 task backend=feishu，doc backend=repo。"
     ]
   },
   "doc_index": {
-    "folder_name": "Image-this",
+    "folder_name": ".planning",
     "folder_token": "",
-    "folder_url": "",
-    "project_doc_token": "",
-    "project_doc_url": "",
-    "requirements_doc_token": "",
-    "requirements_doc_url": "",
-    "roadmap_doc_token": "",
-    "roadmap_doc_url": "",
-    "state_doc_token": "",
-    "state_doc_url": ""
+    "folder_url": "repo://.planning",
+    "project_doc_token": "repo:.planning/PROJECT.md",
+    "project_doc_url": "repo://.planning/PROJECT.md",
+    "requirements_doc_token": "repo:.planning/REQUIREMENTS.md",
+    "requirements_doc_url": "repo://.planning/REQUIREMENTS.md",
+    "roadmap_doc_token": "repo:.planning/ROADMAP.md",
+    "roadmap_doc_url": "repo://.planning/ROADMAP.md",
+    "state_doc_token": "repo:.planning/STATE.md",
+    "state_doc_url": "repo://.planning/STATE.md"
   },
-  "open_tasks": [
-    {
-      "task_id": "T9",
-      "summary": "[T9] 图片生成真实出图联调与模板导入",
-      "status": "in_progress",
-      "guid": "local-task-b65512c1abd2",
-      "url": "local://task/local-task-b65512c1abd2",
-      "updated_at": "2026-06-27T19:54:13+08:00",
-      "created_at": "2026-06-27T13:23:21+08:00"
-    },
-    {
-      "task_id": "T11",
-      "summary": "[T11] 移动端二级文本完整清理",
-      "status": "todo",
-      "guid": "local-task-2c74a6b20f1b",
-      "url": "local://task/local-task-2c74a6b20f1b",
-      "updated_at": "2026-06-27T15:37:01+08:00",
-      "created_at": "2026-06-27T15:37:01+08:00"
-    },
-    {
-      "task_id": "T13",
-      "summary": "[T13] 移动端 UX 全量适配与演示验收计划",
-      "status": "in_progress",
-      "guid": "local-task-108808350b64",
-      "url": "local://task/local-task-108808350b64",
-      "updated_at": "2026-06-28T09:43:21+08:00",
-      "created_at": "2026-06-27T19:10:41+08:00"
-    }
-  ],
-  "next_task": {
-    "task_id": "T9",
-    "summary": "[T9] 图片生成真实出图联调与模板导入",
-    "status": "in_progress",
-    "guid": "local-task-b65512c1abd2",
-    "url": "local://task/local-task-b65512c1abd2",
-    "updated_at": "2026-06-27T19:54:13+08:00",
-    "created_at": "2026-06-27T13:23:21+08:00"
-  },
-  "current_task": {
-    "task_id": "T13",
-    "summary": "[T13] 移动端 UX 全量适配与演示验收计划",
-    "status": "in_progress",
-    "guid": "local-task-108808350b64",
-    "url": "local://task/local-task-108808350b64",
-    "description": "任务编号：T13\n创建时间：2026-06-27 19:10:41 CST\n类型：task\nRepo：/Volumes/DATABASE/code/business/Image-this\n\n需求：\n对 Image-this 全部主要界面做移动端 UX 全量适配规划，覆盖信息密度、顶部介绍/二级文本清理、FAB/底部操作遮挡、下拉改 pill/横向滚动、生成填写区域折叠、上传图片上置和预览、减少步骤、高级设置折叠、场景生成多图结果体验、工具/组合/任务/结果/模板/设置页移动端验收；先输出完整计划给用户确认，确认后再执行开发、验证、部署。\n\n执行要求：\n- 以 task/doc 为主，不再依赖本地 task/context/state 文件。\n- 进度默认写评论，验收证据优先回填附件或评论。\n\n规划方案：\n\n一、目标假设\n把移动端从“桌面界面缩小版”改成“手机上能连续完成生成任务”的工作台：首屏聚焦上传和关键动作，非必要解释文本收起或隐藏，下拉改为 pill/横向滚动，生成配置默认折叠为高级设置，底部操作不被 FAB 或内容遮挡。\n\n二、优先级批次\nP0 演示主路径：/workspace/scene。处理顶部说明、素材上置、多商品上传预览、参考图可选判断、高级设置折叠、候选数量文案、结果按商品图分组、保存/查看按钮不被遮挡。关联 T11 的二级文本清理。\nP1 工具主路径：/tools。上传区保持在移动端顶部，工具切换使用 pill 横滚，背景/扩图提示词和模型尺寸进入高级设置，参考背景/Logo 预览可见，任务结果操作固定在安全底部区域。\nP2 组合工作流：/combo。移动端保留上方模板横滚、步骤列表和一个明确执行按钮；步骤说明文本压缩；全局执行设置和单步参数做折叠/抽屉式编辑，避免页面过长。\nP3 管理页扫尾：/tasks、/results、/templates、/settings。移除移动端顶部介绍和卡片二级文本；筛选/排序统一成 pill 或横滚；结果/任务卡只显示标题、状态、关键操作；设置页把低频说明收进折叠区。\nP4 真实出图联调：继续保留 T9，等待用户提供 key/base URL/图床配置后再执行。\n\n三、不做范围\n本轮不改 provider 真实调用逻辑，不迁移数据库 schema，不重做品牌视觉大方向，不把所有桌面端说明删除；桌面端保留必要管理信息。\n\n四、验证标准\n移动端以 390x844、375x812、430x932 三档验收；每个主页面截图检查首屏信息密度、按钮安全区、横向滚动控件、文本不换行爆版；场景生成录制上传 2-3 张商品图、不传参考图也能进入生成准备；运行 npx tsc --noEmit、npm run lint、npm run build；需要上线时 push 后确认 GitHub Actions 和 /api/health。\n\n五、上线节奏\n建议先跑 P0+P1 并部署给远程演示；P2+P3 作为第二个提交；T9 等 key 到位后单独联调真实出图。",
-    "updated_at": "2026-06-28T09:43:21+08:00",
-    "completed_at": "",
-    "attachments": [],
-    "tasklists": [
-      {
-        "tasklist_guid": "local:image-this"
-      }
-    ]
-  },
-  "recent_comments": [
-    {
-      "guid": "local-comment-d1bfeede408a",
-      "content": "【/combo 工作流移动端交互升级】已按用户反馈把组合工作流移动端从单一步骤列表重构为三段式流程：1）工作流：顶部 pill 分段 + 两列工作流模板卡，先选模板再继续；2）参数：上传商品图放顶部，全局执行设置压缩成紧凑汇总，按当前工作流汇总每一步关键参数摘要，点击步骤打开原参数抽屉；3）编排：独立流水线视图，步骤卡显示摘要，提供触摸拖动手柄重排和删除，保留添加步骤抽屉。移动端 390x844 浏览器验证：工作流模板首屏可见、参数页能看到上传/全局设置/步骤摘要、编排页步骤卡信息宽度改善且固定底部操作不遮挡主流程。验证：npx tsc --noEmit --pretty false PASS；git diff --check PASS；npm run lint PASS（0 errors，既有 warnings）；npm run build PASS。",
-      "resource_id": "local-task-108808350b64",
-      "created_at": "2026-06-28T09:43:21+08:00"
-    },
-    {
-      "guid": "local-comment-09f89602bfd0",
-      "content": "【/push --all】已完成当前可安全推送内容。提交 8036b17 chore(gitignore): 忽略 Prisma 本地数据库备份，新增 prisma/*.db.bak* 规则，防止本地 SQLite 备份误入仓库；提交 7fe21af docs(pm): 同步移动端 UX 任务状态，纳入已跟踪的 .planning/pm 上下文和 T13 评论缓存。排除项：prisma/app.db.bak-p2-232507 为本地数据库备份，已被 .gitignore 忽略，未提交。验证：git diff --check PASS；PM JSON 解析 PASS；敏感词扫描未发现真实密钥（仅说明文字 key/token）；此前同一 HEAD 上 npx tsc --noEmit --pretty false、npm run lint、npm run build 均 PASS。已推送到 origin/feature/ai-studio-2-commerce-workbench，远端更新到 7fe21af。",
-      "resource_id": "local-task-108808350b64",
-      "created_at": "2026-06-28T08:58:39+08:00"
-    },
-    {
-      "guid": "local-comment-9a8da6eafb8d",
-      "content": "【回退排查】用户担心误回退后已完成核查：当前分支 feature/ai-studio-2-commerce-workbench 的 HEAD 仍为 20ea0bd fix(combo): align watermark preview with output ratio，origin 同名分支也指向 20ea0bd1bd223f6f204fc6f0f307105505df87be；src/app/combo/page.tsx 与该提交无差异，水印预览拖拽、比例联动、customPosition 和商品图上传绑定代码均仍在。因此无需 cherry-pick/checkout 恢复，避免制造重复改动。验证：npx tsc --noEmit --pretty false PASS；npm run lint PASS（0 errors，既有 174 warnings）；npm run build PASS。当前工作区仅有 PM 缓存变更和 prisma/app.db.bak-p2-232507 未跟踪备份，未提交。",
-      "resource_id": "local-task-108808350b64",
-      "created_at": "2026-06-28T08:49:09+08:00"
-    },
-    {
-      "guid": "local-comment-662017605549",
-      "content": "【/combo 水印预览修复】已把水印位置预览从静态示意升级为可交互编辑：预览画布跟随全局画面比例（1:1/3:4/4:3/16:9/9:16），水印可在画布内拖动，拖动后进入“自定义”状态并保存相对 editor 坐标；点选左上/右上/左下/右下/居中会回到预设位置。执行 payload 对自定义位置传递 {x,y,editorWidth,editorHeight}，没有拖动坐标时回退 bottom-right，避免把 custom 字符串传给 worker。同步补了商品图上传入口的真实 inputAsset 绑定，执行前要求至少上传一张商品图。验证：npx tsc --noEmit --pretty false PASS；npm run lint PASS（0 errors，既有 warnings）；npm run build PASS；Playwright mobile 390x844 验证 1:1 预览实际 356x356，拖动后水印位置从右下更新到目标坐标。提交并推送：20ea0bd fix(combo): align watermark preview with output ratio。",
-      "resource_id": "local-task-108808350b64",
-      "created_at": "2026-06-28T08:39:00+08:00"
-    },
-    {
-      "guid": "local-comment-5c2b3b99a822",
-      "content": "【/combo 工作流弹窗移动端补齐】已补 AI 换背景步骤参考背景上传：复用 /api/input-assets 和 useUpload，支持上传/替换/移除并显示缩略图与文件名；执行 payload 透出 referenceAsset/customPrompt，方便 worker 读取。已补水印与尺寸步骤位置预览：在抽屉顶部显示 4:3 预览画布，水印文本按 top-left/top-right/bottom-left/bottom-right/center 和 opacity 实时渲染；执行 payload 映射 watermarkText/watermarkPosition/watermarkOpacity，并把 1k/2k/4k 转成 1024/2048/4096 输出尺寸。验证：npx tsc --noEmit --pretty false PASS；npm run lint PASS（0 errors，既有 warnings）；npm run build PASS。移动端 390x844 浏览器验证：AI 换背景 drawer 可见“参考背景/上传参考图”；水印 drawer 可见“位置预览”，实际可见预览框约 348x261，水印位于右下角。",
-      "resource_id": "local-task-108808350b64",
-      "created_at": "2026-06-28T07:54:05+08:00"
-    },
-    {
-      "guid": "local-comment-6533a897152b",
-      "content": "已完成场景风格优先与组合页占位图补齐，并部署上线。\n\n本轮提交：\n- 665eefa feat: 优化场景生成风格优先流程：/workspace/scene 改为「风格 -> 素材 -> 结果」，移动端风格卡两列铺满页面，去掉图片内重复标题，接入 9 张真实静态场景封面。\n- 96e2155 fix: 替换组合页场景模板占位图：/combo 移动端与桌面左侧场景模板均由渐变占位替换为真实场景封面。\n\n验证：npx tsc --noEmit --pretty false 通过；npm run lint 通过（仅既有 warnings）；npm run build 通过。移动端截图证据：out/ui-ux-plan/t13-style-first-flow/final-dev-no-overlay/ 与 out/ui-ux-plan/t13-style-first-flow/combo-final-dev-no-overlay/。\n\n部署：GitHub Actions run 28289929692「Deploy to Production (Source Build)」成功，deploy job 83820091026，用时约 2m31s。线上健康检查 https://image.bojie.store/api/health 返回 HTTP 200，status=healthy，database=connected，application=running，environment=production。静态图 https://image.bojie.store/scene-presets/scene-elegant.webp 返回 HTTP 200 image/webp。\n\n未纳入提交：PM 本地缓存与 prisma/app.db.bak-20260627-193418 仍保持未提交。",
-      "resource_id": "local-task-108808350b64",
-      "created_at": "2026-06-27T21:04:02+08:00"
-    },
-    {
-      "guid": "local-comment-cdd7f3ac931e",
-      "content": "新增产品流调整建议：场景生成移动端应从「素材 -> 风格 -> 结果」调整为「风格 -> 素材 -> 结果」。原因：用户先选择目标画面和风格预期，才知道应该上传哪些商品图/是否需要参考图；移动端先上传会增加认知负担。\n\n场景模板预览不能继续用占位/渐变：建议做一套静态高清场景封面资产，优先逐一生成并落到 public/static 目录，再绑定模板 id；也可先生成一张覆盖多场景的总图再裁切，但逐一生成在风格一致性和后续维护上更稳。\n\n下一轮执行方向：1）重排 stepper 与首屏，让风格卡片作为第一步；2）风格卡片增加真实预览图、横向滚动、选中即进入素材上传；3）素材上传根据已选风格展示最少必填项；4）参考图保持可选并靠后；5）补移动端截图验收。",
-      "resource_id": "local-task-108808350b64",
-      "created_at": "2026-06-27T19:46:27+08:00"
-    },
-    {
-      "guid": "local-comment-550576c0a7bb",
-      "content": "部署已完成并通过线上健康检查。\n\n部署信息：GitHub Actions run 28288091446，workflow「Deploy to Production (Source Build)」，headSha 60b13f1a41e4a228e627a005df0d0653b1d90144，deploy job 83815400609，结论 success，用时约 4m48s。\n线上验证：https://image.bojie.store/api/health 返回 HTTP 200，status=healthy，database=connected，application=running，environment=production，version=0.2.15。\n本次本地验证已完成：npx tsc --noEmit --pretty false、npm run lint（仅既有 warnings）、npm run build。\n演示入口：https://image.bojie.store。\n备注：当前工作树仍有 PM 本地缓存、scripts/uiux/login-generate-image.mjs、src/lib/image-processor/service.ts 和 prisma/app.db.bak-20260627-193418 等未提交/无关变更，未纳入本次移动端 UX 提交。",
-      "resource_id": "local-task-108808350b64",
-      "created_at": "2026-06-27T19:45:25+08:00"
-    },
-    {
-      "guid": "local-comment-180c299af034",
-      "content": "已完成移动端 UX 第一轮实现并推送提交 60b13f1：场景生成参考图改为可选、生成结果按商品来源分组、工具箱移动端参数折叠/底部安全操作、任务/设置页二级文本压缩。验证通过：npx tsc --noEmit、npm run lint（仅既有 warnings）、npm run build；移动端截图证据在 out/ui-ux-plan/t13-mobile-ux-build/，包含 390x844/375x812/430x932。等待 GitHub Actions 部署完成后补健康检查。",
-      "resource_id": "local-task-108808350b64",
-      "created_at": "2026-06-27T19:39:27+08:00"
-    }
-  ]
+  "open_tasks": [],
+  "next_task": null,
+  "current_task": null,
+  "recent_comments": []
 }

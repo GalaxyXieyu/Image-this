@@ -53,7 +53,7 @@ Primary product surfaces are `/workspace/scene` for scene generation, `/combo` f
   - `npm run build` validates the Next standalone output needed by Electron packages; platform packaging should be checked on target OS when Electron, Prisma, Sharp, storage, or file-serving behavior changes.
   - UI/UX replay writes artifacts under `out/ui-ux-plan/<run-id>/`; actual image generation may be `BLOCKED/ENV` when local provider credentials are missing, but navigation and task creation should still be recorded.
   - Use Playwright codegen/opencli recording for new or unstable flows, clean noisy recorded scripts, then promote stable steps into maintained UI/UX replay scripts.
-  - Local UI testing account: `test@imaginethis.local` / `TestPassword123!`; register through `/auth/register` or the local registration API when needed.
+  - Local UI testing account: `test@imaginethis.local` / `[REDACTED-见 .claude/credentials.local.md]`; register through `/auth/register` or the local registration API when needed.
   - `.pen` design files such as `docs/image-this.pen` are encrypted and must be accessed only through Pencil MCP tools, never direct file reads or greps.
 - Quality conventions
   - Prefer Server Components unless browser state, upload, drag/drop, polling, canvas, navigation hooks, or direct interaction require Client Components.
@@ -78,3 +78,27 @@ Primary product surfaces are `/workspace/scene` for scene generation, `/combo` f
 - Before tracked implementation, read `pm.json` and `.pm/current-context.json`.
 - When PM context exists, write progress and completion back through PM.
 - Keep changes minimal, root-cause oriented, and consistent with existing code style.
+
+<!-- PM_SHARED_CONTRACT:START -->
+## Repo / Coder Execution Contract
+
+- PM config: `/Volumes/DATABASE/code/business/Image-this/.planning/pm/pm.json`
+- repo root: `/Volumes/DATABASE/code/business/Image-this`
+- tasklist: `Image-this`
+- doc folder: `.planning`
+- default engineering worker: `xieyu`
+- preferred UI worker: `gemini`
+
+- This repository root is the binding point for Claude Code, Codex, PM context, and local project truth.
+- Start Claude Code / Codex from `/Volumes/DATABASE/code/business/Image-this` before running PM commands or editing project files.
+- Read `.planning/pm/pm.json`, `.planning/pm/current-context.json`, `.planning/pm/bootstrap.json`, and `.planning/pm/coder-context.json` before tracked implementation work.
+- `pm` remains task truth, context truth, progress write-back, and completion truth.
+- Feishu delivery uses the official `lark-cli`; do not route PM Feishu work through OpenClaw/Gateway/Hermes bridge layers.
+- Local backend mode must stay offline and must not invoke `lark-cli`.
+- Repo doc backend materializes repo-local planning docs under the configured doc folder, defaulting to `.planning/`.
+- Do not store app secret, access token, refresh token, tenant secret, or user token in `pm.json`.
+- `product-canvas` clarifies ambiguous product, UX, and acceptance questions before implementation.
+- `coder` executes implementation after PM intake and routes engineering work to `xieyu` while preferring `gemini` for UI or visual exploration.
+- `project-review` is the project-level review and quality layer after implementation, not the front-door intake role.
+- Any tracked behavior, docs, workflow, or code change should still start from a normalized PM task before execution.
+<!-- PM_SHARED_CONTRACT:END -->

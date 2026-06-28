@@ -43,6 +43,10 @@ yarn-error.log*
 .env.production.local
 .env.production
 
+# Local-only credentials (NEVER commit — referenced by CLAUDE.md)
+.claude/credentials.local.md
+*.credentials.local.md
+
 # Vercel
 .vercel
 

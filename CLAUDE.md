@@ -9,14 +9,114 @@ Primary product surfaces are `/workspace/scene` for scene generation, `/combo` f
 ## PM Contract
 
 <!-- PM_CONTRACT:START -->
-- PM config: `pm.json`
-- PM cache/context: `.pm/`
+- PM config: `.planning/pm/pm.json`
+- PM cache/context: `.planning/pm/`
 - Task truth: PM task backend / local task backend
-- Context truth: `.pm/current-context.json`, `.pm/bootstrap.json`, `.pm/coder-context.json`
-- Initialize or refresh PM before tracked work.
-- Use PM for task creation/search, progress write-back, completion, and coder handoff.
-- Do not store secrets or tokens in `pm.json`.
+- Context truth: `.planning/pm/current-context.json`, `.planning/pm/bootstrap.json`, `.planning/pm/coder-context.json`
+- Initialize or refresh PM only when tracked PM work is intended.
+- Use PM for task creation/search, progress write-back, completion, and coder handoff when PM is enabled.
+- Legacy root `pm.json` and `.pm/` are compatibility inputs only; prefer `.planning/pm/` for new PM state.
+- Do not store secrets or tokens in PM config or docs.
 <!-- PM_CONTRACT:END -->
+
+## Harness Operating Model
+
+<!-- HARNESS_MODEL:START -->
+This project uses the Coding Harness.
+
+### Layering
+
+- Commands are user-facing entrypoints and safety gates.
+- Skills contain reusable policy, methodology, rubrics, and conventions.
+- Subagents perform concrete work such as research, planning, execution, verification, integration checking, debugging, and mapping.
+- Do not duplicate long process rules inside commands when a skill owns that policy.
+
+### User-Facing Commands
+
+- `/plan` — turn a feature request into an executable plan.
+- `/build` — implement planned work or a small bounded task.
+- `/fix` — debug, fix, or simplify a narrow issue.
+- `/verify` — unified check/review/verification entrypoint.
+- `/push` — verify, commit, and push selected changes using shared git/PM policy.
+- `/pinit` — write or refresh this Harness operating model; use `--pm`, `--map`, or `--full` for heavier initialization.
+
+### Subagent Routing
+
+- Planning: `phase-researcher`, `assumptions-analyzer`, `planner`, `plan-checker`.
+- Build: `executor`.
+- Fix: `debugger`, optionally `executor`.
+- Verify: `verifier`, `integration-checker`.
+- Project init/map: `codebase-mapper` only when mapping is explicitly requested.
+- UI: `ui-researcher`, `ui-checker`, `ui-auditor`.
+- Product/research/profile support: `project-researcher`, `research-synthesizer`, `roadmapper`, `user-profiler`.
+
+### Verification Policy
+
+Use `/verify` for all review/checking needs. Do not route to a separate `/code-review`. `verifier` checks goal achievement and implementation quality; `integration-checker` checks wiring, cross-module connections, and end-to-end user flows.
+
+### Git Policy
+
+Use `/push` for commit/push. `/push` must follow `gsd-git` policy, bind PM tasks when available, and use `/verify` semantics before committing.
+
+### PM Rule
+
+PM task/doc/context truth must not be bypassed when `.planning/pm/pm.json` exists.
+<!-- HARNESS_MODEL:END -->
+
+## Task Intake Procedure
+
+<!-- TASK_INTAKE:START -->
+收到任何任务后，按以下顺序决策，不要跳步直接写代码。
+
+### Step 1 — 分类
+
+| 任务类型 | 判断依据 |
+|---------|---------|
+| 新需求 / 功能 | 需要设计决策、新 API、新页面、新字段 |
+| Bug 修复 | 实际行为与预期不符，有复现路径 |
+| UI / 视觉调整 | 只涉及样式、布局、交互动效，不改业务逻辑 |
+| 重构 / 清理 | 改结构但不改行为 |
+| 调研 / 分析 | 输出是结论和建议，不是代码 |
+
+分类不确定时，先问清楚再动手。
+
+### Step 2 — 读取上下文（tracked work 必须）
+
+```
+.planning/pm/pm.json + current-context.json   # PM 任务绑定
+.planning/STATE.md / PROJECT.md               # 项目当前阶段和目标
+.planning/codebase-map/concerns.md            # 已知风险，评估影响范围
+```
+
+UI 任务额外读 `.planning/codebase/MINIAPP_UI_UX.md`（如有）。
+
+### Step 3 — Subagent 路由
+
+```
+新需求  → /plan  (phase-researcher → assumptions-analyzer → planner → plan-checker)
+          → /build (executor)
+Bug     → /fix   (debugger → executor)
+UI      → /plan  (ui-researcher → planner → plan-checker)
+          → /build (executor) → /verify (ui-checker → ui-auditor)
+重构    → /plan  (planner → plan-checker) → /build (executor)
+调研    → project-researcher → research-synthesizer
+```
+
+两步以上的任务必须先跑 `/plan` 产出计划，再跑 `/build`，不要在同一步骤里边规划边实现。
+
+### Step 4 — 渐进实现
+
+- 超过两个实质步骤，保持可见计划并实时更新。
+- 业务逻辑变更前先确认字段含义、用户场景和边界规则；发现需求冲突立即上报，不自行猜测。
+- UI 变更前先查 token / primitive，不硬编码颜色、字重、尺寸。
+
+### Step 5 — Verify & Push
+
+```
+/verify   # verifier 检查目标达成；integration-checker 检查跨模块接线
+/push     # 通过验证后提交，绑定 PM 任务，写回进度
+```
+<!-- TASK_INTAKE:END -->
 
 ## Agent / Skill Roles
 
@@ -53,7 +153,9 @@ Primary product surfaces are `/workspace/scene` for scene generation, `/combo` f
   - `npm run build` validates the Next standalone output needed by Electron packages; platform packaging should be checked on target OS when Electron, Prisma, Sharp, storage, or file-serving behavior changes.
   - UI/UX replay writes artifacts under `out/ui-ux-plan/<run-id>/`; actual image generation may be `BLOCKED/ENV` when local provider credentials are missing, but navigation and task creation should still be recorded.
   - Use Playwright codegen/opencli recording for new or unstable flows, clean noisy recorded scripts, then promote stable steps into maintained UI/UX replay scripts.
-  - Local UI testing account: `test@imaginethis.local` / `TestPassword123!`; register through `/auth/register` or the local registration API when needed.
+  - Local UI testing account: `test@imaginethis.local` / `[REDACTED-见 .claude/credentials.local.md]`; register through `/auth/register` or the local registration API when needed.
+  - Production owner account (for end-to-end checks on `https://image.bojie.store`): `xy523018705@gmail.com` / `[REDACTED-见 .claude/credentials.local.md]`. Sensitive — do not commit this credential to a tracked file other than as already noted here, and do not log it.
+  - Working Gemini/toapis provider token for end-to-end image generation: key `[REDACTED-见 .claude/credentials.local.md]`, Base URL `https://toapis.com` (no `/v1`), model `gemini-3.1-flash-image-preview`. Set under `/settings`; account setting overrides server env.
   - `.pen` design files such as `docs/image-this.pen` are encrypted and must be accessed only through Pencil MCP tools, never direct file reads or greps.
 - Quality conventions
   - Prefer Server Components unless browser state, upload, drag/drop, polling, canvas, navigation hooks, or direct interaction require Client Components.
@@ -78,3 +180,4 @@ Primary product surfaces are `/workspace/scene` for scene generation, `/combo` f
 - Before tracked implementation, read `pm.json` and `.pm/current-context.json`.
 - When PM context exists, write progress and completion back through PM.
 - Keep changes minimal, root-cause oriented, and consistent with existing code style.
+- After finishing a feature, always run an end-to-end closed-loop verification through the real app (Chrome MCP / browser): log in, exercise the actual user flow, confirm the visible outcome (generated image, task completion, etc.), and screenshot — not just lint/tsc/unit checks. Use the production owner account above when validating live behavior.

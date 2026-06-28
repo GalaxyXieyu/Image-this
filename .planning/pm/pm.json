@@ -1,0 +1,125 @@
+{
+  "project": {
+    "name": "Image-this",
+    "agent": "xieyu"
+  },
+  "repo_root": "/Volumes/DATABASE/code/business/Image-this",
+  "task": {
+    "backend": "feishu",
+    "tasklist_name": "Image-this",
+    "prefix": "T",
+    "kind": "task",
+    "tasklist_guid": "2db08bb6-ee2f-4600-b324-89bade570efd",
+    "tasklist_url": "https://applink.feishu.cn/client/todo/task_list?guid=2db08bb6-ee2f-4600-b324-89bade570efd",
+    "default_assignee": "ou_1356b97a4de83cfe7903347e04fcfd43"
+  },
+  "doc": {
+    "backend": "repo",
+    "folder_name": ".planning",
+    "project_title": "PROJECT",
+    "requirements_title": "REQUIREMENTS",
+    "roadmap_title": "ROADMAP",
+    "state_title": "STATE",
+    "dry_run": false,
+    "folder_token": "",
+    "folder_url": "repo://.planning",
+    "folder_created": false,
+    "folder_status": "adopted",
+    "project": "PROJECT",
+    "requirements": "REQUIREMENTS",
+    "roadmap": "ROADMAP",
+    "state": "STATE",
+    "project_doc_token": "repo:.planning/PROJECT.md",
+    "requirements_doc_token": "repo:.planning/REQUIREMENTS.md",
+    "roadmap_doc_token": "repo:.planning/ROADMAP.md",
+    "state_doc_token": "repo:.planning/STATE.md",
+    "project_doc_url": "repo://.planning/PROJECT.md",
+    "requirements_doc_url": "repo://.planning/REQUIREMENTS.md",
+    "roadmap_doc_url": "repo://.planning/ROADMAP.md",
+    "state_doc_url": "repo://.planning/STATE.md",
+    "project_doc_status": "adopted",
+    "requirements_doc_status": "adopted",
+    "roadmap_doc_status": "adopted",
+    "state_doc_status": "adopted"
+  },
+  "feishu": {
+    "provider": "lark-cli",
+    "cli_profile": "",
+    "as": "user"
+  },
+  "coder": {
+    "backend": "acp",
+    "agent_id": "codex",
+    "timeout": 900,
+    "thinking": "high",
+    "session_key": "main",
+    "routing": {
+      "enabled": true,
+      "rules": [
+        {
+          "name": "frontend-to-gemini",
+          "match": {
+            "mode": "any",
+            "task_types": [
+              "frontend",
+              "ui",
+              "ux"
+            ],
+            "keywords": [
+              "前端",
+              "ui",
+              "页面",
+              "界面",
+              "交互",
+              "样式",
+              "设计",
+              "landing page",
+              "dashboard"
+            ]
+          },
+          "target": {
+            "backend": "codex-cli",
+            "agent_id": "gemini",
+            "thinking": "high"
+          }
+        },
+        {
+          "name": "backend-and-bugfix-to-codex",
+          "match": {
+            "mode": "any",
+            "task_types": [
+              "backend",
+              "bug",
+              "bugfix"
+            ],
+            "keywords": [
+              "后端",
+              "api",
+              "bug",
+              "修复",
+              "报错",
+              "异常",
+              "回归",
+              "代码健康",
+              "review risk"
+            ]
+          },
+          "target": {
+            "backend": "acp",
+            "agent_id": "codex"
+          }
+        }
+      ]
+    }
+  },
+  "tasklist_name": "",
+  "task_prefix": "T",
+  "kind": "task",
+  "description_requirements": [
+    "以 task/doc 为主，不再依赖本地 task/context/state 文件。",
+    "进度默认写评论，验收证据优先回填附件或评论。"
+  ],
+  "repo": {
+    "root": "/Volumes/DATABASE/code/business/Image-this"
+  }
+}
