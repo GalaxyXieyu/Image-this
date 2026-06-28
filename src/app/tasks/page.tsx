@@ -33,6 +33,8 @@ interface Task {
   createdAt: string;
   type: string;
   usedModel?: string | null;
+  originalImageUrl?: string | null;
+  resultImageUrl?: string | null;
 }
 
 function mapBackendStatus(status: string): TaskStatus {
@@ -89,6 +91,8 @@ interface BackendTask {
   errorMessage: string | null;
   createdAt: string;
   usedModel?: string | null;
+  originalImageUrl?: string | null;
+  resultImageUrl?: string | null;
 }
 
 interface TasksApiResponse {
@@ -96,6 +100,33 @@ interface TasksApiResponse {
   tasks: BackendTask[];
   pagination: { total: number; limit: number; offset: number; hasMore: boolean };
   stats: { pending: number; processing: number; completed: number; failed: number; total: number };
+}
+
+function TaskThumbnail({ src, isResult }: { src?: string | null; isResult: boolean }) {
+  const [error, setError] = useState(false);
+  if (!src || error) {
+    return (
+      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[12px] bg-muted">
+        <ImageIcon className="h-5 w-5 text-muted-foreground" />
+      </div>
+    );
+  }
+  return (
+    <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[12px] border border-line bg-surface-muted">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={isResult ? "结果" : "原图"}
+        className="h-full w-full object-cover"
+        onError={() => setError(true)}
+      />
+      {!isResult && (
+        <span className="absolute inset-x-0 bottom-0 bg-black/45 py-0.5 text-center text-[9px] font-medium text-white">
+          原图
+        </span>
+      )}
+    </div>
+  );
 }
 
 export default function TasksPage() {
@@ -135,6 +166,8 @@ export default function TasksPage() {
         createdAt: formatDate(t.createdAt),
         type: t.type,
         usedModel: t.usedModel,
+        originalImageUrl: t.originalImageUrl,
+        resultImageUrl: t.resultImageUrl,
       }));
       setTasks(mapped);
       setStats({
@@ -318,9 +351,10 @@ export default function TasksPage() {
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                    <ImageIcon className="w-5 h-5 text-muted-foreground" />
-                  </div>
+                  <TaskThumbnail
+                    src={task.resultImageUrl || task.originalImageUrl}
+                    isResult={!!task.resultImageUrl}
+                  />
                   <div className="min-w-0">
                     <h3 className="truncate text-data font-medium text-foreground">
                       {task.name}

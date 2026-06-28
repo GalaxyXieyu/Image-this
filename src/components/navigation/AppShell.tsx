@@ -4,9 +4,9 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Suspense, useEffect, useState } from "react";
-import { createPortal } from "react-dom";
-import { Bell, Download, Moon, Sun, Wand2, Layers, Wrench, Sparkles, Droplets, ZoomIn, Expand, Home, Image as ImageIcon, Settings as SettingsIcon, Menu, X } from "lucide-react";
+import { Bell, Download, Moon, Sun, Wand2, Layers, Wrench, Sparkles, Droplets, ZoomIn, Expand, Home, Image as ImageIcon, Settings as SettingsIcon, ListTodo } from "lucide-react";
 import { BrandLogo } from "@/components/brands/SpriteImage";
+import { MobileTabBar } from "@/components/navigation/MobileTabBar";
 import { cn } from "@/lib/utils";
 
 type PrimaryItem = {
@@ -53,8 +53,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
-  const isWorkspace = WORKSPACE_SEGMENTS.some((s) => s.match(pathname));
+  const isWorkspace = WORKSPACE_SEGMENTS.some((s) => s.match(pathname)) || pathname === "/workspace";
   const isTools = pathname.startsWith("/tools");
+  // combo 自带 fixed 底部操作栏，避开冲突时隐藏底部 Tab 栏
+  const showTabBar = !pathname.startsWith("/combo");
 
   return (
     <div className="flex h-[100dvh] flex-col bg-background text-foreground app-bg-glow">
@@ -62,6 +64,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <TopNavWithSearch pathname={pathname} isWorkspace={isWorkspace} isTools={isTools} />
       </Suspense>
       <main className="flex-1 min-h-0 overflow-hidden">{children}</main>
+      {showTabBar && <MobileTabBar />}
     </div>
   );
 }
@@ -142,16 +145,25 @@ function TopNav({
           <ThemeToggle />
         </div>
 
-        {/* 移动：右上汉堡（一级 + 二级 nav + 工具 + 更新/通知 全在抽屉里） */}
+        {/* 移动：右上 任务入口 + 主题（导航改由底部 Tab 栏 + 顶部二级承接） */}
         <div className="ml-auto md:hidden flex items-center gap-1.5">
+          <Link
+            href="/tasks"
+            aria-label="任务"
+            className={cn(
+              "inline-flex h-11 w-11 items-center justify-center rounded-full border border-border/70 bg-surface/80 transition-colors",
+              pathname.startsWith("/tasks") ? "text-brand-text" : "text-muted-foreground"
+            )}
+          >
+            <ListTodo className="h-5 w-5" />
+          </Link>
           <ThemeToggle />
-          <MobileMenu pathname={pathname} isWorkspace={isWorkspace} isTools={isTools} activeTool={activeTool} />
         </div>
       </div>
 
-      {/* Row 2: 工作台二级 nav（桌面端） — 移动端隐藏，由侧边栏抽屉承接 */}
+      {/* Row 2: 工作台二级 nav（移动端顶部横滚 + 桌面端） */}
       {isWorkspace && (
-        <div className="hidden md:flex h-12 items-center gap-3 border-t border-border/40 px-4 md:px-6 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex h-12 items-center gap-3 border-t border-border/40 px-4 md:px-6 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           <div className="flex items-center gap-1 rounded-full border border-border/70 bg-surface-muted/70 p-1">
             {WORKSPACE_SEGMENTS.map((seg) => {
               const active = seg.match(pathname);
@@ -200,159 +212,6 @@ function TopNav({
         </div>
       )}
     </header>
-  );
-}
-
-function MobileMenu({
-  pathname,
-  isWorkspace,
-  isTools,
-  activeTool,
-}: {
-  pathname: string;
-  isWorkspace: boolean;
-  isTools: boolean;
-  activeTool: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  const close = () => setOpen(false);
-  // 用 portal 把抽屉挂到 <body>，避免被 <header backdrop-blur> 形成的
-  // 局部 stacking context 困住，导致页面 main 内容覆盖到抽屉之上。
-  const overlay = open && mounted ? createPortal(
-    (
-      <div className="fixed inset-0 z-[60]" onClick={close}>
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-          <div
-            className="fixed right-0 top-0 w-[82%] max-w-[320px] bg-background border-l border-border/60 flex flex-col shadow-float overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-            style={{ paddingTop: "env(safe-area-inset-top, 0)", height: "100dvh" }}
-          >
-            <div className="flex items-center justify-between px-4 py-4 border-b border-border/40">
-              <span className="font-serif text-h3 text-ink">导航</span>
-              <button
-                onClick={close}
-                aria-label="关闭"
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full text-ink-2 hover:bg-surface-muted"
-              >
-                <X className="h-5 w-5 text-ink-2" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
-              {/* 一级 */}
-              <section>
-                <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-3">主导航</p>
-                <div className="space-y-1">
-                  {PRIMARY_ITEMS.map((item) => {
-                    const active = item.match(pathname);
-                    const Icon = item.icon;
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={close}
-                        className={cn(
-                          "flex items-center gap-3 rounded-[12px] px-3 py-2.5 text-[14px] font-medium transition-colors",
-                          active ? "bg-brand-soft text-brand-text" : "text-ink-2 hover:bg-surface-muted"
-                        )}
-                      >
-                        <Icon className="h-4 w-4" />
-                        {item.label}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </section>
-
-              {/* 工作台二级 */}
-              {isWorkspace && (
-                <section>
-                  <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-3">工作台</p>
-                  <div className="space-y-1">
-                    {WORKSPACE_SEGMENTS.map((seg) => {
-                      const active = seg.match(pathname);
-                      const Icon = seg.icon;
-                      return (
-                        <Link
-                          key={seg.href}
-                          href={seg.href}
-                          onClick={close}
-                          className={cn(
-                            "flex items-center gap-3 rounded-[12px] px-3 py-2.5 text-[14px] font-medium transition-colors",
-                            active ? "bg-brand-soft text-brand-text" : "text-ink-2 hover:bg-surface-muted"
-                          )}
-                        >
-                          <Icon className="h-4 w-4" />
-                          {seg.label}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </section>
-              )}
-
-              {/* 工具三级（仅 /tools） */}
-              {isTools && (
-                <section>
-                  <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-3">工具</p>
-                  <div className="space-y-1">
-                    {TOOL_PILLS.map((pill) => {
-                      const active = activeTool === pill.tool;
-                      const Icon = pill.icon;
-                      return (
-                        <Link
-                          key={pill.tool}
-                          href={`/tools?tool=${pill.tool}`}
-                          onClick={close}
-                          className={cn(
-                            "flex items-center gap-3 rounded-[12px] px-3 py-2.5 text-[14px] font-medium transition-colors",
-                            active ? "bg-accent-gradient text-white shadow-soft" : "text-ink-2 hover:bg-surface-muted"
-                          )}
-                        >
-                          <Icon className="h-4 w-4" />
-                          {pill.label}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </section>
-              )}
-
-              {/* 工具按钮：更新 / 通知 */}
-              <section>
-                <p className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-3">其他</p>
-                <div className="space-y-1">
-                  <button className="relative flex w-full items-center gap-3 rounded-[12px] px-3 py-2.5 text-[14px] font-medium text-ink-2 hover:bg-surface-muted">
-                    <Download className="h-4 w-4" />
-                    检查更新
-                    <span className="absolute right-3 top-3 h-2 w-2 rounded-full bg-danger" />
-                  </button>
-                  <button className="flex w-full items-center gap-3 rounded-[12px] px-3 py-2.5 text-[14px] font-medium text-ink-2 hover:bg-surface-muted">
-                    <Bell className="h-4 w-4" />
-                    通知
-                  </button>
-                </div>
-              </section>
-            </div>
-          </div>
-        </div>
-    ),
-    document.body
-  ) : null;
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="菜单"
-        className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-border/70 bg-surface/80 text-muted-foreground"
-      >
-        <Menu className="h-5 w-5" />
-      </button>
-      {overlay}
-    </>
   );
 }
 
