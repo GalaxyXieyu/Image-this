@@ -31,6 +31,7 @@ import {
 import {
   Trash2,
   GripVertical,
+  X,
   Plus,
   Play,
   Bookmark,
@@ -933,21 +934,15 @@ export default function ComboPage() {
             />
           </section>
 
+          {/* 处理顺序：紧凑横向 chip，拖动排序 + 删除 + 添加 */}
           <section className="mt-4">
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <h2 className="text-[15px] font-bold text-ink">步骤参数</h2>
-                <p className="mt-0.5 text-[12px] text-ink-3">
-                  {productAssets.length > 0
-                    ? `共 ${productAssets.length} 张商品图 · 每张 ${steps.length} 步，将批量执行`
-                    : "请先在上一步上传商品图"}
-                </p>
-              </div>
+            <div className="mb-2.5 flex items-center justify-between">
+              <h2 className="text-[15px] font-bold text-ink">处理顺序</h2>
               <span className="rounded-full border border-line bg-surface px-2.5 py-1 text-[12px] font-semibold text-ink-2">
                 {steps.length}/5
               </span>
             </div>
-            <div className="flex flex-col gap-3">
+            <div className="-mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               {steps.map((step) => {
                 const Icon = STEP_META[step.type].icon;
                 const isDragging = draggingStepId === step.id;
@@ -957,36 +952,99 @@ export default function ComboPage() {
                   ? workflowTemplates.find((t) => t.id === step.refTemplateId)
                   : undefined;
                 const isRefInvalid = isWorkflow && !refTemplate;
-
                 return (
                   <div
                     key={step.id}
                     data-step-drop-id={step.id}
+                    onPointerDown={(event) => {
+                      event.currentTarget.setPointerCapture(event.pointerId);
+                      startStepDrag(step.id);
+                    }}
                     onPointerMove={moveStepDragPointer}
+                    onPointerUp={endStepDrag}
+                    onPointerCancel={endStepDrag}
                     className={cn(
-                      "glass-panel w-full rounded-[18px] p-3 transition-all",
-                      isDragging && "scale-[0.98] opacity-75 ring-2 ring-brand",
-                      isDragOver && "translate-y-0.5 border-brand",
+                      "flex shrink-0 touch-none items-center gap-1.5 rounded-full border bg-surface py-1.5 pl-2 pr-1 transition-all",
+                      isDragging ? "scale-95 border-brand opacity-70 ring-2 ring-brand" : "border-line",
+                      isDragOver && "border-brand",
                       isRefInvalid && "opacity-60"
                     )}
                   >
-                    {/* 标题栏：拖拽手柄 + 序号/名称 + 删除 */}
+                    <GripVertical className="h-3.5 w-3.5 shrink-0 text-ink-3" />
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-gradient text-[11px] font-bold text-white">
+                      {step.order}
+                    </span>
+                    {isRefInvalid ? (
+                      <AlertTriangle className="h-4 w-4 shrink-0 text-danger" />
+                    ) : (
+                      <Icon className="h-4 w-4 shrink-0 text-brand" />
+                    )}
+                    <span className="whitespace-nowrap text-[13px] font-semibold text-ink">
+                      {isRefInvalid ? `⚠ ${step.name}` : step.name}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label={`删除 ${step.name}`}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={() => removeStep(step.id)}
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-3 hover:text-danger"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
+              <BottomSheetSelect
+                options={getStepOptions(workflowTemplates, selectedTemplate)}
+                value=""
+                onChange={(value) => {
+                  if (typeof value === "string") {
+                    addStep(value);
+                  }
+                }}
+                title="选择处理步骤"
+                trigger={
+                  <button
+                    type="button"
+                    disabled={steps.length >= 5}
+                    className={cn(
+                      "flex h-9 shrink-0 items-center gap-1 rounded-full border-2 border-dashed px-3 text-[13px] font-semibold transition-colors",
+                      steps.length >= 5
+                        ? "cursor-not-allowed border-line text-ink-3"
+                        : "border-line-strong text-ink-2 hover:border-brand hover:text-brand"
+                    )}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    添加
+                  </button>
+                }
+                onOpenChange={setAddStepOpen}
+              />
+            </div>
+          </section>
+
+          {/* 步骤参数：全部摊开，顺序/增删在上方完成 */}
+          <section className="mt-4">
+            <h2 className="text-[15px] font-bold text-ink">步骤参数</h2>
+            <p className="mt-0.5 mb-3 text-[12px] text-ink-3">
+              {productAssets.length > 0
+                ? `共 ${productAssets.length} 张商品图 · 每张 ${steps.length} 步，将批量执行`
+                : "请先在上一步上传商品图"}
+            </p>
+            <div className="flex flex-col gap-3">
+              {steps.map((step) => {
+                const Icon = STEP_META[step.type].icon;
+                const isWorkflow = step.type === "workflow";
+                const refTemplate = isWorkflow
+                  ? workflowTemplates.find((t) => t.id === step.refTemplateId)
+                  : undefined;
+                const isRefInvalid = isWorkflow && !refTemplate;
+                return (
+                  <div
+                    key={step.id}
+                    className={cn("glass-panel w-full rounded-[18px] p-3", isRefInvalid && "opacity-60")}
+                  >
                     <div className="flex items-center gap-2.5">
-                      <button
-                        type="button"
-                        aria-label={`拖动 ${step.name}`}
-                        onPointerDown={(event) => {
-                          event.preventDefault();
-                          event.currentTarget.setPointerCapture(event.pointerId);
-                          startStepDrag(step.id);
-                        }}
-                        onPointerMove={moveStepDragPointer}
-                        onPointerUp={endStepDrag}
-                        onPointerCancel={endStepDrag}
-                        className="flex h-9 w-6 shrink-0 touch-none items-center justify-center rounded-full text-ink-3 active:bg-surface-muted"
-                      >
-                        <GripVertical className="h-4 w-4" />
-                      </button>
                       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-gradient text-[12px] font-bold text-white">
                         {step.order}
                       </span>
@@ -1012,23 +1070,10 @@ export default function ComboPage() {
                           预览
                         </button>
                       )}
-                      <button
-                        type="button"
-                        aria-label={`删除 ${step.name}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeStep(step.id);
-                        }}
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-muted text-ink-3 hover:text-danger"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
                     </div>
-
-                    {/* 内联参数：直接展开，无需打开抽屉 */}
                     {isWorkflow ? (
                       isRefInvalid && (
-                        <p className="mt-2 text-[12px] text-danger">引用的工作流已失效，请删除或重新选择</p>
+                        <p className="mt-2 text-[12px] text-danger">引用的工作流已失效，请在上方顺序条删除或重新选择</p>
                       )
                     ) : (
                       <div className="mt-3 border-t border-line pt-3">
@@ -1068,32 +1113,6 @@ export default function ComboPage() {
                   </div>
                 );
               })}
-              <BottomSheetSelect
-                options={getStepOptions(workflowTemplates, selectedTemplate)}
-                value=""
-                onChange={(value) => {
-                  if (typeof value === "string") {
-                    addStep(value);
-                  }
-                }}
-                title="选择处理步骤"
-                trigger={
-                  <button
-                    type="button"
-                    disabled={steps.length >= 5}
-                    className={cn(
-                      "flex min-h-12 w-full items-center justify-center gap-2 rounded-[18px] border-2 border-dashed text-[14px] font-semibold transition-colors",
-                      steps.length >= 5
-                        ? "cursor-not-allowed border-line text-ink-3"
-                        : "border-line-strong text-ink-2 hover:border-brand hover:text-brand"
-                    )}
-                  >
-                    <Plus className="h-4 w-4" />
-                    添加处理步骤
-                  </button>
-                }
-                onOpenChange={setAddStepOpen}
-              />
             </div>
           </section>
           </>
