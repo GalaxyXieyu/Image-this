@@ -1,12 +1,12 @@
 /**
- * AI 商品套图 Handler：一张任务 = 套图里的一类图。
+ * AI 商品套图 Handler：一个任务串行生成整套图。
  */
 
 import { registerHandler, type WorkerContext } from '@/lib/workbench/worker-handlers';
 import type { ToolParameters } from '@/types/workbench';
 import {
-  executeListingImage,
-  type ListingImageResult,
+  executeListingSet,
+  type ListingSetResult,
 } from '@/lib/workbench/listing-set-service';
 import type { ListingImageType, ListingProductInfo } from '@/lib/workbench/listing-set';
 import fs from 'fs/promises';
@@ -40,7 +40,7 @@ const listingSetHandler = {
     ctx: WorkerContext,
     _input: ToolParameters,
     rawInput: Record<string, unknown>
-  ): Promise<ListingImageResult> {
+  ): Promise<ListingSetResult> {
     const { task } = ctx;
     const inputAsset = rawInput.inputAsset as TaskAssetRef | undefined;
     const sourceImage =
@@ -50,26 +50,26 @@ const listingSetHandler = {
       '';
     if (!sourceImage) throw new Error('缺少商品图');
 
-    return executeListingImage({
+    return executeListingSet({
       userId: task.userId,
+      taskId: task.id,
       sourceImage,
-      listingType: (rawInput.listingType as ListingImageType) || 'main',
       product: (rawInput.product as ListingProductInfo) || {},
       setId: (rawInput.setId as string) || task.id,
+      types: rawInput.types as ListingImageType[] | undefined,
+      prompts: rawInput.prompts as Partial<Record<ListingImageType, string>> | undefined,
       originalUrlForRecord: inputAsset?.clientUrl || (rawInput.imageUrl as string) || '',
       provider: rawInput.provider as string | undefined,
       modelName: rawInput.modelName as string | undefined,
-      onProgress: (message, progress) => ctx.updateProgress(message, progress, progress >= 100 ? 1 : 0),
     });
   },
 
-  normalizeResult(result: ListingImageResult): Record<string, unknown> {
+  normalizeResult(result: ListingSetResult): Record<string, unknown> {
     return {
+      setId: result.setId ?? null,
+      results: result.results ?? [],
       processedImageId: result.processedImageId ?? null,
       processedImageUrl: result.processedImageUrl ?? null,
-      listingType: result.listingType ?? null,
-      setId: result.setId ?? null,
-      usedModel: result.usedModel ?? null,
     };
   },
 };

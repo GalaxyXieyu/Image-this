@@ -1,21 +1,28 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ImagePlus, Sparkles, Loader2, X, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { apiPost } from "@/lib/api-client";
-import { useWorkflowTaskPolling } from "@/hooks/workbench/useWorkflowTaskPolling";
+import { apiGet, apiPost } from "@/lib/api-client";
 import { useToast } from "@/components/ui/use-toast";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { BrandImageFallback } from "@/components/brands/SpriteImage";
 import { LISTING_TYPES, type ListingImageType } from "@/lib/workbench/listing-set";
 
-interface CreatedTask {
-  taskId: string;
-  listingType: ListingImageType;
-  label: string;
+interface SetItem {
+  listingType: string;
   index: string;
+  label: string;
+  processedImageUrl: string;
+}
+
+interface SetStatus {
+  status: string;
+  progress: number;
+  currentStep?: string | null;
+  errorMessage?: string | null;
+  results: SetItem[];
 }
 
 async function fileToDataUrl(file: File): Promise<string> {
@@ -56,34 +63,46 @@ function ResultThumb({ src, alt }: { src?: string | null; alt: string }) {
 export default function ListingSetPage() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
   const [productName, setProductName] = useState("");
   const [productCategory, setProductCategory] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [createdTasks, setCreatedTasks] = useState<CreatedTask[]>([]);
+  const [taskId, setTaskId] = useState<string | null>(null);
+  const [setStatus, setSetStatus] = useState<SetStatus | null>(null);
 
-  const { tasks: polledTasks, startPolling } = useWorkflowTaskPolling({ interval: 3000, autoStart: false });
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
 
-  // taskId -> listingType
-  const taskByType = useMemo(() => {
-    const map = new Map<ListingImageType, { resultImageUrl?: string | null; status: string; progress: number }>();
-    for (const ct of createdTasks) {
-      const polled = polledTasks.find((p) => p.id === ct.taskId);
-      map.set(ct.listingType, {
-        resultImageUrl: polled?.resultImageUrl,
-        status: polled?.status ?? "pending",
-        progress: polled?.progress ?? 0,
-      });
-    }
-    return map;
-  }, [createdTasks, polledTasks]);
+  const startPolling = (tid: string) => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    const tick = async () => {
+      try {
+        const s = await apiGet<SetStatus>(`/api/listing-set/status?taskId=${tid}`);
+        setSetStatus(s);
+        if (["completed", "failed", "cancelled"].includes(s.status) && pollRef.current) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+      } catch {
+        // 忽略瞬时错误，继续轮询
+      }
+    };
+    tick();
+    pollRef.current = setInterval(tick, 3000);
+  };
 
   const handlePick = async (file?: File | null) => {
     if (!file) return;
     try {
       const dataUrl = await fileToDataUrl(file);
       setImageDataUrl(dataUrl);
-      setCreatedTasks([]);
+      setTaskId(null);
+      setSetStatus(null);
     } catch {
       toast({ title: "读取图片失败", variant: "destructive" });
     }
@@ -96,13 +115,14 @@ export default function ListingSetPage() {
     }
     setSubmitting(true);
     try {
-      const res = await apiPost<{ success: boolean; setId: string; tasks: CreatedTask[] }>("/api/listing-set", {
+      const res = await apiPost<{ success: boolean; taskId: string; setId: string }>("/api/listing-set", {
         imageDataUrl,
         product: { name: productName, category: productCategory },
       });
-      setCreatedTasks(res.tasks);
-      startPolling(res.tasks.map((t) => t.taskId));
-      toast({ title: "已提交套图生成", description: `共 ${res.tasks.length} 张，生成中…` });
+      setTaskId(res.taskId);
+      setSetStatus({ status: "pending", progress: 0, results: [] });
+      startPolling(res.taskId);
+      toast({ title: "已提交套图生成", description: "逐张串行生成中…" });
     } catch (err) {
       toast({ title: "提交失败", description: err instanceof Error ? err.message : "请稍后重试", variant: "destructive" });
     } finally {
@@ -110,7 +130,11 @@ export default function ListingSetPage() {
     }
   };
 
-  const hasResult = createdTasks.length > 0;
+  const resultByType = new Map<string, SetItem>();
+  for (const r of setStatus?.results ?? []) resultByType.set(r.listingType, r);
+
+  const hasResult = !!taskId;
+  const processing = setStatus ? !["completed", "failed", "cancelled"].includes(setStatus.status) : false;
   const mainType = LISTING_TYPES[0];
   const restTypes = LISTING_TYPES.slice(1);
 
@@ -119,7 +143,7 @@ export default function ListingSetPage() {
       <div className="mx-auto w-full max-w-3xl px-4 py-5 md:px-6 md:py-8">
         <div className="mb-5">
           <h1 className="font-serif text-[24px] leading-tight tracking-tight text-ink md:text-h2">AI 商品套图</h1>
-          <p className="mt-1 text-data text-ink-2">上传一张商品图，一键生成主图 / 场景 / 模特 / 细节 / 卖点全套</p>
+          <p className="mt-1 text-data text-ink-2">上传一张商品图，逐张串行生成主图 / 场景 / 模特 / 细节 / 卖点全套</p>
         </div>
 
         {/* 上传 + 信息 */}
@@ -150,22 +174,37 @@ export default function ListingSetPage() {
             <div className="flex flex-1 flex-col gap-2.5">
               <Input placeholder="商品名称（可选）" value={productName} onChange={(e) => setProductName(e.target.value)} className="h-11 rounded-[12px]" />
               <Input placeholder="品类，如 美妆/3C/食品（可选）" value={productCategory} onChange={(e) => setProductCategory(e.target.value)} className="h-11 rounded-[12px]" />
-              <Button variant="brand" className="mt-auto min-h-11" onClick={handleGenerate} disabled={!imageDataUrl || submitting}>
-                {submitting ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}
+              <Button variant="brand" className="mt-auto min-h-11" onClick={handleGenerate} disabled={!imageDataUrl || submitting || processing}>
+                {submitting || processing ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}
                 生成套图（{LISTING_TYPES.length} 张）
               </Button>
             </div>
           </div>
         </section>
 
+        {/* 进度条 */}
+        {hasResult && processing && (
+          <div className="mt-4 flex items-center gap-2.5 rounded-[14px] border border-line bg-surface px-3.5 py-2.5">
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-brand" />
+            <span className="text-[13px] text-ink-2">
+              {setStatus?.currentStep || "生成中"} · {setStatus?.results.length ?? 0}/{LISTING_TYPES.length}
+            </span>
+          </div>
+        )}
+        {hasResult && setStatus?.status === "failed" && setStatus.results.length === 0 && (
+          <div className="mt-4 rounded-[14px] border border-danger/30 bg-danger/5 px-3.5 py-2.5 text-[13px] text-danger">
+            生成失败：{setStatus.errorMessage || "请检查 provider 额度或密钥后重试"}
+          </div>
+        )}
+
         {/* 套图结果版式：01 主图大图 + 02–05 网格 */}
         {hasResult && (
           <section className="mt-5">
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <ListingSlot meta={mainType} state={taskByType.get(mainType.type)} large />
+              <ListingSlot meta={mainType} item={resultByType.get(mainType.type)} processing={processing} />
               <div className="grid grid-cols-2 gap-3">
                 {restTypes.map((t) => (
-                  <ListingSlot key={t.type} meta={t} state={taskByType.get(t.type)} />
+                  <ListingSlot key={t.type} meta={t} item={resultByType.get(t.type)} processing={processing} />
                 ))}
               </div>
             </div>
@@ -178,26 +217,24 @@ export default function ListingSetPage() {
 
 function ListingSlot({
   meta,
-  state,
-  large,
+  item,
+  processing,
 }: {
   meta: { type: ListingImageType; index: string; label: string };
-  state?: { resultImageUrl?: string | null; status: string; progress: number };
-  large?: boolean;
+  item?: SetItem;
+  processing: boolean;
 }) {
-  const status = state?.status ?? "pending";
-  const done = status === "completed" && state?.resultImageUrl;
-  const failed = status === "failed" || status === "cancelled";
+  const done = !!item?.processedImageUrl;
 
   return (
     <div className="glass-panel overflow-hidden rounded-[16px] shadow-soft">
-      <div className={cn("relative overflow-hidden bg-surface-muted", large ? "aspect-square" : "aspect-square")}>
+      <div className="relative aspect-square overflow-hidden bg-surface-muted">
         {done ? (
           <>
-            <ResultThumb src={state?.resultImageUrl} alt={meta.label} />
+            <ResultThumb src={item.processedImageUrl} alt={meta.label} />
             <button
               type="button"
-              onClick={() => state?.resultImageUrl && downloadFile(state.resultImageUrl, `${meta.index}-${meta.label}.jpg`)}
+              onClick={() => downloadFile(item.processedImageUrl, `${meta.index}-${meta.label}.jpg`)}
               className="absolute bottom-2 right-2 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-ink-2 transition-colors hover:text-ink"
               title="下载"
             >
@@ -206,16 +243,16 @@ function ListingSlot({
           </>
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-ink-3">
-            {failed ? (
-              <span className="flex flex-col items-center gap-1 text-danger">
-                <X className="h-5 w-5" />
-                <span className="text-[11px]">生成失败</span>
-              </span>
-            ) : (
+            {processing ? (
               <>
                 <Loader2 className="h-5 w-5 animate-spin text-brand" />
-                <span className="text-[11px]">{status === "processing" ? `生成中 ${state?.progress ?? 0}%` : "排队中"}</span>
+                <span className="text-[11px]">排队 / 生成中</span>
               </>
+            ) : (
+              <span className="flex flex-col items-center gap-1 text-ink-3">
+                <X className="h-5 w-5" />
+                <span className="text-[11px]">未生成</span>
+              </span>
             )}
           </div>
         )}

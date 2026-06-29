@@ -100,6 +100,7 @@ class TaskProcessor {
       'videoUrl', 'jimengTaskId', 'frames', 'aspectRatio',
       'expandRatio', 'upscaleFactor', 'watermarkText', 'watermarkOpacity',
       'watermarkPosition', 'watermarkType', 'outputResolution', 'processSteps',
+      'results', 'setId',
     ]);
 
     const raw: Record<string, unknown> =
@@ -116,6 +117,8 @@ class TaskProcessor {
             processedImageUrl: result.processedImageUrl || result.processedUrl || result.imageUrl || null,
             usedModel: result.usedModel || null,
             prompt: result.prompt || null,
+            // 商品套图：保留整套结果（轻量，仅 url/id/类型）
+            ...(result.results ? { results: result.results, setId: result.setId } : {}),
           };
 
     const cleaned: Record<string, unknown> = {};
@@ -691,22 +694,18 @@ class TaskProcessor {
       getAssetClientUrl(inputData.inputAsset);
     if (!sourceImage) throw new Error('缺少商品图');
 
-    const { executeListingImage } = await import('@/lib/workbench/listing-set-service');
-    return executeListingImage({
+    const { executeListingSet } = await import('@/lib/workbench/listing-set-service');
+    return executeListingSet({
       userId: task.userId,
+      taskId: task.id,
       sourceImage,
-      listingType: (raw.listingType as 'main' | 'scene' | 'model' | 'detail' | 'sellingpoint') || 'main',
       product: (raw.product as Record<string, unknown>) || {},
       setId: (raw.setId as string) || task.id,
+      types: raw.types as ('main' | 'scene' | 'model' | 'detail' | 'sellingpoint')[] | undefined,
+      prompts: raw.prompts as Partial<Record<'main' | 'scene' | 'model' | 'detail' | 'sellingpoint', string>> | undefined,
       originalUrlForRecord: getAssetClientUrl(inputData.inputAsset) || (raw.imageUrl as string) || '',
       provider: raw.provider as string | undefined,
       modelName: raw.modelName as string | undefined,
-      onProgress: async (label: string, progress: number) => {
-        await prisma.taskQueue.update({
-          where: { id: task.id },
-          data: { currentStep: label, progress, completedSteps: progress >= 100 ? 1 : 0 },
-        });
-      },
     });
   }
 

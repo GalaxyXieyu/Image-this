@@ -63,47 +63,48 @@ export async function POST(request: NextRequest) {
     const setId = `set-${stamp}`;
     const selectedTypes = LISTING_TYPES.filter(
       (t) => !types || types.length === 0 || types.includes(t.type)
-    );
+    ).map((t) => t.type);
 
-    const created = await Promise.all(
-      selectedTypes.map((t) =>
-        prisma.taskQueue.create({
-          data: {
-            type: 'LISTING_SET',
-            inputData: JSON.stringify({
-              workflowType: 'listing_set',
-              inputAsset,
-              imageUrl: inputAsset.clientUrl,
-              listingType: t.type,
-              setId,
-              product,
-              provider,
-              modelName,
-            }),
-            priority: 2,
-            totalSteps: 1,
-            userId,
-            projectId: projectId || undefined,
-            currentStep: '任务已创建，等待处理',
-            contractVersion: 2,
-            workflowType: 'listing_set',
-            handlerName: 'listing_set',
-          },
-        }).then((task) => ({ taskId: task.id, listingType: t.type, label: t.label, index: t.index }))
-      )
-    );
+    // 单任务：worker 内部串行生成 5 张，尊重 provider 并发限制
+    const task = await prisma.taskQueue.create({
+      data: {
+        type: 'LISTING_SET',
+        inputData: JSON.stringify({
+          workflowType: 'listing_set',
+          inputAsset,
+          imageUrl: inputAsset.clientUrl,
+          setId,
+          types: selectedTypes,
+          product,
+          provider,
+          modelName,
+        }),
+        priority: 2,
+        totalSteps: selectedTypes.length,
+        userId,
+        projectId: projectId || undefined,
+        currentStep: '任务已创建，等待处理',
+        contractVersion: 2,
+        workflowType: 'listing_set',
+        handlerName: 'listing_set',
+      },
+    });
 
-    const taskIds = created.map((c) => c.taskId);
     const workerUrl = getInternalWorkerUrl(request);
     void fetch(workerUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ batch: true, maxTasks: taskIds.length, taskIds }),
+      body: JSON.stringify({ batch: true, maxTasks: 1, taskIds: [task.id] }),
     }).catch((error) => {
       console.error('[商品套图] 自动触发 worker 失败:', error);
     });
 
-    return NextResponse.json({ success: true, setId, tasks: created });
+    return NextResponse.json({
+      success: true,
+      setId,
+      taskId: task.id,
+      types: LISTING_TYPES.filter((t) => selectedTypes.includes(t.type)),
+    });
   } catch (error) {
     console.error('[商品套图] 创建任务失败:', error);
     return NextResponse.json(

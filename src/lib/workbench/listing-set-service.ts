@@ -1,37 +1,46 @@
 /**
- * AI 商品套图：单张图生成核心服务。
- * 被 typed handler（handlers/listing-set.ts）与 worker 兼容分支（processListingSet）共用。
+ * AI 商品套图：一个任务内**串行**生成整套图。
+ * 串行而非并行：尊重火山 ARK 等 provider 的并发限制（约 2），套图作为一个完整作业逐张产出。
+ * 每出一张就把已完成结果写回 taskQueue.outputData，前端可渐进填格。
  */
 
 import { prisma } from '@/lib/prisma';
 import { uploadBase64Image } from '@/lib/storage';
+import type { WorkflowResult } from '@/types/workbench/results';
 import {
+  LISTING_TYPES,
   buildListingPrompt,
+  getListingTypeMeta,
   type ListingImageType,
   type ListingProductInfo,
 } from '@/lib/workbench/listing-set';
 
-export interface ExecuteListingImageParams {
-  userId: string;
-  /** 原始商品图：data URL 或可访问 URL */
-  sourceImage: string;
+export interface ListingSetItemResult {
   listingType: ListingImageType;
+  index: string;
+  label: string;
+  processedImageId: string;
+  processedImageUrl: string;
+}
+
+export interface ExecuteListingSetParams {
+  userId: string;
+  taskId: string;
+  sourceImage: string;
   product: ListingProductInfo;
-  /** 一套套图的分组 id，便于结果分组 */
   setId: string;
+  /** 指定生成哪些类型，默认全部 5 类 */
+  types?: ListingImageType[];
+  /** 用户确认后的提示词（按类型覆盖模板默认词）；缺省则用模板词 */
+  prompts?: Partial<Record<ListingImageType, string>>;
   originalUrlForRecord?: string;
   provider?: string;
   modelName?: string;
-  onProgress?: (message: string, progress: number) => void | Promise<void>;
 }
 
-export interface ListingImageResult {
-  processedImageId: string;
-  processedImageUrl: string;
-  listingType: ListingImageType;
+export interface ListingSetResult extends WorkflowResult {
   setId: string;
-  prompt: string;
-  usedModel: string;
+  results: ListingSetItemResult[];
 }
 
 async function callProvider(
@@ -54,49 +63,93 @@ async function callProvider(
   return { imageData: imageData || '', imageSize: imageData?.length || 0 };
 }
 
-export async function executeListingImage(params: ExecuteListingImageParams): Promise<ListingImageResult> {
-  const provider = params.provider || 'gemini';
-  const userId = params.userId;
-  const prompt = buildListingPrompt(params.listingType, params.product);
-  const usedModel = params.modelName || provider;
-
-  await params.onProgress?.(`生成「${params.listingType}」中…`, 40);
-  const result = await callProvider(provider, params.sourceImage, prompt, userId, params.modelName);
-  if (!result.imageData) {
-    throw new Error('套图生成未返回图像数据');
-  }
-
-  await params.onProgress?.('保存结果…', 85);
-  const filename = `listing-${params.listingType}-${Date.now()}.jpg`;
-  const processedUrl = await uploadBase64Image(result.imageData, filename, userId);
-
-  const processedImage = await prisma.processedImage.create({
+async function persistPartial(
+  taskId: string,
+  setId: string,
+  results: ListingSetItemResult[],
+  currentStep: string,
+  progress: number
+) {
+  await prisma.taskQueue.update({
+    where: { id: taskId },
     data: {
-      filename,
-      originalUrl: params.originalUrlForRecord || '',
-      processedUrl,
-      processType: 'BACKGROUND_REMOVAL',
-      status: 'COMPLETED',
-      fileSize: result.imageSize,
-      metadata: JSON.stringify({
-        operation: 'listing_set',
-        listingType: params.listingType,
-        setId: params.setId,
-        provider,
-        prompt,
-        processingCompletedAt: new Date().toISOString(),
-      }),
-      userId,
+      outputData: JSON.stringify({ setId, results, processedImageUrl: results[0]?.processedImageUrl ?? null }),
+      currentStep,
+      progress,
+      completedSteps: results.length,
     },
   });
+}
 
-  await params.onProgress?.('完成', 100);
+export async function executeListingSet(params: ExecuteListingSetParams): Promise<ListingSetResult> {
+  const provider = params.provider || 'gemini';
+  const userId = params.userId;
+  const types = params.types?.length
+    ? params.types
+    : LISTING_TYPES.map((t) => t.type);
+
+  const results: ListingSetItemResult[] = [];
+  let firstError: Error | null = null;
+
+  for (let i = 0; i < types.length; i++) {
+    const type = types[i];
+    const meta = getListingTypeMeta(type);
+    const prompt = params.prompts?.[type] || buildListingPrompt(type, params.product);
+    const progress = Math.round((i / types.length) * 100);
+
+    await persistPartial(params.taskId, params.setId, results, `生成 ${meta.index} ${meta.label}…`, progress);
+
+    try {
+      const out = await callProvider(provider, params.sourceImage, prompt, userId, params.modelName);
+      if (!out.imageData) throw new Error('未返回图像数据');
+
+      const filename = `listing-${type}-${Date.now()}.jpg`;
+      const processedUrl = await uploadBase64Image(out.imageData, filename, userId);
+      const processedImage = await prisma.processedImage.create({
+        data: {
+          filename,
+          originalUrl: params.originalUrlForRecord || '',
+          processedUrl,
+          processType: 'BACKGROUND_REMOVAL',
+          status: 'COMPLETED',
+          fileSize: out.imageSize,
+          metadata: JSON.stringify({
+            operation: 'listing_set',
+            listingType: type,
+            setId: params.setId,
+            provider,
+            prompt,
+            processingCompletedAt: new Date().toISOString(),
+          }),
+          userId,
+        },
+      });
+
+      results.push({
+        listingType: type,
+        index: meta.index,
+        label: meta.label,
+        processedImageId: processedImage.id,
+        processedImageUrl: processedUrl,
+      });
+    } catch (err) {
+      // 单张失败不阻断整套：记录首个错误，继续后面的类型
+      if (!firstError) firstError = err instanceof Error ? err : new Error(String(err));
+      console.error(`[商品套图] ${type} 生成失败:`, firstError.message);
+    }
+  }
+
+  await persistPartial(params.taskId, params.setId, results, '完成', 100);
+
+  // 全部失败才算任务失败（例如 provider 额度不足）
+  if (results.length === 0 && firstError) {
+    throw firstError;
+  }
+
   return {
-    processedImageId: processedImage.id,
-    processedImageUrl: processedUrl,
-    listingType: params.listingType,
     setId: params.setId,
-    prompt,
-    usedModel,
+    results,
+    processedImageId: results[0]?.processedImageId,
+    processedImageUrl: results[0]?.processedImageUrl,
   };
 }
