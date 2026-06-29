@@ -177,124 +177,135 @@ export default function ListingSetPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto w-full max-w-3xl px-4 py-5 md:px-6 md:py-8">
+      <div className="mx-auto w-full max-w-3xl px-4 py-5 md:px-6 md:py-8 lg:max-w-[1360px]">
         <div className="mb-5">
           <h1 className="font-serif text-[24px] leading-tight tracking-tight text-ink md:text-h2">AI 商品套图</h1>
           <p className="mt-1 text-data text-ink-2">上传一张商品图，逐张串行生成主图 / 场景 / 模特 / 细节 / 卖点全套</p>
         </div>
 
-        {/* 上传 + 信息 */}
-        <section className="glass-panel rounded-[18px] p-4 shadow-soft">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => handlePick(e.target.files?.[0])}
-          />
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="relative flex aspect-square w-full shrink-0 items-center justify-center overflow-hidden rounded-[14px] border-2 border-dashed border-line-strong bg-surface-muted/40 transition-colors hover:border-brand sm:w-40"
-            >
-              {imageDataUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={imageDataUrl} alt="商品图" className="h-full w-full object-cover" />
-              ) : (
-                <span className="flex flex-col items-center gap-1.5 text-ink-3">
-                  <ImagePlus className="h-7 w-7" />
-                  <span className="text-[12px]">上传商品图</span>
-                </span>
-              )}
-            </button>
-            <div className="flex flex-1 flex-col gap-2.5">
-              <Input placeholder="商品名称（可选）" value={productName} onChange={(e) => setProductName(e.target.value)} className="h-11 rounded-[12px]" />
-              <Input placeholder="品类，如 美妆/3C/食品（可选）" value={productCategory} onChange={(e) => setProductCategory(e.target.value)} className="h-11 rounded-[12px]" />
-              <div className="mt-auto flex flex-col gap-1.5">
-                <Button variant="brand" className="min-h-11" onClick={handlePlan} disabled={!imageDataUrl || planning || processing}>
-                  {planning ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Wand2 className="mr-1.5 h-4 w-4" />}
-                  AI 读图出词
-                </Button>
+        {/* 桌面：左控制 / 右结果 双栏；移动端：单列堆叠 */}
+        <div className="lg:grid lg:grid-cols-[minmax(360px,420px)_minmax(0,1fr)] lg:items-start lg:gap-6">
+          {/* 左：控制区 */}
+          <div className="flex flex-col gap-4 lg:sticky lg:top-4">
+            {/* 上传 + 信息 */}
+            <section className="glass-panel rounded-[18px] p-4 shadow-soft">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => handlePick(e.target.files?.[0])}
+              />
+              <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
                 <button
                   type="button"
-                  onClick={handleGenerate}
-                  disabled={!imageDataUrl || submitting || processing}
-                  className="text-[12px] text-ink-3 transition-colors hover:text-ink disabled:opacity-50"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="relative flex aspect-square w-full shrink-0 items-center justify-center overflow-hidden rounded-[14px] border-2 border-dashed border-line-strong bg-surface-muted/40 transition-colors hover:border-brand sm:w-40 lg:w-full"
                 >
-                  跳过出词，用模板直接生成
+                  {imageDataUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={imageDataUrl} alt="商品图" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="flex flex-col items-center gap-1.5 text-ink-3">
+                      <ImagePlus className="h-7 w-7" />
+                      <span className="text-[12px]">上传商品图</span>
+                    </span>
+                  )}
                 </button>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* 出词草稿：可逐条微调后确认生成 */}
-        {planItems && !taskId && (
-          <section className="mt-4 glass-panel rounded-[18px] p-4 shadow-soft">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-[15px] font-bold text-ink">提示词草稿</h2>
-              <button
-                type="button"
-                onClick={() => setPlanItems(null)}
-                className="flex items-center gap-1 text-[12px] text-ink-3 hover:text-ink"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" />
-                重新出词
-              </button>
-            </div>
-            <div className="flex flex-col gap-3">
-              {planItems.map((p, idx) => (
-                <div key={p.listingType} className="space-y-1">
-                  <label className="text-[12px] font-semibold text-ink-2">{p.index} {p.label}</label>
-                  <Textarea
-                    rows={2}
-                    value={p.prompt}
-                    onChange={(e) =>
-                      setPlanItems((prev) =>
-                        prev ? prev.map((it, i) => (i === idx ? { ...it, prompt: e.target.value } : it)) : prev
-                      )
-                    }
-                    className="resize-none rounded-[12px] text-[13px]"
-                  />
+                <div className="flex flex-1 flex-col gap-2.5">
+                  <Input placeholder="商品名称（可选）" value={productName} onChange={(e) => setProductName(e.target.value)} className="h-11 rounded-[12px]" />
+                  <Input placeholder="品类，如 美妆/3C/食品（可选）" value={productCategory} onChange={(e) => setProductCategory(e.target.value)} className="h-11 rounded-[12px]" />
+                  <div className="mt-auto flex flex-col gap-1.5">
+                    <Button variant="brand" className="min-h-11" onClick={handlePlan} disabled={!imageDataUrl || planning || processing}>
+                      {planning ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Wand2 className="mr-1.5 h-4 w-4" />}
+                      AI 读图出词
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={handleGenerate}
+                      disabled={!imageDataUrl || submitting || processing}
+                      className="text-[12px] text-ink-3 transition-colors hover:text-ink disabled:opacity-50"
+                    >
+                      跳过出词，用模板直接生成
+                    </button>
+                  </div>
                 </div>
-              ))}
-            </div>
-            <Button variant="brand" className="mt-3 min-h-11 w-full" onClick={handleGenerate} disabled={submitting || processing}>
-              {submitting || processing ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}
-              确认并生成套图（{LISTING_TYPES.length} 张）
-            </Button>
-          </section>
-        )}
-
-        {/* 进度条 */}
-        {hasResult && processing && (
-          <div className="mt-4 flex items-center gap-2.5 rounded-[14px] border border-line bg-surface px-3.5 py-2.5">
-            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-brand" />
-            <span className="text-[13px] text-ink-2">
-              {setStatus?.currentStep || "生成中"} · {setStatus?.results.length ?? 0}/{LISTING_TYPES.length}
-            </span>
-          </div>
-        )}
-        {hasResult && setStatus?.status === "failed" && setStatus.results.length === 0 && (
-          <div className="mt-4 rounded-[14px] border border-danger/30 bg-danger/5 px-3.5 py-2.5 text-[13px] text-danger">
-            生成失败：{setStatus.errorMessage || "请检查 provider 额度或密钥后重试"}
-          </div>
-        )}
-
-        {/* 套图结果版式：01 主图大图 + 02–05 网格 */}
-        {hasResult && (
-          <section className="mt-5">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <ListingSlot meta={mainType} item={resultByType.get(mainType.type)} processing={processing} />
-              <div className="grid grid-cols-2 gap-3">
-                {restTypes.map((t) => (
-                  <ListingSlot key={t.type} meta={t} item={resultByType.get(t.type)} processing={processing} />
-                ))}
               </div>
-            </div>
-          </section>
-        )}
+            </section>
+
+            {/* 出词草稿：可逐条微调后确认生成 */}
+            {planItems && !taskId && (
+              <section className="glass-panel rounded-[18px] p-4 shadow-soft">
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="text-[15px] font-bold text-ink">提示词草稿</h2>
+                  <button
+                    type="button"
+                    onClick={() => setPlanItems(null)}
+                    className="flex items-center gap-1 text-[12px] text-ink-3 hover:text-ink"
+                  >
+                    <ArrowLeft className="h-3.5 w-3.5" />
+                    重新出词
+                  </button>
+                </div>
+                <div className="flex flex-col gap-3">
+                  {planItems.map((p, idx) => (
+                    <div key={p.listingType} className="space-y-1">
+                      <label className="text-[12px] font-semibold text-ink-2">{p.index} {p.label}</label>
+                      <Textarea
+                        rows={2}
+                        value={p.prompt}
+                        onChange={(e) =>
+                          setPlanItems((prev) =>
+                            prev ? prev.map((it, i) => (i === idx ? { ...it, prompt: e.target.value } : it)) : prev
+                          )
+                        }
+                        className="resize-none rounded-[12px] text-[13px]"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <Button variant="brand" className="mt-3 min-h-11 w-full" onClick={handleGenerate} disabled={submitting || processing}>
+                  {submitting || processing ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}
+                  确认并生成套图（{LISTING_TYPES.length} 张）
+                </Button>
+              </section>
+            )}
+
+            {/* 进度条 */}
+            {hasResult && processing && (
+              <div className="flex items-center gap-2.5 rounded-[14px] border border-line bg-surface px-3.5 py-2.5">
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-brand" />
+                <span className="text-[13px] text-ink-2">
+                  {setStatus?.currentStep || "生成中"} · {setStatus?.results.length ?? 0}/{LISTING_TYPES.length}
+                </span>
+              </div>
+            )}
+            {hasResult && setStatus?.status === "failed" && setStatus.results.length === 0 && (
+              <div className="rounded-[14px] border border-danger/30 bg-danger/5 px-3.5 py-2.5 text-[13px] text-danger">
+                生成失败：{setStatus.errorMessage || "请检查 provider 额度或密钥后重试"}
+              </div>
+            )}
+          </div>
+
+          {/* 右：结果区 */}
+          {hasResult ? (
+            <section className="mt-5 lg:mt-0">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <ListingSlot meta={mainType} item={resultByType.get(mainType.type)} processing={processing} />
+                <div className="grid grid-cols-2 gap-3">
+                  {restTypes.map((t) => (
+                    <ListingSlot key={t.type} meta={t} item={resultByType.get(t.type)} processing={processing} />
+                  ))}
+                </div>
+              </div>
+            </section>
+          ) : (
+            <section className="hidden lg:flex min-h-[420px] flex-col items-center justify-center rounded-[18px] border border-dashed border-line-strong bg-surface-muted/30 text-center">
+              <BrandImageFallback title="" description="" pose="think" className="[&_p]:hidden h-24 w-24" />
+              <p className="mt-3 text-[13px] text-ink-3">上传商品图并出词后，套图结果会显示在这里</p>
+            </section>
+          )}
+        </div>
       </div>
     </div>
   );

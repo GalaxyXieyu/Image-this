@@ -4,45 +4,12 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Suspense, useEffect, useState } from "react";
-import { Bell, Download, Moon, Sun, Wand2, Layers, Wrench, Sparkles, Droplets, ZoomIn, Expand, Home, Image as ImageIcon, Images, Settings as SettingsIcon, ListTodo } from "lucide-react";
+import { Bell, Download, Moon, Sun, ListTodo } from "lucide-react";
 import { BrandLogo } from "@/components/brands/SpriteImage";
 import { MobileTabBar } from "@/components/navigation/MobileTabBar";
+import { DesktopSidebar } from "@/components/navigation/DesktopSidebar";
+import { PRIMARY_ITEMS, WORKSPACE_SEGMENTS, TOOL_PILLS, DEFAULT_TOOL } from "@/components/navigation/nav-config";
 import { cn } from "@/lib/utils";
-
-type PrimaryItem = {
-  label: string;
-  href: string;
-  match: (path: string) => boolean;
-};
-
-const PRIMARY_ITEMS: (PrimaryItem & { icon: typeof Home })[] = [
-  { label: "首页", href: "/", icon: Home, match: (p) => p === "/" },
-  {
-    label: "工作台",
-    href: "/workspace",
-    icon: Wand2,
-    match: (p) =>
-      p.startsWith("/workspace") || p.startsWith("/combo") || p.startsWith("/tools"),
-  },
-  { label: "图库", href: "/results", icon: ImageIcon, match: (p) => p.startsWith("/results") },
-  { label: "设置", href: "/settings", icon: SettingsIcon, match: (p) => p.startsWith("/settings") || p.startsWith("/templates") },
-];
-
-const WORKSPACE_SEGMENTS = [
-  { label: "商品套图", href: "/workspace/listing-set", icon: Images, match: (p: string) => p.startsWith("/workspace/listing-set") },
-  { label: "换背景", href: "/workspace/scene", icon: Wand2, match: (p: string) => p.startsWith("/workspace/scene") },
-  { label: "工作流", href: "/combo", icon: Layers, match: (p: string) => p.startsWith("/combo") },
-  { label: "工具", href: "/tools", icon: Wrench, match: (p: string) => p.startsWith("/tools") },
-];
-
-const TOOL_PILLS = [
-  { label: "AI换背景", tool: "background_replace", icon: Sparkles },
-  { label: "加水印", tool: "watermark", icon: Droplets },
-  { label: "高清放大", tool: "upscale", icon: ZoomIn },
-  { label: "智能扩图", tool: "outpaint", icon: Expand },
-];
-
-const DEFAULT_TOOL = "background_replace";
 
 const HIDDEN_PREFIXES = ["/auth", "/prompt-studio"];
 
@@ -64,7 +31,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Suspense fallback={<TopNav pathname={pathname} isWorkspace={isWorkspace} isTools={isTools} activeTool={DEFAULT_TOOL} />}>
         <TopNavWithSearch pathname={pathname} isWorkspace={isWorkspace} isTools={isTools} />
       </Suspense>
-      <main className="flex-1 min-h-0 overflow-hidden">{children}</main>
+      <div className="flex flex-1 min-h-0">
+        <Suspense fallback={<DesktopSidebar pathname={pathname} isWorkspace={isWorkspace} isTools={isTools} activeTool={DEFAULT_TOOL} />}>
+          <DesktopSidebarWithSearch pathname={pathname} isWorkspace={isWorkspace} isTools={isTools} />
+        </Suspense>
+        <main className="flex-1 min-h-0 overflow-hidden">{children}</main>
+      </div>
       {showTabBar && <MobileTabBar />}
     </div>
   );
@@ -84,6 +56,20 @@ function TopNavWithSearch({
   return <TopNav pathname={pathname} isWorkspace={isWorkspace} isTools={isTools} activeTool={activeTool} />;
 }
 
+function DesktopSidebarWithSearch({
+  pathname,
+  isWorkspace,
+  isTools,
+}: {
+  pathname: string;
+  isWorkspace: boolean;
+  isTools: boolean;
+}) {
+  const searchParams = useSearchParams();
+  const activeTool = searchParams.get("tool") ?? DEFAULT_TOOL;
+  return <DesktopSidebar pathname={pathname} isWorkspace={isWorkspace} isTools={isTools} activeTool={activeTool} />;
+}
+
 function TopNav({
   pathname,
   isWorkspace,
@@ -97,14 +83,14 @@ function TopNav({
 }) {
   return (
     <header className="shrink-0 border-b border-border/60 bg-surface-glass backdrop-blur-[20px] backdrop-saturate-150">
-      {/* Row 1: logo / 一级 nav(桌面) / 右上按钮(桌面) / 汉堡(移动) */}
+      {/* Row 1: logo / 一级 nav(md~lg) / 右上按钮(桌面) / 任务入口(移动) */}
       <div className="flex h-14 items-center gap-4 px-4 md:px-6">
         <Link href="/" className="flex min-h-11 items-center transition-opacity hover:opacity-80">
           <BrandLogo iconClassName="h-7 w-7 rounded-lg" textClassName="tracking-tight" />
         </Link>
 
-        {/* 桌面：一级 nav */}
-        <nav className="ml-2 hidden md:flex items-center gap-1">
+        {/* md~lg：一级 nav（lg 起由左侧栏承接） */}
+        <nav className="ml-2 hidden md:flex lg:hidden items-center gap-1">
           {PRIMARY_ITEMS.map((item) => {
             const active = item.match(pathname);
             return (
@@ -162,9 +148,9 @@ function TopNav({
         </div>
       </div>
 
-      {/* Row 2: 工作台二级 nav — 仅桌面端展示；移动端已由底部 Tab + 工作台 hub 承接，不再重复 */}
+      {/* Row 2: 工作台二级 nav — 仅 md~lg 展示；lg 起由左侧栏承接，移动端由底部 Tab + hub 承接 */}
       {isWorkspace && (
-        <div className="hidden md:flex h-12 items-center gap-3 border-t border-border/40 px-4 md:px-6 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <div className="hidden md:flex lg:hidden h-12 items-center gap-3 border-t border-border/40 px-4 md:px-6 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           <div className="flex items-center gap-1 rounded-full border border-border/70 bg-surface-muted/70 p-1">
             {WORKSPACE_SEGMENTS.map((seg) => {
               const active = seg.match(pathname);

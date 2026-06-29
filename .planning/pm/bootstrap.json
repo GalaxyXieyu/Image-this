@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-06-29T00:01:52+08:00",
+  "generated_at": "2026-06-29T23:44:34+08:00",
   "project": {
     "name": "Image-this",
     "repo_root": "/Volumes/DATABASE/code/business/Image-this",
-    "config_path": ".planning/pm/pm.json",
+    "config_path": "/Volumes/DATABASE/code/business/Image-this/.planning/pm/pm.json",
     "tasklist_name": "Image-this",
     "tasklist_guid": "2db08bb6-ee2f-4600-b324-89bade570efd",
     "task_prefix": "T",

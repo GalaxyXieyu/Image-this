@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-06-29T00:01:52+08:00",
+  "generated_at": "2026-06-29T23:44:34+08:00",
   "project": {
     "name": "Image-this",
     "repo_root": "/Volumes/DATABASE/code/business/Image-this",
-    "config_path": ".planning/pm/pm.json",
+    "config_path": "/Volumes/DATABASE/code/business/Image-this/.planning/pm/pm.json",
     "tasklist_name": "Image-this",
     "tasklist_guid": "2db08bb6-ee2f-4600-b324-89bade570efd",
     "task_prefix": "T",
@@ -72,8 +72,42 @@
     "state_doc_token": "repo:.planning/STATE.md",
     "state_doc_url": "repo://.planning/STATE.md"
   },
-  "open_tasks": [],
-  "next_task": null,
-  "current_task": null,
+  "open_tasks": [
+    {
+      "task_id": "T9",
+      "summary": "[T9] Web 桌面端 UI 信息密度重构",
+      "status": "todo",
+      "guid": "79a9be9f-31cb-4f28-bf86-66021236f0aa",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=79a9be9f-31cb-4f28-bf86-66021236f0aa&suite_entity_num=t100576",
+      "updated_at": "1782742068841",
+      "created_at": "1782739093884"
+    }
+  ],
+  "next_task": {
+    "task_id": "T9",
+    "summary": "[T9] Web 桌面端 UI 信息密度重构",
+    "status": "todo",
+    "guid": "79a9be9f-31cb-4f28-bf86-66021236f0aa",
+    "url": "https://applink.feishu.cn/client/todo/detail?guid=79a9be9f-31cb-4f28-bf86-66021236f0aa&suite_entity_num=t100576",
+    "updated_at": "1782742068841",
+    "created_at": "1782739093884"
+  },
+  "current_task": {
+    "task_id": "T9",
+    "summary": "[T9] Web 桌面端 UI 信息密度重构",
+    "status": "todo",
+    "guid": "79a9be9f-31cb-4f28-bf86-66021236f0aa",
+    "url": "https://applink.feishu.cn/client/todo/detail?guid=79a9be9f-31cb-4f28-bf86-66021236f0aa&suite_entity_num=t100576",
+    "description": "任务编号：T9\n创建时间：2026-06-29 21:18:11 CST\n类型：task\nRepo：/Volumes/DATABASE/code/business/Image-this\n\n需求：\n桌面端目前像移动端的放大版：空白区域多、信息密度低、操作层级深。目标：保持移动端布局/体验不变的前提下，桌面端(≥md/lg)提高信息密度、减少操作层级、让常用操作更便捷。范围：先调研现状(各主要页面 /workspace/scene、/combo、/tools、/tasks、/results、/templates、/settings)，识别密度与层级问题，产出桌面端重设计方案(布局/导航/栅格/组件密度)并同步规划文档，评审通过后再实现。约束：不改业务逻辑、不动移动端、复用现有设计 token 与 shadcn 原子组件。\n\n执行要求：\n- 以 task/doc 为主，不再依赖本地 task/context/state 文件。\n- 进度默认写评论，验收证据优先回填附件或评论。\n\n## 规划方案（已确认设计决策）\n\n**目标**：移动端(<md)不变，桌面端(≥lg)提密度/减层级/操作更便捷。\n\n**已确认决策**：\n1. 桌面导航 → 加左侧固定侧栏(≥lg)，收纳一级+工作台二级nav\n2. 范围 → 一次重构全部主要页面(分批提交)\n3. 生成页 → 桌面单屏双栏 + 去步骤向导(移动端保留分步)\n\n**现状根因**：外壳无桌面侧栏(AppShell.tsx)；各页窄容器(/tasks max-w-5xl、listing-set max-w-3xl、scene max-w-[1100px])导致大留白；results/templates/tools/combo 已双栏可作样板。\n\n**两套范式**：A 生成工作台(左控制+右预览，scene/listing-set/combo/tools)；B 库/列表(左筛选+右密集网格/表格，tasks/results/templates)。\n\n**分期**：P1 外壳侧栏+宽度框架 → P2 scene/listing-set → P3 tasks/results/templates → P4 tools/combo/settings+密度token。每批桌面1440+移动390双断点截图验收。\n\n详细方案文档：repo .planning/T9-desktop-ui-density-redesign.md",
+    "updated_at": "1782742068841",
+    "completed_at": "0",
+    "attachments": [],
+    "tasklists": [
+      {
+        "section_guid": "ba1a2277-c2c0-c353-fdd6-8a2d9e97e778",
+        "tasklist_guid": "2db08bb6-ee2f-4600-b324-89bade570efd"
+      }
+    ]
+  },
   "recent_comments": []
 }
