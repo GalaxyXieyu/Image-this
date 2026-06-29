@@ -230,6 +230,10 @@ export default function SettingsPage() {
     jimengModelName: 'seedream-4.5',
     // 图床配置
     superbedToken: '',
+    // 文案/出词多模态模型配置
+    copywriterApiKey: '',
+    copywriterBaseUrl: 'https://toapis.com/v1',
+    copywriterModelName: 'gpt-5.4-mini',
     // 本地存储配置
     localStoragePath: '',
     // 后台任务配置
@@ -372,6 +376,9 @@ export default function SettingsPage() {
               jimengBaseUrl: data.config.jimeng?.baseUrl || 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
               jimengModelName: data.config.jimeng?.modelName || 'seedream-4.5',
               superbedToken: data.config.imagehosting?.superbedToken || '',
+              copywriterApiKey: data.config.copywriter?.apiKey || '',
+              copywriterBaseUrl: data.config.copywriter?.baseUrl || 'https://toapis.com/v1',
+              copywriterModelName: data.config.copywriter?.modelName || 'gpt-5.4-mini',
               localStoragePath: data.config.localStorage?.savePath || '',
               taskConcurrency: data.config.taskRuntime?.concurrency || 2
             });
@@ -498,6 +505,12 @@ export default function SettingsPage() {
         imagehosting: {
           enabled: !!(apiSettings.superbedToken),
           superbedToken: apiSettings.superbedToken
+        },
+        copywriter: {
+          enabled: !!(apiSettings.copywriterApiKey),
+          apiKey: apiSettings.copywriterApiKey,
+          baseUrl: apiSettings.copywriterBaseUrl,
+          modelName: apiSettings.copywriterModelName
         },
         localStorage: {
           savePath: apiSettings.localStoragePath
@@ -898,6 +911,47 @@ export default function SettingsPage() {
             {flatModels.length === 0 && (
               <p className="hidden text-data text-ink-3 sm:block">尚未配置任何模型，点击右上「新增 Provider」开始</p>
             )}
+
+            {/* 文案/出词模型（多模态 LLM）：商品套图 AI 出词用 */}
+            <div className="glass-panel rounded-[16px] p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <Cpu className="h-4 w-4 text-brand" />
+                <div>
+                  <h3 className="text-[15px] font-bold text-ink">文案 / 出词模型</h3>
+                  <p className="text-[12px] text-ink-3">多模态 LLM，用于「AI 商品套图」读图生成提示词（OpenAI 兼容 chat）</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label className="text-[12px] text-ink-2">Base URL</Label>
+                  <Input
+                    value={apiSettings.copywriterBaseUrl}
+                    onChange={(e) => setApiSettings((p) => ({ ...p, copywriterBaseUrl: e.target.value }))}
+                    placeholder="https://toapis.com/v1"
+                    className="h-11 rounded-[12px]"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[12px] text-ink-2">模型名</Label>
+                  <Input
+                    value={apiSettings.copywriterModelName}
+                    onChange={(e) => setApiSettings((p) => ({ ...p, copywriterModelName: e.target.value }))}
+                    placeholder="gpt-5.4-mini"
+                    className="h-11 rounded-[12px]"
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-[12px] text-ink-2">API Key</Label>
+                  <Input
+                    type="password"
+                    value={apiSettings.copywriterApiKey}
+                    onChange={(e) => setApiSettings((p) => ({ ...p, copywriterApiKey: e.target.value }))}
+                    placeholder="sk-...（留空则复用 OpenAI 的 Key）"
+                    className="h-11 rounded-[12px]"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         );
       }

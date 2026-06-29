@@ -75,6 +75,14 @@ export async function POST(request: NextRequest) {
       };
     }
     
+    if (body.copywriter?.apiKey) {
+      userConfig.copywriter = {
+        apiKey: body.copywriter.apiKey,
+        baseUrl: body.copywriter.baseUrl || 'https://toapis.com/v1',
+        modelName: body.copywriter.modelName || 'gpt-5.4-mini',
+      };
+    }
+
     if (body.localStorage?.savePath) {
       userConfig.localStorage = {
         savePath: body.localStorage.savePath,
@@ -154,6 +162,12 @@ export async function GET(request: NextRequest) {
       imagehosting: {
         enabled: !!userConfig.imagehosting,
         superbedToken: userConfig.imagehosting?.superbedToken || ''
+      },
+      copywriter: {
+        enabled: !!userConfig.copywriter,
+        apiKey: userConfig.copywriter?.apiKey || '',
+        baseUrl: userConfig.copywriter?.baseUrl || 'https://toapis.com/v1',
+        modelName: userConfig.copywriter?.modelName || 'gpt-5.4-mini'
       },
       localStorage: {
         savePath: userConfig.localStorage?.savePath || ''

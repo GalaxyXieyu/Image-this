@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
       provider = 'gemini',
       modelName,
       types,
+      prompts,
       projectId,
     } = body as {
       imageDataUrl?: string;
@@ -40,6 +41,7 @@ export async function POST(request: NextRequest) {
       provider?: string;
       modelName?: string;
       types?: string[];
+      prompts?: Record<string, string>;
       projectId?: string;
     };
 
@@ -75,6 +77,7 @@ export async function POST(request: NextRequest) {
           imageUrl: inputAsset.clientUrl,
           setId,
           types: selectedTypes,
+          prompts: prompts && typeof prompts === 'object' ? prompts : undefined,
           product,
           provider,
           modelName,

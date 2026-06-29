@@ -57,6 +57,12 @@ export interface UserConfig {
   imagehosting?: {
     superbedToken: string;
   };
+  /** 文案/出词多模态模型（OpenAI 兼容 chat/vision），用于商品套图 AI 出词 */
+  copywriter?: {
+    apiKey: string;
+    baseUrl: string;
+    modelName: string;
+  };
   localStorage?: {
     savePath: string;
   };
@@ -129,6 +135,9 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
       jimengModelName: true,
       jimengModelsJson: true,
       hasJimengCredentials: true,
+      copywriterApiKey: true,
+      copywriterBaseUrl: true,
+      copywriterModelName: true,
       superbedToken: true,
       hasSuperbedToken: true,
       localStoragePath: true,
@@ -157,6 +166,9 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
   const jimengBaseUrl = user.jimengBaseUrl || envConfig.jimeng.baseUrl || undefined;
   const jimengModelName = user.jimengModelName || envConfig.jimeng.modelName || undefined;
   const superbedToken = desktopSecrets.superbedToken || user.superbedToken || process.env.SUPERBED_TOKEN || '';
+  const copywriterApiKey = user.copywriterApiKey || gptApiKey || '';
+  const copywriterBaseUrl = user.copywriterBaseUrl || 'https://toapis.com/v1';
+  const copywriterModelName = user.copywriterModelName || 'gpt-5.4-mini';
 
   // 火山引擎配置
   if (volcengineAccessKey && volcengineSecretKey) {
@@ -222,6 +234,15 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
     console.log('[用户配置] 图床: 已加载可用配置');
   } else {
     console.warn('[用户配置] 图床: 未配置，请在设置页面配置 Superbed Token');
+  }
+
+  // 文案/出词多模态模型（缺省回退到 OpenAI(gpt) 的 key + toapis /v1 + gpt-5.4-mini）
+  if (copywriterApiKey) {
+    config.copywriter = {
+      apiKey: copywriterApiKey,
+      baseUrl: copywriterBaseUrl,
+      modelName: copywriterModelName,
+    };
   }
 
   // 本地存储配置
@@ -295,6 +316,10 @@ export async function saveUserConfig(userId: string, config: UserConfig): Promis
       hasJimengCredentials: !!(config.jimeng?.arkApiKey || (config.jimeng?.accessKey && config.jimeng?.secretKey)),
       superbedToken: isDesktopSecretStoreEnabled() ? null : config.imagehosting?.superbedToken || null,
       hasSuperbedToken: !!config.imagehosting?.superbedToken,
+      copywriterApiKey: isDesktopSecretStoreEnabled() ? null : config.copywriter?.apiKey || null,
+      copywriterBaseUrl: config.copywriter?.baseUrl || null,
+      copywriterModelName: config.copywriter?.modelName || null,
+      hasCopywriterApiKey: !!config.copywriter?.apiKey,
       localStoragePath: config.localStorage?.savePath || null,
       taskConcurrency: normalizeTaskConcurrency(config.taskRuntime?.concurrency),
     }

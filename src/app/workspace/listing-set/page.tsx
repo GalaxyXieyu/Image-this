@@ -1,14 +1,22 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ImagePlus, Sparkles, Loader2, X, Download } from "lucide-react";
+import { ImagePlus, Sparkles, Loader2, X, Download, Wand2, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiGet, apiPost } from "@/lib/api-client";
 import { useToast } from "@/components/ui/use-toast";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { BrandImageFallback } from "@/components/brands/SpriteImage";
 import { LISTING_TYPES, type ListingImageType } from "@/lib/workbench/listing-set";
+
+interface PlanItem {
+  listingType: ListingImageType;
+  index: string;
+  label: string;
+  prompt: string;
+}
 
 interface SetItem {
   listingType: string;
@@ -69,6 +77,8 @@ export default function ListingSetPage() {
   const [productName, setProductName] = useState("");
   const [productCategory, setProductCategory] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [planning, setPlanning] = useState(false);
+  const [planItems, setPlanItems] = useState<PlanItem[] | null>(null);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [setStatus, setSetStatus] = useState<SetStatus | null>(null);
 
@@ -103,11 +113,34 @@ export default function ListingSetPage() {
       setImageDataUrl(dataUrl);
       setTaskId(null);
       setSetStatus(null);
+      setPlanItems(null);
     } catch {
       toast({ title: "读取图片失败", variant: "destructive" });
     }
   };
 
+  // 第一步：AI 读图出 5 段提示词草稿，供确认/微调
+  const handlePlan = async () => {
+    if (!imageDataUrl) {
+      toast({ title: "请先上传商品图", variant: "destructive" });
+      return;
+    }
+    setPlanning(true);
+    try {
+      const res = await apiPost<{ success: boolean; items: PlanItem[] }>("/api/listing-set/plan", {
+        imageDataUrl,
+        product: { name: productName, category: productCategory },
+      });
+      setPlanItems(res.items);
+      toast({ title: "已生成提示词草稿", description: "可逐条微调后再生成" });
+    } catch (err) {
+      toast({ title: "出词失败", description: err instanceof Error ? err.message : "请检查文案模型配置", variant: "destructive" });
+    } finally {
+      setPlanning(false);
+    }
+  };
+
+  // 第二步：用确认后的提示词串行生成套图
   const handleGenerate = async () => {
     if (!imageDataUrl) {
       toast({ title: "请先上传商品图", variant: "destructive" });
@@ -115,9 +148,13 @@ export default function ListingSetPage() {
     }
     setSubmitting(true);
     try {
+      const prompts = planItems
+        ? Object.fromEntries(planItems.filter((p) => p.prompt.trim()).map((p) => [p.listingType, p.prompt.trim()]))
+        : undefined;
       const res = await apiPost<{ success: boolean; taskId: string; setId: string }>("/api/listing-set", {
         imageDataUrl,
         product: { name: productName, category: productCategory },
+        prompts,
       });
       setTaskId(res.taskId);
       setSetStatus({ status: "pending", progress: 0, results: [] });
@@ -174,13 +211,61 @@ export default function ListingSetPage() {
             <div className="flex flex-1 flex-col gap-2.5">
               <Input placeholder="商品名称（可选）" value={productName} onChange={(e) => setProductName(e.target.value)} className="h-11 rounded-[12px]" />
               <Input placeholder="品类，如 美妆/3C/食品（可选）" value={productCategory} onChange={(e) => setProductCategory(e.target.value)} className="h-11 rounded-[12px]" />
-              <Button variant="brand" className="mt-auto min-h-11" onClick={handleGenerate} disabled={!imageDataUrl || submitting || processing}>
-                {submitting || processing ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}
-                生成套图（{LISTING_TYPES.length} 张）
-              </Button>
+              <div className="mt-auto flex flex-col gap-1.5">
+                <Button variant="brand" className="min-h-11" onClick={handlePlan} disabled={!imageDataUrl || planning || processing}>
+                  {planning ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Wand2 className="mr-1.5 h-4 w-4" />}
+                  AI 读图出词
+                </Button>
+                <button
+                  type="button"
+                  onClick={handleGenerate}
+                  disabled={!imageDataUrl || submitting || processing}
+                  className="text-[12px] text-ink-3 transition-colors hover:text-ink disabled:opacity-50"
+                >
+                  跳过出词，用模板直接生成
+                </button>
+              </div>
             </div>
           </div>
         </section>
+
+        {/* 出词草稿：可逐条微调后确认生成 */}
+        {planItems && !taskId && (
+          <section className="mt-4 glass-panel rounded-[18px] p-4 shadow-soft">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-[15px] font-bold text-ink">提示词草稿</h2>
+              <button
+                type="button"
+                onClick={() => setPlanItems(null)}
+                className="flex items-center gap-1 text-[12px] text-ink-3 hover:text-ink"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                重新出词
+              </button>
+            </div>
+            <div className="flex flex-col gap-3">
+              {planItems.map((p, idx) => (
+                <div key={p.listingType} className="space-y-1">
+                  <label className="text-[12px] font-semibold text-ink-2">{p.index} {p.label}</label>
+                  <Textarea
+                    rows={2}
+                    value={p.prompt}
+                    onChange={(e) =>
+                      setPlanItems((prev) =>
+                        prev ? prev.map((it, i) => (i === idx ? { ...it, prompt: e.target.value } : it)) : prev
+                      )
+                    }
+                    className="resize-none rounded-[12px] text-[13px]"
+                  />
+                </div>
+              ))}
+            </div>
+            <Button variant="brand" className="mt-3 min-h-11 w-full" onClick={handleGenerate} disabled={submitting || processing}>
+              {submitting || processing ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}
+              确认并生成套图（{LISTING_TYPES.length} 张）
+            </Button>
+          </section>
+        )}
 
         {/* 进度条 */}
         {hasResult && processing && (

@@ -71,6 +71,10 @@ model User {
   jimengModelName     String? // 即梦 默认模型
   jimengModelsJson    String? // 即梦 模型列表 JSON
   hasJimengCredentials Boolean @default(false)
+  copywriterApiKey    String? // 文案/出词多模态模型 API Key
+  copywriterBaseUrl   String? // 文案/出词模型 Base URL（OpenAI 兼容，如 https://toapis.com/v1）
+  copywriterModelName String? // 文案/出词模型名（如 gpt-5.4-mini）
+  hasCopywriterApiKey Boolean @default(false)
   superbedToken       String? // Superbed 图床 Token
   hasSuperbedToken    Boolean @default(false)
   localStoragePath    String? // 本地文件保存路径（默认为 public/uploads）
