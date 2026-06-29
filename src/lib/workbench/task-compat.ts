@@ -16,6 +16,7 @@ export const WORKFLOW_TYPE_LABELS: Record<WorkflowType, string> = {
   one_click: '一键处理',
   pipeline: '组合流水线',
   inpaint: '局部重绘',
+  listing_set: '商品套图',
   video_generation: '视频生成',
 };
 
@@ -41,6 +42,8 @@ const LEGACY_TYPE_ALIASES: Record<string, WorkflowType> = {
   pipeline: 'pipeline',
   INPAINT: 'inpaint',
   inpaint: 'inpaint',
+  LISTING_SET: 'listing_set',
+  listing_set: 'listing_set',
   VIDEO_GENERATION: 'video_generation',
   video_generation: 'video_generation',
 };

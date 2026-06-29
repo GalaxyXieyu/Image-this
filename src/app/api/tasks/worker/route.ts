@@ -11,6 +11,7 @@ import '@/lib/workbench/handlers/watermark';
 import '@/lib/workbench/handlers/one-click';
 import '@/lib/workbench/handlers/pipeline';
 import '@/lib/workbench/handlers/inpaint';
+import '@/lib/workbench/handlers/listing-set';
 import '@/lib/workbench/handlers/video-generation';
 import { validateTaskInput } from '@/lib/workbench/input-validation';
 import fs from 'fs/promises';
@@ -572,6 +573,9 @@ class TaskProcessor {
       case 'INPAINT':
         result = await this.processInpaint(task);
         break;
+      case 'LISTING_SET':
+        result = await this.processListingSet(task);
+        break;
       case 'BACKGROUND_REMOVAL':
         result = await this.processBackgroundRemoval(task);
         break;
@@ -666,6 +670,34 @@ class TaskProcessor {
       prompt: raw.prompt as string | undefined,
       action: (raw.action as 'inpaint' | 'remove' | 'enhance') || 'inpaint',
       strength: (raw.strength as 'low' | 'medium' | 'high') || 'medium',
+      originalUrlForRecord: getAssetClientUrl(inputData.inputAsset) || (raw.imageUrl as string) || '',
+      provider: raw.provider as string | undefined,
+      modelName: raw.modelName as string | undefined,
+      onProgress: async (label: string, progress: number) => {
+        await prisma.taskQueue.update({
+          where: { id: task.id },
+          data: { currentStep: label, progress, completedSteps: progress >= 100 ? 1 : 0 },
+        });
+      },
+    });
+  }
+
+  private async processListingSet(task: { id: string; inputData: string; userId: string }) {
+    const inputData = await resolveTaskInputData(task.inputData);
+    const raw = inputData as Record<string, unknown>;
+    const sourceImage =
+      (await readAssetAsDataUrl(inputData.inputAsset)) ||
+      inputData.imageUrl ||
+      getAssetClientUrl(inputData.inputAsset);
+    if (!sourceImage) throw new Error('缺少商品图');
+
+    const { executeListingImage } = await import('@/lib/workbench/listing-set-service');
+    return executeListingImage({
+      userId: task.userId,
+      sourceImage,
+      listingType: (raw.listingType as 'main' | 'scene' | 'model' | 'detail' | 'sellingpoint') || 'main',
+      product: (raw.product as Record<string, unknown>) || {},
+      setId: (raw.setId as string) || task.id,
       originalUrlForRecord: getAssetClientUrl(inputData.inputAsset) || (raw.imageUrl as string) || '',
       provider: raw.provider as string | undefined,
       modelName: raw.modelName as string | undefined,
