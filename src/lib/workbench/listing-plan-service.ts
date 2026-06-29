@@ -4,7 +4,7 @@
  * 读取商品图 + 商品信息，为 5 类套图各产出一段图像生成提示词草稿，供用户确认。
  */
 
-import { getUserConfig } from '@/lib/user-config';
+import { getUserConfig, normalizeChatBaseUrl } from '@/lib/user-config';
 import { LISTING_TYPES, type ListingImageType, type ListingProductInfo } from '@/lib/workbench/listing-set';
 
 export interface PlanItem {
@@ -41,10 +41,10 @@ export async function planListingPrompts(
   const config = await getUserConfig(userId);
   const cw = config.copywriter;
   if (!cw?.apiKey) {
-    throw new Error('未配置文案/出词模型，请在设置页面配置后再试');
+    throw new Error('未配置文案/出词模型，请在设置页面将某个模型类型设为「多模态语言模型」后再试');
   }
 
-  const baseUrl = cw.baseUrl.replace(/\/+$/, '');
+  const baseUrl = normalizeChatBaseUrl(cw.baseUrl);
   const typeLines = LISTING_TYPES.map((t) => `- ${t.type}（${t.label}）：${t.rule}`).join('\n');
   const brief = [
     product.name ? `商品名称：${product.name}` : '',

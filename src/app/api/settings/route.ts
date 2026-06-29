@@ -24,11 +24,11 @@ export async function POST(request: NextRequest) {
     // 转换前端配置格式到后端格式
     const userConfig: UserConfig = {};
 
-    function normalizeModels(raw: unknown): { id: string; enabled: boolean }[] | undefined {
+    function normalizeModels(raw: unknown): { id: string; enabled: boolean; kind: 'image' | 'llm' }[] | undefined {
       if (!Array.isArray(raw)) return undefined;
       const cleaned = raw
-        .filter((m): m is { id?: unknown; enabled?: unknown } => typeof m === 'object' && m !== null)
-        .map((m) => ({ id: String(m.id ?? '').trim(), enabled: !!m.enabled }))
+        .filter((m): m is { id?: unknown; enabled?: unknown; kind?: unknown } => typeof m === 'object' && m !== null)
+        .map((m) => ({ id: String(m.id ?? '').trim(), enabled: !!m.enabled, kind: m.kind === 'llm' ? 'llm' as const : 'image' as const }))
         .filter((m) => m.id.length > 0);
       return cleaned.length > 0 ? cleaned : undefined;
     }

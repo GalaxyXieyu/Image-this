@@ -41,7 +41,13 @@ import { BrandEmptyState } from '@/components/brands/SpriteImage';
 type SettingSection = 'models' | 'imagehosting' | 'runtime' | 'logs' | 'profile' | 'prompts' | 'updates';
 
 type ProviderId = 'gpt' | 'gemini' | 'jimeng';
-type ProviderModel = { id: string; enabled: boolean };
+type ModelKind = 'image' | 'llm';
+type ProviderModel = { id: string; enabled: boolean; kind?: ModelKind };
+
+const MODEL_KIND_LABEL: Record<ModelKind, string> = {
+  image: '生图模型',
+  llm: '多模态语言模型',
+};
 
 const PROVIDER_META: Record<ProviderId, { label: string; subtitle: string; defaultModel: string; keyPlaceholder: string; defaultUrl: string }> = {
   gpt:    { label: 'OpenAI',         subtitle: 'OpenAI 兼容图像接口（多模型）',  defaultModel: 'gpt-4o-image-vip',           keyPlaceholder: 'sk-...',  defaultUrl: 'https://yunwu.ai' },
@@ -265,7 +271,7 @@ export default function SettingsPage() {
     {
       id: 'models' as SettingSection,
       label: 'AI模型配置',
-      subtitle: '文生图、图生图、扩图',
+      subtitle: '生图模型、多模态语言模型',
       icon: Cpu,
       color: 'text-primary',
       bgColor: 'bg-primary/10',
@@ -876,9 +882,17 @@ export default function SettingsPage() {
                     className="glass-panel group flex min-h-[132px] flex-col gap-3 rounded-[16px] p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-float"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-muted px-2 py-0.5 text-[11px] font-medium text-ink-2">
-                        <Cpu className="h-3 w-3" />
-                        {meta.label}
+                      <span className="inline-flex min-w-0 items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-muted px-2 py-0.5 text-[11px] font-medium text-ink-2">
+                          <Cpu className="h-3 w-3" />
+                          {meta.label}
+                        </span>
+                        <span className={cn(
+                          "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium",
+                          m.kind === 'llm' ? "bg-brand/10 text-brand-text" : "bg-surface-muted text-ink-3"
+                        )}>
+                          {MODEL_KIND_LABEL[m.kind ?? 'image']}
+                        </span>
                       </span>
                       <span className={cn(
                         "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
@@ -912,46 +926,9 @@ export default function SettingsPage() {
               <p className="hidden text-data text-ink-3 sm:block">尚未配置任何模型，点击右上「新增 Provider」开始</p>
             )}
 
-            {/* 文案/出词模型（多模态 LLM）：商品套图 AI 出词用 */}
-            <div className="glass-panel rounded-[16px] p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <Cpu className="h-4 w-4 text-brand" />
-                <div>
-                  <h3 className="text-[15px] font-bold text-ink">文案 / 出词模型</h3>
-                  <p className="text-[12px] text-ink-3">多模态 LLM，用于「AI 商品套图」读图生成提示词（OpenAI 兼容 chat）</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label className="text-[12px] text-ink-2">Base URL</Label>
-                  <Input
-                    value={apiSettings.copywriterBaseUrl}
-                    onChange={(e) => setApiSettings((p) => ({ ...p, copywriterBaseUrl: e.target.value }))}
-                    placeholder="https://toapis.com/v1"
-                    className="h-11 rounded-[12px]"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-[12px] text-ink-2">模型名</Label>
-                  <Input
-                    value={apiSettings.copywriterModelName}
-                    onChange={(e) => setApiSettings((p) => ({ ...p, copywriterModelName: e.target.value }))}
-                    placeholder="gpt-5.4-mini"
-                    className="h-11 rounded-[12px]"
-                  />
-                </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label className="text-[12px] text-ink-2">API Key</Label>
-                  <Input
-                    type="password"
-                    value={apiSettings.copywriterApiKey}
-                    onChange={(e) => setApiSettings((p) => ({ ...p, copywriterApiKey: e.target.value }))}
-                    placeholder="sk-...（留空则复用 OpenAI 的 Key）"
-                    className="h-11 rounded-[12px]"
-                  />
-                </div>
-              </div>
-            </div>
+            <p className="text-[12px] text-ink-3">
+              提示：每个模型可设为「生图模型」或「多模态语言模型」。多模态语言模型用于「AI 商品套图」读图生成提示词（OpenAI 兼容 chat），在模型配置弹窗中切换类型即可。
+            </p>
           </div>
         );
       }
@@ -1638,10 +1615,11 @@ export default function SettingsPage() {
                       <div
                         key={idx}
 	                        className={cn(
-	                          "flex items-center gap-2 rounded-[10px] border bg-surface px-2 py-2",
+	                          "space-y-2 rounded-[10px] border bg-surface px-2 py-2",
                           m.enabled ? "border-brand/40" : "border-border"
                         )}
                       >
+                        <div className="flex items-center gap-2">
                         <Input
 	                          className="h-9 flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0"
                           value={m.id}
@@ -1676,6 +1654,30 @@ export default function SettingsPage() {
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
+                        </div>
+                        <div className="inline-flex rounded-[8px] bg-surface-muted p-0.5">
+                          {(['image', 'llm'] as ModelKind[]).map((k) => {
+                            const active = (m.kind ?? 'image') === k;
+                            return (
+                              <button
+                                key={k}
+                                type="button"
+                                onClick={() => {
+                                  setProviderModels((prev) => ({
+                                    ...prev,
+                                    [modalProvider]: prev[modalProvider].map((mm, i) => (i === idx ? { ...mm, kind: k } : mm)),
+                                  }));
+                                }}
+                                className={cn(
+                                  "rounded-[6px] px-2.5 py-1 text-[11px] font-medium transition-colors",
+                                  active ? "bg-surface text-ink shadow-sm" : "text-ink-3 hover:text-ink-2"
+                                )}
+                              >
+                                {MODEL_KIND_LABEL[k]}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     ))}
                     {(providerModels[modalProvider] ?? []).length === 0 && (

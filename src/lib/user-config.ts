@@ -24,9 +24,14 @@ export function normalizeTaskConcurrency(value: unknown): number {
   return Math.max(1, Math.min(10, Math.floor(parsed)));
 }
 
+/** 模型种类：image=生图模型，llm=多模态语言模型（读图出词/文案） */
+export type ModelKind = 'image' | 'llm';
+
 export interface ProviderModel {
   id: string;
   enabled: boolean;
+  /** 缺省视为 'image'（生图模型）；'llm' 为多模态语言模型 */
+  kind?: ModelKind;
 }
 
 export interface UserConfig {
@@ -78,7 +83,7 @@ function parseModelsJson(json: string | null | undefined, fallbackModelName?: st
       if (Array.isArray(parsed)) {
         return parsed
           .filter((m) => m && typeof m.id === 'string')
-          .map((m) => ({ id: m.id, enabled: !!m.enabled }));
+          .map((m) => ({ id: m.id, enabled: !!m.enabled, kind: m.kind === 'llm' ? 'llm' as const : 'image' as const }));
       }
     } catch {
       // fall through to fallback
@@ -92,11 +97,24 @@ function parseModelsJson(json: string | null | undefined, fallbackModelName?: st
 
 function serializeModels(models?: ProviderModel[]): string | null {
   if (!models || models.length === 0) return null;
-  return JSON.stringify(models.map((m) => ({ id: m.id, enabled: !!m.enabled })));
+  return JSON.stringify(
+    models.map((m) => (m.kind === 'llm' ? { id: m.id, enabled: !!m.enabled, kind: 'llm' } : { id: m.id, enabled: !!m.enabled }))
+  );
 }
 
+/** provider 默认生图模型：只取启用中的生图模型，排除多模态语言模型 */
 function firstEnabledModelId(models?: ProviderModel[]): string | undefined {
-  return models?.find((m) => m.enabled)?.id;
+  return models?.find((m) => m.enabled && m.kind !== 'llm')?.id;
+}
+
+/** OpenAI 兼容 chat base：保证以 /v1 结尾（即梦等图像专用地址原样返回） */
+export function normalizeChatBaseUrl(baseUrl: string): string {
+  const trimmed = baseUrl.replace(/\/+$/, '');
+  if (!trimmed) return trimmed;
+  if (/\/v\d+$/.test(trimmed) || trimmed.includes('/chat/completions')) return trimmed;
+  // 仅对裸域名/路径补 /v1；带具体业务路径（如即梦 images 路径）不强行改写
+  if (/\/(images|api)\b/.test(trimmed)) return trimmed;
+  return `${trimmed}/v1`;
 }
 
 function cloneUserConfig(config: UserConfig): UserConfig {
@@ -236,8 +254,27 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
     console.warn('[用户配置] 图床: 未配置，请在设置页面配置 Superbed Token');
   }
 
-  // 文案/出词多模态模型（缺省回退到 OpenAI(gpt) 的 key + toapis /v1 + gpt-5.4-mini）
-  if (copywriterApiKey) {
+  // 文案/出词多模态模型：优先取「生图 provider 里标记为 llm 的模型」，复用该 provider 的 Key/Base URL；
+  // 找不到时回退到旧的独立 copywriter 字段，再回退到 OpenAI(gpt) 的 key + toapis /v1 + gpt-5.4-mini
+  const llmCandidates: { apiKey: string; baseUrl: string; modelId: string }[] = [];
+  const pushLlm = (apiKey: string, baseUrl: string | undefined, models?: ProviderModel[]) => {
+    if (!apiKey || !baseUrl) return;
+    for (const m of models ?? []) {
+      if (m.enabled && m.kind === 'llm') llmCandidates.push({ apiKey, baseUrl, modelId: m.id });
+    }
+  };
+  pushLlm(gptApiKey, gptApiUrl, config.gpt?.models);
+  pushLlm(geminiApiKey, geminiBaseUrl, config.gemini?.models);
+  pushLlm(arkApiKey, jimengBaseUrl, config.jimeng?.models);
+
+  const llm = llmCandidates[0];
+  if (llm) {
+    config.copywriter = {
+      apiKey: llm.apiKey,
+      baseUrl: normalizeChatBaseUrl(llm.baseUrl),
+      modelName: llm.modelId,
+    };
+  } else if (copywriterApiKey) {
     config.copywriter = {
       apiKey: copywriterApiKey,
       baseUrl: copywriterBaseUrl,
