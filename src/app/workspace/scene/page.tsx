@@ -343,7 +343,7 @@ function ProductInfoStep({
     ? {
         id: workflowData.selectedTemplates[0] ?? "preset",
         name: workflowData.activePresetName,
-        desc: workflowData.activePresetDescription ?? "已选择的场景风格",
+        desc: workflowData.activePresetDescription ?? "已选择的背景模板",
         image: "/scene-presets/scene-elegant.webp",
         stylePreference: workflowData.stylePreference || workflowData.usageScene,
       }
@@ -816,7 +816,7 @@ function StyleTemplateStep({
         <div className="mx-auto flex max-w-[1100px] flex-col gap-3.5 md:gap-5">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-[18px] font-bold text-ink md:text-[22px]">先选场景风格</h2>
+              <h2 className="text-[18px] font-bold text-ink md:text-[22px]">先选背景模板</h2>
             </div>
             <span className="inline-flex min-h-10 w-fit items-center rounded-full border border-line bg-surface px-3.5 py-1.5 text-[13px] font-semibold text-brand-text">
               {selectedTemplate ? selectedTemplate.name : "未选择"}
@@ -929,7 +929,7 @@ function GenerateAdjustStep({
     ? {
         id: workflowData.selectedTemplates[0] ?? "preset",
         name: workflowData.activePresetName,
-        desc: workflowData.activePresetDescription ?? "已选择的场景风格",
+        desc: workflowData.activePresetDescription ?? "已选择的背景模板",
         image: "/scene-presets/scene-elegant.webp",
         stylePreference: workflowData.stylePreference || workflowData.usageScene,
       }

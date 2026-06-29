@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Suspense, useEffect, useState } from "react";
-import { Bell, Download, Moon, Sun, Wand2, Layers, Wrench, Sparkles, Droplets, ZoomIn, Expand, Home, Image as ImageIcon, Settings as SettingsIcon, ListTodo } from "lucide-react";
+import { Bell, Download, Moon, Sun, Wand2, Layers, Wrench, Sparkles, Droplets, ZoomIn, Expand, Home, Image as ImageIcon, Images, Settings as SettingsIcon, ListTodo } from "lucide-react";
 import { BrandLogo } from "@/components/brands/SpriteImage";
 import { MobileTabBar } from "@/components/navigation/MobileTabBar";
 import { cn } from "@/lib/utils";
@@ -19,7 +19,7 @@ const PRIMARY_ITEMS: (PrimaryItem & { icon: typeof Home })[] = [
   { label: "首页", href: "/", icon: Home, match: (p) => p === "/" },
   {
     label: "工作台",
-    href: "/workspace/scene",
+    href: "/workspace",
     icon: Wand2,
     match: (p) =>
       p.startsWith("/workspace") || p.startsWith("/combo") || p.startsWith("/tools"),
@@ -29,9 +29,10 @@ const PRIMARY_ITEMS: (PrimaryItem & { icon: typeof Home })[] = [
 ];
 
 const WORKSPACE_SEGMENTS = [
-  { label: "场景生成", href: "/workspace/scene", icon: Wand2, match: (p: string) => p.startsWith("/workspace") },
-  { label: "组合工作流", href: "/combo", icon: Layers, match: (p: string) => p.startsWith("/combo") },
-  { label: "单点工具", href: "/tools", icon: Wrench, match: (p: string) => p.startsWith("/tools") },
+  { label: "商品套图", href: "/workspace/listing-set", icon: Images, match: (p: string) => p.startsWith("/workspace/listing-set") },
+  { label: "换背景", href: "/workspace/scene", icon: Wand2, match: (p: string) => p.startsWith("/workspace/scene") },
+  { label: "工作流", href: "/combo", icon: Layers, match: (p: string) => p.startsWith("/combo") },
+  { label: "工具", href: "/tools", icon: Wrench, match: (p: string) => p.startsWith("/tools") },
 ];
 
 const TOOL_PILLS = [

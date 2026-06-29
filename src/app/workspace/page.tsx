@@ -4,17 +4,24 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Layers, Sparkles, Droplets, ZoomIn, Expand, ChevronRight } from "lucide-react";
 import { apiGet } from "@/lib/api-client";
-import { sceneStyleTemplates } from "@/lib/scene-presets";
 import { cn } from "@/lib/utils";
 
 const TOOLS = [
-  { label: "AI 换背景", desc: "电商场景 / 白底", tool: "background_replace", icon: Sparkles },
-  { label: "加水印", desc: "文字 / Logo 水印", tool: "watermark", icon: Droplets },
-  { label: "高清放大", desc: "提升清晰度", tool: "upscale", icon: ZoomIn },
-  { label: "智能扩图", desc: "扩展画布", tool: "outpaint", icon: Expand },
+  { label: "AI 换背景", desc: "场景 / 白底背景模板", href: "/workspace/scene", icon: Sparkles },
+  { label: "加水印", desc: "文字 / Logo 水印", href: "/tools?tool=watermark", icon: Droplets },
+  { label: "高清放大", desc: "提升清晰度", href: "/tools?tool=upscale", icon: ZoomIn },
+  { label: "智能扩图", desc: "扩展画布", href: "/tools?tool=outpaint", icon: Expand },
 ];
 
-const SCENE_PREVIEW_COUNT = 9;
+// 场景 = 具体产出（要什么给什么）。首发：AI 商品套图
+const SCENES = [
+  {
+    label: "AI 商品套图",
+    desc: "一张商品图 → 主图 / 场景 / 模特 / 细节 / 卖点 全套",
+    href: "/workspace/listing-set",
+  },
+];
+
 const WORKFLOW_PREVIEW_COUNT = 6;
 
 interface WorkflowTemplate {
@@ -68,26 +75,31 @@ export default function WorkbenchHubPage() {
   }, []);
 
   const workflowCover = latestImage || WORKFLOW_PLACEHOLDER;
+  const sceneCover = latestImage || "/scene-presets/scene-lifestyle.webp";
 
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto w-full max-w-3xl px-4 py-5 md:px-6 md:py-8">
-        {/* 场景功能：直接铺场景风格卡片，点击进第二步 */}
+        {/* 场景：具体产出（要什么给什么），首发 AI 商品套图 */}
         <section className="mb-6">
-          <SectionHeader title="场景生成" moreHref="/workspace/scene" />
-          <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:px-0">
-            {sceneStyleTemplates.slice(0, SCENE_PREVIEW_COUNT).map((s) => (
+          <h2 className="mb-2.5 text-caption font-semibold uppercase tracking-wider text-ink-3">场景</h2>
+          <div className="flex flex-col gap-3">
+            {SCENES.map((s) => (
               <Link
-                key={s.id}
-                href={`/workspace/scene?sceneStyle=${s.id}`}
-                className="glass-panel w-40 shrink-0 overflow-hidden rounded-[16px] shadow-soft transition-transform hover:-translate-y-0.5"
+                key={s.href}
+                href={s.href}
+                className="glass-panel block overflow-hidden rounded-[18px] shadow-soft transition-transform hover:-translate-y-0.5"
               >
-                <div className="aspect-[4/3] overflow-hidden bg-surface-muted">
-                  <SceneThumb src={s.image} alt={s.name} />
-                </div>
-                <div className="px-2.5 py-2">
-                  <p className="truncate text-[13px] font-semibold text-ink">{s.name}</p>
-                  <p className="mt-0.5 truncate text-[11px] text-ink-3">{s.desc}</p>
+                <div className="relative aspect-[16/9] overflow-hidden bg-surface-muted">
+                  <SceneThumb src={sceneCover} alt={s.label} />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
+                  <div className="absolute inset-x-0 bottom-0 p-3.5">
+                    <p className="text-[16px] font-bold text-white">{s.label}</p>
+                    <p className="mt-0.5 text-[12px] text-white/85">{s.desc}</p>
+                  </div>
+                  <span className="absolute right-3 top-3 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+                    一键成套
+                  </span>
                 </div>
               </Link>
             ))}
@@ -125,16 +137,16 @@ export default function WorkbenchHubPage() {
           </div>
         </section>
 
-        {/* 小工具（横向滑动） */}
+        {/* 工具：原子操作 */}
         <section>
-          <h2 className="mb-2.5 text-caption font-semibold uppercase tracking-wider text-ink-3">小工具</h2>
+          <h2 className="mb-2.5 text-caption font-semibold uppercase tracking-wider text-ink-3">工具</h2>
           <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:grid md:grid-cols-4 md:overflow-visible md:px-0">
             {TOOLS.map((t) => {
               const Icon = t.icon;
               return (
                 <Link
-                  key={t.tool}
-                  href={`/tools?tool=${t.tool}`}
+                  key={t.label}
+                  href={t.href}
                   className={cn(
                     "glass-panel flex w-32 shrink-0 flex-col gap-2 rounded-[18px] p-3.5 shadow-soft transition-transform hover:-translate-y-0.5 md:w-auto"
                   )}
