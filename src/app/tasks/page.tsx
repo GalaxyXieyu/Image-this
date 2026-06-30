@@ -290,12 +290,6 @@ export default function TasksPage() {
       {/* Header */}
       <div className="px-4 py-2.5 flex items-center justify-between gap-3 shrink-0 sm:px-8 md:py-5 md:flex-row">
         <div>
-          <h1 className="hidden font-serif text-[28px] leading-tight text-foreground tracking-tight sm:text-h2 md:block">
-            任务中心
-          </h1>
-          <p className="hidden text-data text-muted-foreground mt-1 md:block">
-            查看和管理你的生成任务
-          </p>
           <div className="md:hidden">
             {isPolling ? (
               <div className="flex min-h-9 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-[12px] font-medium text-processing">

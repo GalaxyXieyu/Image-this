@@ -178,7 +178,7 @@ export default function ListingSetPage() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto w-full max-w-3xl px-4 py-5 md:px-6 md:py-8 lg:max-w-[1360px]">
-        <div className="mb-5">
+        <div className="mb-5 lg:hidden">
           <h1 className="font-serif text-[24px] leading-tight tracking-tight text-ink md:text-h2">AI 商品套图</h1>
           <p className="mt-1 text-data text-ink-2">上传一张商品图，逐张串行生成主图 / 场景 / 模特 / 细节 / 卖点全套</p>
         </div>

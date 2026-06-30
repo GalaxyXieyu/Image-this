@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-30T10:06:33+08:00",
+  "generated_at": "2026-06-30T10:51:05+08:00",
   "project": {
     "name": "Image-this",
     "repo_root": "/Volumes/DATABASE/code/business/Image-this",
@@ -83,67 +83,40 @@
       "created_at": "1782739093884"
     },
     {
-      "task_id": "T10",
-      "summary": "[T10] [Web桌面端] 首页移出侧边栏，根路由改为重定向工作台",
+      "task_id": "T17",
+      "summary": "[T17] [Web桌面端] 工作台首页(hub)视觉重设计",
       "status": "todo",
-      "guid": "85e5c47e-2363-49fa-87f1-0dc09b727e8f",
-      "url": "https://applink.feishu.cn/client/todo/detail?guid=85e5c47e-2363-49fa-87f1-0dc09b727e8f&suite_entity_num=t100577",
-      "updated_at": "1782784691060",
-      "created_at": "1782784691020"
+      "guid": "7707ead3-8d69-4dbf-81d8-7f5fab2e5f4a",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=7707ead3-8d69-4dbf-81d8-7f5fab2e5f4a&suite_entity_num=t100584",
+      "updated_at": "1782787715607",
+      "created_at": "1782787715563"
     },
     {
-      "task_id": "T11",
-      "summary": "[T11] [Web桌面端] 设置页顶部 tab 选中态文字对比度修复",
+      "task_id": "T18",
+      "summary": "[T18] [Web桌面端] 图库任务可中断 + 图片增删改查",
       "status": "todo",
-      "guid": "c9ceb742-03a6-400a-b13e-583b48b24d7a",
-      "url": "https://applink.feishu.cn/client/todo/detail?guid=c9ceb742-03a6-400a-b13e-583b48b24d7a&suite_entity_num=t100578",
-      "updated_at": "1782784731424",
-      "created_at": "1782784731386"
+      "guid": "0dab9ebf-9e74-43f8-bc69-4d3d74f01042",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=0dab9ebf-9e74-43f8-bc69-4d3d74f01042&suite_entity_num=t100585",
+      "updated_at": "1782787739669",
+      "created_at": "1782787739624"
     },
     {
-      "task_id": "T12",
-      "summary": "[T12] [Web桌面端] 设置页模型卡片比例修复（过细长）",
+      "task_id": "T19",
+      "summary": "[T19] [Web桌面端] 删除各子页面顶部 hero/标题区",
       "status": "todo",
-      "guid": "4d45622a-3fe9-4e6a-8e8a-b2d8d35ac0ee",
-      "url": "https://applink.feishu.cn/client/todo/detail?guid=4d45622a-3fe9-4e6a-8e8a-b2d8d35ac0ee&suite_entity_num=t100579",
-      "updated_at": "1782784776503",
-      "created_at": "1782784776445"
+      "guid": "aed70f46-5565-4594-bcf4-384792836374",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=aed70f46-5565-4594-bcf4-384792836374&suite_entity_num=t100586",
+      "updated_at": "1782787766142",
+      "created_at": "1782787766099"
     },
     {
-      "task_id": "T13",
-      "summary": "[T13] [Web桌面端] 工作台 hub 去空白 + 场景卡对齐工作流卡尺寸",
+      "task_id": "T20",
+      "summary": "[T20] [Web桌面端] 工具箱布局重构(中间占位列)",
       "status": "todo",
-      "guid": "4a467cf6-f2f5-4783-9570-8e7573e69760",
-      "url": "https://applink.feishu.cn/client/todo/detail?guid=4a467cf6-f2f5-4783-9570-8e7573e69760&suite_entity_num=t100580",
-      "updated_at": "1782784831006",
-      "created_at": "1782784830966"
-    },
-    {
-      "task_id": "T14",
-      "summary": "[T14] [Web桌面端] 工作台二级侧边栏重构（场景生图+工作流+工具箱）",
-      "status": "todo",
-      "guid": "7405daf8-1233-4ed4-8e8f-c00c6460cf92",
-      "url": "https://applink.feishu.cn/client/todo/detail?guid=7405daf8-1233-4ed4-8e8f-c00c6460cf92&suite_entity_num=t100581",
-      "updated_at": "1782784884564",
-      "created_at": "1782784884524"
-    },
-    {
-      "task_id": "T15",
-      "summary": "[T15] [Web桌面端] 生图主按钮改悬浮居中/固定（免滚动）",
-      "status": "todo",
-      "guid": "20675ee7-94d3-45ad-8491-3a7b7fb1558c",
-      "url": "https://applink.feishu.cn/client/todo/detail?guid=20675ee7-94d3-45ad-8491-3a7b7fb1558c&suite_entity_num=t100582",
-      "updated_at": "1782784931918",
-      "created_at": "1782784931870"
-    },
-    {
-      "task_id": "T16",
-      "summary": "[T16] [Web桌面端] 整页滚动改内部容器滚动（settings 等）",
-      "status": "todo",
-      "guid": "19e3f742-6c8f-4f92-a584-b8d9e8c4aa71",
-      "url": "https://applink.feishu.cn/client/todo/detail?guid=19e3f742-6c8f-4f92-a584-b8d9e8c4aa71&suite_entity_num=t100583",
-      "updated_at": "1782784981502",
-      "created_at": "1782784981457"
+      "guid": "87d46d8e-0a27-46ff-995a-84e9ff15c011",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=87d46d8e-0a27-46ff-995a-84e9ff15c011&suite_entity_num=t100587",
+      "updated_at": "1782787792903",
+      "created_at": "1782787792861"
     }
   ],
   "next_task": {

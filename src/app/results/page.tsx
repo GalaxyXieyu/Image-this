@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import { apiGet, apiPatch, apiPost } from "@/lib/api-client";
+import { apiGet, apiPatch, apiPost, apiDelete } from "@/lib/api-client";
 import { BrandEmptyState, BrandImageFallback } from "@/components/brands/SpriteImage";
 import {
   Search,
@@ -279,6 +279,17 @@ export default function ResultsPage() {
     }
   };
 
+  const handleCancelTask = async (id: string) => {
+    if (!confirm("取消并删除这个进行中的任务吗？")) return;
+    try {
+      await apiDelete(`/api/tasks/${id}`);
+      setActiveTasks((prev) => prev.filter((t) => t.id !== id));
+      fetchResults();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "取消失败");
+    }
+  };
+
   const handleInpaintSubmit = async (payload: InpaintSubmitPayload) => {
     try {
       await apiPost("/api/inpaint", {
@@ -324,16 +335,6 @@ export default function ResultsPage() {
 
   return (
     <div className="h-full flex flex-col bg-background">
-      {/* Header */}
-      <div className="hidden items-center justify-between border-b border-line px-4 py-4 shrink-0 sm:px-6 md:flex">
-        <div>
-          <h1 className="font-serif text-[28px] leading-tight text-ink tracking-tight sm:text-h2">图库</h1>
-          <p className="mt-1 text-data text-ink-2">
-            查看、筛选、批量下载已生成的商品图
-          </p>
-        </div>
-      </div>
-
       {/* Two-column layout: 移动端 sidebar 折叠成顶部横滚 chips */}
       <div className="flex flex-1 flex-col md:flex-row overflow-hidden">
         {/* 移动端：横滚分类 chips */}
@@ -482,8 +483,17 @@ export default function ResultsPage() {
                     style={{ gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))" }}
                   >
                     {filteredActive.map((task) => (
-                      <div key={`active-${task.id}`} className="glass-panel overflow-hidden rounded-[16px]">
+                      <div key={`active-${task.id}`} className="group glass-panel relative overflow-hidden rounded-[16px]">
                         <WaterFillCard task={task} />
+                        <button
+                          type="button"
+                          onClick={() => handleCancelTask(task.id)}
+                          className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-surface/85 text-ink-2 shadow-soft backdrop-blur-sm transition-colors hover:text-danger md:opacity-0 md:group-hover:opacity-100"
+                          title="取消任务"
+                          aria-label="取消任务"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
                         <div className="px-2.5 py-2">
                           <h3 className="truncate text-[12px] font-semibold text-ink">处理中…</h3>
                           <p className="mt-0.5 hidden text-[11px] text-ink-3 sm:block">

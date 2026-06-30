@@ -58,20 +58,29 @@ const WORKFLOW_PLACEHOLDER = "/scene-presets/scene-minimal.webp";
 export default function WorkbenchHubPage() {
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
   const [latestImage, setLatestImage] = useState<string | null>(null);
+  const [recentImages, setRecentImages] = useState<Array<{ id: string; url: string }>>([]);
 
   useEffect(() => {
     apiGet<{ templates: WorkflowTemplate[] }>("/api/workflow-templates")
       .then((res) => setTemplates(res.templates || []))
       .catch(() => setTemplates([]));
-    // 最新生成图：作为工作流卡片默认封面
-    apiGet<{ images: Array<{ processedUrl?: string | null; thumbnailUrl?: string | null }> }>(
-      "/api/images?limit=1&status=COMPLETED&includeFullSize=true"
+    // 最近生成图：首图作为封面，整体作为「最近生成」网格
+    apiGet<{ images: Array<{ id: string; processedUrl?: string | null; thumbnailUrl?: string | null }> }>(
+      "/api/images?limit=12&status=COMPLETED&includeFullSize=true"
     )
       .then((res) => {
-        const first = res.images?.[0];
-        setLatestImage(first?.processedUrl || first?.thumbnailUrl || null);
+        const imgs = res.images || [];
+        setLatestImage(imgs[0]?.processedUrl || imgs[0]?.thumbnailUrl || null);
+        setRecentImages(
+          imgs
+            .map((i) => ({ id: i.id, url: i.thumbnailUrl || i.processedUrl || "" }))
+            .filter((i) => i.url)
+        );
       })
-      .catch(() => setLatestImage(null));
+      .catch(() => {
+        setLatestImage(null);
+        setRecentImages([]);
+      });
   }, []);
 
   const workflowCover = latestImage || WORKFLOW_PLACEHOLDER;
@@ -105,23 +114,24 @@ export default function WorkbenchHubPage() {
               </Link>
             ))}
           </div>
-          {/* 桌面：对齐工作流的 w-40 方卡 */}
-          <div className="hidden gap-3 lg:flex lg:flex-wrap">
+          {/* 桌面：全宽 banner，铺满整行 */}
+          <div className="hidden flex-col gap-4 lg:flex">
             {SCENES.map((s) => (
               <Link
                 key={s.href}
                 href={s.href}
-                className="glass-panel w-40 shrink-0 overflow-hidden rounded-[16px] shadow-soft transition-transform hover:-translate-y-0.5"
+                className="glass-panel group block overflow-hidden rounded-[22px] shadow-soft transition-transform hover:-translate-y-0.5"
               >
-                <div className="relative aspect-square overflow-hidden bg-surface-muted">
+                <div className="relative aspect-[24/7] overflow-hidden bg-surface-muted">
                   <SceneThumb src={sceneCover} alt={s.label} />
-                  <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
-                    一键成套
-                  </span>
-                </div>
-                <div className="px-2.5 py-2">
-                  <p className="truncate text-[13px] font-semibold text-ink">{s.label}</p>
-                  <p className="mt-0.5 truncate text-[11px] text-ink-3">{s.desc}</p>
+                  <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/35 to-transparent" />
+                  <div className="absolute inset-y-0 left-0 flex max-w-[60%] flex-col justify-center p-7">
+                    <span className="mb-2 inline-flex w-fit rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-semibold text-white backdrop-blur-sm">
+                      一键成套
+                    </span>
+                    <p className="text-[22px] font-bold text-white">{s.label}</p>
+                    <p className="mt-1 text-[13px] text-white/85">{s.desc}</p>
+                  </div>
                 </div>
               </Link>
             ))}
@@ -131,7 +141,7 @@ export default function WorkbenchHubPage() {
         {/* 工作流：铺工作流模板卡片，点击进参数步 */}
         <section className="mb-6">
           <SectionHeader title="工作流" moreHref="/combo" />
-          <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:px-0">
+          <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:px-0 lg:grid lg:grid-cols-3 lg:gap-4 lg:overflow-visible xl:grid-cols-4">
             {(templates.length > 0
               ? templates.slice(0, WORKFLOW_PREVIEW_COUNT)
               : [{ id: "__empty", name: "组合工作流", description: "多步骤链式流水线，一键批量处理", steps: [] }]
@@ -139,7 +149,7 @@ export default function WorkbenchHubPage() {
               <Link
                 key={t.id}
                 href={t.id === "__empty" ? "/combo" : `/combo?template=${t.id}&stage=params`}
-                className="glass-panel w-40 shrink-0 overflow-hidden rounded-[16px] shadow-soft transition-transform hover:-translate-y-0.5"
+                className="glass-panel w-40 shrink-0 overflow-hidden rounded-[16px] shadow-soft transition-transform hover:-translate-y-0.5 lg:w-auto"
               >
                 <div className="relative aspect-square overflow-hidden bg-surface-muted">
                   <SceneThumb src={workflowCover} alt={t.name} />
@@ -185,6 +195,26 @@ export default function WorkbenchHubPage() {
             })}
           </div>
         </section>
+
+        {/* 最近生成：填充仪表盘 + 快速回到图库 */}
+        {recentImages.length > 0 && (
+          <section className="mt-6">
+            <SectionHeader title="最近生成" moreHref="/results" />
+            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+              {recentImages.map((img) => (
+                <Link
+                  key={img.id}
+                  href="/results"
+                  className="glass-panel group overflow-hidden rounded-[14px] shadow-soft transition-transform hover:-translate-y-0.5"
+                >
+                  <div className="relative aspect-square overflow-hidden bg-surface-muted">
+                    <SceneThumb src={img.url} alt="最近生成" />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );

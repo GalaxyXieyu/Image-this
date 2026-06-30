@@ -451,21 +451,23 @@ function ToolboxPageInner() {
 
   const resultPreviewUrl = runState.resultImageUrl ?? draft.inputAssets[0]?.clientUrl;
   const isBusy = creatingTask || uploading || isPolling || runState.status === "processing" || runState.status === "pending" || runState.status === "queued";
-  const taskActions = (
+  const createBtn = (
+    <Button
+      variant="gradient"
+      className="min-h-11 w-full"
+      disabled={draft.inputAssets.length === 0 || creatingTask || uploading}
+      onClick={handleCreateTask}
+    >
+      {creatingTask ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
+      {creatingTask
+        ? "创建中..."
+        : draft.inputAssets.length > 1
+          ? `批量处理 ${draft.inputAssets.length} 张`
+          : "创建工具任务"}
+    </Button>
+  );
+  const resultBtns = (
     <>
-      <Button
-        variant="gradient"
-        className="min-h-11 w-full"
-        disabled={draft.inputAssets.length === 0 || creatingTask || uploading}
-        onClick={handleCreateTask}
-      >
-        {creatingTask ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
-        {creatingTask
-          ? "创建中..."
-          : draft.inputAssets.length > 1
-            ? `批量处理 ${draft.inputAssets.length} 张`
-            : "创建工具任务"}
-      </Button>
       <Button variant="outline" className="min-h-11 w-full" disabled={!runState.resultImageUrl} onClick={() => downloadImage(runState.resultImageUrl)}>
         <Download className="w-4 h-4 mr-2" />
         下载结果
@@ -483,16 +485,18 @@ function ToolboxPageInner() {
       </Button>
     </>
   );
+  const taskActions = (
+    <>
+      {createBtn}
+      {resultBtns}
+    </>
+  );
 
   return (
     <div className="h-full flex flex-col bg-background">
 
       <div className="shrink-0 border-b border-line px-4 py-2.5 sm:px-6 md:flex md:flex-row md:items-center md:justify-between md:py-4">
         <div className="hidden md:block">
-          <h1 className="text-[24px] font-semibold leading-tight text-ink md:text-h3">单点工具箱</h1>
-          <p className="mt-0.5 text-data text-ink-2">
-            上传商品素材，选择工具能力，创建可追踪的 AI 处理任务
-          </p>
           {draft.activePresetName && (
             <div className="mt-2 flex items-center gap-2">
               <Badge variant="secondary" className="bg-brand-soft text-brand-text">
@@ -623,73 +627,70 @@ function ToolboxPageInner() {
               <ChevronDown className="h-4 w-4 shrink-0 text-ink-3" />
             </button>
           </div>
-        </aside>
-
-        <main className="flex flex-1 items-center justify-center md:overflow-auto bg-surface-muted/40 p-4 pb-3 md:p-8">
-          {!resultPreviewUrl ? (
-            <BrandEmptyState
-              pose="think"
-              title="请先上传图片"
-              description=""
-              className="glass-panel w-full max-w-[360px] rounded-[20px] px-5"
-            />
-          ) : (
-            <div className="glass-panel relative aspect-square w-full max-w-3xl overflow-hidden rounded-[24px]">
-              <img src={resultPreviewUrl} alt={runState.resultImageUrl ? "处理结果" : "输入预览"} className="h-full w-full object-contain" />
-              {isBusy && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-surface/70 backdrop-blur-sm">
-                  <ConicSpinner size={64} />
-                  <span className="text-data font-semibold text-brand-text">
-                    {runState.currentStep || "任务处理中…"}
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
-        </main>
-
-        <aside className="flex md:w-[340px] md:shrink-0 flex-col md:overflow-y-auto border-t md:border-t-0 md:border-l border-line bg-surface-glass backdrop-blur-[20px] backdrop-saturate-150">
-          <div className="p-5 space-y-6">
-            <section>
-              <div className="flex items-center justify-between">
-                <h3 className="text-data font-semibold text-foreground">
-                  任务与结果
-                </h3>
-                <Badge variant="secondary" className={getStatusClassName(runState.status)}>
-                  {getStatusLabel(runState.status)}
-                </Badge>
-              </div>
-              <p className="hidden text-caption text-muted-foreground mt-2 md:block">
-                当前工具：{selectedTool.label}。{selectedTool.description}
-              </p>
-
-              {runState.taskId && (
-                <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3 space-y-2">
-                  <p className="hidden text-caption text-muted-foreground truncate md:block">任务 ID：{runState.taskId}</p>
-                  {runState.currentStep && <p className="hidden text-caption text-muted-foreground md:block">{runState.currentStep}</p>}
-                  {(runState.status === "processing" || runState.status === "pending" || runState.status === "queued") && (
-                    <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                      <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.max(0, Math.min(100, runState.progress))}%` }} />
-                    </div>
-                  )}
-                  {runState.usedModel && <p className="hidden text-[11px] text-muted-foreground/70 md:block">模型：{runState.usedModel}</p>}
-                  {runState.errorMessage && (
-                    <div className="flex items-start gap-2 text-caption text-destructive">
-                      <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                      <span>{runState.errorMessage}</span>
-                    </div>
-                  )}
-                  {pollingError && <p className="text-caption text-destructive">状态刷新失败：{pollingError}</p>}
-                  {runState.status === "completed" && runState.processedImageId && (
-                    <p className="text-[11px] text-green-600">结果已保存到结果管理</p>
-                  )}
-                </div>
-              )}
-            </section>
-
-            <div className="sticky bottom-0 z-10 -mx-5 -mb-6 hidden space-y-3 border-t border-line bg-surface-glass/95 px-5 py-3 backdrop-blur-[12px] md:block">{taskActions}</div>
+          {/* 桌面：左栏底部固定「创建任务」主 CTA */}
+          <div className="sticky bottom-0 z-10 hidden border-t border-line bg-surface-glass/95 p-4 backdrop-blur-[12px] md:block">
+            {createBtn}
           </div>
         </aside>
+
+        {/* 桌面：右侧大预览 + 状态 + 结果操作（二列布局，合并原中间预览与右侧任务列） */}
+        <main className="flex flex-1 flex-col bg-surface-muted/40 md:min-h-0">
+          <div className="hidden items-center justify-between gap-2 border-b border-line bg-surface-glass px-6 py-2.5 md:flex">
+            <p className="min-w-0 truncate text-[13px] text-ink-2">当前工具：{selectedTool.label}。{selectedTool.description}</p>
+            <Badge variant="secondary" className={cn("shrink-0", getStatusClassName(runState.status))}>
+              {getStatusLabel(runState.status)}
+            </Badge>
+          </div>
+
+          <div className="flex flex-1 items-center justify-center overflow-auto p-4 pb-3 md:p-8">
+            {!resultPreviewUrl ? (
+              <BrandEmptyState
+                pose="think"
+                title="预览 / 结果区"
+                description="上传图片并创建任务后，输入预览与处理结果会显示在这里"
+                className="glass-panel w-full max-w-[360px] rounded-[20px] px-5"
+              />
+            ) : (
+              <div className="glass-panel relative aspect-square w-full max-w-3xl overflow-hidden rounded-[24px]">
+                <img src={resultPreviewUrl} alt={runState.resultImageUrl ? "处理结果" : "输入预览"} className="h-full w-full object-contain" />
+                {isBusy && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-surface/70 backdrop-blur-sm">
+                    <ConicSpinner size={64} />
+                    <span className="text-data font-semibold text-brand-text">
+                      {runState.currentStep || "任务处理中…"}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* 桌面：任务信息 + 结果操作 */}
+          <div className="hidden border-t border-line bg-surface-glass px-6 py-3 md:block">
+            {runState.taskId && (
+              <div className="mb-3 space-y-1.5">
+                {runState.currentStep && <p className="text-caption text-muted-foreground">{runState.currentStep}</p>}
+                {(runState.status === "processing" || runState.status === "pending" || runState.status === "queued") && (
+                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.max(0, Math.min(100, runState.progress))}%` }} />
+                  </div>
+                )}
+                {runState.usedModel && <p className="text-[11px] text-muted-foreground/70">模型：{runState.usedModel}</p>}
+                {runState.errorMessage && (
+                  <div className="flex items-start gap-2 text-caption text-destructive">
+                    <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                    <span>{runState.errorMessage}</span>
+                  </div>
+                )}
+                {pollingError && <p className="text-caption text-destructive">状态刷新失败：{pollingError}</p>}
+                {runState.status === "completed" && runState.processedImageId && (
+                  <p className="text-[11px] text-green-600">结果已保存到结果管理</p>
+                )}
+              </div>
+            )}
+            <div className="grid grid-cols-3 gap-2">{resultBtns}</div>
+          </div>
+        </main>
       </div>
       <div className="z-30 grid shrink-0 grid-cols-2 gap-2 border-t border-line bg-surface-glass px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+12px)] backdrop-blur-[18px] backdrop-saturate-150 md:hidden">
         {taskActions}

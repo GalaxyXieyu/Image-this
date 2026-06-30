@@ -1282,10 +1282,6 @@ export default function SettingsPage() {
   return (
     <div className="h-full bg-background flex flex-col overflow-y-auto lg:overflow-hidden">
       <div className="flex-1 bg-background px-4 py-3 sm:px-6 sm:py-8 lg:flex lg:min-h-0 lg:flex-col lg:px-8">
-        <div className="mb-5 hidden sm:mb-8 md:block">
-          <h1 className="font-serif text-[28px] font-semibold leading-tight tracking-[-0.01em] text-ink sm:text-h2">设置</h1>
-          <p className="mt-2 text-ink-2">管理 AI 服务配置、提示词、系统并发与账户信息</p>
-        </div>
 
         {/* 顶部 4 Tab + 各 Tab 内子 section */}
         {(() => {
