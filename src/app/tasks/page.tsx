@@ -129,6 +129,33 @@ function TaskThumbnail({ src, isResult }: { src?: string | null; isResult: boole
   );
 }
 
+function TaskActions({ task, onDelete }: { task: Task; onDelete: (_id: string) => void }) {
+  return (
+    <>
+      {task.status === "failed" && (
+        <Button variant="ghost" size="sm" className="min-h-10" onClick={() => alert("重试功能待实现")}>
+          <RotateCcw className="w-4 h-4 mr-1.5" />
+          重试
+        </Button>
+      )}
+      {task.status === "completed" && (
+        <Button variant="ghost" size="sm" className="min-h-10" asChild>
+          <Link href={`/results?task=${task.id}`}>查看结果</Link>
+        </Button>
+      )}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="min-h-10 text-muted-foreground hover:text-destructive"
+        onClick={() => onDelete(task.id)}
+      >
+        <Trash2 className="w-4 h-4 md:mr-1.5" />
+        <span className="hidden md:inline">删除</span>
+      </Button>
+    </>
+  );
+}
+
 export default function TasksPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -318,7 +345,7 @@ export default function TasksPage() {
 
       {/* Task List */}
       <div className="flex-1 overflow-auto p-4 sm:p-8">
-        <div className="max-w-5xl mx-auto space-y-3 md:space-y-4">
+        <div className="mx-auto max-w-5xl space-y-3 md:space-y-4 lg:max-w-none">
           {loading && (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -344,72 +371,110 @@ export default function TasksPage() {
             </div>
           )}
 
-          {filteredTasks.map((task) => (
-            <div
-              key={task.id}
-              className="glass-panel rounded-[18px] p-3.5 shadow-soft transition-shadow hover:shadow-float sm:rounded-card sm:p-5"
-            >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-                  <TaskThumbnail
-                    src={task.resultImageUrl || task.originalImageUrl}
-                    isResult={!!task.resultImageUrl}
-                  />
-                  <div className="min-w-0">
-                    <h3 className="truncate text-data font-medium text-foreground">
-                      {task.name}
-                    </h3>
-                    <p className="mt-0.5 hidden text-caption text-muted-foreground sm:block">
-                      {task.createdAt} · {task.completed}/{task.total} 张
-                    </p>
-                    {(task.status === "completed" || task.status === "failed") && task.usedModel && (
-                      <p className="mt-0.5 hidden text-[11px] text-muted-foreground/70 sm:block">
-                        模型: {task.usedModel}
+          {/* 移动 / 中屏：卡片 */}
+          <div className="space-y-3 md:space-y-4 lg:hidden">
+            {filteredTasks.map((task) => (
+              <div
+                key={task.id}
+                className="glass-panel rounded-[18px] p-3.5 shadow-soft transition-shadow hover:shadow-float sm:rounded-card sm:p-5"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+                    <TaskThumbnail
+                      src={task.resultImageUrl || task.originalImageUrl}
+                      isResult={!!task.resultImageUrl}
+                    />
+                    <div className="min-w-0">
+                      <h3 className="truncate text-data font-medium text-foreground">
+                        {task.name}
+                      </h3>
+                      <p className="mt-0.5 hidden text-caption text-muted-foreground sm:block">
+                        {task.createdAt} · {task.completed}/{task.total} 张
                       </p>
-                    )}
+                      {(task.status === "completed" || task.status === "failed") && task.usedModel && (
+                        <p className="mt-0.5 hidden text-[11px] text-muted-foreground/70 sm:block">
+                          模型: {task.usedModel}
+                        </p>
+                      )}
+                    </div>
                   </div>
+                  <StatusBadge status={task.status} />
                 </div>
-                <StatusBadge status={task.status} />
-              </div>
 
-              {(task.status === "running" || task.status === "pending") && (
-                <div className="mt-4">
-                  <div className="mb-1.5 hidden items-center justify-between sm:flex">
-                    <span className="text-caption text-muted-foreground">
-                      进度 {task.progress}%
-                    </span>
-                    <span className="text-caption text-muted-foreground">
-                      {task.completed}/{task.total}
-                    </span>
+                {(task.status === "running" || task.status === "pending") && (
+                  <div className="mt-4">
+                    <div className="mb-1.5 hidden items-center justify-between sm:flex">
+                      <span className="text-caption text-muted-foreground">
+                        进度 {task.progress}%
+                      </span>
+                      <span className="text-caption text-muted-foreground">
+                        {task.completed}/{task.total}
+                      </span>
+                    </div>
+                    <Progress value={task.progress} className="h-2" />
                   </div>
-                  <Progress value={task.progress} className="h-2" />
-                </div>
-              )}
+                )}
 
-              <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-border md:mt-4 md:pt-4">
-                {task.status === "failed" && (
-	                  <Button variant="ghost" size="sm" className="min-h-10" onClick={() => alert("重试功能待实现")}>
-                    <RotateCcw className="w-4 h-4 mr-1.5" />
-                    重试
-                  </Button>
-                )}
-                {task.status === "completed" && (
-	                  <Button variant="ghost" size="sm" className="min-h-10" asChild>
-                    <Link href={`/results?task=${task.id}`}>查看结果</Link>
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-	                  className="min-h-10 text-muted-foreground hover:text-destructive"
-                  onClick={() => handleDelete(task.id)}
-                >
-                  <Trash2 className="w-4 h-4 md:mr-1.5" />
-                  <span className="hidden md:inline">删除</span>
-                </Button>
+                <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-border md:mt-4 md:pt-4">
+                  <TaskActions task={task} onDelete={handleDelete} />
+                </div>
               </div>
+            ))}
+          </div>
+
+          {/* 桌面：紧凑表格 */}
+          {!loading && !error && filteredTasks.length > 0 && (
+            <div className="hidden overflow-hidden rounded-[16px] border border-line glass-panel lg:block">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-line text-[12px] font-medium text-ink-3">
+                    <th className="px-4 py-2.5">任务</th>
+                    <th className="w-28 px-3 py-2.5">状态</th>
+                    <th className="w-48 px-3 py-2.5">进度</th>
+                    <th className="w-40 px-3 py-2.5">创建时间</th>
+                    <th className="w-px px-4 py-2.5 text-right">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTasks.map((task) => (
+                    <tr key={task.id} className="border-b border-line/60 transition-colors last:border-0 hover:bg-surface-muted/40">
+                      <td className="px-4 py-2.5">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <TaskThumbnail
+                            src={task.resultImageUrl || task.originalImageUrl}
+                            isResult={!!task.resultImageUrl}
+                          />
+                          <div className="min-w-0">
+                            <h3 className="truncate text-[13px] font-medium text-foreground">{task.name}</h3>
+                            {(task.status === "completed" || task.status === "failed") && task.usedModel && (
+                              <p className="mt-0.5 truncate text-[11px] text-muted-foreground/70">模型: {task.usedModel}</p>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5"><StatusBadge status={task.status} /></td>
+                      <td className="px-3 py-2.5">
+                        {task.status === "running" || task.status === "pending" ? (
+                          <div className="flex items-center gap-2">
+                            <Progress value={task.progress} className="h-1.5 flex-1" />
+                            <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{task.progress}%</span>
+                          </div>
+                        ) : (
+                          <span className="text-[12px] text-muted-foreground">{task.completed}/{task.total} 张</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-[12px] text-muted-foreground">{task.createdAt}</td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center justify-end gap-1">
+                          <TaskActions task={task} onDelete={handleDelete} />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          ))}
+          )}
         </div>
       </div>
     </div>

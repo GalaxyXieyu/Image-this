@@ -479,7 +479,7 @@ export default function ResultsPage() {
                 {viewMode === "grid" ? (
                   <div
                     className="grid gap-3"
-                    style={{ gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))" }}
+                    style={{ gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))" }}
                   >
                     {filteredActive.map((task) => (
                       <div key={`active-${task.id}`} className="glass-panel overflow-hidden rounded-[16px]">
