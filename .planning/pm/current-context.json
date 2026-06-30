@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-30T10:51:05+08:00",
+  "generated_at": "2026-06-30T11:43:38+08:00",
   "project": {
     "name": "Image-this",
     "repo_root": "/Volumes/DATABASE/code/business/Image-this",
@@ -81,42 +81,6 @@
       "url": "https://applink.feishu.cn/client/todo/detail?guid=79a9be9f-31cb-4f28-bf86-66021236f0aa&suite_entity_num=t100576",
       "updated_at": "1782742068841",
       "created_at": "1782739093884"
-    },
-    {
-      "task_id": "T17",
-      "summary": "[T17] [Web桌面端] 工作台首页(hub)视觉重设计",
-      "status": "todo",
-      "guid": "7707ead3-8d69-4dbf-81d8-7f5fab2e5f4a",
-      "url": "https://applink.feishu.cn/client/todo/detail?guid=7707ead3-8d69-4dbf-81d8-7f5fab2e5f4a&suite_entity_num=t100584",
-      "updated_at": "1782787715607",
-      "created_at": "1782787715563"
-    },
-    {
-      "task_id": "T18",
-      "summary": "[T18] [Web桌面端] 图库任务可中断 + 图片增删改查",
-      "status": "todo",
-      "guid": "0dab9ebf-9e74-43f8-bc69-4d3d74f01042",
-      "url": "https://applink.feishu.cn/client/todo/detail?guid=0dab9ebf-9e74-43f8-bc69-4d3d74f01042&suite_entity_num=t100585",
-      "updated_at": "1782787739669",
-      "created_at": "1782787739624"
-    },
-    {
-      "task_id": "T19",
-      "summary": "[T19] [Web桌面端] 删除各子页面顶部 hero/标题区",
-      "status": "todo",
-      "guid": "aed70f46-5565-4594-bcf4-384792836374",
-      "url": "https://applink.feishu.cn/client/todo/detail?guid=aed70f46-5565-4594-bcf4-384792836374&suite_entity_num=t100586",
-      "updated_at": "1782787766142",
-      "created_at": "1782787766099"
-    },
-    {
-      "task_id": "T20",
-      "summary": "[T20] [Web桌面端] 工具箱布局重构(中间占位列)",
-      "status": "todo",
-      "guid": "87d46d8e-0a27-46ff-995a-84e9ff15c011",
-      "url": "https://applink.feishu.cn/client/todo/detail?guid=87d46d8e-0a27-46ff-995a-84e9ff15c011&suite_entity_num=t100587",
-      "updated_at": "1782787792903",
-      "created_at": "1782787792861"
     }
   ],
   "next_task": {

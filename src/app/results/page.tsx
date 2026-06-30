@@ -488,7 +488,7 @@ export default function ResultsPage() {
                         <button
                           type="button"
                           onClick={() => handleCancelTask(task.id)}
-                          className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-surface/85 text-ink-2 shadow-soft backdrop-blur-sm transition-colors hover:text-danger md:opacity-0 md:group-hover:opacity-100"
+                          className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-surface/85 text-ink-2 shadow-soft backdrop-blur-sm transition-colors hover:text-danger"
                           title="取消任务"
                           aria-label="取消任务"
                         >
@@ -537,8 +537,8 @@ export default function ResultsPage() {
                               />
                             </div>
                           </div>
-                          {/* Hover actions */}
-	                          <div className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+                          {/* 操作栏：常驻可见（桌面不再仅 hover 显示） */}
+	                          <div className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-100 transition-opacity">
 	                            <button type="button" onClick={(e) => { e.stopPropagation(); const u = item.processedUrl || item.thumbnail; if (u) setInpaintTarget({ id: item.id, url: u }); }} className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-ink-2 hover:text-brand" title="局部重绘">
 	                              <Paintbrush className="h-3.5 w-3.5" />
 	                            </button>
@@ -583,7 +583,7 @@ export default function ResultsPage() {
                         <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold text-brand-text">
                           {CATEGORY_LABELS[item.category] || "其他"}
                         </span>
-                        <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                        <div className="flex items-center gap-0.5 opacity-100 transition-opacity">
 	                          <Button variant="ghost" size="sm" className="h-10 w-10 p-0 text-ink-2 hover:text-brand" title="局部重绘" onClick={() => { const u = item.processedUrl || item.thumbnail; if (u) setInpaintTarget({ id: item.id, url: u }); }}>
                             <Paintbrush className="h-3.5 w-3.5" />
                           </Button>
