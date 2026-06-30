@@ -14,6 +14,7 @@ import '@/lib/workbench/handlers/inpaint';
 import '@/lib/workbench/handlers/listing-set';
 import '@/lib/workbench/handlers/video-generation';
 import { validateTaskInput } from '@/lib/workbench/input-validation';
+import { mapProviderErrorMessage, isRetryableProviderError } from '@/lib/provider-error-utils';
 import fs from 'fs/promises';
 
 type TaskAssetRef = {
@@ -531,8 +532,13 @@ class TaskProcessor {
       
       const retryCount = currentTask?.retryCount ?? 0;
       const maxRetries = currentTask?.maxRetries ?? 3;
-      
-      if (retryCount < maxRetries) {
+      const rawMessage = error instanceof Error ? error.message : '未知错误';
+      const friendlyMessage = mapProviderErrorMessage(rawMessage);
+      // 配额/余额不足、鉴权、模型/接口/参数类错误重试也不会成功，直接失败并给出可操作提示，
+      // 避免一直卡在「等待重试」却无人重新触发 worker。
+      const retryable = isRetryableProviderError(rawMessage);
+
+      if (retryable && retryCount < maxRetries) {
         // 还可以重试：增加重试次数，重置为 PENDING 状态
         await prisma.taskQueue.update({
           where: { id: task.id },
@@ -542,22 +548,25 @@ class TaskProcessor {
             progress: 0,
             currentStep: `等待重试 (${retryCount + 1}/${maxRetries})`,
             startedAt: null,
-            errorMessage: `处理失败: ${error instanceof Error ? error.message : '未知错误'}，准备第 ${retryCount + 1} 次重试`
+            errorMessage: `处理失败: ${friendlyMessage}，准备第 ${retryCount + 1} 次重试`
           }
         });
         console.log(`[Task Worker] 任务 ${task.id} 处理失败，将进行第 ${retryCount + 1} 次重试`);
       } else {
-        // 超过最大重试次数：标记为失败
+        // 不可重试错误 或 已达最大重试次数：标记为失败
+        const failMessage = retryable
+          ? `重试 ${maxRetries} 次后仍然失败: ${friendlyMessage}`
+          : friendlyMessage;
         await prisma.taskQueue.update({
           where: { id: task.id },
           data: {
             status: 'FAILED',
             completedAt: new Date(),
-            errorMessage: `重试 ${maxRetries} 次后仍然失败: ${error instanceof Error ? error.message : '未知错误'}`,
-            currentStep: '处理失败（已达最大重试次数）'
+            errorMessage: failMessage,
+            currentStep: retryable ? '处理失败（已达最大重试次数）' : '处理失败'
           }
         });
-        console.log(`[Task Worker] 任务 ${task.id} 已达最大重试次数 (${maxRetries})，标记为失败`);
+        console.log(`[Task Worker] 任务 ${task.id} ${retryable ? `已达最大重试次数 (${maxRetries})` : '遇到不可重试错误'}，标记为失败`);
       }
       
       throw error;

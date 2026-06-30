@@ -75,6 +75,44 @@ function normalizeWrappedMessage(message: string, provider?: ProviderType): stri
   return null;
 }
 
+/**
+ * 判断 provider 错误是否值得重试。
+ * 配额/余额不足、鉴权、模型/接口不存在、参数错误等重试也不会成功 → 不重试，直接失败并提示。
+ * 超时、429 限流、5xx、网络抖动 → 可重试。
+ */
+export function isRetryableProviderError(message: string): boolean {
+  if (!message) return true;
+  const normalized = message.toLowerCase();
+  const status = extractStatus(message);
+
+  if (
+    status === 400 ||
+    status === 401 ||
+    status === 402 ||
+    status === 403 ||
+    status === 404 ||
+    normalized.includes('quota') ||
+    normalized.includes('not enough') ||
+    normalized.includes('insufficient') ||
+    normalized.includes('余额') ||
+    normalized.includes('额度') ||
+    normalized.includes('invalid token') ||
+    normalized.includes('invalid api key') ||
+    normalized.includes('incorrect api key') ||
+    normalized.includes('authentication') ||
+    normalized.includes('model not found') ||
+    normalized.includes('invalid model') ||
+    normalized.includes('unknown model') ||
+    normalized.includes('unsupported') ||
+    normalized.includes('does not support image') ||
+    normalized.includes('not support image')
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
 export function mapProviderErrorMessage(message: string, provider?: ProviderType): string {
   if (!message) {
     return '未知错误，请稍后重试。';
@@ -106,6 +144,17 @@ export function mapProviderErrorMessage(message: string, provider?: ProviderType
     normalized.includes('does not exist')
   ) {
     return `${providerLabel} 模型不存在，或当前接口不支持这个模型，请检查模型名称。`;
+  }
+
+  if (
+    status === 402 ||
+    normalized.includes('quota') ||
+    normalized.includes('not enough') ||
+    normalized.includes('insufficient') ||
+    normalized.includes('余额') ||
+    normalized.includes('额度')
+  ) {
+    return `${providerLabel} 账户配额/余额不足，请充值或更换有额度的密钥后重试。`;
   }
 
   if (
