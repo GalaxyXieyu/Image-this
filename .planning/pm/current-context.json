@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-30T08:28:31+08:00",
+  "generated_at": "2026-06-30T10:06:33+08:00",
   "project": {
     "name": "Image-this",
     "repo_root": "/Volumes/DATABASE/code/business/Image-this",
@@ -81,6 +81,69 @@
       "url": "https://applink.feishu.cn/client/todo/detail?guid=79a9be9f-31cb-4f28-bf86-66021236f0aa&suite_entity_num=t100576",
       "updated_at": "1782742068841",
       "created_at": "1782739093884"
+    },
+    {
+      "task_id": "T10",
+      "summary": "[T10] [Web桌面端] 首页移出侧边栏，根路由改为重定向工作台",
+      "status": "todo",
+      "guid": "85e5c47e-2363-49fa-87f1-0dc09b727e8f",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=85e5c47e-2363-49fa-87f1-0dc09b727e8f&suite_entity_num=t100577",
+      "updated_at": "1782784691060",
+      "created_at": "1782784691020"
+    },
+    {
+      "task_id": "T11",
+      "summary": "[T11] [Web桌面端] 设置页顶部 tab 选中态文字对比度修复",
+      "status": "todo",
+      "guid": "c9ceb742-03a6-400a-b13e-583b48b24d7a",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=c9ceb742-03a6-400a-b13e-583b48b24d7a&suite_entity_num=t100578",
+      "updated_at": "1782784731424",
+      "created_at": "1782784731386"
+    },
+    {
+      "task_id": "T12",
+      "summary": "[T12] [Web桌面端] 设置页模型卡片比例修复（过细长）",
+      "status": "todo",
+      "guid": "4d45622a-3fe9-4e6a-8e8a-b2d8d35ac0ee",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=4d45622a-3fe9-4e6a-8e8a-b2d8d35ac0ee&suite_entity_num=t100579",
+      "updated_at": "1782784776503",
+      "created_at": "1782784776445"
+    },
+    {
+      "task_id": "T13",
+      "summary": "[T13] [Web桌面端] 工作台 hub 去空白 + 场景卡对齐工作流卡尺寸",
+      "status": "todo",
+      "guid": "4a467cf6-f2f5-4783-9570-8e7573e69760",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=4a467cf6-f2f5-4783-9570-8e7573e69760&suite_entity_num=t100580",
+      "updated_at": "1782784831006",
+      "created_at": "1782784830966"
+    },
+    {
+      "task_id": "T14",
+      "summary": "[T14] [Web桌面端] 工作台二级侧边栏重构（场景生图+工作流+工具箱）",
+      "status": "todo",
+      "guid": "7405daf8-1233-4ed4-8e8f-c00c6460cf92",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=7405daf8-1233-4ed4-8e8f-c00c6460cf92&suite_entity_num=t100581",
+      "updated_at": "1782784884564",
+      "created_at": "1782784884524"
+    },
+    {
+      "task_id": "T15",
+      "summary": "[T15] [Web桌面端] 生图主按钮改悬浮居中/固定（免滚动）",
+      "status": "todo",
+      "guid": "20675ee7-94d3-45ad-8491-3a7b7fb1558c",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=20675ee7-94d3-45ad-8491-3a7b7fb1558c&suite_entity_num=t100582",
+      "updated_at": "1782784931918",
+      "created_at": "1782784931870"
+    },
+    {
+      "task_id": "T16",
+      "summary": "[T16] [Web桌面端] 整页滚动改内部容器滚动（settings 等）",
+      "status": "todo",
+      "guid": "19e3f742-6c8f-4f92-a584-b8d9e8c4aa71",
+      "url": "https://applink.feishu.cn/client/todo/detail?guid=19e3f742-6c8f-4f92-a584-b8d9e8c4aa71&suite_entity_num=t100583",
+      "updated_at": "1782784981502",
+      "created_at": "1782784981457"
     }
   ],
   "next_task": {

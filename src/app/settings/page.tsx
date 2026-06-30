@@ -872,7 +872,7 @@ export default function SettingsPage() {
             </div>
 
             {/* 模型卡片网格 */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
               {flatModels.map((m, idx) => {
                 const meta = PROVIDER_META[m.provider];
                 return (
@@ -915,7 +915,7 @@ export default function SettingsPage() {
                   const empty = providerIds.find((p) => (providerModels[p] ?? []).length === 0);
                   setModalProvider(empty || providerIds[0]);
                 }}
-                className="flex min-h-[140px] flex-col items-center justify-center gap-2 rounded-[16px] border-2 border-dashed border-border/60 bg-transparent text-ink-3 transition-colors hover:border-brand hover:text-brand-text"
+                className="flex min-h-[132px] flex-col items-center justify-center gap-2 rounded-[16px] border-2 border-dashed border-border/60 bg-transparent text-ink-3 transition-colors hover:border-brand hover:text-brand-text"
               >
                 <Plus className="h-6 w-6" />
                 <span className="text-[13px] font-medium">新增模型</span>
@@ -1280,8 +1280,8 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="h-full bg-background flex flex-col overflow-y-auto">
-      <div className="flex-1 bg-background px-4 py-3 sm:px-6 sm:py-8 lg:px-8">
+    <div className="h-full bg-background flex flex-col overflow-y-auto lg:overflow-hidden">
+      <div className="flex-1 bg-background px-4 py-3 sm:px-6 sm:py-8 lg:flex lg:min-h-0 lg:flex-col lg:px-8">
         <div className="mb-5 hidden sm:mb-8 md:block">
           <h1 className="font-serif text-[28px] font-semibold leading-tight tracking-[-0.01em] text-ink sm:text-h2">设置</h1>
           <p className="mt-2 text-ink-2">管理 AI 服务配置、提示词、系统并发与账户信息</p>
@@ -1309,7 +1309,7 @@ export default function SettingsPage() {
                         className={cn(
                           "relative inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-semibold transition-colors sm:gap-2 sm:rounded-none sm:border-0 sm:px-4 sm:py-2.5 sm:text-[14px] sm:font-medium",
                           active
-                            ? "border-transparent bg-accent-gradient text-white shadow-soft sm:bg-transparent sm:text-brand-text sm:shadow-none"
+                            ? "border-transparent bg-accent-gradient text-white shadow-soft sm:bg-transparent sm:text-ink sm:font-semibold sm:shadow-none"
                             : "border-line bg-surface text-ink-2 hover:text-ink sm:bg-transparent sm:text-ink-3"
                         )}
                       >
@@ -1353,7 +1353,7 @@ export default function SettingsPage() {
           );
         })()}
 
-        <div className="flex min-h-0 gap-6 sm:min-h-[calc(100vh-16rem)]">
+        <div className="flex min-h-0 gap-6 sm:min-h-[calc(100vh-16rem)] lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
           {/* 右侧内容区域 */}
           <div className="flex-1 space-y-6">
             {renderContent()}

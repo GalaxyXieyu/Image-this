@@ -79,11 +79,12 @@ export default function WorkbenchHubPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto w-full max-w-3xl px-4 py-5 md:px-6 md:py-8">
+      <div className="mx-auto w-full max-w-3xl px-4 py-5 md:px-6 md:py-8 lg:max-w-[1200px]">
         {/* 场景：具体产出（要什么给什么），首发 AI 商品套图 */}
         <section className="mb-6">
           <h2 className="mb-2.5 text-caption font-semibold uppercase tracking-wider text-ink-3">场景</h2>
-          <div className="flex flex-col gap-3">
+          {/* 移动 / 中屏：满宽 16:9 hero 卡 */}
+          <div className="flex flex-col gap-3 lg:hidden">
             {SCENES.map((s) => (
               <Link
                 key={s.href}
@@ -100,6 +101,27 @@ export default function WorkbenchHubPage() {
                   <span className="absolute right-3 top-3 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
                     一键成套
                   </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+          {/* 桌面：对齐工作流的 w-40 方卡 */}
+          <div className="hidden gap-3 lg:flex lg:flex-wrap">
+            {SCENES.map((s) => (
+              <Link
+                key={s.href}
+                href={s.href}
+                className="glass-panel w-40 shrink-0 overflow-hidden rounded-[16px] shadow-soft transition-transform hover:-translate-y-0.5"
+              >
+                <div className="relative aspect-square overflow-hidden bg-surface-muted">
+                  <SceneThumb src={sceneCover} alt={s.label} />
+                  <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+                    一键成套
+                  </span>
+                </div>
+                <div className="px-2.5 py-2">
+                  <p className="truncate text-[13px] font-semibold text-ink">{s.label}</p>
+                  <p className="mt-0.5 truncate text-[11px] text-ink-3">{s.desc}</p>
                 </div>
               </Link>
             ))}

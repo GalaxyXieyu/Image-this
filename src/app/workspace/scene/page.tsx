@@ -1668,20 +1668,22 @@ function SceneDesktopWorkspace({
           <SceneAdvancedSettings workflowData={workflowData} setWorkflowData={setWorkflowData} />
         </div>
 
-        <Button
-          onClick={gen.handleGenerate}
-          disabled={gen.generating || productAssets.length === 0}
-          variant="brand"
-          className="w-full min-h-11 rounded-[12px]"
-        >
-          <Wand2 className="w-4 h-4 mr-2" />
-          {gen.generating ? "生成中..." : "开始生成"}
-        </Button>
-        {productAssets.length > 0 && (
-          <div className="rounded-full border border-line bg-surface px-3 py-1.5 text-center text-[12px] font-semibold text-ink-2">
-            {productAssets.length} 图 × {Math.max(1, workflowData.candidateCount || 1)} = {expectedTaskCount} 任务
-          </div>
-        )}
+        <div className="sticky bottom-0 z-10 -mx-5 -mb-5 mt-1 space-y-2 border-t border-line bg-surface-soft/95 px-5 py-3 backdrop-blur-[12px]">
+          <Button
+            onClick={gen.handleGenerate}
+            disabled={gen.generating || productAssets.length === 0}
+            variant="brand"
+            className="w-full min-h-11 rounded-[12px]"
+          >
+            <Wand2 className="w-4 h-4 mr-2" />
+            {gen.generating ? "生成中..." : "开始生成"}
+          </Button>
+          {productAssets.length > 0 && (
+            <div className="rounded-full border border-line bg-surface px-3 py-1.5 text-center text-[12px] font-semibold text-ink-2">
+              {productAssets.length} 图 × {Math.max(1, workflowData.candidateCount || 1)} = {expectedTaskCount} 任务
+            </div>
+          )}
+        </div>
       </aside>
 
       <div className="flex-1 min-h-0 overflow-y-auto p-6">

@@ -36,6 +36,10 @@ export async function middleware(request: NextRequest) {
   // 有 token.id 才算登录；NextAuth jwt callback 在用户行消失时会清空 token
   // (返回 {})，那时 token 仍为 truthy 但没有 id —— 必须按未登录处理。
   if (token?.id) {
+    // 已登录访问根路由：直接进工作台，不展示营销首页
+    if (pathname === "/") {
+      return NextResponse.redirect(new URL("/workspace", request.url));
+    }
     return NextResponse.next();
   }
 

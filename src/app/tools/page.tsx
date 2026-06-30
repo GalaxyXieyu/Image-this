@@ -687,7 +687,7 @@ function ToolboxPageInner() {
               )}
             </section>
 
-            <div className="hidden pt-2 space-y-3 md:block">{taskActions}</div>
+            <div className="sticky bottom-0 z-10 -mx-5 -mb-6 hidden space-y-3 border-t border-line bg-surface-glass/95 px-5 py-3 backdrop-blur-[12px] md:block">{taskActions}</div>
           </div>
         </aside>
       </div>
