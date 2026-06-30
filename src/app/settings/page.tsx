@@ -1305,8 +1305,8 @@ export default function SettingsPage() {
                         className={cn(
                           "relative inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-semibold transition-colors sm:gap-2 sm:rounded-none sm:border-0 sm:px-4 sm:py-2.5 sm:text-[14px] sm:font-medium",
                           active
-                            ? "border-transparent bg-accent-gradient text-white shadow-soft sm:bg-transparent sm:text-ink sm:font-semibold sm:shadow-none"
-                            : "border-line bg-surface text-ink-2 hover:text-ink sm:bg-transparent sm:text-ink-3"
+                            ? "border-transparent bg-accent-gradient text-white shadow-soft sm:rounded-full"
+                            : "border-line bg-surface text-ink-2 hover:text-ink sm:border-transparent sm:bg-transparent sm:text-ink-3"
                         )}
                       >
                         {(() => {
@@ -1314,9 +1314,6 @@ export default function SettingsPage() {
                           return Icon ? <Icon className="h-4 w-4" /> : null;
                         })()}
                         {g.label}
-                        {active && (
-                          <span className="absolute inset-x-2 bottom-0 hidden h-[2px] rounded-full bg-accent-gradient sm:block" />
-                        )}
                       </button>
                     );
                   })}
