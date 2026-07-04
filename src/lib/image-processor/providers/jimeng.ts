@@ -83,8 +83,8 @@ export class JimengProcessor implements IImageProcessor {
         prompt: finalPrompt,
         size: '1728x2304',
         response_format: 'b64_json',
-        watermark: false,
-        sequential_image_generation: false
+        watermark: false
+        // 注：不再固定下发 sequential_image_generation —— 新版 Seedream(doubao-seedream-4-5) 会以 400 InvalidParameter 拒绝该参数
       };
 
       if (referenceImages.length === 1) {
