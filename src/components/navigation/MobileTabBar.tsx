@@ -21,7 +21,7 @@ export function MobileTabBar() {
 
   return (
     <nav className="md:hidden shrink-0 border-t border-border/60 bg-surface-glass backdrop-blur-[20px] backdrop-saturate-150 pb-[env(safe-area-inset-bottom)]">
-      <div className="flex h-16 items-end justify-around px-8 pb-2">
+      <div className="flex h-16 items-center justify-around px-8">
         <Link
           href="/results"
           className={cn(
@@ -33,18 +33,19 @@ export function MobileTabBar() {
           图库
         </Link>
 
-        {/* 中间凸起：工作台 hub 入口 */}
-        <Link href="/workspace" aria-label="工作台" className="flex w-16 flex-col items-center">
+        {/* 中间：工作台 hub 入口，矩形填充、与栏平齐（不上浮，避免遮挡页面） */}
+        <Link href="/workspace" aria-label="工作台" className="flex w-16 flex-col items-center gap-0.5">
           <span
             className={cn(
-              "-mt-7 flex h-14 w-14 items-center justify-center rounded-full bg-accent-gradient text-white shadow-float ring-4 ring-background transition-transform active:scale-95"
+              "flex h-8 w-11 items-center justify-center rounded-[10px] transition-transform active:scale-95",
+              workbenchActive ? "bg-accent-gradient text-white shadow-soft" : "bg-surface-muted text-ink-2"
             )}
           >
-            <Plus className="h-6 w-6" />
+            <Plus className="h-5 w-5" />
           </span>
           <span
             className={cn(
-              "mt-0.5 text-[11px] font-semibold",
+              "text-[11px] font-semibold",
               workbenchActive ? "text-brand-text" : "text-ink-3"
             )}
           >

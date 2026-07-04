@@ -19,6 +19,7 @@ import {
   Loader2,
   Wand2,
   Paintbrush,
+  Layers,
   X,
 } from "lucide-react";
 import { InpaintDialog, type InpaintSubmitPayload } from "@/components/workbench/InpaintDialog";
@@ -85,6 +86,7 @@ interface BackendImage {
   height: number | null;
   qualityScore: number | null;
   createdAt: string;
+  metadata?: string | null;
   project: { id: string; name: string } | null;
 }
 
@@ -95,6 +97,37 @@ interface ResultImage {
   createdAt: string;
   thumbnail?: string | null;
   processedUrl?: string | null;
+  /** 同一大任务的合并键（套图 setId / 场景 taskId），无则为单张 */
+  groupKey?: string;
+  groupLabel?: string;
+}
+
+const WORKFLOW_LABELS: Record<string, string> = {
+  listing_set: "商品套图",
+  scene_generation: "场景图",
+  background_replace: "背景替换",
+  video_generation: "视频生成",
+};
+
+// 从 ProcessedImage.metadata 解析「所属大任务」的合并键与标题
+function parseGroup(metaStr?: string | null): { key?: string; label?: string } {
+  if (!metaStr) return {};
+  try {
+    const m = JSON.parse(metaStr) as Record<string, unknown>;
+    const op = typeof m.operation === "string" ? m.operation : undefined;
+    const wf = typeof m.workflowType === "string" ? m.workflowType : undefined;
+    const name = (typeof m.productName === "string" && m.productName) ||
+      (typeof m.presetName === "string" && m.presetName) || "";
+    if (typeof m.setId === "string" && m.setId) {
+      return { key: `set:${m.setId}`, label: name || WORKFLOW_LABELS[op ?? ""] || "商品套图" };
+    }
+    if (typeof m.taskId === "string" && m.taskId) {
+      return { key: `task:${m.taskId}`, label: name || WORKFLOW_LABELS[wf ?? ""] || "生成任务" };
+    }
+    return {};
+  } catch {
+    return {};
+  }
 }
 
 function mapProcessType(type: string): string {
@@ -150,6 +183,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 export default function ResultsPage() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [groupByTask, setGroupByTask] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [results, setResults] = useState<ResultImage[]>([]);
@@ -176,14 +210,19 @@ export default function ResultsPage() {
       const data = await apiGet<{ success: boolean; images: BackendImage[]; pagination: { total: number } }>(
         `/api/images?${params.toString()}`
       );
-      const mapped = data.images.map((img) => ({
-        id: img.id,
-        name: img.filename,
-        category: mapProcessType(img.processType),
-        createdAt: formatDate(img.createdAt),
-        thumbnail: img.thumbnailUrl,
-        processedUrl: img.processedUrl,
-      }));
+      const mapped = data.images.map((img) => {
+        const group = parseGroup(img.metadata);
+        return {
+          id: img.id,
+          name: img.filename,
+          category: mapProcessType(img.processType),
+          createdAt: formatDate(img.createdAt),
+          thumbnail: img.thumbnailUrl,
+          processedUrl: img.processedUrl,
+          groupKey: group.key,
+          groupLabel: group.label,
+        };
+      });
       setResults(mapped);
 
       // Compute category counts
@@ -333,6 +372,98 @@ export default function ResultsPage() {
     }
   };
 
+  // 按任务把结果合并成分组（保持出现顺序）；无合并键的作为单张
+  const taskGroups: Array<{ key: string; label: string; createdAt: string; items: ResultImage[] }> = [];
+  const ungrouped: ResultImage[] = [];
+  if (groupByTask) {
+    const map = new Map<string, { key: string; label: string; createdAt: string; items: ResultImage[] }>();
+    for (const item of filteredResults) {
+      if (item.groupKey) {
+        let g = map.get(item.groupKey);
+        if (!g) {
+          g = { key: item.groupKey, label: item.groupLabel || "生成任务", createdAt: item.createdAt, items: [] };
+          map.set(item.groupKey, g);
+          taskGroups.push(g);
+        }
+        g.items.push(item);
+      } else {
+        ungrouped.push(item);
+      }
+    }
+  }
+
+  const renderGridCard = (item: ResultImage) => (
+    <div
+      key={item.id}
+      className={cn(
+        "group glass-panel overflow-hidden rounded-[16px] transition-all duration-200 hover:-translate-y-0.5",
+        selectedIds.has(item.id) && "ring-2 ring-brand"
+      )}
+    >
+      <div className="relative aspect-square overflow-hidden bg-surface-muted">
+        <ImageThumbnail src={item.thumbnail || item.processedUrl} alt={item.name} className="h-full w-full" />
+        <button
+          type="button"
+          aria-label="查看大图"
+          className="absolute inset-0 cursor-zoom-in"
+          onClick={() => {
+            const url = item.processedUrl || item.thumbnail;
+            if (url) setLightbox({ url, name: item.name });
+          }}
+        />
+        <span className="absolute left-2 top-2 rounded-full bg-surface/85 px-2 py-0.5 text-[10px] font-semibold text-brand-text backdrop-blur-sm">
+          {CATEGORY_LABELS[item.category] || "其他"}
+        </span>
+        <div
+          className={cn(
+            "absolute right-2 top-2 transition-opacity",
+            selectedIds.has(item.id) ? "opacity-100" : "opacity-100 md:opacity-0 md:group-hover:opacity-100"
+          )}
+        >
+          <div className="rounded-md bg-surface/85 p-1 backdrop-blur-sm">
+            <Checkbox checked={selectedIds.has(item.id)} onCheckedChange={() => toggleSelect(item.id)} />
+          </div>
+        </div>
+        <div className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-100 transition-opacity">
+          <button type="button" onClick={(e) => { e.stopPropagation(); const u = item.processedUrl || item.thumbnail; if (u) setInpaintTarget({ id: item.id, url: u }); }} className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-ink-2 hover:text-brand" title="局部重绘">
+            <Paintbrush className="h-3.5 w-3.5" />
+          </button>
+          <button type="button" onClick={(e) => { e.stopPropagation(); const u = item.processedUrl || item.thumbnail; if (u) downloadFile(u, item.name); }} className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-ink-2 hover:text-ink" title="下载">
+            <Download className="h-3.5 w-3.5" />
+          </button>
+          <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteOne(item.id); }} className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-ink-2 hover:text-danger" title="删除">
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+      <div className="px-2.5 py-2">
+        <h3 className="truncate text-[12px] font-semibold text-ink">{item.name}</h3>
+        <p className="mt-0.5 hidden text-[11px] text-ink-3 sm:block">{item.createdAt}</p>
+      </div>
+    </div>
+  );
+
+  const renderActiveCard = (task: ActiveTask) => (
+    <div key={`active-${task.id}`} className="group glass-panel relative overflow-hidden rounded-[16px]">
+      <WaterFillCard task={task} />
+      <button
+        type="button"
+        onClick={() => handleCancelTask(task.id)}
+        className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-surface/85 text-ink-2 shadow-soft backdrop-blur-sm transition-colors hover:text-danger"
+        title="取消任务"
+        aria-label="取消任务"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+      <div className="px-2.5 py-2">
+        <h3 className="truncate text-[12px] font-semibold text-ink">处理中…</h3>
+        <p className="mt-0.5 hidden text-[11px] text-ink-3 sm:block">{CATEGORY_LABELS[task.category] || "其他"}</p>
+      </div>
+    </div>
+  );
+
+  const gridColStyle = { gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))" } as const;
+
   return (
     <div className="h-full flex flex-col bg-background">
       {/* Two-column layout: 移动端 sidebar 折叠成顶部横滚 chips */}
@@ -447,6 +578,20 @@ export default function ResultsPage() {
                   />
                 </div>
                 <button
+                  onClick={() => setGroupByTask((v) => !v)}
+                  className={cn(
+                    "flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium transition-colors",
+                    groupByTask
+                      ? "border-transparent bg-accent-gradient text-white"
+                      : "border-line bg-surface text-ink-2 hover:text-ink"
+                  )}
+                  aria-pressed={groupByTask}
+                  title="按任务合并同一批生成的结果"
+                >
+                  <Layers className="h-4 w-4" />
+                  <span className="hidden sm:inline">按任务</span>
+                </button>
+                <button
                   onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-ink-3 transition-colors hover:text-ink"
                   aria-label={viewMode === "grid" ? "切换为列表视图" : "切换为网格视图"}
@@ -477,7 +622,39 @@ export default function ResultsPage() {
 
             {!loading && !error && (
               <>
-                {viewMode === "grid" ? (
+                {groupByTask ? (
+                  <div className="flex flex-col gap-5">
+                    {filteredActive.length > 0 && (
+                      <div className="grid gap-3" style={gridColStyle}>
+                        {filteredActive.map(renderActiveCard)}
+                      </div>
+                    )}
+                    {taskGroups.map((g) => (
+                      <section key={g.key}>
+                        <div className="mb-2.5 flex items-center gap-2">
+                          <Layers className="h-4 w-4 text-brand" />
+                          <h3 className="text-[14px] font-bold text-ink">{g.label}</h3>
+                          <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand-text">{g.items.length} 张</span>
+                          <span className="hidden text-[11px] text-ink-3 sm:inline">{g.createdAt}</span>
+                        </div>
+                        <div className="grid gap-3" style={gridColStyle}>
+                          {g.items.map(renderGridCard)}
+                        </div>
+                      </section>
+                    ))}
+                    {ungrouped.length > 0 && (
+                      <section>
+                        <div className="mb-2.5 flex items-center gap-2">
+                          <h3 className="text-[14px] font-bold text-ink">单张结果</h3>
+                          <span className="rounded-full bg-surface-muted px-2 py-0.5 text-[11px] font-semibold text-ink-2">{ungrouped.length} 张</span>
+                        </div>
+                        <div className="grid gap-3" style={gridColStyle}>
+                          {ungrouped.map(renderGridCard)}
+                        </div>
+                      </section>
+                    )}
+                  </div>
+                ) : viewMode === "grid" ? (
                   <div
                     className="grid gap-3"
                     style={{ gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))" }}
