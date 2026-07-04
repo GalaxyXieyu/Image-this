@@ -70,8 +70,15 @@ export function getListingTypeMeta(type: ListingImageType): ListingTypeMeta {
 
 /**
  * 为某一类套图构建最终提示词。
+ * @param variant 同类内第几张（1-based），配合 total 用于「跳过出词」时的模板级差异化
+ * @param total 同类总张数；>1 时追加「保持统一风格、仅构图/角度不同」的约束
  */
-export function buildListingPrompt(type: ListingImageType, product: ListingProductInfo): string {
+export function buildListingPrompt(
+  type: ListingImageType,
+  product: ListingProductInfo,
+  variant?: number,
+  total?: number
+): string {
   const meta = getListingTypeMeta(type);
   const profile = detectSceneCategoryProfile(product.category, product.name, product.description);
 
@@ -84,12 +91,18 @@ export function buildListingPrompt(type: ListingImageType, product: ListingProdu
     .filter(Boolean)
     .join('，');
 
+  const multiHint =
+    total && total > 1 && variant
+      ? `本类共 ${total} 张，这是第 ${variant} 张：与同类其它张保持统一的背景基调、光线、色彩与品牌调性，仅在构图、机位、角度、取景或道具组合上做出明显差异，避免与其它张重复。`
+      : undefined;
+
   return [
     '基于上传的商品图生成一张电商用图。先分析该商品的结构、比例、轮廓、主次颜色、材质质感、包装与品牌标识；生成时必须严格保持商品主体的外观、比例、材质、品牌特征和数量稳定，不得改变或替换商品本身。',
     `本张图片类型：${meta.label}。版式规则：${meta.rule}`,
     type === 'main'
       ? '严格使用纯白背景，不要加入场景、道具或文字。'
       : `场景风格参考（${profile.label}）：${profile.guidance}`,
+    multiHint,
     brief ? `商品信息：${brief}。文字信息仅作辅助，不得覆盖商品图本身呈现的事实。` : undefined,
     '专业摄影、真实光影、高质量、干净可商用，避免明显伪影与杂乱元素。',
   ]

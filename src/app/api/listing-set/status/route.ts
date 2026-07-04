@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: '任务不存在' }, { status: 404 });
   }
 
-  let results: Array<{ listingType: string; index: string; label: string; processedImageUrl: string }> = [];
+  let results: Array<{ listingType: string; index: string; label: string; candidateIndex?: number; processedImageUrl: string }> = [];
   try {
     if (task.outputData) {
       const parsed = JSON.parse(task.outputData) as { results?: typeof results };

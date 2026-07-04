@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
       provider = 'gemini',
       modelName,
       types,
+      counts,
       prompts,
       projectId,
     } = body as {
@@ -41,7 +42,8 @@ export async function POST(request: NextRequest) {
       provider?: string;
       modelName?: string;
       types?: string[];
-      prompts?: Record<string, string>;
+      counts?: Record<string, number>;
+      prompts?: Record<string, string | string[]>;
       projectId?: string;
     };
 
@@ -67,7 +69,16 @@ export async function POST(request: NextRequest) {
       (t) => !types || types.length === 0 || types.includes(t.type)
     ).map((t) => t.type);
 
-    // 单任务：worker 内部串行生成 5 张，尊重 provider 并发限制
+    // 每类张数：counts 里 >0 的值，缺省每类 1 张；总步数 = 各类张数之和
+    const normalizedCounts: Record<string, number> = {};
+    let totalSteps = 0;
+    for (const type of selectedTypes) {
+      const n = Math.max(1, Math.floor(counts?.[type] ?? 1));
+      normalizedCounts[type] = n;
+      totalSteps += n;
+    }
+
+    // 单任务：worker 内部串行生成整套，尊重 provider 并发限制
     const task = await prisma.taskQueue.create({
       data: {
         type: 'LISTING_SET',
@@ -77,13 +88,14 @@ export async function POST(request: NextRequest) {
           imageUrl: inputAsset.clientUrl,
           setId,
           types: selectedTypes,
+          counts: normalizedCounts,
           prompts: prompts && typeof prompts === 'object' ? prompts : undefined,
           product,
           provider,
           modelName,
         }),
         priority: 2,
-        totalSteps: selectedTypes.length,
+        totalSteps,
         userId,
         projectId: projectId || undefined,
         currentStep: '任务已创建，等待处理',

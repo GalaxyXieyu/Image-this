@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ImagePlus, Sparkles, Loader2, X, Download, Wand2, ArrowLeft, Check } from "lucide-react";
+import { ImagePlus, Sparkles, Loader2, X, Download, Wand2, ArrowLeft, Check, Minus, Plus, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiGet, apiPost } from "@/lib/api-client";
 import { useToast } from "@/components/ui/use-toast";
@@ -23,10 +23,18 @@ import { getSceneGenerationModels } from "@/lib/ai-models";
 const IMAGE_MODELS = getSceneGenerationModels().filter((m) => m.provider !== "volcengine");
 const DEFAULT_MODEL_ID = IMAGE_MODELS[0]?.id ?? "gemini-3.1-flash-image-preview";
 
+type TypeCounts = Record<ListingImageType, number>;
+
+const DEFAULT_TYPE_COUNTS: TypeCounts = LISTING_TYPES.reduce((acc, t) => {
+  acc[t.type] = 1;
+  return acc;
+}, {} as TypeCounts);
+
 interface PlanItem {
   listingType: ListingImageType;
   index: string;
   label: string;
+  variant: number;
   prompt: string;
 }
 
@@ -34,6 +42,7 @@ interface SetItem {
   listingType: string;
   index: string;
   label: string;
+  candidateIndex?: number;
   processedImageUrl: string;
 }
 
@@ -89,9 +98,7 @@ export default function ListingSetPage() {
   const [productName, setProductName] = useState("");
   const [productCategory, setProductCategory] = useState("");
   const [sellingPoints, setSellingPoints] = useState("");
-  const [selectedTypes, setSelectedTypes] = useState<ListingImageType[]>(
-    LISTING_TYPES.map((t) => t.type)
-  );
+  const [typeCounts, setTypeCounts] = useState<TypeCounts>({ ...DEFAULT_TYPE_COUNTS });
   const [modelId, setModelId] = useState(DEFAULT_MODEL_ID);
   const [copywriterModels, setCopywriterModels] = useState<{ id: string; provider: string }[]>([]);
   const [copywriterModelId, setCopywriterModelId] = useState("");
@@ -101,16 +108,26 @@ export default function ListingSetPage() {
   const [taskId, setTaskId] = useState<string | null>(null);
   const [setStatus, setSetStatus] = useState<SetStatus | null>(null);
 
+  // 勾选/取消某类（至少保留一类）
   const toggleType = (type: ListingImageType) => {
-    setSelectedTypes((prev) => {
-      if (prev.includes(type)) {
-        if (prev.length === 1) return prev; // 至少保留一类
-        return prev.filter((t) => t !== type);
+    setTypeCounts((prev) => {
+      const cur = prev[type] ?? 0;
+      if (cur > 0) {
+        const remaining = LISTING_TYPES.filter((t) => t.type !== type && (prev[t.type] ?? 0) > 0);
+        if (remaining.length === 0) return prev; // 至少一类
+        return { ...prev, [type]: 0 };
       }
-      // 保持与 LISTING_TYPES 相同顺序
-      return LISTING_TYPES.filter((t) => prev.includes(t.type) || t.type === type).map((t) => t.type);
+      return { ...prev, [type]: 1 };
     });
   };
+  // 调整某类张数（无上限，最少 1）
+  const setTypeCount = (type: ListingImageType, n: number) => {
+    setTypeCounts((prev) => ({ ...prev, [type]: Math.max(1, Math.floor(n)) }));
+  };
+
+  const selectedTypes = LISTING_TYPES.filter((t) => (typeCounts[t.type] ?? 0) > 0).map((t) => t.type);
+  const selectedMetas = LISTING_TYPES.filter((t) => (typeCounts[t.type] ?? 0) > 0);
+  const totalCount = LISTING_TYPES.reduce((s, t) => s + (typeCounts[t.type] ?? 0), 0);
 
   useEffect(() => {
     return () => {
@@ -176,7 +193,10 @@ export default function ListingSetPage() {
     }
   };
 
-  // 第一步：AI 读图出 5 段提示词草稿，供确认/微调
+  const buildCounts = () =>
+    Object.fromEntries(selectedTypes.map((t) => [t, typeCounts[t]])) as Record<string, number>;
+
+  // 第一步：AI 读图，按每类张数出多段提示词草稿，供确认/微调
   const handlePlan = async () => {
     if (!imageDataUrl) {
       toast({ title: "请先上传商品图", variant: "destructive" });
@@ -187,11 +207,11 @@ export default function ListingSetPage() {
       const res = await apiPost<{ success: boolean; items: PlanItem[] }>("/api/listing-set/plan", {
         imageDataUrl,
         product: { name: productName, category: productCategory, sellingPoints },
+        counts: buildCounts(),
         model: copywriterModelId || undefined,
       });
-      // 只保留当前选中的类型，供逐条微调
-      setPlanItems(res.items.filter((it) => selectedTypes.includes(it.listingType)));
-      toast({ title: "已生成提示词草稿", description: "可逐条微调后再生成" });
+      setPlanItems(res.items);
+      toast({ title: "已生成提示词草稿", description: `共 ${res.items.length} 段，可逐条微调后再生成` });
     } catch (err) {
       toast({ title: "出词失败", description: err instanceof Error ? err.message : "请检查文案模型配置", variant: "destructive" });
     } finally {
@@ -199,7 +219,7 @@ export default function ListingSetPage() {
     }
   };
 
-  // 第二步：用确认后的提示词串行生成套图
+  // 第二步：用确认后的多段提示词串行生成套图
   const handleGenerate = async () => {
     if (!imageDataUrl) {
       toast({ title: "请先上传商品图", variant: "destructive" });
@@ -211,18 +231,22 @@ export default function ListingSetPage() {
     }
     setSubmitting(true);
     try {
-      const prompts = planItems
-        ? Object.fromEntries(
-            planItems
-              .filter((p) => p.prompt.trim() && selectedTypes.includes(p.listingType))
-              .map((p) => [p.listingType, p.prompt.trim()])
-          )
-        : undefined;
+      // 把 planItems 聚成 { type: [第1张, 第2张, ...] }
+      let prompts: Record<string, string[]> | undefined;
+      if (planItems) {
+        const byKey = new Map<string, string>();
+        for (const p of planItems) byKey.set(`${p.listingType}-${p.variant}`, p.prompt.trim());
+        prompts = {};
+        for (const t of selectedTypes) {
+          prompts[t] = Array.from({ length: typeCounts[t] }, (_, i) => byKey.get(`${t}-${i + 1}`) ?? "");
+        }
+      }
       const model = IMAGE_MODELS.find((m) => m.id === modelId);
       const res = await apiPost<{ success: boolean; taskId: string; setId: string }>("/api/listing-set", {
         imageDataUrl,
         product: { name: productName, category: productCategory, sellingPoints },
         types: selectedTypes,
+        counts: buildCounts(),
         provider: model?.provider ?? "gemini",
         modelName: model?.id,
         prompts,
@@ -230,7 +254,7 @@ export default function ListingSetPage() {
       setTaskId(res.taskId);
       setSetStatus({ status: "pending", progress: 0, results: [] });
       startPolling(res.taskId);
-      toast({ title: "已提交套图生成", description: `逐张串行生成 ${selectedTypes.length} 张…` });
+      toast({ title: "已提交套图生成", description: `逐张串行生成 ${totalCount} 张…` });
     } catch (err) {
       toast({ title: "提交失败", description: err instanceof Error ? err.message : "请稍后重试", variant: "destructive" });
     } finally {
@@ -238,15 +262,19 @@ export default function ListingSetPage() {
     }
   };
 
-  const resultByType = new Map<string, SetItem>();
-  for (const r of setStatus?.results ?? []) resultByType.set(r.listingType, r);
+  // 结果按类型分组（同类多图）
+  const resultsByType = new Map<string, SetItem[]>();
+  for (const r of setStatus?.results ?? []) {
+    const arr = resultsByType.get(r.listingType) ?? [];
+    arr.push(r);
+    resultsByType.set(r.listingType, arr);
+  }
+  const getResult = (type: string, variant: number) =>
+    (resultsByType.get(type) ?? []).find((r) => (r.candidateIndex ?? 1) === variant);
 
   const hasResult = !!taskId;
   const processing = setStatus ? !["completed", "failed", "cancelled"].includes(setStatus.status) : false;
-  // 结果仅展示实际选中的类型
-  const selectedMetas = LISTING_TYPES.filter((t) => selectedTypes.includes(t.type));
-  const mainMeta = selectedMetas.find((t) => t.type === "main");
-  const restMetas = selectedMetas.filter((t) => t.type !== "main");
+  const busy = submitting || processing;
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -256,11 +284,27 @@ export default function ListingSetPage() {
           <StepHint hasPlan={!!planItems} hasResult={hasResult} />
         </div>
 
-        {/* 桌面：左控制 / 右结果 双栏；移动端：单列堆叠 */}
+        {/* 滚动区：移动端单列堆叠（类型选择器折叠置顶）；桌面左右双栏 */}
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto lg:grid lg:grid-cols-[minmax(340px,400px)_minmax(0,1fr)] lg:gap-6 lg:overflow-hidden">
+          {/* 移动端：类型/张数选择器折叠置顶（仅第一步） */}
+          {!hasResult && !planItems && (
+            <details className="group glass-panel rounded-[18px] lg:hidden" open>
+              <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+                <div className="min-w-0">
+                  <div className="text-[14px] font-bold text-ink">选择要生成的图</div>
+                  <div className="mt-0.5 text-[12px] text-ink-3">共 {totalCount} 张 · {selectedTypes.length} 类</div>
+                </div>
+                <ChevronDown className="h-4 w-4 shrink-0 text-ink-3 transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="space-y-3 px-4 pb-4 pt-1">
+                <TypeCountCards typeCounts={typeCounts} toggleType={toggleType} setTypeCount={setTypeCount} />
+                <ModelSelect modelId={modelId} setModelId={setModelId} />
+              </div>
+            </details>
+          )}
+
           {/* 左：控制区 */}
           <div className="flex flex-col gap-4 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            {/* 上传 + 信息（填满左栏高度，按钮固定底部） */}
             <section className="glass-panel flex flex-col rounded-[18px] p-4 shadow-soft lg:flex-1">
               <input
                 ref={fileInputRef}
@@ -315,18 +359,21 @@ export default function ListingSetPage() {
                         </Select>
                       </div>
                     )}
-                    <Button variant="brand" className="min-h-11" onClick={handlePlan} disabled={!imageDataUrl || planning || processing}>
-                      {planning ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Wand2 className="mr-1.5 h-4 w-4" />}
-                      AI 读图出词
-                    </Button>
-                    <button
-                      type="button"
-                      onClick={handleGenerate}
-                      disabled={!imageDataUrl || submitting || processing}
-                      className="min-h-10 rounded-[12px] border border-line-strong bg-surface text-[12px] font-semibold text-ink-2 transition-colors hover:border-brand hover:text-ink disabled:opacity-50"
-                    >
-                      跳过出词，用当前配置直接生成
-                    </button>
+                    {/* 桌面端操作按钮；移动端改用置底操作条 */}
+                    <div className="hidden flex-col gap-1.5 lg:flex">
+                      <Button variant="brand" className="min-h-11" onClick={handlePlan} disabled={!imageDataUrl || planning || processing}>
+                        {planning ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Wand2 className="mr-1.5 h-4 w-4" />}
+                        AI 读图出词
+                      </Button>
+                      <button
+                        type="button"
+                        onClick={handleGenerate}
+                        disabled={!imageDataUrl || busy}
+                        className="min-h-10 rounded-[12px] border border-line-strong bg-surface text-[12px] font-semibold text-ink-2 transition-colors hover:border-brand hover:text-ink disabled:opacity-50"
+                      >
+                        跳过出词，用当前配置直接生成
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -337,7 +384,7 @@ export default function ListingSetPage() {
               <div className="flex items-center gap-2.5 rounded-[14px] border border-line bg-surface px-3.5 py-2.5">
                 <Loader2 className="h-4 w-4 shrink-0 animate-spin text-brand" />
                 <span className="text-[13px] text-ink-2">
-                  {setStatus?.currentStep || "生成中"} · {setStatus?.results.length ?? 0}/{selectedTypes.length}
+                  {setStatus?.currentStep || "生成中"} · {setStatus?.results.length ?? 0}/{totalCount}
                 </span>
               </div>
             )}
@@ -348,42 +395,103 @@ export default function ListingSetPage() {
             )}
           </div>
 
-          {/* 右：结果区 */}
+          {/* 右：结果 / 提示词草稿 / 配置 */}
           <div className="flex min-h-0 flex-col lg:h-full lg:overflow-hidden">
             {hasResult ? (
-              <section className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:pr-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  {mainMeta && (
-                    <ListingSlot meta={mainMeta} item={resultByType.get(mainMeta.type)} processing={processing} />
-                  )}
-                  {restMetas.length > 0 && (
-                    <div className="grid grid-cols-2 gap-3">
-                      {restMetas.map((t) => (
-                        <ListingSlot key={t.type} meta={t} item={resultByType.get(t.type)} processing={processing} />
-                      ))}
+              <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto lg:pr-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                {selectedMetas.map((meta) => {
+                  const count = typeCounts[meta.type];
+                  const done = resultsByType.get(meta.type)?.length ?? 0;
+                  return (
+                    <div key={meta.type} className="rounded-[18px] border border-line bg-surface/50 p-3 md:p-4">
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <h3 className="text-[13px] font-bold text-ink">
+                          <span className="text-ink-3">{meta.index}</span> {meta.label}
+                        </h3>
+                        <span className="shrink-0 rounded-full bg-surface-muted px-2.5 py-0.5 text-[11px] font-semibold text-ink-2">
+                          {done}/{count}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                        {Array.from({ length: count }, (_, i) => i + 1).map((v) => (
+                          <ListingSlot
+                            key={`${meta.type}-${v}`}
+                            meta={meta}
+                            item={getResult(meta.type, v)}
+                            processing={processing}
+                            variant={v}
+                            total={count}
+                          />
+                        ))}
+                      </div>
                     </div>
-                  )}
-                </div>
+                  );
+                })}
               </section>
             ) : planItems ? (
               <PromptDraftPanel
                 planItems={planItems}
                 setPlanItems={setPlanItems}
-                selectedCount={selectedTypes.length}
+                totalCount={totalCount}
                 onRegenerate={() => setPlanItems(null)}
                 onGenerate={handleGenerate}
-                busy={submitting || processing}
+                busy={busy}
               />
             ) : (
-              <ListingConfigPanel
-                selectedTypes={selectedTypes}
-                toggleType={toggleType}
-                modelId={modelId}
-                setModelId={setModelId}
-              />
+              <div className="hidden flex-1 lg:flex">
+                <ListingConfigPanel
+                  typeCounts={typeCounts}
+                  toggleType={toggleType}
+                  setTypeCount={setTypeCount}
+                  totalCount={totalCount}
+                  modelId={modelId}
+                  setModelId={setModelId}
+                />
+              </div>
             )}
           </div>
         </div>
+
+        {/* 移动端置底操作条（随步骤切换主操作） */}
+        {!hasResult && (
+          <div className="z-30 flex shrink-0 items-center gap-2 border-t border-line bg-surface-glass px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+12px)] backdrop-blur-[18px] backdrop-saturate-150 lg:hidden">
+            {planItems ? (
+              <>
+                <Button variant="ghost" onClick={() => setPlanItems(null)} className="min-h-11 shrink-0 px-3 text-ink-2">
+                  <ArrowLeft className="mr-1 h-4 w-4" />
+                  重新出词
+                </Button>
+                <Button
+                  onClick={handleGenerate}
+                  disabled={busy}
+                  className="h-12 flex-1 rounded-[14px] bg-accent-gradient px-6 text-[15px] font-semibold text-white shadow-float"
+                >
+                  {busy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}
+                  确认并生成（{totalCount} 张）
+                </Button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={handleGenerate}
+                  disabled={!imageDataUrl || busy}
+                  className="min-h-12 shrink-0 rounded-[14px] border border-line-strong bg-surface px-3 text-[12px] font-semibold text-ink-2 transition-colors hover:text-ink disabled:opacity-50"
+                >
+                  跳过出词
+                </button>
+                <Button
+                  onClick={handlePlan}
+                  disabled={!imageDataUrl || planning || processing}
+                  className="h-12 flex-1 rounded-[14px] bg-accent-gradient px-6 text-[15px] font-semibold text-white shadow-float"
+                >
+                  {planning ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Wand2 className="mr-1.5 h-4 w-4" />}
+                  AI 读图出词（{totalCount} 张）
+                </Button>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -421,50 +529,56 @@ function StepHint({ hasPlan, hasResult }: { hasPlan: boolean; hasResult: boolean
   );
 }
 
-// 第一步右栏：选择要生成的图（= 张数）+ 出图模型
-function ListingConfigPanel({
-  selectedTypes,
+// 张数步进器
+function CountStepper({ value, onChange }: { value: number; onChange: (n: number) => void }) {
+  return (
+    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        onClick={() => onChange(value - 1)}
+        disabled={value <= 1}
+        className="flex h-7 w-7 items-center justify-center rounded-full border border-line-strong text-ink-2 transition-colors hover:border-brand hover:text-ink disabled:opacity-40"
+        aria-label="减少"
+      >
+        <Minus className="h-3.5 w-3.5" />
+      </button>
+      <span className="w-6 text-center text-[14px] font-bold text-ink">{value}</span>
+      <button
+        type="button"
+        onClick={() => onChange(value + 1)}
+        className="flex h-7 w-7 items-center justify-center rounded-full border border-line-strong text-ink-2 transition-colors hover:border-brand hover:text-ink"
+        aria-label="增加"
+      >
+        <Plus className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
+// 类型 + 每类张数选择卡片（桌面/移动共用）
+function TypeCountCards({
+  typeCounts,
   toggleType,
-  modelId,
-  setModelId,
+  setTypeCount,
 }: {
-  selectedTypes: ListingImageType[];
+  typeCounts: TypeCounts;
   toggleType: (type: ListingImageType) => void;
-  modelId: string;
-  setModelId: (id: string) => void;
+  setTypeCount: (type: ListingImageType, n: number) => void;
 }) {
   return (
-    <div className="flex min-h-[340px] flex-1 flex-col rounded-[20px] border border-line bg-surface/50 p-4 md:p-5 lg:min-h-0 lg:overflow-y-auto">
-      <div className="flex shrink-0 items-center justify-between gap-2">
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
-            <Sparkles className="h-4 w-4" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-[14px] font-bold text-ink">选择要生成的图</p>
-            <p className="text-[12px] text-ink-3">勾选类型即为生成张数，逐张串行出图</p>
-          </div>
-        </div>
-        <span className="shrink-0 rounded-full bg-brand-soft px-3 py-1 text-[13px] font-bold text-brand-text">
-          已选 {selectedTypes.length} 张
-        </span>
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-        {LISTING_TYPES.map((t) => {
-          const selected = selectedTypes.includes(t.type);
-          return (
-            <button
-              key={t.type}
-              type="button"
-              onClick={() => toggleType(t.type)}
-              className={cn(
-                "flex items-start gap-2.5 rounded-[14px] border p-3 text-left transition-all",
-                selected
-                  ? "border-brand bg-brand-soft/30 shadow-soft"
-                  : "border-line bg-surface hover:border-line-strong"
-              )}
-            >
+    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+      {LISTING_TYPES.map((t) => {
+        const count = typeCounts[t.type] ?? 0;
+        const selected = count > 0;
+        return (
+          <div
+            key={t.type}
+            className={cn(
+              "flex flex-col rounded-[14px] border p-3 transition-all",
+              selected ? "border-brand bg-brand-soft/30 shadow-soft" : "border-line bg-surface"
+            )}
+          >
+            <button type="button" onClick={() => toggleType(t.type)} className="flex w-full items-start gap-2.5 text-left">
               <span
                 className={cn(
                   "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors",
@@ -481,47 +595,117 @@ function ListingConfigPanel({
                 <span className="mt-1 line-clamp-2 block text-[12px] leading-4 text-ink-3">{t.rule}</span>
               </span>
             </button>
-          );
-        })}
+            {selected && (
+              <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-line pt-2.5">
+                <span className="text-[12px] font-semibold text-ink-2">张数</span>
+                <CountStepper value={count} onChange={(n) => setTypeCount(t.type, n)} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ModelSelect({ modelId, setModelId }: { modelId: string; setModelId: (id: string) => void }) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-[12px] font-semibold text-ink-2">出图模型</label>
+      <Select value={modelId} onValueChange={setModelId}>
+        <SelectTrigger className="min-h-11">
+          <SelectValue placeholder="选择模型" />
+        </SelectTrigger>
+        <SelectContent>
+          {IMAGE_MODELS.map((m) => (
+            <SelectItem key={m.id} value={m.id}>
+              {m.label}
+              {m.priority === "primary" && <span className="ml-1.5 text-[10px] text-green-600">推荐</span>}
+              {m.priority === "fallback" && <span className="ml-1.5 text-[10px] text-amber-600">兜底</span>}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+// 第一步桌面右栏：选择要生成的图（每类张数）+ 出图模型
+function ListingConfigPanel({
+  typeCounts,
+  toggleType,
+  setTypeCount,
+  totalCount,
+  modelId,
+  setModelId,
+}: {
+  typeCounts: TypeCounts;
+  toggleType: (type: ListingImageType) => void;
+  setTypeCount: (type: ListingImageType, n: number) => void;
+  totalCount: number;
+  modelId: string;
+  setModelId: (id: string) => void;
+}) {
+  return (
+    <div className="flex min-h-[340px] flex-1 flex-col rounded-[20px] border border-line bg-surface/50 p-4 md:p-5 lg:min-h-0 lg:overflow-y-auto">
+      <div className="flex shrink-0 items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
+            <Sparkles className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[14px] font-bold text-ink">选择要生成的图</p>
+            <p className="text-[12px] text-ink-3">勾选类型并设定每类张数，逐张串行出图</p>
+          </div>
+        </div>
+        <span className="shrink-0 rounded-full bg-brand-soft px-3 py-1 text-[13px] font-bold text-brand-text">
+          共 {totalCount} 张
+        </span>
       </div>
 
+      <div className="mt-4">
+        <TypeCountCards typeCounts={typeCounts} toggleType={toggleType} setTypeCount={setTypeCount} />
+      </div>
+
+      <p className="mt-3 text-[11px] text-ink-3">串行生成，张数越多耗时越长；多张会由出词模型生成不同构图的提示词。</p>
+
       <div className="mt-auto pt-4">
-        <label className="mb-1.5 block text-[12px] font-semibold text-ink-2">出图模型</label>
-        <Select value={modelId} onValueChange={setModelId}>
-          <SelectTrigger className="min-h-11">
-            <SelectValue placeholder="选择模型" />
-          </SelectTrigger>
-          <SelectContent>
-            {IMAGE_MODELS.map((m) => (
-              <SelectItem key={m.id} value={m.id}>
-                {m.label}
-                {m.priority === "primary" && <span className="ml-1.5 text-[10px] text-green-600">推荐</span>}
-                {m.priority === "fallback" && <span className="ml-1.5 text-[10px] text-amber-600">兜底</span>}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <ModelSelect modelId={modelId} setModelId={setModelId} />
       </div>
     </div>
   );
 }
 
-// 第二步右栏：确认并微调 AI 出的提示词
+// 第二步右栏：按类型分组，确认并微调每张的提示词
 function PromptDraftPanel({
   planItems,
   setPlanItems,
-  selectedCount,
+  totalCount,
   onRegenerate,
   onGenerate,
   busy,
 }: {
   planItems: PlanItem[];
   setPlanItems: React.Dispatch<React.SetStateAction<PlanItem[] | null>>;
-  selectedCount: number;
+  totalCount: number;
   onRegenerate: () => void;
   onGenerate: () => void;
   busy: boolean;
 }) {
+  // 按 LISTING_TYPES 顺序分组
+  const groups = LISTING_TYPES.map((t) => ({
+    meta: t,
+    items: planItems.filter((p) => p.listingType === t.type).sort((a, b) => a.variant - b.variant),
+  })).filter((g) => g.items.length > 0);
+
+  const updatePrompt = (listingType: ListingImageType, variant: number, value: string) => {
+    setPlanItems((prev) =>
+      prev
+        ? prev.map((it) => (it.listingType === listingType && it.variant === variant ? { ...it, prompt: value } : it))
+        : prev
+    );
+  };
+
   return (
     <div className="flex min-h-[340px] flex-1 flex-col rounded-[20px] border border-line bg-surface/50 p-4 md:p-5 lg:min-h-0 lg:overflow-hidden">
       <div className="flex shrink-0 items-center justify-between gap-2">
@@ -531,40 +715,52 @@ function PromptDraftPanel({
           </span>
           <div className="min-w-0">
             <p className="text-[14px] font-bold text-ink">确认并微调提示词</p>
-            <p className="text-[12px] text-ink-3">每类一段，可逐条修改后再生成</p>
+            <p className="text-[12px] text-ink-3">同类多段风格一致、构图不同，可逐条修改</p>
           </div>
         </div>
         <button
           type="button"
           onClick={onRegenerate}
-          className="flex shrink-0 items-center gap-1 rounded-full border border-line-strong px-3 py-1.5 text-[12px] font-semibold text-ink-2 transition-colors hover:border-brand hover:text-ink"
+          className="hidden shrink-0 items-center gap-1 rounded-full border border-line-strong px-3 py-1.5 text-[12px] font-semibold text-ink-2 transition-colors hover:border-brand hover:text-ink lg:flex"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           重新出词
         </button>
       </div>
 
-      <div className="mt-3 flex flex-1 flex-col gap-3 overflow-y-auto pr-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-        {planItems.map((p, idx) => (
-          <div key={p.listingType} className="space-y-1.5 rounded-[14px] border border-line bg-surface p-3">
-            <label className="text-[12px] font-semibold text-ink-2">{p.index} {p.label}</label>
-            <Textarea
-              rows={3}
-              value={p.prompt}
-              onChange={(e) =>
-                setPlanItems((prev) =>
-                  prev ? prev.map((it, i) => (i === idx ? { ...it, prompt: e.target.value } : it)) : prev
-                )
-              }
-              className="resize-none rounded-[12px] text-[13px]"
-            />
+      <div className="mt-3 flex flex-1 flex-col gap-4 overflow-y-auto pr-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        {groups.map((g) => (
+          <div key={g.meta.type} className="space-y-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-bold text-ink-3">{g.meta.index}</span>
+              <span className="text-[13px] font-bold text-ink">{g.meta.label}</span>
+              {g.items.length > 1 && (
+                <span className="rounded-full bg-surface-muted px-2 py-0.5 text-[11px] font-semibold text-ink-2">
+                  {g.items.length} 张
+                </span>
+              )}
+            </div>
+            {g.items.map((p) => (
+              <div key={`${p.listingType}-${p.variant}`} className="space-y-1.5 rounded-[14px] border border-line bg-surface p-3">
+                {g.items.length > 1 && (
+                  <label className="text-[12px] font-semibold text-ink-2">第 {p.variant} 张</label>
+                )}
+                <Textarea
+                  rows={3}
+                  value={p.prompt}
+                  onChange={(e) => updatePrompt(p.listingType, p.variant, e.target.value)}
+                  className="resize-none rounded-[12px] text-[13px]"
+                />
+              </div>
+            ))}
           </div>
         ))}
       </div>
 
-      <Button variant="brand" className="mt-3 min-h-12 w-full shrink-0" onClick={onGenerate} disabled={busy}>
+      {/* 桌面端生成按钮；移动端用置底操作条 */}
+      <Button variant="brand" className="mt-3 hidden min-h-12 w-full shrink-0 lg:flex" onClick={onGenerate} disabled={busy}>
         {busy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}
-        确认并生成套图（{selectedCount} 张）
+        确认并生成套图（{totalCount} 张）
       </Button>
     </div>
   );
@@ -574,22 +770,30 @@ function ListingSlot({
   meta,
   item,
   processing,
+  variant,
+  total,
 }: {
   meta: { type: ListingImageType; index: string; label: string };
   item?: SetItem;
   processing: boolean;
+  variant?: number;
+  total?: number;
 }) {
   const done = !!item?.processedImageUrl;
+  const showVariant = (total ?? 1) > 1 && variant;
+  const downloadName = showVariant
+    ? `${meta.index}-${meta.label}-${variant}.jpg`
+    : `${meta.index}-${meta.label}.jpg`;
 
   return (
     <div className="glass-panel overflow-hidden rounded-[16px] shadow-soft">
       <div className="relative aspect-square overflow-hidden bg-surface-muted">
         {done ? (
           <>
-            <ResultThumb src={item.processedImageUrl} alt={meta.label} />
+            <ResultThumb src={item!.processedImageUrl} alt={meta.label} />
             <button
               type="button"
-              onClick={() => downloadFile(item.processedImageUrl, `${meta.index}-${meta.label}.jpg`)}
+              onClick={() => downloadFile(item!.processedImageUrl, downloadName)}
               className="absolute bottom-2 right-2 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-ink-2 transition-colors hover:text-ink"
               title="下载"
             >
@@ -612,7 +816,7 @@ function ListingSlot({
           </div>
         )}
         <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
-          {meta.index} {meta.label}
+          {showVariant ? `第 ${variant} 张` : `${meta.index} ${meta.label}`}
         </span>
       </div>
     </div>
