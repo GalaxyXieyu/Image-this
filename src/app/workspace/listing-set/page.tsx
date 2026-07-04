@@ -176,17 +176,13 @@ export default function ListingSetPage() {
   const restTypes = LISTING_TYPES.slice(1);
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="mx-auto w-full max-w-3xl px-4 py-5 md:px-6 md:py-8 lg:max-w-[1360px]">
-        <div className="mb-5 lg:hidden">
-          <h1 className="font-serif text-[24px] leading-tight tracking-tight text-ink md:text-h2">AI 商品套图</h1>
-          <p className="mt-1 text-data text-ink-2">上传一张商品图，逐张串行生成主图 / 场景 / 模特 / 细节 / 卖点全套</p>
-        </div>
-
+    <div className="flex h-full flex-col overflow-hidden">
+      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col overflow-hidden px-4 py-4 md:px-6 md:py-6 lg:max-w-[1360px]">
         {/* 桌面：左控制 / 右结果 双栏；移动端：单列堆叠 */}
-        <div className="lg:grid lg:grid-cols-[minmax(360px,420px)_minmax(0,1fr)] lg:items-start lg:gap-6">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto lg:grid lg:grid-cols-[minmax(340px,400px)_minmax(0,1fr)] lg:gap-6 lg:overflow-hidden">
           {/* 左：控制区 */}
-          <div className="flex flex-col gap-4 lg:sticky lg:top-4">
+          <div className="flex flex-col gap-4 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <StepHint hasPlan={!!planItems} hasResult={hasResult} />
             {/* 上传 + 信息 */}
             <section className="glass-panel rounded-[18px] p-4 shadow-soft">
               <input
@@ -200,7 +196,7 @@ export default function ListingSetPage() {
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="relative flex aspect-square w-full shrink-0 items-center justify-center overflow-hidden rounded-[14px] border-2 border-dashed border-line-strong bg-surface-muted/40 transition-colors hover:border-brand sm:w-40 lg:w-full"
+                  className="relative flex aspect-square w-full shrink-0 items-center justify-center overflow-hidden rounded-[14px] border-2 border-dashed border-line-strong bg-surface-muted/40 transition-colors hover:border-brand sm:w-40 lg:aspect-[4/3] lg:w-full"
                 >
                   {imageDataUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -208,7 +204,8 @@ export default function ListingSetPage() {
                   ) : (
                     <span className="flex flex-col items-center gap-1.5 text-ink-3">
                       <ImagePlus className="h-7 w-7" />
-                      <span className="text-[12px]">上传商品图</span>
+                      <span className="text-[13px] font-semibold text-ink-2">点击上传商品图</span>
+                      <span className="text-[11px] text-ink-3">支持 JPG / PNG，主体清晰更佳</span>
                     </span>
                   )}
                 </button>
@@ -224,7 +221,7 @@ export default function ListingSetPage() {
                       type="button"
                       onClick={handleGenerate}
                       disabled={!imageDataUrl || submitting || processing}
-                      className="text-[12px] text-ink-3 transition-colors hover:text-ink disabled:opacity-50"
+                      className="min-h-10 rounded-[12px] border border-line-strong bg-surface text-[12px] font-semibold text-ink-2 transition-colors hover:border-brand hover:text-ink disabled:opacity-50"
                     >
                       跳过出词，用模板直接生成
                     </button>
@@ -288,24 +285,97 @@ export default function ListingSetPage() {
           </div>
 
           {/* 右：结果区 */}
-          {hasResult ? (
-            <section className="mt-5 lg:mt-0">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <ListingSlot meta={mainType} item={resultByType.get(mainType.type)} processing={processing} />
-                <div className="grid grid-cols-2 gap-3">
-                  {restTypes.map((t) => (
-                    <ListingSlot key={t.type} meta={t} item={resultByType.get(t.type)} processing={processing} />
-                  ))}
+          <div className="flex min-h-0 flex-col lg:h-full lg:overflow-hidden">
+            {hasResult ? (
+              <section className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:pr-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <ListingSlot meta={mainType} item={resultByType.get(mainType.type)} processing={processing} />
+                  <div className="grid grid-cols-2 gap-3">
+                    {restTypes.map((t) => (
+                      <ListingSlot key={t.type} meta={t} item={resultByType.get(t.type)} processing={processing} />
+                    ))}
+                  </div>
                 </div>
+              </section>
+            ) : (
+              <div className="flex min-h-[340px] flex-1 flex-col rounded-[20px] border border-dashed border-line-strong bg-surface-muted/25 p-4 md:p-5 lg:min-h-0">
+                <div className="mb-4 flex items-center gap-2.5">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
+                    <Sparkles className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[14px] font-bold text-ink">套图预览蓝图</p>
+                    <p className="text-[12px] text-ink-3">上传商品图并出词后，这 5 张会逐张串行生成</p>
+                  </div>
+                </div>
+                <ListingBlueprint />
               </div>
-            </section>
-          ) : (
-            <section className="hidden lg:flex min-h-[420px] flex-col items-center justify-center rounded-[18px] border border-dashed border-line-strong bg-surface-muted/30 text-center">
-              <BrandImageFallback title="" description="" pose="think" className="[&_p]:hidden h-24 w-24" />
-              <p className="mt-3 text-[13px] text-ink-3">上传商品图并出词后，套图结果会显示在这里</p>
-            </section>
-          )}
+            )}
+          </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function StepHint({ hasPlan, hasResult }: { hasPlan: boolean; hasResult: boolean }) {
+  const active = hasResult ? 3 : hasPlan ? 2 : 1;
+  const steps = [
+    { n: 1, label: "上传出词" },
+    { n: 2, label: "确认微调" },
+    { n: 3, label: "生成套图" },
+  ];
+  return (
+    <div className="flex items-center">
+      {steps.map((s, i) => {
+        const reached = active >= s.n;
+        return (
+          <div key={s.n} className="flex items-center">
+            <span
+              className={cn(
+                "flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold transition-colors",
+                reached ? "bg-accent-gradient text-white shadow-soft" : "bg-surface-muted text-ink-3"
+              )}
+            >
+              {s.n}
+            </span>
+            <span className={cn("ml-1.5 text-[12px] font-semibold", reached ? "text-ink" : "text-ink-3")}>
+              {s.label}
+            </span>
+            {i < steps.length - 1 && <span className="mx-2 h-px w-4 shrink-0 bg-line-strong" />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function BlueprintSlot({ meta, big = false }: { meta: { index: string; label: string }; big?: boolean }) {
+  return (
+    <div
+      className={cn(
+        "relative flex flex-col items-center justify-center gap-2 rounded-[16px] border border-dashed border-line-strong bg-surface/60 p-2 text-center transition-colors",
+        big ? "aspect-square md:aspect-auto md:h-full" : "aspect-square md:aspect-auto md:h-full"
+      )}
+    >
+      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-muted text-[13px] font-bold text-ink-2">
+        {meta.index}
+      </span>
+      <span className="px-1 text-[12px] font-semibold text-ink-2">{meta.label}</span>
+    </div>
+  );
+}
+
+function ListingBlueprint() {
+  const mainType = LISTING_TYPES[0];
+  const restTypes = LISTING_TYPES.slice(1);
+  return (
+    <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 md:grid-cols-2">
+      <BlueprintSlot meta={mainType} big />
+      <div className="grid grid-cols-2 grid-rows-2 gap-3">
+        {restTypes.map((t) => (
+          <BlueprintSlot key={t.type} meta={t} />
+        ))}
       </div>
     </div>
   );
