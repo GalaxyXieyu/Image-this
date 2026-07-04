@@ -28,13 +28,24 @@ export async function GET(request: NextRequest) {
   }
 
   let results: Array<{ listingType: string; index: string; label: string; candidateIndex?: number; processedImageUrl: string }> = [];
+  let total: number | null = null;
+  let failed: number | null = null;
+  let partialError: string | null = null;
   try {
     if (task.outputData) {
-      const parsed = JSON.parse(task.outputData) as { results?: typeof results };
+      const parsed = JSON.parse(task.outputData) as {
+        results?: typeof results;
+        total?: number | null;
+        failed?: number | null;
+        partialError?: string | null;
+      };
       results = (parsed.results || []).map((r) => ({
         ...r,
         processedImageUrl: normalizeImageUrlForClient(r.processedImageUrl) || r.processedImageUrl,
       }));
+      total = parsed.total ?? null;
+      failed = parsed.failed ?? null;
+      partialError = parsed.partialError ?? null;
     }
   } catch {
     // ignore
@@ -47,5 +58,8 @@ export async function GET(request: NextRequest) {
     currentStep: task.currentStep,
     errorMessage: task.errorMessage,
     results,
+    total,
+    failed,
+    partialError,
   });
 }

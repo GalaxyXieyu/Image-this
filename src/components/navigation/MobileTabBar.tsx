@@ -13,11 +13,6 @@ export function MobileTabBar() {
   const pathname = usePathname() ?? "/";
   const galleryActive = pathname.startsWith("/results");
   const settingsActive = pathname.startsWith("/settings") || pathname.startsWith("/templates");
-  const workbenchActive =
-    pathname === "/workspace" ||
-    pathname.startsWith("/workspace") ||
-    pathname.startsWith("/combo") ||
-    pathname.startsWith("/tools");
 
   return (
     <nav className="md:hidden shrink-0 border-t border-border/60 bg-surface-glass backdrop-blur-[20px] backdrop-saturate-150 pb-[env(safe-area-inset-bottom)]">
@@ -33,23 +28,10 @@ export function MobileTabBar() {
           图库
         </Link>
 
-        {/* 中间：工作台 hub 入口，矩形填充、与栏平齐（不上浮，避免遮挡页面） */}
-        <Link href="/workspace" aria-label="工作台" className="flex w-16 flex-col items-center gap-0.5">
-          <span
-            className={cn(
-              "flex h-8 w-11 items-center justify-center rounded-[10px] transition-transform active:scale-95",
-              workbenchActive ? "bg-accent-gradient text-white shadow-soft" : "bg-surface-muted text-ink-2"
-            )}
-          >
+        {/* 中间：工作台入口 = 黑底白色 + 号按钮（矩形、与栏平齐、无文字，不遮挡页面） */}
+        <Link href="/workspace" aria-label="工作台" className="flex w-16 items-center justify-center">
+          <span className="flex h-10 w-12 items-center justify-center rounded-[12px] bg-[#1a1a17] text-white shadow-soft transition-transform active:scale-95">
             <Plus className="h-5 w-5" />
-          </span>
-          <span
-            className={cn(
-              "text-[11px] font-semibold",
-              workbenchActive ? "text-brand-text" : "text-ink-3"
-            )}
-          >
-            工作台
           </span>
         </Link>
 

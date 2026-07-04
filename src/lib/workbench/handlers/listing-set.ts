@@ -69,6 +69,9 @@ const listingSetHandler = {
     return {
       setId: result.setId ?? null,
       results: result.results ?? [],
+      total: result.total ?? null,
+      failed: result.failed ?? null,
+      partialError: result.partialError ?? null,
       processedImageId: result.processedImageId ?? null,
       processedImageUrl: result.processedImageUrl ?? null,
     };

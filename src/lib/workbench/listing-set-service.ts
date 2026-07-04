@@ -45,6 +45,12 @@ export interface ExecuteListingSetParams {
 export interface ListingSetResult extends WorkflowResult {
   setId: string;
   results: ListingSetItemResult[];
+  /** 计划总张数 */
+  total?: number;
+  /** 失败张数（total - 成功） */
+  failed?: number;
+  /** 部分失败时的首个错误原因（供前端提示与重试） */
+  partialError?: string | null;
 }
 
 async function callProvider(
@@ -67,17 +73,49 @@ async function callProvider(
   return { imageData: imageData || '', imageSize: imageData?.length || 0 };
 }
 
+/** 单张出图带重试：应对 provider 限流/瞬时错误，减少「请求 8 张只成 5 张」的丢失 */
+async function callProviderWithRetry(
+  provider: string,
+  sourceImage: string,
+  prompt: string,
+  userId: string,
+  modelName: string | undefined,
+  attempts = 2
+): Promise<{ imageData: string; imageSize: number }> {
+  let lastErr: Error | null = null;
+  for (let a = 0; a < attempts; a++) {
+    try {
+      const out = await callProvider(provider, sourceImage, prompt, userId, modelName);
+      if (!out.imageData) throw new Error('未返回图像数据');
+      return out;
+    } catch (err) {
+      lastErr = err instanceof Error ? err : new Error(String(err));
+      if (a < attempts - 1) {
+        // 退避后重试（限流类错误给 provider 一点喘息）
+        await new Promise((r) => setTimeout(r, 900 * (a + 1)));
+      }
+    }
+  }
+  throw lastErr ?? new Error('出图失败');
+}
+
 async function persistPartial(
   taskId: string,
   setId: string,
   results: ListingSetItemResult[],
   currentStep: string,
-  progress: number
+  progress: number,
+  extra?: Record<string, unknown>
 ) {
   await prisma.taskQueue.update({
     where: { id: taskId },
     data: {
-      outputData: JSON.stringify({ setId, results, processedImageUrl: results[0]?.processedImageUrl ?? null }),
+      outputData: JSON.stringify({
+        setId,
+        results,
+        processedImageUrl: results[0]?.processedImageUrl ?? null,
+        ...extra,
+      }),
       currentStep,
       progress,
       completedSteps: results.length,
@@ -124,8 +162,7 @@ export async function executeListingSet(params: ExecuteListingSetParams): Promis
     await persistPartial(params.taskId, params.setId, results, stepLabel, progress);
 
     try {
-      const out = await callProvider(provider, params.sourceImage, prompt, userId, params.modelName);
-      if (!out.imageData) throw new Error('未返回图像数据');
+      const out = await callProviderWithRetry(provider, params.sourceImage, prompt, userId, params.modelName);
 
       const filename = `listing-${type}-${variant}-${Date.now()}.jpg`;
       const processedUrl = await uploadBase64Image(out.imageData, filename, userId);
@@ -165,7 +202,16 @@ export async function executeListingSet(params: ExecuteListingSetParams): Promis
     }
   }
 
-  await persistPartial(params.taskId, params.setId, results, '完成', 100);
+  const failedCount = totalJobs - results.length;
+  const partialError = failedCount > 0 && firstError ? firstError.message.slice(0, 300) : null;
+  await persistPartial(
+    params.taskId,
+    params.setId,
+    results,
+    failedCount > 0 ? `完成 ${results.length}/${totalJobs} 张，${failedCount} 张失败` : '完成',
+    100,
+    { total: totalJobs, failed: failedCount, partialError }
+  );
 
   // 全部失败才算任务失败（例如 provider 额度不足）
   if (results.length === 0 && firstError) {
@@ -175,6 +221,9 @@ export async function executeListingSet(params: ExecuteListingSetParams): Promis
   return {
     setId: params.setId,
     results,
+    total: totalJobs,
+    failed: failedCount,
+    partialError,
     processedImageId: results[0]?.processedImageId,
     processedImageUrl: results[0]?.processedImageUrl,
   };

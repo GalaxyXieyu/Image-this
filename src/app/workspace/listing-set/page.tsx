@@ -18,6 +18,7 @@ import {
 import { BrandImageFallback } from "@/components/brands/SpriteImage";
 import { LISTING_TYPES, type ListingImageType } from "@/lib/workbench/listing-set";
 import { getSceneGenerationModels } from "@/lib/ai-models";
+import { mapProviderErrorMessage } from "@/lib/provider-error-utils";
 
 // 出图模型：复用场景生成模型，排除 service 未接线的 volcengine
 const IMAGE_MODELS = getSceneGenerationModels().filter((m) => m.provider !== "volcengine");
@@ -52,6 +53,9 @@ interface SetStatus {
   currentStep?: string | null;
   errorMessage?: string | null;
   results: SetItem[];
+  total?: number | null;
+  failed?: number | null;
+  partialError?: string | null;
 }
 
 async function fileToDataUrl(file: File): Promise<string> {
@@ -391,6 +395,26 @@ export default function ListingSetPage() {
             {hasResult && setStatus?.status === "failed" && setStatus.results.length === 0 && (
               <div className="rounded-[14px] border border-danger/30 bg-danger/5 px-3.5 py-2.5 text-[13px] text-danger">
                 生成失败：{setStatus.errorMessage || "请检查 provider 额度或密钥后重试"}
+              </div>
+            )}
+            {/* 部分成功：告知失败张数与原因，并可一键补齐失败的张 */}
+            {hasResult && !processing && (setStatus?.failed ?? 0) > 0 && (setStatus?.results.length ?? 0) > 0 && (
+              <div className="space-y-2 rounded-[14px] border border-amber-300/50 bg-amber-50 px-3.5 py-2.5 text-[13px] text-amber-700">
+                <p>
+                  共 {setStatus?.total ?? totalCount} 张，成功 {setStatus?.results.length ?? 0} 张，
+                  {setStatus?.failed} 张生成失败
+                  {setStatus?.partialError ? `：${mapProviderErrorMessage(setStatus.partialError)}` : "（可能是 provider 限流或额度）"}。
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="min-h-9 border-amber-300 bg-white text-amber-700 hover:text-amber-800"
+                  onClick={handleGenerate}
+                  disabled={busy}
+                >
+                  <Wand2 className="mr-1.5 h-3.5 w-3.5" />
+                  重新生成整套（{totalCount} 张）
+                </Button>
               </div>
             )}
           </div>
@@ -808,9 +832,9 @@ function ListingSlot({
                 <span className="text-[11px]">排队 / 生成中</span>
               </>
             ) : (
-              <span className="flex flex-col items-center gap-1 text-ink-3">
+              <span className="flex flex-col items-center gap-1 text-danger">
                 <X className="h-5 w-5" />
-                <span className="text-[11px]">未生成</span>
+                <span className="text-[11px]">生成失败</span>
               </span>
             )}
           </div>
