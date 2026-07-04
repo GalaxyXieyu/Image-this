@@ -36,10 +36,15 @@ function extractJson(text: string): Record<string, unknown> | null {
 export async function planListingPrompts(
   userId: string,
   imageDataUrl: string,
-  product: ListingProductInfo
+  product: ListingProductInfo,
+  /** 可选：指定出词模型 id（须为用户已配置的多模态语言模型之一），缺省用自动选中的第一个 */
+  modelOverride?: string
 ): Promise<PlanItem[]> {
   const config = await getUserConfig(userId);
-  const cw = config.copywriter;
+  // 指定了模型就在候选里按 id 匹配，否则用默认 copywriter
+  const cw =
+    (modelOverride && config.copywriterCandidates?.find((c) => c.modelName === modelOverride)) ||
+    config.copywriter;
   if (!cw?.apiKey) {
     throw new Error('未配置文案/出词模型，请在设置页面将某个模型类型设为「多模态语言模型」后再试');
   }

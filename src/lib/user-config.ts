@@ -68,6 +68,12 @@ export interface UserConfig {
     baseUrl: string;
     modelName: string;
   };
+  /** 全部可用的出词(llm)候选，供用户在生成时选择具体模型（服务端凭据，勿下发前端明文） */
+  copywriterCandidates?: {
+    apiKey: string;
+    baseUrl: string;
+    modelName: string;
+  }[];
   localStorage?: {
     savePath: string;
   };
@@ -267,6 +273,12 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
   pushLlm(geminiApiKey, geminiBaseUrl, config.gemini?.models);
   pushLlm(arkApiKey, jimengBaseUrl, config.jimeng?.models);
 
+  const candidates: { apiKey: string; baseUrl: string; modelName: string }[] = llmCandidates.map((c) => ({
+    apiKey: c.apiKey,
+    baseUrl: normalizeChatBaseUrl(c.baseUrl),
+    modelName: c.modelId,
+  }));
+
   const llm = llmCandidates[0];
   if (llm) {
     config.copywriter = {
@@ -280,6 +292,11 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
       baseUrl: copywriterBaseUrl,
       modelName: copywriterModelName,
     };
+    candidates.push({ apiKey: copywriterApiKey, baseUrl: copywriterBaseUrl, modelName: copywriterModelName });
+  }
+
+  if (candidates.length > 0) {
+    config.copywriterCandidates = candidates;
   }
 
   // 本地存储配置

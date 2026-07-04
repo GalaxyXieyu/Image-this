@@ -15,15 +15,16 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { imageDataUrl, product = {} } = body as {
+    const { imageDataUrl, product = {}, model } = body as {
       imageDataUrl?: string;
       product?: ListingProductInfo;
+      model?: string;
     };
     if (!imageDataUrl) {
       return NextResponse.json({ error: '缺少商品图' }, { status: 400 });
     }
 
-    const items = await planListingPrompts(session.user.id, imageDataUrl, product);
+    const items = await planListingPrompts(session.user.id, imageDataUrl, product, model);
     return NextResponse.json({ success: true, items });
   } catch (error) {
     console.error('[商品套图] 出词失败:', error);
