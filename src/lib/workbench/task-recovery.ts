@@ -43,26 +43,34 @@ export interface RecoveryResult {
 export async function recoverStuckTasks({ mode }: { mode: 'boot' | 'sweep' }): Promise<RecoveryResult> {
   const result: RecoveryResult = { recovered: 0, resumed: 0, failed: 0, scanned: 0 };
   try {
-    const where =
+    const select = {
+      id: true,
+      type: true,
+      status: true,
+      retryCount: true,
+      maxRetries: true,
+      currentStep: true,
+      userId: true,
+      inputData: true,
+      outputData: true,
+      priority: true,
+      projectId: true,
+    } as const;
+
+    const processingWhere =
       mode === 'sweep'
         ? { status: 'PROCESSING', updatedAt: { lt: new Date(Date.now() - STALE_MS) } }
         : { status: 'PROCESSING' };
+    const stuckProcessing = await prisma.taskQueue.findMany({ where: processingWhere, select });
 
-    const stuck = await prisma.taskQueue.findMany({
-      where,
-      select: {
-        id: true,
-        type: true,
-        retryCount: true,
-        maxRetries: true,
-        currentStep: true,
-        userId: true,
-        inputData: true,
-        outputData: true,
-        priority: true,
-        projectId: true,
-      },
+    // 套图残局：被（旧逻辑或其它）盲目重置为 PENDING、但已有部分结果的任务。
+    // 直接排空会整体重跑 → 重复已成功的图；这里也按缺失续跑处理。
+    const abandonedSets = await prisma.taskQueue.findMany({
+      where: { type: 'LISTING_SET', status: 'PENDING', completedSteps: { gt: 0 } },
+      select,
     });
+
+    const stuck = [...stuckProcessing, ...abandonedSets];
     result.scanned = stuck.length;
     if (stuck.length === 0) return result;
 
@@ -70,9 +78,9 @@ export async function recoverStuckTasks({ mode }: { mode: 'boot' | 'sweep' }): P
 
     for (const task of stuck) {
       if (task.type === 'LISTING_SET') {
-        // 原子占用：把原 PROCESSING 置 COMPLETED（保留 outputData 的已成功图，仍按 setId 归组）
+        // 原子占用：把原任务（PROCESSING 或残局 PENDING）置 COMPLETED（保留已成功图，按 setId 归组）
         const claimed = await prisma.taskQueue.updateMany({
-          where: { id: task.id, status: 'PROCESSING' },
+          where: { id: task.id, status: task.status },
           data: { status: 'COMPLETED', completedAt: new Date(), currentStep: '已中断，自动补齐缺失' },
         });
         if (claimed.count !== 1) continue; // 已被其它 sweeper 处理
@@ -90,12 +98,12 @@ export async function recoverStuckTasks({ mode }: { mode: 'boot' | 'sweep' }): P
         continue;
       }
 
-      // 其它类型：整体重跑
+      // 其它类型：整体重跑（这些只来自 PROCESSING 扫描）
       const retryCount = task.retryCount ?? 0;
       const maxRetries = task.maxRetries ?? 3;
       if (retryCount < maxRetries) {
         const claimed = await prisma.taskQueue.updateMany({
-          where: { id: task.id, status: 'PROCESSING' },
+          where: { id: task.id, status: task.status },
           data: {
             status: 'PENDING',
             retryCount: retryCount + 1,
@@ -108,7 +116,7 @@ export async function recoverStuckTasks({ mode }: { mode: 'boot' | 'sweep' }): P
         if (claimed.count === 1) result.recovered++;
       } else {
         const claimed = await prisma.taskQueue.updateMany({
-          where: { id: task.id, status: 'PROCESSING' },
+          where: { id: task.id, status: task.status },
           data: {
             status: 'FAILED',
             completedAt: new Date(),
