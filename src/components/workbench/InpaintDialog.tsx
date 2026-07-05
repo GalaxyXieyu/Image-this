@@ -310,7 +310,7 @@ export function InpaintDialog({ open, imageUrl, imageId, onClose, onSubmit }: In
       onClick={onClose}
     >
       <div
-        className="glass-panel relative flex max-h-[92dvh] w-full max-w-[600px] flex-col overflow-hidden rounded-t-[24px] shadow-float sm:rounded-[20px]"
+        className="relative flex max-h-[92dvh] w-full max-w-[600px] flex-col overflow-hidden rounded-t-[24px] border border-line bg-surface shadow-float sm:rounded-[20px]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
