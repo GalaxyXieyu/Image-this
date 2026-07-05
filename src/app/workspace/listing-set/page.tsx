@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ImagePlus, Sparkles, Loader2, X, Download, Wand2, ArrowLeft, Check, Minus, Plus, ChevronDown } from "lucide-react";
+import { ImagePlus, Sparkles, Loader2, X, Download, Wand2, ArrowLeft, Check, Minus, Plus, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiGet, apiPost } from "@/lib/api-client";
 import { useToast } from "@/components/ui/use-toast";
@@ -722,6 +722,20 @@ function PromptDraftPanel({
     items: planItems.filter((p) => p.listingType === t.type).sort((a, b) => a.variant - b.variant),
   })).filter((g) => g.items.length > 0);
 
+  const [activeType, setActiveType] = useState<ListingImageType>(groups[0]?.meta.type ?? "main");
+  const [cardIdx, setCardIdx] = useState(0);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  // 分组变化时保证 activeType 有效
+  useEffect(() => {
+    if (!groups.find((g) => g.meta.type === activeType) && groups[0]) {
+      setActiveType(groups[0].meta.type);
+    }
+  }, [groups, activeType]);
+
+  const activeGroup = groups.find((g) => g.meta.type === activeType) ?? groups[0];
+  const items = activeGroup?.items ?? [];
+
   const updatePrompt = (listingType: ListingImageType, variant: number, value: string) => {
     setPlanItems((prev) =>
       prev
@@ -730,8 +744,27 @@ function PromptDraftPanel({
     );
   };
 
+  const selectType = (type: ListingImageType) => {
+    setActiveType(type);
+    setCardIdx(0);
+    scrollRef.current?.scrollTo({ left: 0 });
+  };
+  const scrollToCard = (i: number) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const clamped = Math.max(0, Math.min(items.length - 1, i));
+    el.scrollTo({ left: clamped * el.clientWidth, behavior: "smooth" });
+    setCardIdx(clamped);
+  };
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (!el || el.clientWidth === 0) return;
+    const i = Math.round(el.scrollLeft / el.clientWidth);
+    if (i !== cardIdx) setCardIdx(i);
+  };
+
   return (
-    <div className="flex min-h-[340px] flex-1 flex-col rounded-[20px] border border-line bg-surface/50 p-4 md:p-5 lg:min-h-0 lg:overflow-hidden">
+    <div className="flex min-h-[360px] flex-1 flex-col rounded-[20px] border border-line bg-surface/50 p-4 md:p-5 lg:min-h-0 lg:overflow-hidden">
       <div className="flex shrink-0 items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
@@ -739,7 +772,7 @@ function PromptDraftPanel({
           </span>
           <div className="min-w-0">
             <p className="text-[14px] font-bold text-ink">确认并微调提示词</p>
-            <p className="text-[12px] text-ink-3">同类多段风格一致、构图不同，可逐条修改</p>
+            <p className="text-[12px] text-ink-3">切类型、左右滑看每张，同类风格一致、构图不同</p>
           </div>
         </div>
         <button
@@ -752,31 +785,77 @@ function PromptDraftPanel({
         </button>
       </div>
 
-      <div className="mt-3 flex flex-1 flex-col gap-4 overflow-y-auto pr-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-        {groups.map((g) => (
-          <div key={g.meta.type} className="space-y-2">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold text-ink-3">{g.meta.index}</span>
-              <span className="text-[13px] font-bold text-ink">{g.meta.label}</span>
-              {g.items.length > 1 && (
-                <span className="rounded-full bg-surface-muted px-2 py-0.5 text-[11px] font-semibold text-ink-2">
-                  {g.items.length} 张
-                </span>
+      {/* 横向类型 tab 条 */}
+      <div className="mt-3 flex shrink-0 gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        {groups.map((g) => {
+          const active = g.meta.type === activeType;
+          return (
+            <button
+              key={g.meta.type}
+              type="button"
+              onClick={() => selectType(g.meta.type)}
+              className={cn(
+                "flex min-h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-[12px] font-semibold transition-colors",
+                active ? "bg-accent-gradient text-white" : "border border-line bg-surface text-ink-2 hover:text-ink"
               )}
+            >
+              <span>{g.meta.label}</span>
+              <span className={cn("rounded-full px-1.5 text-[10px] font-bold", active ? "bg-white/25 text-white" : "bg-surface-muted text-ink-3")}>
+                {g.items.length}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 当前类型标题 + 位置 + 左右切换 */}
+      <div className="mt-3 flex shrink-0 items-center justify-between gap-2">
+        <span className="min-w-0 truncate text-[12px] font-semibold text-ink-2">
+          {activeGroup?.meta.index} {activeGroup?.meta.label}
+          {items.length > 1 && <span className="text-ink-3"> · 第 {cardIdx + 1}/{items.length} 张</span>}
+        </span>
+        {items.length > 1 && (
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => scrollToCard(cardIdx - 1)}
+              disabled={cardIdx <= 0}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-line-strong text-ink-2 transition-colors hover:border-brand hover:text-ink disabled:opacity-40"
+              aria-label="上一张"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToCard(cardIdx + 1)}
+              disabled={cardIdx >= items.length - 1}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-line-strong text-ink-2 transition-colors hover:border-brand hover:text-ink disabled:opacity-40"
+              aria-label="下一张"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 卡片横向轮播：每卡满宽，可左右滑动 */}
+      <div
+        ref={scrollRef}
+        onScroll={onScroll}
+        className="mt-2 flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {items.map((p) => (
+          <div key={`${p.listingType}-${p.variant}`} className="flex w-full shrink-0 snap-center flex-col px-0.5">
+            <div className="flex min-h-0 flex-1 flex-col rounded-[14px] border border-line bg-surface p-3">
+              {items.length > 1 && (
+                <label className="mb-1.5 shrink-0 text-[12px] font-semibold text-ink-2">第 {p.variant} 张</label>
+              )}
+              <Textarea
+                value={p.prompt}
+                onChange={(e) => updatePrompt(p.listingType, p.variant, e.target.value)}
+                className="min-h-[180px] flex-1 resize-none rounded-[12px] text-[13px] leading-5"
+              />
             </div>
-            {g.items.map((p) => (
-              <div key={`${p.listingType}-${p.variant}`} className="space-y-1.5 rounded-[14px] border border-line bg-surface p-3">
-                {g.items.length > 1 && (
-                  <label className="text-[12px] font-semibold text-ink-2">第 {p.variant} 张</label>
-                )}
-                <Textarea
-                  rows={3}
-                  value={p.prompt}
-                  onChange={(e) => updatePrompt(p.listingType, p.variant, e.target.value)}
-                  className="resize-none rounded-[12px] text-[13px]"
-                />
-              </div>
-            ))}
           </div>
         ))}
       </div>

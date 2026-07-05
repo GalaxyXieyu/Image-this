@@ -146,6 +146,8 @@ export async function executeListingSet(params: ExecuteListingSetParams): Promis
     }
   }
   const totalJobs = jobs.length;
+  // 若上游漏传 counts，这里会退化成每类 1 张——打日志便于发现「请求 N 张只出 5 张」类漂移
+  console.log(`[商品套图] setId=${params.setId} 计划生成 ${totalJobs} 张 (counts=${JSON.stringify(params.counts ?? null)})`);
 
   const results: ListingSetItemResult[] = [];
   let firstError: Error | null = null;

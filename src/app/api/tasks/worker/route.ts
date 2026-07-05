@@ -711,7 +711,9 @@ class TaskProcessor {
       product: (raw.product as Record<string, unknown>) || {},
       setId: (raw.setId as string) || task.id,
       types: raw.types as ('main' | 'scene' | 'model' | 'detail' | 'sellingpoint')[] | undefined,
-      prompts: raw.prompts as Partial<Record<'main' | 'scene' | 'model' | 'detail' | 'sellingpoint', string>> | undefined,
+      // 关键：批处理路径此前漏传 counts，导致每类只出 1 张（5 类=恒定 5 张）
+      counts: raw.counts as Partial<Record<'main' | 'scene' | 'model' | 'detail' | 'sellingpoint', number>> | undefined,
+      prompts: raw.prompts as Partial<Record<'main' | 'scene' | 'model' | 'detail' | 'sellingpoint', string | string[]>> | undefined,
       originalUrlForRecord: getAssetClientUrl(inputData.inputAsset) || (raw.imageUrl as string) || '',
       provider: raw.provider as string | undefined,
       modelName: raw.modelName as string | undefined,

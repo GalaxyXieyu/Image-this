@@ -20,6 +20,8 @@ import {
   Wand2,
   Paintbrush,
   Layers,
+  AlertTriangle,
+  RefreshCw,
   X,
 } from "lucide-react";
 import { InpaintDialog, type InpaintSubmitPayload } from "@/components/workbench/InpaintDialog";
@@ -40,6 +42,17 @@ interface ActiveTask {
   currentStep?: string | null;
   originalImageUrl: string | null;
   category: string;
+}
+
+interface FailedTask {
+  id: string;
+  setId: string | null;
+  status: string;
+  total: number | null;
+  failed: number | null;
+  reason: string | null;
+  originalImageUrl: string | null;
+  createdAt: string;
 }
 
 // 进行中任务占位：原图打底，水位随进度上涨，跑完即变成实景
@@ -191,6 +204,9 @@ export default function ResultsPage() {
   const [error, setError] = useState<string | null>(null);
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
   const [activeTasks, setActiveTasks] = useState<ActiveTask[]>([]);
+  const [failedTasks, setFailedTasks] = useState<FailedTask[]>([]);
+  const [dismissedFailures, setDismissedFailures] = useState<Set<string>>(new Set());
+  const [retryingId, setRetryingId] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ url: string; name: string } | null>(null);
   const [inpaintTarget, setInpaintTarget] = useState<{ id: string; url: string } | null>(null);
   const prevActiveCount = useRef(0);
@@ -268,11 +284,45 @@ export default function ResultsPage() {
     }
   }, [fetchResults]);
 
+  const fetchFailed = useCallback(async () => {
+    try {
+      const data = await apiGet<{ success: boolean; failures: FailedTask[] }>("/api/listing-set/failures");
+      setFailedTasks(data.failures || []);
+    } catch {
+      // 失败 feed 为增强项，出错不打断图库
+    }
+  }, []);
+
   useEffect(() => {
     fetchActive();
-    const timer = setInterval(fetchActive, 3500);
+    fetchFailed();
+    const timer = setInterval(() => {
+      fetchActive();
+      fetchFailed();
+    }, 3500);
     return () => clearInterval(timer);
-  }, [fetchActive]);
+  }, [fetchActive, fetchFailed]);
+
+  const visibleFailures = failedTasks.filter((f) => !dismissedFailures.has(f.id));
+
+  const handleRetryMissing = async (id: string) => {
+    setRetryingId(id);
+    try {
+      await apiPost("/api/listing-set/retry", { taskId: id });
+      // 隐藏该失败卡，补齐任务会以「处理中」占位出现，完成后并入同一套图分组
+      setDismissedFailures((prev) => new Set(prev).add(id));
+      fetchActive();
+      fetchResults();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "重试失败");
+    } finally {
+      setRetryingId(null);
+    }
+  };
+
+  const dismissFailure = (id: string) => {
+    setDismissedFailures((prev) => new Set(prev).add(id));
+  };
 
   const filteredActive = activeTasks.filter(
     (t) => activeCategory === "all" || t.category === activeCategory
@@ -462,6 +512,47 @@ export default function ResultsPage() {
     </div>
   );
 
+  const renderFailedCard = (f: FailedTask) => {
+    const totalFail = f.status === "FAILED";
+    return (
+      <div key={`failed-${f.id}`} className="group glass-panel relative overflow-hidden rounded-[16px] ring-1 ring-amber-300/60">
+        <div className="relative aspect-square overflow-hidden bg-surface-muted">
+          <ImageThumbnail src={f.originalImageUrl} alt="生成失败" className="h-full w-full" />
+          <div className="absolute inset-0 bg-black/50" />
+          <button
+            type="button"
+            onClick={() => dismissFailure(f.id)}
+            className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-surface/85 text-ink-2 shadow-soft backdrop-blur-sm transition-colors hover:text-ink"
+            title="忽略"
+            aria-label="忽略"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-3 text-center text-white">
+            <AlertTriangle className="h-6 w-6 text-amber-300" />
+            <span className="text-[12px] font-bold">
+              {totalFail ? "整套生成失败" : `${f.failed ?? "部分"} 张生成失败`}
+            </span>
+            {f.total ? <span className="text-[11px] text-white/80">计划 {f.total} 张</span> : null}
+            <button
+              type="button"
+              onClick={() => handleRetryMissing(f.id)}
+              disabled={retryingId === f.id}
+              className="mt-1 flex items-center gap-1 rounded-full bg-white/90 px-3 py-1.5 text-[12px] font-semibold text-ink transition-colors hover:bg-white disabled:opacity-60"
+            >
+              {retryingId === f.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              {totalFail ? "重试整套" : "重试缺失"}
+            </button>
+          </div>
+        </div>
+        <div className="px-2.5 py-2">
+          <h3 className="truncate text-[12px] font-semibold text-ink">商品套图</h3>
+          <p className="mt-0.5 truncate text-[11px] text-ink-3">{f.reason || "点击重试补齐缺失的图"}</p>
+        </div>
+      </div>
+    );
+  };
+
   const gridColStyle = { gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))" } as const;
 
   return (
@@ -624,8 +715,9 @@ export default function ResultsPage() {
               <>
                 {groupByTask ? (
                   <div className="flex flex-col gap-5">
-                    {filteredActive.length > 0 && (
+                    {(visibleFailures.length > 0 || filteredActive.length > 0) && (
                       <div className="grid gap-3" style={gridColStyle}>
+                        {visibleFailures.map(renderFailedCard)}
                         {filteredActive.map(renderActiveCard)}
                       </div>
                     )}
@@ -659,6 +751,7 @@ export default function ResultsPage() {
                     className="grid gap-3"
                     style={{ gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))" }}
                   >
+                    {visibleFailures.map(renderFailedCard)}
                     {filteredActive.map((task) => (
                       <div key={`active-${task.id}`} className="group glass-panel relative overflow-hidden rounded-[16px]">
                         <WaterFillCard task={task} />
@@ -776,7 +869,7 @@ export default function ResultsPage() {
                   </div>
                 )}
 
-                {filteredResults.length === 0 && filteredActive.length === 0 && (
+                {filteredResults.length === 0 && filteredActive.length === 0 && visibleFailures.length === 0 && (
                   <BrandEmptyState
                     pose="star"
                     title="暂无结果"
