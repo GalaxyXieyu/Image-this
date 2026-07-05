@@ -28,12 +28,31 @@ import {
 } from "lucide-react";
 import { InpaintDialog, type InpaintSubmitPayload } from "@/components/workbench/InpaintDialog";
 
-function ImageThumbnail({ src, alt, className }: { src?: string | null; alt: string; className?: string }) {
+// 图库网格用小尺寸缩略图：/api/files 支持 ?w= 按需缩放为 webp，把 ~1MB 原图降到 ~20-30KB
+function thumbUrl(url?: string | null, w = 400): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith("/api/files/") || url.startsWith("/uploads/")) {
+    return `${url}${url.includes("?") ? "&" : "?"}w=${w}`;
+  }
+  return url;
+}
+
+function ImageThumbnail({ src, alt, className, thumbWidth }: { src?: string | null; alt: string; className?: string; thumbWidth?: number }) {
   const [error, setError] = useState(false);
-  if (!src || error) {
+  const resolved = thumbWidth ? thumbUrl(src, thumbWidth) : src;
+  if (!resolved || error) {
     return <BrandImageFallback title="图片预览" description="素材暂不可用" pose="sleep" className={cn("rounded-none", className)} />;
   }
-  return <img src={src} alt={alt} className={cn("w-full h-full object-cover", className)} onError={() => setError(true)} />;
+  return (
+    <img
+      src={resolved}
+      alt={alt}
+      loading="lazy"
+      decoding="async"
+      className={cn("w-full h-full object-cover", className)}
+      onError={() => setError(true)}
+    />
+  );
 }
 
 interface ActiveTask {
@@ -71,7 +90,7 @@ function WaterFillCard({ task }: { task: ActiveTask }) {
   const countLabel = total > 1 ? `${done}/${total} 张` : null;
   return (
     <div className="relative aspect-square overflow-hidden bg-surface-muted">
-      <ImageThumbnail src={task.originalImageUrl} alt="处理中" className="h-full w-full" />
+      <ImageThumbnail src={task.originalImageUrl} alt="处理中" className="h-full w-full" thumbWidth={400} />
       {/* 原图压暗，凸显水位 */}
       <div className="absolute inset-0 bg-black/35" />
       {/* 水体（随进度上涨，平滑过渡） */}
@@ -464,7 +483,7 @@ export default function ResultsPage() {
       )}
     >
       <div className="relative aspect-square overflow-hidden bg-surface-muted">
-        <ImageThumbnail src={item.thumbnail || item.processedUrl} alt={item.name} className="h-full w-full" />
+        <ImageThumbnail src={item.thumbnail || item.processedUrl} alt={item.name} className="h-full w-full" thumbWidth={400} />
         <button
           type="button"
           aria-label="查看大图"
@@ -530,7 +549,7 @@ export default function ResultsPage() {
     return (
       <div key={`failed-${f.id}`} className="group glass-panel relative overflow-hidden rounded-[16px] ring-1 ring-amber-300/60">
         <div className="relative aspect-square overflow-hidden bg-surface-muted">
-          <ImageThumbnail src={f.originalImageUrl} alt="生成失败" className="h-full w-full" />
+          <ImageThumbnail src={f.originalImageUrl} alt="生成失败" className="h-full w-full" thumbWidth={400} />
           <div className="absolute inset-0 bg-black/50" />
           <button
             type="button"
@@ -832,7 +851,7 @@ export default function ResultsPage() {
                         )}
                       >
                         <div className="relative aspect-square overflow-hidden bg-surface-muted">
-                          <ImageThumbnail src={item.thumbnail || item.processedUrl} alt={item.name} className="h-full w-full" />
+                          <ImageThumbnail src={item.thumbnail || item.processedUrl} alt={item.name} className="h-full w-full" thumbWidth={400} />
                           <button
                             type="button"
                             aria-label="查看大图"
@@ -895,7 +914,7 @@ export default function ResultsPage() {
                           onCheckedChange={() => toggleSelect(item.id)}
                         />
                         <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[8px] bg-surface-muted">
-                          <ImageThumbnail src={item.thumbnail || item.processedUrl} alt={item.name} className="h-full w-full" />
+                          <ImageThumbnail src={item.thumbnail || item.processedUrl} alt={item.name} className="h-full w-full" thumbWidth={400} />
                         </div>
                         <div className="min-w-0 flex-1">
                           <h3 className="truncate text-[13px] font-semibold text-ink">{item.name}</h3>

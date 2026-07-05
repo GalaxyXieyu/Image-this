@@ -137,7 +137,7 @@ export async function GET(
     
     // 读取文件
     const fileBuffer = await fs.readFile(filePath);
-    
+
     // 确定 MIME 类型
     const ext = path.extname(filePath).toLowerCase();
     const mimeTypes: Record<string, string> = {
@@ -149,8 +149,43 @@ export async function GET(
       '.svg': 'image/svg+xml',
     };
     const contentType = mimeTypes[ext] || 'application/octet-stream';
-    
-    return new NextResponse(fileBuffer, {
+
+    // 按需缩略图：?w=<宽度> → sharp 缩放为 webp 并磁盘缓存（大幅降低图库网格的下载量）。
+    // 仅对位图生效；失败则回退原图。
+    const wParam = request.nextUrl.searchParams.get('w');
+    const reqWidth = wParam ? Math.min(1600, Math.max(16, parseInt(wParam, 10) || 0)) : 0;
+    if (reqWidth && ['.jpg', '.jpeg', '.png', '.webp'].includes(ext)) {
+      try {
+        const crypto = await import('crypto');
+        const key = crypto.createHash('md5').update(`${resolvedPath}|w${reqWidth}`).digest('hex');
+        const cacheDir = path.join(os.tmpdir(), 'imagethis-thumb-cache');
+        const cacheFile = path.join(cacheDir, `${key}.webp`);
+        let out: Buffer;
+        try {
+          out = await fs.readFile(cacheFile);
+        } catch {
+          const sharp = (await import('sharp')).default;
+          out = await sharp(fileBuffer)
+            .rotate()
+            .resize({ width: reqWidth, withoutEnlargement: true })
+            .webp({ quality: 72 })
+            .toBuffer();
+          await fs.mkdir(cacheDir, { recursive: true }).catch(() => {});
+          await fs.writeFile(cacheFile, out).catch(() => {});
+        }
+        return new NextResponse(new Uint8Array(out), {
+          headers: {
+            'Content-Type': 'image/webp',
+            'Cache-Control': 'public, max-age=31536000, immutable',
+          },
+        });
+      } catch (e) {
+        console.warn('[files] 缩略图生成失败，回退原图:', e);
+        // 落到下面返回原图
+      }
+    }
+
+    return new NextResponse(new Uint8Array(fileBuffer), {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=31536000',
