@@ -616,7 +616,8 @@ function TypeCountCards({
                   <span className="text-[11px] font-bold text-ink-3">{t.index}</span>
                   <span className="text-[13px] font-bold text-ink">{t.label}</span>
                 </span>
-                <span className="mt-1 line-clamp-2 block text-[12px] leading-4 text-ink-3">{t.rule}</span>
+                {/* 说明文案仅桌面显示；移动端类型名已够辨识，隐藏以免卡片过高 */}
+                <span className="mt-1 hidden text-[12px] leading-4 text-ink-3 lg:line-clamp-2">{t.rule}</span>
               </span>
             </button>
             {selected && (
