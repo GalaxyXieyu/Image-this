@@ -47,27 +47,33 @@ const ACTION_AUTO_PROMPT: Record<InpaintAction, string> = {
 
 export function InpaintDialog({ open, imageUrl, imageId, onClose, onSubmit }: InpaintDialogProps) {
   const maskRef = useRef<HTMLCanvasElement | null>(null);
+  const previewRef = useRef<HTMLCanvasElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
+  const draggingRef = useRef(false);
+  const lastPtRef = useRef<{ x: number; y: number } | null>(null);
+  const lassoRef = useRef<{ x: number; y: number }[]>([]);
 
   const [tool, setTool] = useState<Tool>("brush");
   const [action, setAction] = useState<InpaintAction>("inpaint");
   const [strength, setStrength] = useState<InpaintStrength>("medium");
-  const [brushSize, setBrushSize] = useState(24);
+  const [brushSize, setBrushSize] = useState(28);
   const [prompt, setPrompt] = useState("");
-  const [painting, setPainting] = useState(false);
   const [hasMask, setHasMask] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [lassoPoints, setLassoPoints] = useState<{ x: number; y: number }[]>([]);
 
   const syncSize = useCallback(() => {
-    const mc = maskRef.current;
     const img = imgRef.current;
-    if (!mc || !img) return;
+    if (!img) return;
     const rect = img.getBoundingClientRect();
-    mc.width = img.naturalWidth || rect.width;
-    mc.height = img.naturalHeight || rect.height;
-    mc.style.width = rect.width + "px";
-    mc.style.height = rect.height + "px";
+    const w = img.naturalWidth || rect.width;
+    const h = img.naturalHeight || rect.height;
+    for (const c of [maskRef.current, previewRef.current]) {
+      if (!c) continue;
+      c.width = w;
+      c.height = h;
+      c.style.width = rect.width + "px";
+      c.style.height = rect.height + "px";
+    }
   }, []);
 
   useEffect(() => {
@@ -88,11 +94,16 @@ export function InpaintDialog({ open, imageUrl, imageId, onClose, onSubmit }: In
       setTool("brush");
       setAction("inpaint");
       setStrength("medium");
-      setLassoPoints([]);
+      lassoRef.current = [];
+      draggingRef.current = false;
+      lastPtRef.current = null;
     }
   }, [open, imageId]);
 
-  function getPos(e: React.MouseEvent): { x: number; y: number } {
+  // 选区高亮色（画布上以满不透明度绘制，画布整体用 CSS opacity 呈半透明 → 均匀、不叠深、对比清晰）
+  const MASK_FILL = "rgba(255,70,0,1)";
+
+  function getPos(e: { clientX: number; clientY: number }): { x: number; y: number } {
     const mc = maskRef.current;
     if (!mc) return { x: 0, y: 0 };
     const rect = mc.getBoundingClientRect();
@@ -101,48 +112,73 @@ export function InpaintDialog({ open, imageUrl, imageId, onClose, onSubmit }: In
     return { x: (e.clientX - rect.left) * sx, y: (e.clientY - rect.top) * sy };
   }
 
-  function paintAt(x: number, y: number) {
+  // 画笔/橡皮：从上一点到当前点连成粗圆头线段，涂抹连续无断点
+  function paintStroke(from: { x: number; y: number } | null, to: { x: number; y: number }) {
     const mc = maskRef.current;
     if (!mc) return;
     const ctx = mc.getContext("2d");
     if (!ctx) return;
-    const r = brushSize / 2;
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.lineWidth = brushSize;
     if (tool === "eraser") {
-      ctx.save();
       ctx.globalCompositeOperation = "destination-out";
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(0,0,0,1)";
       ctx.fillStyle = "rgba(0,0,0,1)";
-      ctx.fill();
-      ctx.restore();
     } else {
+      ctx.strokeStyle = MASK_FILL;
+      ctx.fillStyle = MASK_FILL;
+    }
+    if (from) {
       ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(255,107,53,0.42)";
-      ctx.fill();
-      ctx.strokeStyle = "rgba(255,130,60,0.55)";
-      ctx.lineWidth = 2;
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
       ctx.stroke();
     }
+    ctx.beginPath();
+    ctx.arc(to.x, to.y, brushSize / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
     checkMask();
   }
 
+  // 套索：拖动时在预览层实时画虚线轮廓；松手闭合并填到蒙版层
+  function drawLassoPreview() {
+    const pc = previewRef.current;
+    if (!pc) return;
+    const ctx = pc.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, pc.width, pc.height);
+    const pts = lassoRef.current;
+    if (pts.length < 1) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    pts.forEach((p) => ctx.lineTo(p.x, p.y));
+    ctx.fillStyle = "rgba(255,70,0,0.18)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,70,0,0.95)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   function commitLasso(points: { x: number; y: number }[]) {
+    const pc = previewRef.current;
+    pc?.getContext("2d")?.clearRect(0, 0, pc.width, pc.height);
     const mc = maskRef.current;
     if (!mc || points.length < 3) return;
     const ctx = mc.getContext("2d");
     if (!ctx) return;
     ctx.save();
-    ctx.setLineDash([]);
     ctx.beginPath();
     ctx.moveTo(points[0].x, points[0].y);
     points.forEach((p) => ctx.lineTo(p.x, p.y));
     ctx.closePath();
-    ctx.fillStyle = "rgba(255,107,53,0.4)";
+    ctx.fillStyle = MASK_FILL;
     ctx.fill();
-    ctx.strokeStyle = "rgba(255,107,53,0.8)";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
     ctx.restore();
     checkMask();
   }
@@ -153,77 +189,62 @@ export function InpaintDialog({ open, imageUrl, imageId, onClose, onSubmit }: In
     const ctx = mc.getContext("2d");
     if (!ctx) return;
     const d = ctx.getImageData(0, 0, mc.width, mc.height).data;
-    const has = d.some((_, i) => i % 4 === 3 && d[i] > 10);
+    let has = false;
+    for (let i = 3; i < d.length; i += 4) {
+      if (d[i] > 10) { has = true; break; }
+    }
     setHasMask(has);
   }
 
   function clearMask() {
     const mc = maskRef.current;
-    if (!mc) return;
-    const ctx = mc.getContext("2d");
-    if (!ctx) return;
-    ctx.clearRect(0, 0, mc.width, mc.height);
-    setLassoPoints([]);
+    const pc = previewRef.current;
+    mc?.getContext("2d")?.clearRect(0, 0, mc.width, mc.height);
+    pc?.getContext("2d")?.clearRect(0, 0, pc.width, pc.height);
+    lassoRef.current = [];
     setHasMask(false);
   }
 
-  function handleMouseDown(e: React.MouseEvent) {
-    if (tool === "lasso") return;
-    setPainting(true);
-    const { x, y } = getPos(e);
-    paintAt(x, y);
-  }
-
-  function handleMouseMove(e: React.MouseEvent) {
-    if (!painting || tool === "lasso") return;
-    const { x, y } = getPos(e);
-    paintAt(x, y);
-  }
-
-  function handleMouseUp() {
-    setPainting(false);
-  }
-
-  function handleClick(e: React.MouseEvent) {
-    if (tool !== "lasso") return;
-    const pos = getPos(e);
-    setLassoPoints((prev) => {
-      const next = [...prev, pos];
-      const mc = maskRef.current;
-      if (mc) {
-        const ctx = mc.getContext("2d");
-        if (ctx && next.length > 0) {
-          ctx.save();
-          ctx.strokeStyle = "rgba(255,107,53,0.9)";
-          ctx.lineWidth = 1.5;
-          ctx.setLineDash([5, 3]);
-          ctx.beginPath();
-          ctx.moveTo(next[0].x, next[0].y);
-          next.forEach((p) => ctx.lineTo(p.x, p.y));
-          ctx.stroke();
-          next.forEach((p) => {
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
-            ctx.fillStyle = "rgba(255,107,53,0.9)";
-            ctx.fill();
-          });
-          ctx.restore();
-        }
-      }
-      return next;
-    });
-  }
-
-  function handleDoubleClick() {
-    if (tool !== "lasso" || lassoPoints.length < 3) return;
-    const points = lassoPoints.slice(0, -1);
-    commitLasso(points);
-    setLassoPoints([]);
-  }
-
-  function handleContextMenu(e: React.MouseEvent) {
+  function onPointerDown(e: React.PointerEvent) {
     e.preventDefault();
-    setLassoPoints([]);
+    try {
+      maskRef.current?.setPointerCapture?.(e.pointerId);
+    } catch {
+      // 某些浏览器/事件下 setPointerCapture 可能抛错，忽略不影响绘制
+    }
+    draggingRef.current = true;
+    const p = getPos(e);
+    if (tool === "lasso") {
+      lassoRef.current = [p];
+      drawLassoPreview();
+    } else {
+      lastPtRef.current = null;
+      paintStroke(null, p);
+      lastPtRef.current = p;
+    }
+  }
+
+  function onPointerMove(e: React.PointerEvent) {
+    if (!draggingRef.current) return;
+    e.preventDefault();
+    const p = getPos(e);
+    if (tool === "lasso") {
+      lassoRef.current.push(p);
+      drawLassoPreview();
+    } else {
+      paintStroke(lastPtRef.current, p);
+      lastPtRef.current = p;
+    }
+  }
+
+  function onPointerUp() {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
+    if (tool === "lasso") {
+      commitLasso(lassoRef.current);
+      lassoRef.current = [];
+    }
+    lastPtRef.current = null;
   }
 
   function appendChip(text: string) {
@@ -363,7 +384,8 @@ export function InpaintDialog({ open, imageUrl, imageId, onClose, onSubmit }: In
                     title={title}
                     onClick={() => {
                       setTool(t);
-                      setLassoPoints([]);
+                      lassoRef.current = [];
+                      previewRef.current?.getContext("2d")?.clearRect(0, 0, previewRef.current.width, previewRef.current.height);
                     }}
                     className={cn(
                       "flex h-8 w-8 items-center justify-center rounded-md border transition-colors",
@@ -408,31 +430,36 @@ export function InpaintDialog({ open, imageUrl, imageId, onClose, onSubmit }: In
                 onLoad={syncSize}
                 crossOrigin="anonymous"
               />
+              {/* 蒙版层：满不透明度绘制，CSS opacity 呈半透明 → 选区均匀清晰、触控可画 */}
               <canvas
                 ref={maskRef}
-                className="absolute left-0 top-0 cursor-crosshair"
+                className="absolute left-0 top-0 cursor-crosshair touch-none select-none"
+                style={{ width: "100%", height: "100%", opacity: 0.5 }}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                onPointerCancel={onPointerUp}
+                onPointerLeave={onPointerUp}
+              />
+              {/* 预览层：套索拖动时的实时虚线轮廓，压在蒙版之上 */}
+              <canvas
+                ref={previewRef}
+                className="pointer-events-none absolute left-0 top-0"
                 style={{ width: "100%", height: "100%" }}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                onClick={handleClick}
-                onDoubleClick={handleDoubleClick}
-                onContextMenu={handleContextMenu}
               />
               {!hasMask && (
-                <div className="pointer-events-none absolute bottom-2.5 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-[11px] text-white/60 backdrop-blur">
-                  用画笔涂抹想修改的区域，或用套索圈选
+                <div className="pointer-events-none absolute bottom-2.5 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-[11px] text-white backdrop-blur">
+                  {tool === "lasso" ? "按住拖动圈出区域，松手闭合" : "按住涂抹想修改的区域"}
                 </div>
               )}
               {hasMask && (
-                <div className="pointer-events-none absolute left-2.5 top-2.5 flex items-center gap-1 rounded-full bg-brand/90 px-2.5 py-1 text-[11px] font-medium text-white">
+                <div className="pointer-events-none absolute left-2.5 top-2.5 flex items-center gap-1 rounded-full bg-brand px-2.5 py-1 text-[11px] font-semibold text-white shadow-soft">
                   ✦ 已选区域
                 </div>
               )}
               {tool === "lasso" && (
                 <div className="pointer-events-none absolute right-2.5 top-2.5 rounded-full bg-brand/90 px-2.5 py-1 text-[11px] text-white">
-                  双击完成 · 右键取消
+                  按住拖动圈选
                 </div>
               )}
             </div>

@@ -190,12 +190,12 @@ function WatermarkDragEditor({
           onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth || 4, h: e.currentTarget.naturalHeight || 3 })}
         />
         <div
-          className="pointer-events-none absolute flex items-center justify-center rounded ring-2 ring-primary shadow-lg"
+          className="pointer-events-none absolute flex items-center justify-center"
           style={{ left: `${leftRatio * 100}%`, top: `${topRatio * 100}%`, width: `${widthRatio * 100}%`, opacity }}
         >
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt="水印" className="w-full object-contain" />
+            <img src={logoUrl} alt="水印" className="w-full object-contain" draggable={false} />
           ) : (
             <span className="whitespace-nowrap rounded bg-black/55 px-2 py-1 text-[12px] font-semibold text-white">
               {text || "水印"}
@@ -908,39 +908,26 @@ function ToolParameterPanel({
       <div className="space-y-4">
         <div className="space-y-2">
           <Label>水印类型</Label>
-          {isMobile ? (
-            <BottomSheetSelect
-              title="水印类型"
-              options={[
-                { id: "text", label: "文字" },
-                { id: "logo", label: "Logo" },
-              ]}
-              value={params.watermarkType}
-              onChange={(value) => {
-                if (typeof value === "string") {
-                  updateParameters({ watermarkType: value as WatermarkParams["watermarkType"] } as Partial<WatermarkParams>);
-                }
-              }}
-              trigger={<SheetTrigger label={params.watermarkType === "logo" ? "Logo" : "文字"} />}
-            />
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              {(["text", "logo"] as WatermarkParams["watermarkType"][]).map((type) => (
-                <button
-                  key={type}
-	                className={cn("min-h-11 rounded-lg border px-3 py-2 text-data", params.watermarkType === type ? "border-primary bg-primary/5 text-primary" : "border-border")}
-                  onClick={() => updateParameters({ watermarkType: type } as Partial<WatermarkParams>)}
-                >
-                  {type === "text" ? "文字" : "Logo"}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* 文字/Logo 二选一，pill 切换（移动端也用 pill，不用下拉） */}
+          <div className="grid grid-cols-2 gap-2">
+            {(["text", "logo"] as WatermarkParams["watermarkType"][]).map((type) => (
+              <button
+                key={type}
+                className={cn("min-h-11 rounded-lg border px-3 py-2 text-data transition-colors", params.watermarkType === type ? "border-primary bg-primary/5 text-primary" : "border-border")}
+                onClick={() => updateParameters({ watermarkType: type } as Partial<WatermarkParams>)}
+              >
+                {type === "text" ? "文字" : "Logo"}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="space-y-2">
-          <Label>水印文字</Label>
-          <Input className="min-h-11" value={params.watermarkText} onChange={(event) => updateParameters({ watermarkText: event.target.value } as Partial<WatermarkParams>)} />
-        </div>
+        {/* 文字水印 → 显示文字输入；Logo 水印 → 隐藏（改用下方上传） */}
+        {params.watermarkType === "text" && (
+          <div className="space-y-2">
+            <Label>水印文字</Label>
+            <Input className="min-h-11" value={params.watermarkText} onChange={(event) => updateParameters({ watermarkText: event.target.value } as Partial<WatermarkParams>)} />
+          </div>
+        )}
         <div className="space-y-2">
           <Label>透明度：{Math.round(params.watermarkOpacity * 100)}%</Label>
           <Slider value={[params.watermarkOpacity * 100]} min={5} max={100} step={5} onValueChange={([value]) => updateParameters({ watermarkOpacity: value / 100 } as Partial<WatermarkParams>)} />
@@ -989,15 +976,15 @@ function ToolParameterPanel({
           <Label>输出尺寸</Label>
           <Input className="min-h-11" value={params.outputResolution} onChange={(event) => updateParameters({ outputResolution: event.target.value } as Partial<WatermarkParams>)} placeholder="1024x1024" />
         </div>
-        <input ref={logoInputRef} type="file" accept="image/png" className="hidden" onChange={(event) => onUploadAsset({ role: "logo", file: event.target.files?.[0] })} />
-        <Button variant="outline" size="sm" className="min-h-11 w-full" onClick={() => logoInputRef.current?.click()}>
-          上传 PNG 水印（可选）
-        </Button>
-        <InlineAssetPreview asset={draft.watermarkLogoAsset} label="Logo 水印" />
-        {draft.watermarkLogoAsset && (
-          <p className="hidden text-caption text-muted-foreground truncate md:block">
-            Logo：{draft.watermarkLogoAsset.originalFilename}
-          </p>
+        {/* Logo 水印 → 才显示上传（与文字二选一） */}
+        {params.watermarkType === "logo" && (
+          <>
+            <input ref={logoInputRef} type="file" accept="image/png" className="hidden" onChange={(event) => onUploadAsset({ role: "logo", file: event.target.files?.[0] })} />
+            <Button variant="outline" size="sm" className="min-h-11 w-full" onClick={() => logoInputRef.current?.click()}>
+              {draft.watermarkLogoAsset ? "更换 PNG 水印" : "上传 PNG 水印"}
+            </Button>
+            <InlineAssetPreview asset={draft.watermarkLogoAsset} label="Logo 水印" />
+          </>
         )}
       </div>
     );
