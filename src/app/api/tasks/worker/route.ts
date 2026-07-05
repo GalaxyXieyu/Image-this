@@ -16,6 +16,7 @@ import '@/lib/workbench/handlers/video-generation';
 import { validateTaskInput } from '@/lib/workbench/input-validation';
 import { mapProviderErrorMessage, isRetryableProviderError } from '@/lib/provider-error-utils';
 import fs from 'fs/promises';
+import path from 'path';
 
 type TaskAssetRef = {
   assetId: string;
@@ -57,13 +58,33 @@ type PersistedTaskResult = {
 };
 
 async function readAssetAsDataUrl(asset?: TaskAssetRef): Promise<string | null> {
-  if (!asset?.filePath) {
-    return null;
+  if (!asset) return null;
+  const mimeType = asset.mimeType || 'application/octet-stream';
+
+  // 候选路径：先试存下来的绝对 filePath；但生产每次部署换 release 目录、filePath 里
+  // 烧死了旧 release 路径，重新部署后失效。public/uploads 跨部署持久，用 clientUrl 相对
+  // 当前进程重解析即可读到 → 让中断/续跑任务不因换版本而丢源图。
+  const candidates: string[] = [];
+  if (asset.filePath) candidates.push(asset.filePath);
+  if (asset.clientUrl) {
+    let rel = asset.clientUrl.replace(/^\/+/, '');
+    if (rel.startsWith('api/files/')) rel = rel.slice('api/files/'.length);
+    candidates.push(
+      rel.startsWith('uploads/')
+        ? path.join(process.cwd(), 'public', rel)
+        : path.join(process.cwd(), 'public', 'uploads', rel)
+    );
   }
 
-  const buffer = await fs.readFile(asset.filePath);
-  const mimeType = asset.mimeType || 'application/octet-stream';
-  return `data:${mimeType};base64,${buffer.toString('base64')}`;
+  for (const p of candidates) {
+    try {
+      const buffer = await fs.readFile(p);
+      return `data:${mimeType};base64,${buffer.toString('base64')}`;
+    } catch {
+      // 尝试下一个候选路径
+    }
+  }
+  return null;
 }
 
 async function resolveTaskInputData(rawInputData: string): Promise<ParsedTaskInput> {
