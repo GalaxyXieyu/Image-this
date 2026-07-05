@@ -57,34 +57,43 @@ const WORKFLOW_PLACEHOLDER = "/scene-presets/scene-minimal.webp";
 
 export default function WorkbenchHubPage() {
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
-  const [latestImage, setLatestImage] = useState<string | null>(null);
+  const [sceneImage, setSceneImage] = useState<string | null>(null);
   const [recentImages, setRecentImages] = useState<Array<{ id: string; url: string }>>([]);
 
   useEffect(() => {
     apiGet<{ templates: WorkflowTemplate[] }>("/api/workflow-templates")
       .then((res) => setTemplates(res.templates || []))
       .catch(() => setTemplates([]));
-    // 最近生成图：首图作为封面，整体作为「最近生成」网格
-    apiGet<{ images: Array<{ id: string; processedUrl?: string | null; thumbnailUrl?: string | null }> }>(
+    // 最近生成图：套图/场景来源的图作为场景封面；「最近生成」网格用全部
+    apiGet<{ images: Array<{ id: string; processedUrl?: string | null; thumbnailUrl?: string | null; metadata?: string | null }> }>(
       "/api/images?limit=12&status=COMPLETED&includeFullSize=true"
     )
       .then((res) => {
         const imgs = res.images || [];
-        setLatestImage(imgs[0]?.processedUrl || imgs[0]?.thumbnailUrl || null);
-        setRecentImages(
-          imgs
-            .map((i) => ({ id: i.id, url: i.thumbnailUrl || i.processedUrl || "" }))
-            .filter((i) => i.url)
-        );
+        const url = (i: { processedUrl?: string | null; thumbnailUrl?: string | null }) => i.thumbnailUrl || i.processedUrl || "";
+        // 场景封面只取「归属场景/套图来源」的图，避免拿到工具类产物
+        const isScene = (m?: string | null) => {
+          if (!m) return false;
+          try {
+            const o = JSON.parse(m) as { operation?: string; workflowType?: string };
+            return o.operation === "listing_set" || o.workflowType === "scene_generation" || o.workflowType === "listing_set";
+          } catch {
+            return false;
+          }
+        };
+        const scene = imgs.find((i) => isScene(i.metadata)) || imgs[0];
+        setSceneImage(scene ? url(scene) : null);
+        setRecentImages(imgs.map((i) => ({ id: i.id, url: url(i) })).filter((i) => i.url));
       })
       .catch(() => {
-        setLatestImage(null);
+        setSceneImage(null);
         setRecentImages([]);
       });
   }, []);
 
-  const workflowCover = latestImage || WORKFLOW_PLACEHOLDER;
-  const sceneCover = latestImage || "/scene-presets/scene-lifestyle.webp";
+  // 工作流封面用模板预览图（不复用用户最近产物），与场景封面区分开
+  const workflowCover = WORKFLOW_PLACEHOLDER;
+  const sceneCover = sceneImage || "/scene-presets/scene-lifestyle.webp";
 
   return (
     <div className="h-full overflow-y-auto">

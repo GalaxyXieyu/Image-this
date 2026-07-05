@@ -27,6 +27,8 @@ export async function GET() {
         type: true,
         status: true,
         progress: true,
+        completedSteps: true,
+        totalSteps: true,
         currentStep: true,
         createdAt: true,
         inputData: true,
@@ -39,6 +41,8 @@ export async function GET() {
       type: task.type,
       status: task.status,
       progress: task.progress ?? 0,
+      completedSteps: task.completedSteps ?? 0,
+      totalSteps: task.totalSteps ?? 0,
       currentStep: task.currentStep,
       createdAt: task.createdAt,
       originalImageUrl:

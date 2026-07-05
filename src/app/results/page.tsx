@@ -22,6 +22,8 @@ import {
   Layers,
   AlertTriangle,
   RefreshCw,
+  ChevronLeft,
+  ChevronRight,
   X,
 } from "lucide-react";
 import { InpaintDialog, type InpaintSubmitPayload } from "@/components/workbench/InpaintDialog";
@@ -39,6 +41,8 @@ interface ActiveTask {
   type: string;
   status: string;
   progress: number;
+  completedSteps?: number;
+  totalSteps?: number;
   currentStep?: string | null;
   originalImageUrl: string | null;
   category: string;
@@ -58,7 +62,13 @@ interface FailedTask {
 // 进行中任务占位：原图打底，水位随进度上涨，跑完即变成实景
 function WaterFillCard({ task }: { task: ActiveTask }) {
   const pending = task.status === "PENDING";
-  const level = Math.max(6, Math.min(100, Math.round(task.progress || 0)));
+  const total = task.totalSteps ?? 0;
+  const done = task.completedSteps ?? 0;
+  // 有多张任务时按「已完成/总数」显示水位，更贴合套图逐张出图
+  const level = total > 1
+    ? Math.max(6, Math.min(100, Math.round((done / total) * 100)))
+    : Math.max(6, Math.min(100, Math.round(task.progress || 0)));
+  const countLabel = total > 1 ? `${done}/${total} 张` : null;
   return (
     <div className="relative aspect-square overflow-hidden bg-surface-muted">
       <ImageThumbnail src={task.originalImageUrl} alt="处理中" className="h-full w-full" />
@@ -67,7 +77,7 @@ function WaterFillCard({ task }: { task: ActiveTask }) {
       {/* 水体（随进度上涨，平滑过渡） */}
       <div
         className="absolute inset-x-0 bottom-0 transition-[height] duration-700 ease-out"
-        style={{ height: pending ? "6%" : `${level}%` }}
+        style={{ height: pending && total <= 1 ? "6%" : `${level}%` }}
       >
         {/* 两层水面波浪 */}
         <div className="water-wave absolute -top-3 inset-x-0 h-4" />
@@ -79,7 +89,7 @@ function WaterFillCard({ task }: { task: ActiveTask }) {
       <div className="absolute inset-0 flex items-center justify-center">
         <span className="flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1 text-[12px] font-semibold text-white backdrop-blur-sm">
           <Loader2 className="h-3 w-3 animate-spin" />
-          {pending ? "排队中" : `生成中 ${level}%`}
+          {countLabel ? `生成中 ${countLabel}` : pending ? "排队中" : `生成中 ${level}%`}
         </span>
       </div>
     </div>
@@ -197,6 +207,7 @@ export default function ResultsPage() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [groupByTask, setGroupByTask] = useState(false);
+  const [focusedGroupKey, setFocusedGroupKey] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [results, setResults] = useState<ResultImage[]>([]);
@@ -262,13 +273,15 @@ export default function ResultsPage() {
     try {
       const data = await apiGet<{
         success: boolean;
-        tasks: Array<{ id: string; type: string; status: string; progress: number; currentStep?: string | null; originalImageUrl: string | null }>;
+        tasks: Array<{ id: string; type: string; status: string; progress: number; completedSteps?: number; totalSteps?: number; currentStep?: string | null; originalImageUrl: string | null }>;
       }>("/api/tasks/active");
       const mapped: ActiveTask[] = (data.tasks || []).map((t) => ({
         id: t.id,
         type: t.type,
         status: t.status,
         progress: t.progress,
+        completedSteps: t.completedSteps,
+        totalSteps: t.totalSteps,
         currentStep: t.currentStep,
         originalImageUrl: t.originalImageUrl,
         category: mapProcessType(t.type),
@@ -669,7 +682,7 @@ export default function ResultsPage() {
                   />
                 </div>
                 <button
-                  onClick={() => setGroupByTask((v) => !v)}
+                  onClick={() => { setGroupByTask((v) => !v); setFocusedGroupKey(null); }}
                   className={cn(
                     "flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium transition-colors",
                     groupByTask
@@ -714,38 +727,76 @@ export default function ResultsPage() {
             {!loading && !error && (
               <>
                 {groupByTask ? (
-                  <div className="flex flex-col gap-5">
-                    {(visibleFailures.length > 0 || filteredActive.length > 0) && (
-                      <div className="grid gap-3" style={gridColStyle}>
-                        {visibleFailures.map(renderFailedCard)}
-                        {filteredActive.map(renderActiveCard)}
+                  (() => {
+                    const focused = focusedGroupKey ? taskGroups.find((g) => g.key === focusedGroupKey) : null;
+                    // 聚焦某个任务：只看这一套的图 + 返回全部
+                    if (focused) {
+                      return (
+                        <div className="flex flex-col gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setFocusedGroupKey(null)}
+                            className="flex w-fit items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-[13px] font-semibold text-ink-2 transition-colors hover:text-ink"
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                            返回全部
+                          </button>
+                          <div className="flex items-center gap-2">
+                            <Layers className="h-4 w-4 text-brand" />
+                            <h3 className="text-[14px] font-bold text-ink">{focused.label}</h3>
+                            <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand-text">{focused.items.length} 张</span>
+                            <span className="hidden text-[11px] text-ink-3 sm:inline">{focused.createdAt}</span>
+                          </div>
+                          <div className="grid gap-3" style={gridColStyle}>
+                            {focused.items.map(renderGridCard)}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="flex flex-col gap-5">
+                        {(visibleFailures.length > 0 || filteredActive.length > 0) && (
+                          <div className="grid gap-3" style={gridColStyle}>
+                            {visibleFailures.map(renderFailedCard)}
+                            {filteredActive.map(renderActiveCard)}
+                          </div>
+                        )}
+                        {taskGroups.map((g) => (
+                          <section key={g.key}>
+                            <button
+                              type="button"
+                              onClick={() => setFocusedGroupKey(g.key)}
+                              className="group/hdr mb-2.5 flex w-full items-center gap-2 text-left"
+                              title="只看这个任务"
+                            >
+                              <Layers className="h-4 w-4 text-brand" />
+                              <h3 className="text-[14px] font-bold text-ink">{g.label}</h3>
+                              <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand-text">{g.items.length} 张</span>
+                              <span className="hidden text-[11px] text-ink-3 sm:inline">{g.createdAt}</span>
+                              <span className="ml-auto flex items-center gap-0.5 text-[12px] font-semibold text-ink-3 transition-colors group-hover/hdr:text-brand">
+                                只看这套
+                                <ChevronRight className="h-3.5 w-3.5" />
+                              </span>
+                            </button>
+                            <div className="grid gap-3" style={gridColStyle}>
+                              {g.items.map(renderGridCard)}
+                            </div>
+                          </section>
+                        ))}
+                        {ungrouped.length > 0 && (
+                          <section>
+                            <div className="mb-2.5 flex items-center gap-2">
+                              <h3 className="text-[14px] font-bold text-ink">单张结果</h3>
+                              <span className="rounded-full bg-surface-muted px-2 py-0.5 text-[11px] font-semibold text-ink-2">{ungrouped.length} 张</span>
+                            </div>
+                            <div className="grid gap-3" style={gridColStyle}>
+                              {ungrouped.map(renderGridCard)}
+                            </div>
+                          </section>
+                        )}
                       </div>
-                    )}
-                    {taskGroups.map((g) => (
-                      <section key={g.key}>
-                        <div className="mb-2.5 flex items-center gap-2">
-                          <Layers className="h-4 w-4 text-brand" />
-                          <h3 className="text-[14px] font-bold text-ink">{g.label}</h3>
-                          <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand-text">{g.items.length} 张</span>
-                          <span className="hidden text-[11px] text-ink-3 sm:inline">{g.createdAt}</span>
-                        </div>
-                        <div className="grid gap-3" style={gridColStyle}>
-                          {g.items.map(renderGridCard)}
-                        </div>
-                      </section>
-                    ))}
-                    {ungrouped.length > 0 && (
-                      <section>
-                        <div className="mb-2.5 flex items-center gap-2">
-                          <h3 className="text-[14px] font-bold text-ink">单张结果</h3>
-                          <span className="rounded-full bg-surface-muted px-2 py-0.5 text-[11px] font-semibold text-ink-2">{ungrouped.length} 张</span>
-                        </div>
-                        <div className="grid gap-3" style={gridColStyle}>
-                          {ungrouped.map(renderGridCard)}
-                        </div>
-                      </section>
-                    )}
-                  </div>
+                    );
+                  })()
                 ) : viewMode === "grid" ? (
                   <div
                     className="grid gap-3"
