@@ -237,9 +237,24 @@ export default function ResultsPage() {
   const [failedTasks, setFailedTasks] = useState<FailedTask[]>([]);
   const [dismissedFailures, setDismissedFailures] = useState<Set<string>>(new Set());
   const [retryingId, setRetryingId] = useState<string | null>(null);
-  const [lightbox, setLightbox] = useState<{ url: string; name: string } | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [inpaintTarget, setInpaintTarget] = useState<{ id: string; url: string } | null>(null);
   const prevActiveCount = useRef(0);
+  const touchStartX = useRef<number | null>(null);
+
+  // 从 URL 聚焦到某任务/套图：/results?set=<setId> 或 ?task=<taskId>
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const set = params.get("set");
+    const task = params.get("task");
+    if (set) {
+      setGroupByTask(true);
+      setFocusedGroupKey(`set:${set}`);
+    } else if (task) {
+      setGroupByTask(true);
+      setFocusedGroupKey(`task:${task}`);
+    }
+  }, []);
 
   const fetchResults = useCallback(async () => {
     setLoading(true);
@@ -474,6 +489,35 @@ export default function ResultsPage() {
     }
   }
 
+  // #2 灯箱：当前可见有序列表（镜像渲染顺序），供左右切换
+  const focusedGroup = groupByTask && focusedGroupKey ? taskGroups.find((g) => g.key === focusedGroupKey) : null;
+  const visibleImages: ResultImage[] = groupByTask
+    ? focusedGroup
+      ? focusedGroup.items
+      : [...taskGroups.flatMap((g) => g.items), ...ungrouped]
+    : filteredResults;
+  const lightboxItem = lightboxIndex != null ? visibleImages[lightboxIndex] : null;
+  const lightboxUrl = lightboxItem ? lightboxItem.processedUrl || lightboxItem.thumbnail || null : null;
+  const openLightbox = (item: ResultImage) => {
+    const idx = visibleImages.findIndex((i) => i.id === item.id);
+    if (idx >= 0) setLightboxIndex(idx);
+  };
+  const moveLightbox = (delta: number) =>
+    setLightboxIndex((i) => (i == null ? i : Math.max(0, Math.min(visibleImages.length - 1, i + delta))));
+
+  // 键盘 ←/→/Esc 切换/关闭大图
+  useEffect(() => {
+    if (lightboxIndex == null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") moveLightbox(-1);
+      else if (e.key === "ArrowRight") moveLightbox(1);
+      else if (e.key === "Escape") setLightboxIndex(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lightboxIndex, visibleImages.length]);
+
   const renderGridCard = (item: ResultImage) => (
     <div
       key={item.id}
@@ -488,10 +532,7 @@ export default function ResultsPage() {
           type="button"
           aria-label="查看大图"
           className="absolute inset-0 cursor-zoom-in"
-          onClick={() => {
-            const url = item.processedUrl || item.thumbnail;
-            if (url) setLightbox({ url, name: item.name });
-          }}
+          onClick={() => openLightbox(item)}
         />
         <span className="absolute left-2 top-2 rounded-full bg-surface/85 px-2 py-0.5 text-[10px] font-semibold text-brand-text backdrop-blur-sm">
           {CATEGORY_LABELS[item.category] || "其他"}
@@ -856,10 +897,7 @@ export default function ResultsPage() {
                             type="button"
                             aria-label="查看大图"
                             className="absolute inset-0 cursor-zoom-in"
-                            onClick={() => {
-                              const url = item.processedUrl || item.thumbnail;
-                              if (url) setLightbox({ url, name: item.name });
-                            }}
+                            onClick={() => openLightbox(item)}
                           />
                           {/* Category corner badge */}
                           <span className="absolute left-2 top-2 rounded-full bg-surface/85 px-2 py-0.5 text-[10px] font-semibold text-brand-text backdrop-blur-sm">
@@ -968,15 +1006,24 @@ export default function ResultsPage() {
         </main>
       </div>
 
-      {/* 大图灯箱 */}
-      {lightbox && (
+      {/* 大图灯箱：左右箭头 / 键盘 ←→ / 触摸滑动 切换 */}
+      {lightboxItem && lightboxUrl && lightboxIndex != null && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
-          onClick={() => setLightbox(null)}
+          onClick={() => setLightboxIndex(null)}
+          onTouchStart={(e) => {
+            touchStartX.current = e.touches[0]?.clientX ?? null;
+          }}
+          onTouchEnd={(e) => {
+            if (touchStartX.current == null) return;
+            const dx = (e.changedTouches[0]?.clientX ?? touchStartX.current) - touchStartX.current;
+            touchStartX.current = null;
+            if (Math.abs(dx) > 40) moveLightbox(dx < 0 ? 1 : -1);
+          }}
         >
           <img
-            src={lightbox.url}
-            alt={lightbox.name}
+            src={lightboxUrl}
+            alt={lightboxItem.name}
             className="max-h-[90vh] max-w-[92vw] rounded-lg object-contain shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           />
@@ -984,15 +1031,50 @@ export default function ResultsPage() {
             type="button"
             aria-label="关闭"
             className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur-sm transition-colors hover:bg-white/25"
-            onClick={() => setLightbox(null)}
+            onClick={() => setLightboxIndex(null)}
           >
             <X className="h-5 w-5" />
           </button>
+
+          {/* 上一张 */}
+          {lightboxIndex > 0 && (
+            <button
+              type="button"
+              aria-label="上一张"
+              className="absolute left-3 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur-sm transition-colors hover:bg-white/25 sm:left-6"
+              onClick={(e) => {
+                e.stopPropagation();
+                moveLightbox(-1);
+              }}
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
+          )}
+          {/* 下一张 */}
+          {lightboxIndex < visibleImages.length - 1 && (
+            <button
+              type="button"
+              aria-label="下一张"
+              className="absolute right-3 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur-sm transition-colors hover:bg-white/25 sm:right-6"
+              onClick={(e) => {
+                e.stopPropagation();
+                moveLightbox(1);
+              }}
+            >
+              <ChevronRight className="h-6 w-6" />
+            </button>
+          )}
+
+          {/* 位置指示 */}
+          <span className="absolute left-1/2 top-4 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-[12px] font-semibold text-white backdrop-blur-sm">
+            {lightboxIndex + 1} / {visibleImages.length}
+          </span>
+
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              downloadFile(lightbox.url, lightbox.name);
+              downloadFile(lightboxUrl, lightboxItem.name);
             }}
             className="absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-[13px] font-semibold text-ink transition-colors hover:bg-white"
           >

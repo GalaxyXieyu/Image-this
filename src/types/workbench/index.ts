@@ -127,17 +127,25 @@ export interface BackgroundReplaceParams {
   outputResolution: string;
 }
 
+/** 自由拖拽定位（编辑器坐标，引擎按比例映射到图像） */
+export interface WatermarkFreePosition {
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  editorWidth?: number;
+  editorHeight?: number;
+}
+
+export type WatermarkPreset = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center';
+
 export interface WatermarkParams {
   watermarkType: 'text' | 'logo';
   watermarkText: string;
   watermarkLogoAsset?: InputAssetRef;
   watermarkOpacity: number;
-  watermarkPosition:
-    | 'top-left'
-    | 'top-right'
-    | 'bottom-left'
-    | 'bottom-right'
-    | 'center';
+  /** 预设角落/居中，或自由拖拽坐标对象 */
+  watermarkPosition: WatermarkPreset | WatermarkFreePosition;
   outputResolution: string;
 }
 

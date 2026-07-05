@@ -42,6 +42,8 @@ import type {
   ToolType,
   UpscaleParams,
   WatermarkParams,
+  WatermarkPreset,
+  WatermarkFreePosition,
   WorkflowTaskSummary,
 } from "@/types/workbench";
 import {
@@ -67,7 +69,7 @@ const SUPPORTED_TOOLS: Array<{ id: ToolType; label: string; description: string;
   { id: "outpaint", label: "智能扩图", description: "向外延展画面边界", icon: Expand },
 ];
 
-const WATERMARK_POSITION_OPTIONS: Array<{ id: WatermarkParams["watermarkPosition"]; label: string }> = [
+const WATERMARK_POSITION_OPTIONS: Array<{ id: WatermarkPreset; label: string }> = [
   { id: "bottom-right", label: "右下" },
   { id: "bottom-left", label: "左下" },
   { id: "top-right", label: "右上" },
@@ -75,10 +77,140 @@ const WATERMARK_POSITION_OPTIONS: Array<{ id: WatermarkParams["watermarkPosition
   { id: "center", label: "居中" },
 ];
 
-const WATERMARK_POSITION_LABELS: Record<WatermarkParams["watermarkPosition"], string> = WATERMARK_POSITION_OPTIONS.reduce(
+const WATERMARK_POSITION_LABELS: Record<WatermarkPreset, string> = WATERMARK_POSITION_OPTIONS.reduce(
   (acc, item) => ({ ...acc, [item.id]: item.label }),
-  {} as Record<WatermarkParams["watermarkPosition"], string>
+  {} as Record<WatermarkPreset, string>
 );
+
+// 预设 → 编辑器显示位置比例（仅用于把 marker 摆到对应角落，拖动后转为自由坐标）
+const PRESET_RATIO: Record<WatermarkPreset, { l: number; t: number }> = {
+  "top-left": { l: 0.04, t: 0.04 },
+  "top-right": { l: 0.72, t: 0.04 },
+  "bottom-left": { l: 0.04, t: 0.78 },
+  "bottom-right": { l: 0.72, t: 0.78 },
+  center: { l: 0.38, t: 0.4 },
+};
+
+// 水印拖拽定位编辑器：源图上叠一个可拖拽的水印标记，输出 {x,y,width,editorWidth,editorHeight}
+function WatermarkDragEditor({
+  imageUrl,
+  logoUrl,
+  text,
+  opacity,
+  position,
+  onChange,
+}: {
+  imageUrl: string;
+  logoUrl?: string;
+  text: string;
+  opacity: number;
+  position: WatermarkParams["watermarkPosition"];
+  onChange: (pos: WatermarkFreePosition) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
+
+  const free = typeof position === "object" ? position : null;
+  const preset = typeof position === "string" ? position : null;
+  const widthRatio = free?.width && free?.editorWidth ? free.width / free.editorWidth : 0.25;
+  const leftRatio = free && free.editorWidth
+    ? free.x / free.editorWidth
+    : preset
+      ? PRESET_RATIO[preset].l
+      : 0.5;
+  const topRatio = free && free.editorHeight
+    ? free.y / free.editorHeight
+    : preset
+      ? PRESET_RATIO[preset].t
+      : 0.4;
+
+  const emitAt = (clientX: number, clientY: number, wRatio = widthRatio) => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const markerW = wRatio * rect.width;
+    const markerH = markerW;
+    let x = clientX - rect.left - markerW / 2;
+    let y = clientY - rect.top - markerH / 2;
+    x = Math.max(0, Math.min(rect.width - markerW, x));
+    y = Math.max(0, Math.min(rect.height - markerH, y));
+    onChange({
+      x: Math.round(x),
+      y: Math.round(y),
+      width: Math.round(markerW),
+      editorWidth: Math.round(rect.width),
+      editorHeight: Math.round(rect.height),
+    });
+  };
+
+  const setWidthRatio = (wRatio: number) => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const markerW = wRatio * rect.width;
+    // 保持当前中心
+    const cx = leftRatio * rect.width + (widthRatio * rect.width) / 2;
+    const cy = topRatio * rect.height + (widthRatio * rect.width) / 2;
+    let x = cx - markerW / 2;
+    let y = cy - markerW / 2;
+    x = Math.max(0, Math.min(rect.width - markerW, x));
+    y = Math.max(0, Math.min(rect.height - markerW, y));
+    onChange({
+      x: Math.round(x),
+      y: Math.round(y),
+      width: Math.round(markerW),
+      editorWidth: Math.round(rect.width),
+      editorHeight: Math.round(rect.height),
+    });
+  };
+
+  return (
+    <div className="space-y-2">
+      <div
+        ref={ref}
+        className="relative w-full touch-none select-none overflow-hidden rounded-lg border border-border bg-muted"
+        style={{ aspectRatio: natural ? `${natural.w} / ${natural.h}` : "4 / 3" }}
+        onPointerDown={(e) => {
+          setDragging(true);
+          (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+          emitAt(e.clientX, e.clientY);
+        }}
+        onPointerMove={(e) => {
+          if (dragging) emitAt(e.clientX, e.clientY);
+        }}
+        onPointerUp={() => setDragging(false)}
+        onPointerCancel={() => setDragging(false)}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={imageUrl}
+          alt="预览"
+          className="pointer-events-none h-full w-full object-cover"
+          onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth || 4, h: e.currentTarget.naturalHeight || 3 })}
+        />
+        <div
+          className="pointer-events-none absolute flex items-center justify-center rounded ring-2 ring-primary shadow-lg"
+          style={{ left: `${leftRatio * 100}%`, top: `${topRatio * 100}%`, width: `${widthRatio * 100}%`, opacity }}
+        >
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt="水印" className="w-full object-contain" />
+          ) : (
+            <span className="whitespace-nowrap rounded bg-black/55 px-2 py-1 text-[12px] font-semibold text-white">
+              {text || "水印"}
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="space-y-1">
+        <Label className="text-caption text-muted-foreground">水印大小：{Math.round(widthRatio * 100)}%</Label>
+        <Slider value={[Math.round(widthRatio * 100)]} min={8} max={60} step={2} onValueChange={([v]) => setWidthRatio(v / 100)} />
+      </div>
+      <p className="text-caption text-muted-foreground">在图上拖动水印到任意位置；也可点下方预设快速定位。</p>
+    </div>
+  );
+}
 
 /** 移动端 BottomSheetSelect 统一触发器，复用设计 token，桌面端不使用。 */
 function SheetTrigger({ label, icon: Icon }: { label: string; icon?: typeof Wand2 }) {
@@ -201,7 +333,10 @@ function downloadImage(url?: string | null) {
 function getToolParameterSummary(draft: ToolDraftState) {
   if (draft.toolType === "watermark") {
     const params = draft.parameters as WatermarkParams;
-    return `${params.watermarkType === "logo" ? "Logo" : "文字"} / ${params.watermarkPosition}`;
+    const posLabel = typeof params.watermarkPosition === "string"
+      ? WATERMARK_POSITION_LABELS[params.watermarkPosition] ?? params.watermarkPosition
+      : "自定义位置";
+    return `${params.watermarkType === "logo" ? "Logo" : "文字"} / ${posLabel}`;
   }
 
   if (draft.toolType === "upscale") {
@@ -811,28 +946,40 @@ function ToolParameterPanel({
           <Slider value={[params.watermarkOpacity * 100]} min={5} max={100} step={5} onValueChange={([value]) => updateParameters({ watermarkOpacity: value / 100 } as Partial<WatermarkParams>)} />
         </div>
         <div className="space-y-2">
-          <Label>水印位置</Label>
+          <Label>水印位置{typeof params.watermarkPosition === "object" ? "（已自定义拖放）" : ""}</Label>
+          {/* 拖拽定位编辑器：有源图时显示，直接把水印拖到想要的位置 */}
+          {draft.inputAssets[0]?.clientUrl && (
+            <WatermarkDragEditor
+              imageUrl={draft.inputAssets[0].clientUrl}
+              logoUrl={params.watermarkType === "logo" ? draft.watermarkLogoAsset?.clientUrl : undefined}
+              text={params.watermarkText}
+              opacity={params.watermarkOpacity}
+              position={params.watermarkPosition}
+              onChange={(pos) => updateParameters({ watermarkPosition: pos } as Partial<WatermarkParams>)}
+            />
+          )}
+          <Label className="text-caption text-muted-foreground">快捷定位</Label>
           {isMobile ? (
             <BottomSheetSelect
-              title="水印位置"
+              title="快捷定位"
               options={WATERMARK_POSITION_OPTIONS.map((option) => ({ id: option.id, label: option.label }))}
-              value={params.watermarkPosition}
+              value={typeof params.watermarkPosition === "string" ? params.watermarkPosition : ""}
               onChange={(value) => {
-                if (typeof value === "string") {
+                if (typeof value === "string" && value) {
                   updateParameters({ watermarkPosition: value as WatermarkParams["watermarkPosition"] } as Partial<WatermarkParams>);
                 }
               }}
-              trigger={<SheetTrigger label={WATERMARK_POSITION_LABELS[params.watermarkPosition] ?? params.watermarkPosition} />}
+              trigger={<SheetTrigger label={typeof params.watermarkPosition === "string" ? (WATERMARK_POSITION_LABELS[params.watermarkPosition] ?? params.watermarkPosition) : "自定义位置"} />}
             />
           ) : (
-            <div className="grid grid-cols-2 gap-2">
-              {(["bottom-right", "bottom-left", "top-right", "top-left", "center"] as WatermarkParams["watermarkPosition"][]).map((position) => (
+            <div className="grid grid-cols-5 gap-2">
+              {WATERMARK_POSITION_OPTIONS.map(({ id, label }) => (
                 <button
-                  key={position}
-	                className={cn("min-h-11 rounded-lg border px-3 py-2 text-caption", params.watermarkPosition === position ? "border-primary bg-primary/5 text-primary" : "border-border")}
-                  onClick={() => updateParameters({ watermarkPosition: position } as Partial<WatermarkParams>)}
+                  key={id}
+	                className={cn("min-h-11 rounded-lg border px-2 py-2 text-caption", params.watermarkPosition === id ? "border-primary bg-primary/5 text-primary" : "border-border")}
+                  onClick={() => updateParameters({ watermarkPosition: id } as Partial<WatermarkParams>)}
                 >
-                  {position}
+                  {label}
                 </button>
               ))}
             </div>
@@ -842,9 +989,9 @@ function ToolParameterPanel({
           <Label>输出尺寸</Label>
           <Input className="min-h-11" value={params.outputResolution} onChange={(event) => updateParameters({ outputResolution: event.target.value } as Partial<WatermarkParams>)} placeholder="1024x1024" />
         </div>
-        <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => onUploadAsset({ role: "logo", file: event.target.files?.[0] })} />
+        <input ref={logoInputRef} type="file" accept="image/png" className="hidden" onChange={(event) => onUploadAsset({ role: "logo", file: event.target.files?.[0] })} />
         <Button variant="outline" size="sm" className="min-h-11 w-full" onClick={() => logoInputRef.current?.click()}>
-          上传 Logo 水印（可选）
+          上传 PNG 水印（可选）
         </Button>
         <InlineAssetPreview asset={draft.watermarkLogoAsset} label="Logo 水印" />
         {draft.watermarkLogoAsset && (

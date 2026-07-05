@@ -65,13 +65,27 @@ export function validateWatermarkParams(raw: unknown): WatermarkParams {
   const obj = raw as Record<string, unknown>;
 
   const position = obj.watermarkPosition;
-  const validPosition =
+  const isPreset =
     position === 'top-left' ||
     position === 'top-right' ||
     position === 'bottom-left' ||
     position === 'bottom-right' ||
-    position === 'center'
-      ? position
+    position === 'center';
+  // 自由拖拽坐标对象：{x,y,width?,height?,editorWidth?,editorHeight?}
+  const asObj = (position && typeof position === 'object' ? position : null) as Record<string, unknown> | null;
+  const isFree = !!asObj && typeof asObj.x === 'number' && typeof asObj.y === 'number';
+  const num = (v: unknown): number | undefined => (typeof v === 'number' ? v : undefined);
+  const validPosition: WatermarkParams['watermarkPosition'] = isPreset
+    ? (position as WatermarkParams['watermarkPosition'])
+    : isFree
+      ? {
+          x: asObj!.x as number,
+          y: asObj!.y as number,
+          width: num(asObj!.width),
+          height: num(asObj!.height),
+          editorWidth: num(asObj!.editorWidth),
+          editorHeight: num(asObj!.editorHeight),
+        }
       : 'bottom-right';
 
   const type = obj.watermarkType;

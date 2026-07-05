@@ -35,6 +35,7 @@ interface Task {
   usedModel?: string | null;
   originalImageUrl?: string | null;
   resultImageUrl?: string | null;
+  setId?: string | null;
 }
 
 function mapBackendStatus(status: string): TaskStatus {
@@ -93,6 +94,7 @@ interface BackendTask {
   usedModel?: string | null;
   originalImageUrl?: string | null;
   resultImageUrl?: string | null;
+  setId?: string | null;
 }
 
 interface TasksApiResponse {
@@ -140,7 +142,8 @@ function TaskActions({ task, onDelete }: { task: Task; onDelete: (_id: string) =
       )}
       {task.status === "completed" && (
         <Button variant="ghost" size="sm" className="min-h-10" asChild>
-          <Link href={`/results?task=${task.id}`}>查看结果</Link>
+          {/* 套图按 setId 聚焦分组，其余按 taskId */}
+          <Link href={task.setId ? `/results?set=${task.setId}` : `/results?task=${task.id}`}>查看结果</Link>
         </Button>
       )}
       <Button
@@ -195,6 +198,7 @@ export default function TasksPage() {
         usedModel: t.usedModel,
         originalImageUrl: t.originalImageUrl,
         resultImageUrl: t.resultImageUrl,
+        setId: t.setId,
       }));
       setTasks(mapped);
       setStats({

@@ -108,6 +108,17 @@ function extractOriginalImageUrl(inputData?: string | null): string | null {
   }
 }
 
+// 套图任务的 setId（用于图库按任务聚焦）；非套图返回 null
+function extractSetId(outputData?: string | null): string | null {
+  if (!outputData) return null;
+  try {
+    const parsed = JSON.parse(outputData) as { setId?: string };
+    return typeof parsed.setId === 'string' && parsed.setId ? parsed.setId : null;
+  } catch {
+    return null;
+  }
+}
+
 function extractResultImageUrl(outputData?: string | null): string | null {
   if (!outputData) {
     return null;
@@ -426,6 +437,7 @@ export async function GET(request: NextRequest) {
         processedImageId: task.processedImageId,
         originalImageUrl,
         resultImageUrl,
+        setId: extractSetId(task.outputData),
         videoUrl: extractVideoUrl(task.type, task.outputData),
         usedModel: extractUsedModel(task.outputData),
         project: task.project,

@@ -27,7 +27,7 @@ export interface OutpaintResult extends WorkflowResult {
 export interface WatermarkResult extends WorkflowResult {
   watermarkText?: string;
   watermarkOpacity?: number;
-  watermarkPosition?: string;
+  watermarkPosition?: string | { x: number; y: number; width?: number; height?: number; editorWidth?: number; editorHeight?: number };
   watermarkType?: string;
   outputResolution?: string;
 }
