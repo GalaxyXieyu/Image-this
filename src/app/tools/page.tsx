@@ -9,14 +9,6 @@ import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  DrawerRoot,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerFooter,
-  DrawerClose,
-} from "@/components/ui/drawer";
 import { cn } from "@/lib/utils";
 import { apiPost } from "@/lib/api-client";
 import { useUpload } from "@/lib/use-upload";
@@ -420,7 +412,6 @@ function ToolboxPageInner() {
   const appliedSyncRef = useRef<{ preset?: string; tool?: string }>({ preset: presetId, tool: toolParam });
   const [runState, setRunState] = useState<ToolRunState>(EMPTY_RUN_STATE);
   const [creatingTask, setCreatingTask] = useState(false);
-  const [paramDrawerOpen, setParamDrawerOpen] = useState(false);
   const { tasks, isPolling, startPolling, error: pollingError } = useWorkflowTaskPolling({
     interval: 3000,
     autoStart: false,
@@ -740,8 +731,9 @@ function ToolboxPageInner() {
               )}
             </section>
 
-            <section className="hidden md:block">
-              <h3 className="mb-3 text-data font-semibold text-ink">工具参数</h3>
+            {/* 工具参数：桌面/移动都内联展示（水印等参数常用，不再收进抽屉） */}
+            <section>
+              <h3 className="mb-2 text-data font-semibold text-ink md:mb-3">工具参数</h3>
               <ToolParameterPanel
                 draft={draft}
                 updateParameters={updateParameters}
@@ -750,17 +742,6 @@ function ToolboxPageInner() {
                 onUploadAsset={handleUploadAsset}
               />
             </section>
-            <button
-              type="button"
-              onClick={() => setParamDrawerOpen(true)}
-              className="flex min-h-12 w-full items-center justify-between gap-3 rounded-[12px] border border-line-strong bg-surface px-3.5 py-2.5 text-left text-[14px] text-ink transition-colors hover:border-brand md:hidden"
-            >
-              <div className="min-w-0">
-                <div className="text-[14px] font-bold text-ink">工具参数</div>
-                <div className="mt-0.5 truncate text-[12px] text-ink-3">{getToolParameterSummary(draft)}</div>
-              </div>
-              <ChevronDown className="h-4 w-4 shrink-0 text-ink-3" />
-            </button>
           </div>
           {/* 桌面：左栏底部固定「创建任务」主 CTA */}
           <div className="sticky bottom-0 z-10 hidden border-t border-line bg-surface-glass/95 p-4 backdrop-blur-[12px] md:block">
@@ -830,34 +811,6 @@ function ToolboxPageInner() {
       <div className="z-30 grid shrink-0 grid-cols-2 gap-2 border-t border-line bg-surface-glass px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+12px)] backdrop-blur-[18px] backdrop-saturate-150 md:hidden">
         {taskActions}
       </div>
-
-      {/* 移动端：工具参数抽屉 */}
-      <DrawerRoot open={paramDrawerOpen} onOpenChange={setParamDrawerOpen}>
-        <DrawerContent>
-          <DrawerHeader>
-            <DrawerTitle>工具参数</DrawerTitle>
-          </DrawerHeader>
-          <div className="flex-1 overflow-y-auto px-4 pb-4">
-            <ToolParameterPanel
-              draft={draft}
-              updateParameters={updateParameters}
-              referenceInputRef={referenceInputRef}
-              logoInputRef={logoInputRef}
-              onUploadAsset={handleUploadAsset}
-            />
-          </div>
-          <DrawerFooter>
-            <DrawerClose asChild>
-              <Button
-                className="h-12 w-full rounded-full bg-accent-gradient text-[14px] font-semibold text-white"
-                onClick={() => setParamDrawerOpen(false)}
-              >
-                完成
-              </Button>
-            </DrawerClose>
-          </DrawerFooter>
-        </DrawerContent>
-      </DrawerRoot>
     </div>
   );
 }
