@@ -1,126 +1,43 @@
 /**
  * Next.js Instrumentation
- * 在服务器启动时执行，用于恢复卡住的任务
- * 
+ * 服务器启动时执行：boot 恢复所有中断任务（类型感知，套图按缺失续跑）。
+ * 并常驻一个 60s 心跳：定期回收「掉线」的 PROCESSING + 排空 PENDING —— 生产 standalone
+ * 无 Electron 8s 调度，靠这个心跳保证中断任务能自动续跑、排队任务不会永久静止。
+ *
  * 参考: https://nextjs.org/docs/app/building-your-application/optimizing/instrumentation
  */
 
+const SWEEP_INTERVAL_MS = 60 * 1000;
+let sweepStarted = false;
+
 export async function register() {
   // 只在 Node.js 运行时执行（不在 Edge 运行时）
-  if (process.env.NEXT_RUNTIME === 'nodejs') {
-    console.log('[Instrumentation] Next.js 服务启动中...');
-    
-    // 延迟执行，确保数据库连接已建立
-    setTimeout(async () => {
-      await recoverStuckTasks();
-    }, 3000); // 3秒后执行恢复
-  }
-}
+  if (process.env.NEXT_RUNTIME !== 'nodejs') return;
 
-async function recoverStuckTasks() {
-  try {
-    // 动态导入 Prisma 客户端，避免在构建时出错
-    const { prisma } = await import('@/lib/prisma');
-    
-    console.log('[Task Recovery] 检查是否有卡住的任务...');
-    
-    // 查找所有卡住的 PROCESSING 任务
-    const stuckTasks = await prisma.taskQueue.findMany({
-      where: {
-        status: 'PROCESSING'
-      },
-      select: {
-        id: true,
-        type: true,
-        retryCount: true,
-        maxRetries: true,
-        currentStep: true
+  console.log('[Instrumentation] Next.js 服务启动中...');
+
+  // boot：延迟 3s 确保数据库连接已建立，恢复所有中断任务
+  setTimeout(async () => {
+    try {
+      const { recoverStuckTasks } = await import('@/lib/workbench/task-recovery');
+      await recoverStuckTasks({ mode: 'boot' });
+    } catch (e) {
+      console.error('[Task Recovery] boot 恢复出错:', e);
+    }
+  }, 3000);
+
+  // 常驻心跳：回收掉线 PROCESSING + 驱动 PENDING
+  if (!sweepStarted) {
+    sweepStarted = true;
+    setInterval(async () => {
+      try {
+        const { recoverStuckTasks, pokeWorker } = await import('@/lib/workbench/task-recovery');
+        await recoverStuckTasks({ mode: 'sweep' });
+        await pokeWorker();
+      } catch {
+        // 心跳出错不影响服务
       }
-    });
-
-    if (stuckTasks.length === 0) {
-      console.log('[Task Recovery] 没有需要恢复的任务');
-      return;
-    }
-
-    console.log(`[Task Recovery] 发现 ${stuckTasks.length} 个卡住的任务，开始恢复...`);
-
-    let recoveredCount = 0;
-    let failedCount = 0;
-
-    for (const task of stuckTasks) {
-      const retryCount = task.retryCount ?? 0;
-      const maxRetries = task.maxRetries ?? 3;
-
-      if (retryCount < maxRetries) {
-        // 可以重试：重置为 PENDING 状态
-        await prisma.taskQueue.update({
-          where: { id: task.id },
-          data: {
-            status: 'PENDING',
-            retryCount: retryCount + 1,
-            progress: 0,
-            currentStep: `任务恢复中（第 ${retryCount + 1} 次重试）`,
-            startedAt: null,
-            errorMessage: `服务重启导致任务中断，自动重试 (${retryCount + 1}/${maxRetries})`
-          }
-        });
-        recoveredCount++;
-        console.log(`[Task Recovery] 任务 ${task.id} (${task.type}) 已恢复，重试次数: ${retryCount + 1}/${maxRetries}`);
-      } else {
-        // 超过最大重试次数：标记为失败
-        await prisma.taskQueue.update({
-          where: { id: task.id },
-          data: {
-            status: 'FAILED',
-            completedAt: new Date(),
-            errorMessage: `任务重试次数已达上限 (${maxRetries} 次)，最后状态: ${task.currentStep || '未知'}`,
-            currentStep: '重试次数已达上限'
-          }
-        });
-        failedCount++;
-        console.log(`[Task Recovery] 任务 ${task.id} (${task.type}) 重试次数已达上限，标记为失败`);
-      }
-    }
-
-    console.log(`[Task Recovery] 恢复完成: ${recoveredCount} 个任务已恢复, ${failedCount} 个任务标记为失败`);
-
-    // 如果有恢复的任务，触发 worker 处理
-    if (recoveredCount > 0) {
-      // 再延迟一点触发 worker，确保服务完全启动
-      setTimeout(async () => {
-        try {
-          const baseUrl = process.env.NEXTAUTH_URL || `http://localhost:${process.env.PORT || 3000}`;
-          console.log(`[Task Recovery] 触发 worker 处理恢复的任务...`);
-          
-          const response = await fetch(`${baseUrl}/api/tasks/worker`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ batch: true })
-          });
-          
-          if (response.ok) {
-            console.log('[Task Recovery] Worker 已触发');
-          } else {
-            console.warn('[Task Recovery] Worker 触发失败:', response.status);
-          }
-        } catch (e) {
-          console.warn('[Task Recovery] 触发 worker 失败:', e);
-        }
-      }, 2000);
-    }
-
-  } catch (error) {
-    // 数据库未初始化（缺少表）时不要让启动流程报错刷屏
-    // Prisma: P2021 = 表不存在
-    const maybePrismaError = error as { code?: string; message?: string };
-    if (maybePrismaError?.code === 'P2021') {
-      console.warn(
-        '[Task Recovery] 数据库表不存在，跳过任务恢复（请先初始化数据库，例如运行: npx prisma db push）'
-      );
-      return;
-    }
-
-    console.error('[Task Recovery] 恢复任务时出错:', error);
+    }, SWEEP_INTERVAL_MS);
+    console.log(`[Instrumentation] 已启动 ${SWEEP_INTERVAL_MS / 1000}s 任务回收/驱动心跳`);
   }
 }
