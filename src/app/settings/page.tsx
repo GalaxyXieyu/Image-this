@@ -33,7 +33,8 @@ import { DesktopUpdateCard } from '@/components/settings/DesktopUpdateCard';
 import { LogDiagnosticsCard } from '@/components/settings/LogDiagnosticsCard';
 import { BottomSheetSelect } from '@/components/workbench/BottomSheetSelect';
 import { useIsMobile } from '@/lib/use-is-mobile';
-import { Key, Sparkles, User, Image, FileText, Plus, Edit, Trash2, Star, StarOff, Cpu, HardDrive, FolderOpen, Folder, RefreshCw, Search, ChevronsUpDown, SlidersHorizontal, FileSearch, ChevronRight, X } from 'lucide-react';
+import { Key, Sparkles, User, Image, FileText, Plus, Edit, Trash2, Star, StarOff, Cpu, HardDrive, FolderOpen, Folder, RefreshCw, Search, ChevronsUpDown, SlidersHorizontal, FileSearch, ChevronRight, X, History, FlaskConical, Check } from 'lucide-react';
+import Link from 'next/link';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/use-toast';
 import { BrandEmptyState } from '@/components/brands/SpriteImage';
@@ -63,8 +64,19 @@ interface PromptTemplate {
   prompt: string;
   isDefault: boolean;
   isSystem: boolean;
+  activeVersionId?: string | null;
   createdAt: string;
   updatedAt: string;
+  _count?: { versions: number };
+}
+
+interface PromptVersion {
+  id: string;
+  versionNo: number;
+  label?: string | null;
+  content: string;
+  note?: string | null;
+  createdAt: string;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -211,6 +223,14 @@ export default function SettingsPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [currentTemplate, setCurrentTemplate] = useState<PromptTemplate | null>(null);
+  // 版本管理弹窗状态
+  const [versionTemplate, setVersionTemplate] = useState<PromptTemplate | null>(null);
+  const [versions, setVersions] = useState<PromptVersion[]>([]);
+  const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
+  const [isLoadingVersions, setIsLoadingVersions] = useState(false);
+  const [newVersionContent, setNewVersionContent] = useState('');
+  const [newVersionLabel, setNewVersionLabel] = useState('');
+  const [savingVersion, setSavingVersion] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -847,6 +867,85 @@ export default function SettingsPage() {
     setIsDeleteDialogOpen(true);
   };
 
+  // === 版本管理 ===
+  const loadVersions = async (templateId: string) => {
+    try {
+      setIsLoadingVersions(true);
+      const res = await fetch(`/api/prompt-templates/${templateId}/versions`);
+      if (!res.ok) throw new Error('加载失败');
+      const data = await res.json();
+      setVersions(data.versions || []);
+      setActiveVersionId(data.activeVersionId ?? null);
+    } catch {
+      toast({ title: '加载失败', description: '无法加载版本历史', variant: 'destructive' });
+    } finally {
+      setIsLoadingVersions(false);
+    }
+  };
+
+  const openVersionDialog = (template: PromptTemplate) => {
+    setVersionTemplate(template);
+    setVersions([]);
+    setActiveVersionId(template.activeVersionId ?? null);
+    setNewVersionContent('');
+    setNewVersionLabel('');
+    loadVersions(template.id);
+  };
+
+  const handleActivateVersion = async (versionId: string) => {
+    if (!versionTemplate) return;
+    try {
+      const res = await fetch(`/api/prompt-templates/${versionTemplate.id}/versions/${versionId}/activate`, { method: 'POST' });
+      if (!res.ok) throw new Error('切换失败');
+      setActiveVersionId(versionId);
+      toast({ title: '已切换', description: '该版本已设为当前生效版本' });
+      loadTemplates();
+    } catch {
+      toast({ title: '操作失败', description: '切换当前版本失败', variant: 'destructive' });
+    }
+  };
+
+  const handleCreateVersion = async () => {
+    if (!versionTemplate || !newVersionContent.trim()) {
+      toast({ title: '提示', description: '请填写版本内容', variant: 'destructive' });
+      return;
+    }
+    try {
+      setSavingVersion(true);
+      const res = await fetch(`/api/prompt-templates/${versionTemplate.id}/versions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: newVersionContent.trim(), label: newVersionLabel.trim() || undefined }),
+      });
+      if (!res.ok) throw new Error('创建失败');
+      setNewVersionContent('');
+      setNewVersionLabel('');
+      toast({ title: '已保存', description: '新版本已创建' });
+      loadVersions(versionTemplate.id);
+      loadTemplates();
+    } catch {
+      toast({ title: '保存失败', description: '创建版本失败', variant: 'destructive' });
+    } finally {
+      setSavingVersion(false);
+    }
+  };
+
+  const handleDeleteVersion = async (versionId: string) => {
+    if (!versionTemplate) return;
+    try {
+      const res = await fetch(`/api/prompt-templates/${versionTemplate.id}/versions/${versionId}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast({ title: '删除失败', description: data.error || '无法删除该版本', variant: 'destructive' });
+        return;
+      }
+      loadVersions(versionTemplate.id);
+      loadTemplates();
+    } catch {
+      toast({ title: '删除失败', description: '删除版本失败', variant: 'destructive' });
+    }
+  };
+
   const renderContent = () => {
     switch (activeSection) {
       case 'models': {
@@ -1156,11 +1255,26 @@ export default function SettingsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => openVersionDialog(template)}
+                          className="min-h-10 gap-1"
+                        >
+                          <History className="w-4 h-4" />
+                          版本{template._count?.versions ? ` (${template._count.versions})` : ''}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => openEditDialog(template)}
                           className="min-h-10 gap-1"
                         >
                           <Edit className="w-4 h-4" />
                           编辑
+                        </Button>
+                        <Button variant="ghost" size="sm" asChild className="min-h-10 gap-1">
+                          <Link href={`/prompt-studio?templateId=${template.id}`}>
+                            <FlaskConical className="w-4 h-4" />
+                            工作室
+                          </Link>
                         </Button>
                         <Button
                           variant="ghost"
@@ -1493,6 +1607,96 @@ export default function SettingsPage() {
               删除
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 版本管理弹窗 */}
+      <Dialog open={!!versionTemplate} onOpenChange={(open) => !open && setVersionTemplate(null)}>
+        <DialogContent className="max-w-2xl max-sm:w-[calc(100vw-1.5rem)] max-h-[calc(100dvh-3rem)] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-serif-brand text-[20px]">版本管理 · {versionTemplate?.name}</DialogTitle>
+            <DialogDescription>
+              一个提示词可以保留多个版本；把满意的版本「设为当前」即作为该模板的生效内容。
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* 版本列表 */}
+          <div className="space-y-2">
+            {isLoadingVersions ? (
+              <p className="py-6 text-center text-data text-muted-foreground">加载中…</p>
+            ) : versions.length === 0 ? (
+              <p className="py-6 text-center text-data text-muted-foreground">暂无版本</p>
+            ) : (
+              versions.map((v) => {
+                const isActive = v.id === activeVersionId;
+                return (
+                  <div
+                    key={v.id}
+                    className={cn(
+                      'rounded-[12px] border p-3 transition-colors',
+                      isActive ? 'border-[color:var(--accent-ai-line)] bg-ai-soft' : 'border-line'
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-data font-semibold text-ink">v{v.versionNo}</span>
+                      {v.label && <span className="rounded bg-secondary px-2 py-0.5 text-caption text-secondary-foreground">{v.label}</span>}
+                      {isActive && (
+                        <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-caption text-ai-accent">
+                          <Check className="h-3 w-3" /> 当前
+                        </span>
+                      )}
+                      <div className="ml-auto flex items-center gap-1">
+                        {!isActive && (
+                          <Button variant="ghost" size="xs" className="gap-1" onClick={() => handleActivateVersion(v.id)}>
+                            <Check className="h-3.5 w-3.5" /> 设为当前
+                          </Button>
+                        )}
+                        {!isActive && (
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => handleDeleteVersion(v.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <p className="mt-1.5 line-clamp-3 whitespace-pre-wrap text-caption text-muted-foreground">{v.content}</p>
+                    {v.note && <p className="mt-1 text-caption text-ink-3">备注：{v.note}</p>}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* 新建版本 */}
+          <div className="mt-2 space-y-2 rounded-[12px] border border-dashed border-line-strong p-3">
+            <Label className="text-data font-medium">新建版本</Label>
+            <Input
+              placeholder="版本名（可选，如：柔光版）"
+              value={newVersionLabel}
+              onChange={(e) => setNewVersionLabel(e.target.value)}
+              className="min-h-10"
+            />
+            <Textarea
+              placeholder="填写这个版本的提示词内容…"
+              value={newVersionContent}
+              onChange={(e) => setNewVersionContent(e.target.value)}
+              className="min-h-[88px]"
+            />
+            <div className="flex items-center justify-between gap-2">
+              <Button variant="ghost" size="sm" asChild className="gap-1">
+                <Link href={versionTemplate ? `/prompt-studio?templateId=${versionTemplate.id}` : '#'}>
+                  <FlaskConical className="h-4 w-4" /> 去工作室对比测试
+                </Link>
+              </Button>
+              <Button size="sm" className="min-h-10 gap-1" disabled={savingVersion} onClick={handleCreateVersion}>
+                <Plus className="h-4 w-4" /> 保存为新版本
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

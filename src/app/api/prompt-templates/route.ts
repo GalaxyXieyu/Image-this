@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
       where.category = category;
     }
 
-    // 获取用户的模板
+    // 获取用户的模板（附带版本数，供设置页展示"N 个版本"）
     const templates = await prisma.promptTemplate.findMany({
       where,
       orderBy: [
@@ -66,6 +66,7 @@ export async function GET(request: NextRequest) {
         { isSystem: 'desc' },  // 系统模板排在前面
         { createdAt: 'desc' }, // 最新的排在前面
       ],
+      include: { _count: { select: { versions: true } } },
     });
 
     // 如果需要包含系统模板且没有找到任何模板，创建默认系统模板
@@ -120,13 +121,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 创建新模板
-    const template = await prisma.promptTemplate.create({
-      data: {
-        ...validatedData,
-        userId: user.id,
-        isSystem: false, // 用户创建的模板不是系统模板
-      },
+    // 创建新模板（同时建立 v1 版本并设为当前版本）
+    const template = await createTemplateWithInitialVersion(user.id, {
+      ...validatedData,
+      isSystem: false, // 用户创建的模板不是系统模板
     });
 
     return NextResponse.json({ template }, { status: 201 });
@@ -177,15 +175,29 @@ async function createDefaultTemplates(userId: string) {
   ];
 
   const createdTemplates = await Promise.all(
-    defaultTemplates.map((template) =>
-      prisma.promptTemplate.create({
-        data: {
-          ...template,
-          userId,
-        },
-      })
-    )
+    defaultTemplates.map((template) => createTemplateWithInitialVersion(userId, template))
   );
 
   return createdTemplates;
+}
+
+/**
+ * 创建模板并同时建立 v1 版本 + 设为当前生效版本。
+ * 保证任何新模板都有版本记录，与迁移回填的存量模板一致。
+ */
+async function createTemplateWithInitialVersion(
+  userId: string,
+  data: { name: string; description?: string; category: string; prompt: string; isDefault?: boolean; isSystem?: boolean }
+) {
+  // 事务保证：模板 + v1 版本 + activeVersionId 原子创建，避免中途失败产生无版本的孤儿模板
+  return prisma.$transaction(async (tx) => {
+    const template = await tx.promptTemplate.create({ data: { ...data, userId } });
+    const version = await tx.promptTemplateVersion.create({
+      data: { templateId: template.id, userId, versionNo: 1, content: template.prompt, label: 'v1' },
+    });
+    return tx.promptTemplate.update({
+      where: { id: template.id },
+      data: { activeVersionId: version.id },
+    });
+  });
 }

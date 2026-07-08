@@ -217,21 +217,74 @@ model PromptTemplate {
   name        String   // 模板名称
   description String?  // 模板描述
   category    String   // 模板分类：BACKGROUND_REPLACE, OUTPAINT, UPSCALE, ONE_CLICK
-  prompt      String   // 提示词内容
+  prompt      String   // 提示词内容（当前生效版本内容的冗余镜像，向后兼容）
   isDefault   Boolean  @default(false) // 是否为默认模板
   isSystem    Boolean  @default(false) // 是否为系统预设模板（不可删除）
-  
+  activeVersionId String? // 当前生效版本（-> PromptTemplateVersion.id）
+
   // 时间戳
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   // 关联
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  versions    PromptTemplateVersion[]
+  comparisons PromptComparison[]
+
   @@index([userId, category])
   @@index([userId, isDefault])
   @@map("prompt_templates")
+}
+
+// 提示词版本：一个模板多个版本（历史 / 多版本对比）
+model PromptTemplateVersion {
+  id         String   @id @default(cuid())
+  templateId String
+  template   PromptTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  userId     String   // 归属用户（冗余，便于按用户过滤；级联经由 template 保证）
+  versionNo  Int      // 模板内自增版本号（1,2,3…）
+  label      String?  // 可选版本名
+  content    String   // 该版本提示词正文
+  note       String?  // 备注 / 改动说明
+  createdAt  DateTime @default(now())
+
+  @@index([templateId, versionNo])
+  @@map("prompt_template_versions")
+}
+
+// 对比实验：一次"多版本 × 多模型 对同一张测试图"的运行
+model PromptComparison {
+  id           String   @id @default(cuid())
+  templateId   String
+  template     PromptTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  userId       String
+  testImageUrl String   // 输入测试图（引用 / 路径，不存 base64）
+  note         String?
+  createdAt    DateTime @default(now())
+  cells        PromptComparisonCell[]
+
+  @@index([templateId, createdAt])
+  @@map("prompt_comparisons")
+}
+
+// 对比结果格：一格 = 一个 (版本 × 模型) 的运行结果
+model PromptComparisonCell {
+  id               String   @id @default(cuid())
+  comparisonId     String
+  comparison       PromptComparison @relation(fields: [comparisonId], references: [id], onDelete: Cascade)
+  versionId        String   // 参与对比的版本
+  versionNo        Int      // 冗余版本号（回看时版本可能已删）
+  provider         String
+  modelName        String
+  taskId           String?  // -> TaskQueue.id（弱关联）
+  processedImageId String?  // -> ProcessedImage.id 结果
+  status           String   @default("PENDING") // PENDING/PROCESSING/COMPLETED/FAILED
+  errorMessage     String?
+  createdAt        DateTime @default(now())
+
+  @@index([comparisonId])
+  @@map("prompt_comparison_cells")
 }
 
 // PromptTemplate Category 常量:
