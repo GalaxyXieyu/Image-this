@@ -402,6 +402,7 @@ function toOutputResolution(resolution: string) {
 
 export default function ComboPage() {
   const [workflowTemplates, setWorkflowTemplates] = useState<WorkflowTemplateType[]>([]);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [templateSearch, setTemplateSearch] = useState("");
   const [steps, setSteps] = useState<WorkflowStep[]>(INITIAL_STEPS);
@@ -450,6 +451,8 @@ export default function ComboPage() {
         setWorkflowTemplates(res.templates || []);
       } catch (error) {
         console.error("加载工作流模板失败:", error);
+      } finally {
+        setIsLoadingTemplates(false);
       }
     };
     loadTemplates();
@@ -821,6 +824,14 @@ export default function ComboPage() {
             {(() => {
               const q = templateSearch.trim().toLowerCase();
               const list = q ? templates.filter((t) => t.name.toLowerCase().includes(q)) : templates;
+              if (isLoadingTemplates && templates.length === 0) {
+                return (
+                  <div className="flex items-center justify-center gap-2 py-8 text-[13px] text-ink-3">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    加载工作流模板…
+                  </div>
+                );
+              }
               if (list.length === 0) {
                 return (
                   <p className="py-6 text-center text-[13px] text-ink-3">
@@ -1335,7 +1346,12 @@ export default function ComboPage() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto px-3 pb-4">
-              {templates.length === 0 ? (
+              {isLoadingTemplates && templates.length === 0 ? (
+                <p className="flex items-center gap-2 px-1 py-2 text-caption text-ink-3">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  加载中…
+                </p>
+              ) : templates.length === 0 ? (
                 <p className="text-caption text-ink-3 px-1 py-2">暂无工作流模板</p>
               ) : (
                 <div className="flex flex-col gap-2">
