@@ -77,6 +77,13 @@ log "$GREEN" "✅ 依赖安装完成"
 log "$YELLOW" "[4/8] 🗄️ Prisma generate + db push"
 ./node_modules/.bin/prisma generate
 DATABASE_URL="file:../data/app.db" ./node_modules/.bin/prisma db push --skip-generate
+# 幂等数据回填：db push 不跑 migration 文件，需在此为无版本的提示词模板补 v1
+if [ -f prisma/backfill-prompt-versions.sql ]; then
+  DATABASE_URL="file:../data/app.db" ./node_modules/.bin/prisma db execute \
+    --file prisma/backfill-prompt-versions.sql --schema prisma/schema.prisma \
+    && log "$GREEN" "✅ 提示词版本回填完成" \
+    || log "$YELLOW" "⚠️ 提示词版本回填跳过/失败（非致命，不阻断部署）"
+fi
 log "$GREEN" "✅ Prisma 同步完成"
 
 log "$YELLOW" "[5/8] 🛠️ npm run build"
