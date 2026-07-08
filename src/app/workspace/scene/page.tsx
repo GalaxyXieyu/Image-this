@@ -520,13 +520,17 @@ function SceneTemplateGrid({
   workflowData: WorkflowData;
   setWorkflowData: React.Dispatch<React.SetStateAction<WorkflowData>>;
 }) {
+  // 置顶卡的封面应取真实选中预设的图；仅当预设来自模板库（不在场景预设内）时才回退占位图
+  const matchedScenePreset = workflowData.selectedPresetId
+    ? sceneStyleTemplates.find((t) => t.id === workflowData.selectedPresetId)
+    : undefined;
   const presetTemplate =
     workflowData.selectedPresetId && workflowData.activePresetName
       ? {
           id: workflowData.selectedPresetId,
           name: workflowData.activePresetName,
           desc: workflowData.activePresetDescription ?? "来自模板库的场景预设",
-          image: "/scene-presets/scene-elegant.webp",
+          image: matchedScenePreset?.image ?? "/scene-presets/scene-elegant.webp",
           stylePreference: workflowData.stylePreference || workflowData.usageScene || "professional ecommerce scene",
         }
       : null;
