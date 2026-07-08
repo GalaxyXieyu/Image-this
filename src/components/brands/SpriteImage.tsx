@@ -144,11 +144,11 @@ export function BrandEmptyState({
   className?: string;
 }) {
   return (
-    <div className={cn("flex flex-col items-center justify-center gap-3 px-8 py-10 text-center", className)}>
-      <BrandMascotImage family="ip1" pose={pose} size={112} className="opacity-80" />
-      <p className="text-body font-semibold text-foreground">{title}</p>
-      {description && <p className="max-w-sm text-data text-muted-foreground">{description}</p>}
-      {action && <div className="mt-2">{action}</div>}
+    <div className={cn("flex flex-col items-center justify-center gap-2.5 px-8 py-10 text-center", className)}>
+      <BrandMascotImage family="ip1" pose={pose} size={116} className="opacity-85" />
+      <p className="font-serif-brand mt-1.5 text-[22px] font-semibold leading-tight text-foreground">{title}</p>
+      {description && <p className="max-w-xs text-[13px] leading-relaxed text-muted-foreground">{description}</p>}
+      {action && <div className="mt-3">{action}</div>}
     </div>
   );
 }

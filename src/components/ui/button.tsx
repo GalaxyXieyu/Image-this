@@ -19,7 +19,7 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
         brand: "bg-primary text-primary-foreground hover:bg-primary-hover shadow-sm",
         ai: "bg-ai text-ai-foreground hover:bg-ai-hover shadow-sm",
-        gradient: "bg-[#1E1B4B] text-white hover:bg-[#312E81] shadow-sm",
+        gradient: "bg-ai-gradient text-white shadow-sm transition-opacity hover:opacity-90",
       },
       size: {
         default: "h-10 px-4 py-2",

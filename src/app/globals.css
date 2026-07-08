@@ -49,6 +49,46 @@
   .bg-accent-gradient {
     background: linear-gradient(135deg, var(--brand), var(--brand-2));
   }
+
+  /* === AI 强调（紫罗兰）：仅生成态 / AI CTA / 选中，克制使用 === */
+  .bg-ai-gradient {
+    background: linear-gradient(135deg, var(--accent-ai-strong), var(--accent-ai-2));
+  }
+  .text-ai-accent {
+    color: var(--accent-ai);
+  }
+  .bg-ai-soft {
+    background: var(--accent-ai-soft);
+  }
+  /* 衬线标题：Newsreader(西文) + 思源宋体(中文)，用于 Hero/空状态/大标题的优雅层级 */
+  .font-serif-brand {
+    font-family: var(--font-serif), var(--font-noto-serif-sc), Georgia, "Songti SC", serif;
+    letter-spacing: -0.01em;
+  }
+  .ring-ai {
+    box-shadow: 0 0 0 1px var(--accent-ai-line);
+  }
+
+  /* === 可交互卡片：hover 效果只在支持鼠标的设备生效，触屏点按用轻按压，
+        避免 sticky-hover 把强调态黏在卡上（第 3 轮修复） === */
+  .card-interactive {
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .card-interactive:active {
+    transform: scale(0.985);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .card-interactive:hover {
+      transform: translateY(-2px);
+      border-color: var(--accent-ai-line);
+      box-shadow: var(--shadow-hover);
+    }
+    .card-interactive:hover .card-ico {
+      background: var(--accent-ai-soft);
+      color: var(--accent-ai);
+    }
+  }
   .text-accent-gradient {
     background: linear-gradient(135deg, var(--brand), var(--brand-2));
     -webkit-background-clip: text;
@@ -132,8 +172,16 @@
     --warn: #d98a3d;
     --danger: #d9544b;
     --shadow-soft: 0 2px 10px rgba(20, 20, 24, 0.07);
+    --shadow-hover: 0 10px 28px rgba(20, 20, 24, 0.12);   /* 卡片悬浮：适度，不是弹窗级 */
     --shadow-float: 0 26px 64px rgba(20, 20, 24, 0.18);
     --radius-card: 18px;
+
+    /* === AI 强调色（克制的紫罗兰）：仅用于生成态 / 进度 / 选中 === */
+    --accent-ai: #6d5ee8;          /* 主强调 */
+    --accent-ai-2: #9a8cff;        /* 渐变浅端 */
+    --accent-ai-strong: #5a4bd6;   /* hover / 深端 */
+    --accent-ai-soft: rgba(109, 94, 232, 0.1);   /* 选中底 / 标签底 */
+    --accent-ai-line: rgba(109, 94, 232, 0.28);  /* 选中边框 */
   }
   .dark {
     --background: 240 8% 8%;        /* --bg #121215 */
@@ -158,9 +206,9 @@
 
     --surface: #1c1c21;
     --surface-2: #26262c;
-    --glass: rgba(26, 26, 34, 0.6);
-    --line-soft: rgba(255, 255, 255, 0.055);
-    --line-strong: rgba(255, 255, 255, 0.13);
+    --glass: rgba(32, 32, 40, 0.72);          /* 更实、更亮一档：卡片从近黑背景里分层出来 */
+    --line-soft: rgba(255, 255, 255, 0.09);   /* hairline 加强，卡片边缘干脆 */
+    --line-strong: rgba(255, 255, 255, 0.16);
     --ink: #f2f2ef;
     --ink-2: #a8a8a1;
     --ink-3: #74746c;
@@ -172,7 +220,15 @@
     --warn: #e0995a;
     --danger: #e0685f;
     --shadow-soft: 0 2px 12px rgba(0, 0, 0, 0.4);
+    --shadow-hover: 0 12px 30px rgba(0, 0, 0, 0.5);
     --shadow-float: 0 28px 70px rgba(0, 0, 0, 0.6);
+
+    /* === AI 强调色（深色模式：更亮一档以保对比） === */
+    --accent-ai: #8b7bff;
+    --accent-ai-2: #b3a6ff;
+    --accent-ai-strong: #a294ff;
+    --accent-ai-soft: rgba(139, 123, 255, 0.16);
+    --accent-ai-line: rgba(139, 123, 255, 0.34);
   }
 }
 
@@ -190,37 +246,20 @@
   }
 }
 
-/* === Legacy :root vars (kept for backward compat, aligned to brand) === */
-:root {
-  --primary-orange: #F97316;
-  --primary-orange-light: #FED7AA;
-  --primary-orange-dark: #EA580C;
-
-  --primary-blue: #1A1A17;
-  --primary-blue-hover: #000000;
-  --primary-blue-light: rgba(26, 26, 23, 0.12);
-  --primary-blue-lighter: rgba(26, 26, 23, 0.06);
-  --primary-blue-border: rgba(26, 26, 23, 0.22);
-  --primary-blue-ring: rgba(26, 26, 23, 0.4);
-
-  --neutral-gray: #64748B;
-  --neutral-gray-light: #F9FAFB;
-  --neutral-gray-dark: #374151;
-}
-
-/* === Custom scrollbar === */
+/* === Custom scrollbar（跟随主题 token，深色下不再发白） === */
 ::-webkit-scrollbar {
   width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--color-slate-50, #F8FAFC);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-slate-300, #CBD5E1);
+  background: var(--line-strong);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-slate-400, #94A3B8);
+  background: var(--ink-3);
 }
 
 /* === Animation utilities === */
@@ -264,15 +303,15 @@
   100% { transform: scale(0.92); opacity: 0; }
 }
 
-/* 图库占位：水位上涨的水面波浪 */
+/* 图库占位：水位上涨的水面波浪（用 AI 强调紫，与体系统一） */
 .water-wave {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 20' preserveAspectRatio='none'%3E%3Cpath d='M0 10 Q30 2 60 10 T120 10 V20 H0 Z' fill='%237c6cff'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 20' preserveAspectRatio='none'%3E%3Cpath d='M0 10 Q30 2 60 10 T120 10 V20 H0 Z' fill='%236d5ee8'/%3E%3C/svg%3E");
   background-repeat: repeat-x;
   background-size: 120px 16px;
   animation: waterWave 2.4s linear infinite;
 }
 .water-wave-2 {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 20' preserveAspectRatio='none'%3E%3Cpath d='M0 12 Q30 4 60 12 T120 12 V20 H0 Z' fill='%23a78bff'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 20' preserveAspectRatio='none'%3E%3Cpath d='M0 12 Q30 4 60 12 T120 12 V20 H0 Z' fill='%239a8cff'/%3E%3C/svg%3E");
   background-repeat: repeat-x;
   background-size: 90px 14px;
   animation: waterWave 3.6s linear infinite reverse;

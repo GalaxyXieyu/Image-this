@@ -764,7 +764,7 @@ function ToolboxPageInner() {
                 pose="think"
                 title="预览 / 结果区"
                 description="上传图片并创建任务后，输入预览与处理结果会显示在这里"
-                className="glass-panel w-full max-w-[360px] rounded-[20px] px-5"
+                className="w-full max-w-[360px] px-5"
               />
             ) : (
               <div className="glass-panel relative aspect-square w-full max-w-3xl overflow-hidden rounded-[24px]">
