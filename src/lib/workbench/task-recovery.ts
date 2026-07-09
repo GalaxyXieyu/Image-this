@@ -17,7 +17,18 @@ import { createListingSetResumeTask } from '@/lib/workbench/listing-set-resume';
 const STALE_MS = 5 * 60 * 1000; // 5 分钟无心跳视为掉线（安全高于单张出图耗时）
 
 function workerBaseUrl(): string {
-  return process.env.NEXTAUTH_URL || `http://localhost:${process.env.PORT || 3000}`;
+  // 不能用 NEXTAUTH_URL 公网地址自调用：生产 nginx 会把 http POST 301 到 https，
+  // fetch 跟随重定向时 POST 降级为 GET，worker 只回状态不处理任务（同 internal-worker-url.ts）。
+  // 必须走 127.0.0.1 回环直连本进程；端口取 PORT，退化时从 NEXTAUTH_URL 解析（本地 dev 未设 PORT）。
+  const portFromEnv = process.env.PORT;
+  const portFromAuthUrl = (() => {
+    try {
+      return new URL(process.env.NEXTAUTH_URL || '').port;
+    } catch {
+      return '';
+    }
+  })();
+  return `http://127.0.0.1:${portFromEnv || portFromAuthUrl || 3000}`;
 }
 
 /** 触发 worker 批处理，排空 PENDING */
