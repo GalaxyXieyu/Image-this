@@ -156,7 +156,9 @@ interface WatermarkCustomPosition {
 }
 
 interface WatermarkParams {
+  type?: "text" | "logo";
   content: string;
+  logoAsset?: InputAssetRef;
   position: WatermarkPresetPosition | "custom";
   opacity: number;
   customPosition?: WatermarkCustomPosition;
@@ -355,10 +357,12 @@ function normalizeStepTaskInput(
 
   if (step.type === "watermark") {
     const watermarkParams = step.params as WatermarkParams;
+    const isLogo = watermarkParams.type === "logo" && Boolean(watermarkParams.logoAsset);
     return {
       ...baseInput,
-      watermarkType: "text",
+      watermarkType: isLogo ? "logo" : "text",
       watermarkText: watermarkParams.content,
+      watermarkLogoAsset: isLogo ? watermarkParams.logoAsset : undefined,
       watermarkPosition:
         watermarkParams.position === "custom"
           ? watermarkParams.customPosition ?? "bottom-right"
@@ -2257,6 +2261,20 @@ function WatermarkStepParams({
   aspectRatio: string;
   onChange: (_patch: Partial<WatermarkParams>) => void;
 }) {
+  const { upload, uploading } = useUpload();
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const wmType = params.type ?? "text";
+
+  const handleLogoPick = async (file?: File) => {
+    if (!file) return;
+    try {
+      const res = await upload({ watermarkLogo: file });
+      if (res.watermarkLogoAsset) onChange({ logoAsset: res.watermarkLogoAsset });
+    } catch {
+      // useUpload 通过 error 暴露失败，这里保持编辑区紧凑
+    }
+  };
+
   return (
     <>
       <WatermarkPositionPreview
@@ -2265,14 +2283,56 @@ function WatermarkStepParams({
         onChange={onChange}
       />
       <section className="flex flex-col gap-2">
-        <FieldLabel>水印内容</FieldLabel>
-        <Input
-          value={params.content}
-          onChange={(e) => onChange({ content: e.target.value })}
-          placeholder="@品牌名"
-          className="h-9 rounded-[11px]"
+        <FieldLabel>水印类型</FieldLabel>
+        <ChipGroup
+          value={wmType}
+          onChange={(v) => onChange({ type: v as "text" | "logo" })}
+          options={[
+            { id: "text", label: "文字" },
+            { id: "logo", label: "图片 / Logo" },
+          ]}
+          cols={2}
         />
       </section>
+      {wmType === "logo" ? (
+        <section className="flex flex-col gap-2">
+          <FieldLabel>水印 Logo（建议 PNG 透明底）</FieldLabel>
+          <input
+            ref={logoInputRef}
+            type="file"
+            accept="image/png,image/*"
+            className="hidden"
+            onChange={(e) => handleLogoPick(e.target.files?.[0] ?? undefined)}
+          />
+          <button
+            type="button"
+            onClick={() => logoInputRef.current?.click()}
+            disabled={uploading}
+            className="flex min-h-10 items-center justify-center gap-2 rounded-[11px] border border-dashed border-line-strong bg-surface px-3 text-[13px] text-ink-2 transition-colors hover:border-brand disabled:opacity-60"
+          >
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            {params.logoAsset ? "更换 Logo" : "上传 Logo"}
+          </button>
+          {params.logoAsset && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={params.logoAsset.clientUrl}
+              alt="Logo 预览"
+              className="h-14 w-14 rounded-[10px] border border-line bg-surface-muted object-contain p-1"
+            />
+          )}
+        </section>
+      ) : (
+        <section className="flex flex-col gap-2">
+          <FieldLabel>水印内容</FieldLabel>
+          <Input
+            value={params.content}
+            onChange={(e) => onChange({ content: e.target.value })}
+            placeholder="@品牌名"
+            className="h-9 rounded-[11px]"
+          />
+        </section>
+      )}
       <section className="flex flex-col gap-2">
         <FieldLabel>水印位置</FieldLabel>
         <ChipGroup
@@ -2432,10 +2492,20 @@ function WatermarkPositionPreview({
             updateCustomPosition(event);
           }}
           onPointerMove={handlePointerMove}
-          className="absolute max-w-[72%] cursor-grab select-none rounded-full bg-ink px-2.5 py-1 text-[11px] font-semibold text-white shadow-soft active:cursor-grabbing"
+          className={cn(
+            "absolute max-w-[72%] cursor-grab select-none shadow-soft active:cursor-grabbing",
+            params.type === "logo" && params.logoAsset
+              ? ""
+              : "rounded-full bg-ink px-2.5 py-1 text-[11px] font-semibold text-white"
+          )}
           style={{ opacity: Math.max(0.1, params.opacity / 100) }}
         >
-          {previewText}
+          {params.type === "logo" && params.logoAsset ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={params.logoAsset.clientUrl} alt="" className="h-8 w-auto object-contain" draggable={false} />
+          ) : (
+            previewText
+          )}
         </span>
       </div>
     </section>

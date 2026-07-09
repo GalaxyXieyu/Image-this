@@ -68,7 +68,13 @@ const pipelineHandler = {
       if (!referenceImageUrl && refAsset) {
         referenceImageUrl = (await readAssetAsDataUrl(refAsset)) || refAsset.clientUrl || undefined;
       }
-      steps.push({ ...s, stepType, referenceImageUrl } as OrderedPipelineStep);
+      // 水印步：把 Logo 资源转成可用 URL（此前只解析了背景步的参考图，导致 combo 的 Logo 水印失效）
+      let watermarkLogoUrl = (s.watermarkLogoUrl as string) || undefined;
+      const logoAsset = s.watermarkLogoAsset as TaskAssetRef | undefined;
+      if (!watermarkLogoUrl && logoAsset) {
+        watermarkLogoUrl = (await readAssetAsDataUrl(logoAsset)) || logoAsset.clientUrl || undefined;
+      }
+      steps.push({ ...s, stepType, referenceImageUrl, watermarkLogoUrl } as OrderedPipelineStep);
     }
 
     const result = await executeOrderedPipeline({
