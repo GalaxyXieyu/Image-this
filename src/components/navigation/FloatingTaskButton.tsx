@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ListTodo, Clock, Loader, CheckCircle, XCircle, Wand2, Image as ImageIcon, Expand, Zap, ImagePlus, Video } from 'lucide-react';
+import { ListTodo, Clock, Loader, CheckCircle, XCircle, Wand2, Image as ImageIcon, Expand, Zap, ImagePlus, Video, Trash2 } from 'lucide-react';
 import { BrandEmptyState } from '@/components/brands/SpriteImage';
 import { getWorkflowTypeLabel, normalizeTaskStatus } from '@/lib/workbench/task-compat';
 
@@ -112,6 +112,27 @@ export default function FloatingTaskButton() {
       return () => clearInterval(interval);
     }
   }, [isOpen]);
+
+  const handleDeleteTask = async (task: Task) => {
+    const isPending = isTaskStatus(task, 'pending');
+    if (!confirm(isPending ? '删除这个排队中的任务？' : '取消并删除这个进行中的任务？')) return;
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || '删除任务失败');
+      }
+      setTasks((prev) => prev.filter((t) => t.id !== task.id));
+      setStats((prev) => ({
+        ...prev,
+        pending: isPending ? Math.max(0, prev.pending - 1) : prev.pending,
+        processing: isPending ? prev.processing : Math.max(0, prev.processing - 1),
+        total: Math.max(0, prev.total - 1),
+      }));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '删除任务失败');
+    }
+  };
 
   const hasActiveTasks = stats.pending > 0 || stats.processing > 0;
 
@@ -235,7 +256,7 @@ export default function FloatingTaskButton() {
                         {isTaskStatus(task, 'processing') && task.progress > 0 && (
                           <div className="mt-1 flex items-center gap-1.5">
                             <div className="flex-1 bg-gray-200 rounded-full h-1">
-                              <div 
+                              <div
                                 className="bg-primary h-1 rounded-full transition-all duration-300"
                                 style={{ width: `${Math.max(task.progress, 5)}%` }}
                               />
@@ -244,6 +265,19 @@ export default function FloatingTaskButton() {
                           </div>
                         )}
                       </div>
+
+                      {/* 排队/进行中任务：删除以中断 */}
+                      {(isTaskStatus(task, 'pending') || isTaskStatus(task, 'processing')) && (
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteTask(task)}
+                          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                          title={isTaskStatus(task, 'pending') ? '删除排队任务' : '取消并删除任务'}
+                          aria-label={isTaskStatus(task, 'pending') ? '删除排队任务' : '取消并删除任务'}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </div>
                   );
                 })
