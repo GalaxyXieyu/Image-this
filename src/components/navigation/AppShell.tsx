@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
+import { signOut, useSession } from "next-auth/react";
 import { Suspense, useEffect, useState } from "react";
-import { Bell, Download, Moon, Sun, ListTodo } from "lucide-react";
+import { Bell, Download, History, Moon, Sun, ListTodo, LogOut } from "lucide-react";
 import { BrandLogo } from "@/components/brands/SpriteImage";
 import { MobileTabBar } from "@/components/navigation/MobileTabBar";
 import { DesktopSidebar } from "@/components/navigation/DesktopSidebar";
@@ -112,6 +113,18 @@ function TopNav({
 
         {/* 桌面：右上按钮组 */}
         <div className="ml-auto hidden md:flex items-center gap-1.5">
+          <Link
+            href="/tasks"
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-surface/80 px-3 py-1.5 text-data transition-colors hover:text-foreground",
+              pathname.startsWith("/tasks") ? "text-brand-text" : "text-muted-foreground"
+            )}
+            aria-label="历史记录"
+            title="历史记录"
+          >
+            <History className="h-3.5 w-3.5" />
+            <span className="hidden md:inline">历史记录</span>
+          </Link>
           <button
             type="button"
             className="relative inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-surface/80 px-3 py-1.5 text-data text-muted-foreground transition-colors hover:text-foreground"
@@ -130,6 +143,7 @@ function TopNav({
             <Bell className="h-3.5 w-3.5" />
           </button>
           <ThemeToggle />
+          <LogoutButton />
         </div>
 
         {/* 移动：右上 任务入口 + 主题（导航改由底部 Tab 栏 + 顶部二级承接） */}
@@ -145,6 +159,7 @@ function TopNav({
             <ListTodo className="h-5 w-5" />
           </Link>
           <ThemeToggle />
+          <LogoutButton mobile />
         </div>
       </div>
 
@@ -223,6 +238,25 @@ function ThemeToggle() {
       ) : (
         <Moon className="h-4 w-4" />
       )}
+    </button>
+  );
+}
+
+function LogoutButton({ mobile }: { mobile?: boolean }) {
+  const { status } = useSession();
+  if (status !== "authenticated") return null;
+  return (
+    <button
+      type="button"
+      onClick={() => signOut({ callbackUrl: "/auth/login" })}
+      aria-label="退出登录"
+      title="退出登录"
+      className={cn(
+        "inline-flex items-center justify-center rounded-full border border-border/70 bg-surface/80 text-muted-foreground transition-colors hover:text-destructive",
+        mobile ? "h-11 w-11" : "h-8 w-8"
+      )}
+    >
+      <LogOut className={mobile ? "h-5 w-5" : "h-3.5 w-3.5"} />
     </button>
   );
 }
