@@ -143,7 +143,7 @@ export default function WorkbenchHubPage() {
         {/* 工具：原子操作 */}
         <section>
           <h2 className="mb-2.5 text-caption font-semibold uppercase tracking-wider text-ink-3">工具</h2>
-          <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:grid md:grid-cols-4 md:overflow-visible md:px-0">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {TOOLS.map((t) => {
               const Icon = t.icon;
               return (
@@ -151,7 +151,7 @@ export default function WorkbenchHubPage() {
                   key={t.label}
                   href={t.href}
                   className={cn(
-                    "glass-panel card-interactive flex w-32 shrink-0 flex-col gap-2 rounded-[18px] p-3.5 shadow-soft md:w-auto"
+                    "glass-panel card-interactive flex flex-col gap-2 rounded-[18px] p-3.5 shadow-soft"
                   )}
                 >
                   <span className="card-ico flex h-11 w-11 items-center justify-center rounded-[14px] bg-brand-soft text-ink transition-colors">
