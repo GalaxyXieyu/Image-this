@@ -572,11 +572,11 @@ export default function ResultsPage() {
       <button
         type="button"
         onClick={() => handleCancelTask(task.id)}
-        className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-surface/85 text-ink-2 shadow-soft backdrop-blur-sm transition-colors hover:text-danger"
-        title="取消任务"
-        aria-label="取消任务"
+        className="absolute right-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-danger shadow-soft transition-colors hover:bg-white"
+        title="取消并删除任务"
+        aria-label="取消并删除任务"
       >
-        <X className="h-3.5 w-3.5" />
+        <X className="h-4 w-4" />
       </button>
       <div className="px-2.5 py-2">
         <h3 className="truncate text-[12px] font-semibold text-ink">处理中…</h3>
@@ -869,11 +869,11 @@ export default function ResultsPage() {
                         <button
                           type="button"
                           onClick={() => handleCancelTask(task.id)}
-                          className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-surface/85 text-ink-2 shadow-soft backdrop-blur-sm transition-colors hover:text-danger"
-                          title="取消任务"
-                          aria-label="取消任务"
+                          className="absolute right-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-danger shadow-soft transition-colors hover:bg-white"
+                          title="取消并删除任务"
+                          aria-label="取消并删除任务"
                         >
-                          <X className="h-3.5 w-3.5" />
+                          <X className="h-4 w-4" />
                         </button>
                         <div className="px-2.5 py-2">
                           <h3 className="truncate text-[12px] font-semibold text-ink">处理中…</h3>
