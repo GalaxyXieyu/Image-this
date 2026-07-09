@@ -550,7 +550,14 @@ class TaskProcessor {
         where: { id: task.id },
         select: { retryCount: true, maxRetries: true }
       });
-      
+
+      // 任务行已不存在：用户在处理期间取消并删除了任务（DELETE /api/tasks/[id]），
+      // 不再回写状态、不计入失败，静默结束即可。
+      if (!currentTask) {
+        console.warn(`[Task Worker] 任务 ${task.id} 已被删除（用户取消），跳过失败状态回写`);
+        return null;
+      }
+
       const retryCount = currentTask?.retryCount ?? 0;
       const maxRetries = currentTask?.maxRetries ?? 3;
       const rawMessage = error instanceof Error ? error.message : '未知错误';
@@ -559,9 +566,11 @@ class TaskProcessor {
       // 避免一直卡在「等待重试」却无人重新触发 worker。
       const retryable = isRetryableProviderError(rawMessage);
 
+      // updateMany 天然容忍行不存在（返回 count 0 而非抛 P2025），
+      // 覆盖「findUnique 之后、回写之前」任务被用户删除的竞态窗口。
       if (retryable && retryCount < maxRetries) {
         // 还可以重试：增加重试次数，重置为 PENDING 状态
-        await prisma.taskQueue.update({
+        const updated = await prisma.taskQueue.updateMany({
           where: { id: task.id },
           data: {
             status: 'PENDING',
@@ -572,13 +581,17 @@ class TaskProcessor {
             errorMessage: `处理失败: ${friendlyMessage}，准备第 ${retryCount + 1} 次重试`
           }
         });
+        if (updated.count === 0) {
+          console.warn(`[Task Worker] 任务 ${task.id} 回写重试状态时已被删除（用户取消），跳过`);
+          return null;
+        }
         console.log(`[Task Worker] 任务 ${task.id} 处理失败，将进行第 ${retryCount + 1} 次重试`);
       } else {
         // 不可重试错误 或 已达最大重试次数：标记为失败
         const failMessage = retryable
           ? `重试 ${maxRetries} 次后仍然失败: ${friendlyMessage}`
           : friendlyMessage;
-        await prisma.taskQueue.update({
+        const updated = await prisma.taskQueue.updateMany({
           where: { id: task.id },
           data: {
             status: 'FAILED',
@@ -587,9 +600,13 @@ class TaskProcessor {
             currentStep: retryable ? '处理失败（已达最大重试次数）' : '处理失败'
           }
         });
+        if (updated.count === 0) {
+          console.warn(`[Task Worker] 任务 ${task.id} 回写失败状态时已被删除（用户取消），跳过`);
+          return null;
+        }
         console.log(`[Task Worker] 任务 ${task.id} ${retryable ? `已达最大重试次数 (${maxRetries})` : '遇到不可重试错误'}，标记为失败`);
       }
-      
+
       throw error;
     }
   }
