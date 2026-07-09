@@ -580,7 +580,9 @@ function ToolboxPageInner() {
     }
   };
 
-  const resultPreviewUrl = runState.resultImageUrl ?? draft.inputAssets[0]?.clientUrl;
+  // 加水印工具的输入预览已由左侧拖拽编辑器承担，主区不再重复显示原图（避免上下两个一样的预览），只显示处理结果
+  const resultPreviewUrl = runState.resultImageUrl
+    ?? (draft.toolType === "watermark" ? undefined : draft.inputAssets[0]?.clientUrl);
   const isBusy = creatingTask || uploading || isPolling || runState.status === "processing" || runState.status === "pending" || runState.status === "queued";
   const createBtn = (
     <Button
