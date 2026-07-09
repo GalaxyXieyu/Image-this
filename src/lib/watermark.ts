@@ -18,6 +18,8 @@ interface WatermarkOptions {
   outputResolution?: string;
   xScale?: number;
   yScale?: number;
+  /** 水印大小：占图片宽度的比例（0.05~0.6），控制 Logo/文字水印的整体尺寸；缺省 0.2 */
+  watermarkScale?: number;
 }
 
 /**
@@ -43,7 +45,8 @@ export async function addWatermarkToImage(options: WatermarkOptions): Promise<st
     watermarkText = 'Watermark',
     outputResolution,
     xScale = 1,
-    yScale = 1
+    yScale = 1,
+    watermarkScale
   } = options;
 
   console.log('[addWatermarkToImage] 开始处理水印:', {
@@ -110,7 +113,8 @@ export async function addWatermarkToImage(options: WatermarkOptions): Promise<st
       outputWidth,
       outputHeight,
       xScale,
-      yScale
+      yScale,
+      watermarkScale
     );
   } else {
     processedImage = await addTextWatermark(
@@ -121,7 +125,8 @@ export async function addWatermarkToImage(options: WatermarkOptions): Promise<st
       outputWidth,
       outputHeight,
       xScale,
-      yScale
+      yScale,
+      watermarkScale
     );
   }
 
@@ -152,7 +157,8 @@ async function addLogoWatermark(
   width: number,
   height: number,
   xScale: number = 1,
-  yScale: number = 1
+  yScale: number = 1,
+  watermarkScale?: number
 ): Promise<sharp.Sharp> {
   // 解析 Logo 图片
   const logoBase64 = extractBase64FromDataUrl(logoUrl);
@@ -221,9 +227,9 @@ async function addLogoWatermark(
       isOutsideCanvas: x < 0 || y < 0 || x + logoWidth > width || y + logoHeight > height
     });
   } else {
-    // 使用预设位置
-    const maxLogoWidth = width * 0.2;
-    const scale = Math.min(maxLogoWidth / logoOriginalWidth, 1);
+    // 使用预设位置：水印宽度 = 图片宽度 × watermarkScale（缺省 0.2），允许放大超过原图
+    const targetLogoWidth = width * (watermarkScale && watermarkScale > 0 ? watermarkScale : 0.2);
+    const scale = targetLogoWidth / logoOriginalWidth;
     logoWidth = Math.round(logoOriginalWidth * scale);
     logoHeight = Math.round(logoOriginalHeight * scale);
     
@@ -368,10 +374,13 @@ async function addTextWatermark(
   width: number,
   height: number,
   xScale: number = 1,
-  yScale: number = 1
+  yScale: number = 1,
+  watermarkScale?: number
 ): Promise<sharp.Sharp> {
-  // 计算字体大小
-  const fontSize = Math.max(20, Math.floor(width / 30));
+  // 计算字体大小：默认 图片宽/30；watermarkScale 时按其比例（映射到合理字号范围）
+  const fontSize = watermarkScale && watermarkScale > 0
+    ? Math.max(12, Math.round(width * watermarkScale * 0.5))
+    : Math.max(20, Math.floor(width / 30));
   const padding = 20;
   
   // 估算文字宽度（粗略估计：每个字符约 0.6 倍字体大小）

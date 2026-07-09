@@ -22,6 +22,7 @@ import { useUpload } from "@/lib/use-upload";
 import { useWorkflowTaskPolling } from "@/hooks/workbench/useWorkflowTaskPolling";
 import { mapProviderErrorMessage } from "@/lib/provider-error-utils";
 import { useToast } from "@/components/ui/use-toast";
+import { hasEnabledImageModel } from "@/lib/ensure-model";
 import { getPresetById } from "@/lib/workbench/presets";
 import { sceneStyleTemplates, type SceneStyleTemplate } from "@/lib/scene-presets";
 import { buildSceneLegacyTaskRequests } from "@/lib/workbench/scene-task-adapter";
@@ -382,6 +383,10 @@ function useSceneGeneration(workflowData: WorkflowData): UseSceneGenerationResul
   };
 
   const handleGenerate = async () => {
+    if (!(await hasEnabledImageModel())) {
+      toast({ title: "还没有配置模型 Key", description: "请先到「设置 → AI 模型配置」配置并启用模型后再生成，否则任务无法运行。", variant: "destructive" });
+      return;
+    }
     setGenerating(true);
     try {
       const candidateCount = Math.max(1, workflowData.candidateCount || 1);
@@ -755,8 +760,8 @@ function SceneProductForm({
 
         {productAssets.length > 0 && (
           <div className={cn(
-            "-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
-            !dense && "md:mx-0 md:grid md:grid-cols-5 md:overflow-visible md:px-0"
+            "-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:grid md:overflow-visible md:px-0",
+            dense ? "md:grid-cols-3" : "md:grid-cols-5"
           )}>
             {productAssets.map((asset, index) => (
               <div

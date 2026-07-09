@@ -33,7 +33,10 @@ export interface OrderedPipelineStep {
   watermarkPosition?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center' | string;
   watermarkType?: 'text' | 'logo' | string;
   watermarkLogoUrl?: string;
+  watermarkScale?: number; // 水印大小（占图宽比例）
   outputResolution?: string;
+  // upscale
+  upscaleFactor?: number; // 放大倍数（真实按倍数缩放分辨率）
 }
 
 export interface OrderedPipelineParams {
@@ -140,6 +143,12 @@ export async function executeOrderedPipeline(params: OrderedPipelineParams) {
             imagehostingConfig
           );
           current = r.imageData;
+          // 真正按用户选的倍数缩放分辨率（旧逻辑倍数不生效）
+          const factor = Number(step.upscaleFactor) || 0;
+          if (factor > 0 && Math.abs(factor - 1) > 0.001) {
+            const { scaleImageByFactor } = await import('@/lib/image-scale');
+            current = await scaleImageByFactor(current, factor);
+          }
         } else if (step.stepType === 'watermark') {
           const { addWatermarkToImage } = await import('@/lib/watermark');
           current = await addWatermarkToImage({
@@ -151,6 +160,7 @@ export async function executeOrderedPipeline(params: OrderedPipelineParams) {
               'bottom-right',
             watermarkType: (step.watermarkType as 'text' | 'logo') || 'text',
             watermarkLogoUrl: step.watermarkLogoUrl,
+            watermarkScale: step.watermarkScale,
             outputResolution: step.outputResolution || outputResolution,
           });
         } else {

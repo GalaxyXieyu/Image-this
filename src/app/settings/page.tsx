@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useSession } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -33,7 +33,7 @@ import { DesktopUpdateCard } from '@/components/settings/DesktopUpdateCard';
 import { LogDiagnosticsCard } from '@/components/settings/LogDiagnosticsCard';
 import { BottomSheetSelect } from '@/components/workbench/BottomSheetSelect';
 import { useIsMobile } from '@/lib/use-is-mobile';
-import { Key, Sparkles, User, Image, FileText, Plus, Edit, Trash2, Star, StarOff, Cpu, HardDrive, FolderOpen, Folder, RefreshCw, Search, ChevronsUpDown, SlidersHorizontal, FileSearch, ChevronRight, X, History, FlaskConical, Check } from 'lucide-react';
+import { Key, Sparkles, User, Image, FileText, Plus, Edit, Trash2, Star, StarOff, Cpu, HardDrive, FolderOpen, Folder, RefreshCw, Search, ChevronsUpDown, SlidersHorizontal, FileSearch, ChevronRight, X, History, FlaskConical, Check, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/use-toast';
@@ -1378,6 +1378,16 @@ export default function SettingsPage() {
                   <div className="break-all rounded border bg-muted px-3 py-2.5 font-mono text-data text-muted-foreground">
                     {session.user?.id}
                   </div>
+                </div>
+                <div className="border-t border-line pt-4">
+                  <Button
+                    variant="outline"
+                    className="min-h-11 w-full gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive sm:w-auto"
+                    onClick={() => signOut({ callbackUrl: '/auth/login' })}
+                  >
+                    <LogOut className="h-4 w-4" />
+                    退出登录
+                  </Button>
                 </div>
               </CardContent>
             </Card>

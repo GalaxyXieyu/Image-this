@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState, useEffect, type PointerEvent } from "react";
 import Image from "next/image";
+import { hasEnabledImageModel } from "@/lib/ensure-model";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -159,6 +160,7 @@ interface WatermarkParams {
   type?: "text" | "logo";
   content: string;
   logoAsset?: InputAssetRef;
+  sizeRatio?: number; // 水印大小：占图宽比例（0.05~0.6），缺省 0.2
   position: WatermarkPresetPosition | "custom";
   opacity: number;
   customPosition?: WatermarkCustomPosition;
@@ -368,6 +370,16 @@ function normalizeStepTaskInput(
           ? watermarkParams.customPosition ?? "bottom-right"
           : watermarkParams.position,
       watermarkOpacity: watermarkParams.opacity / 100,
+      watermarkScale: watermarkParams.sizeRatio,
+      outputResolution: toOutputResolution(global.resolution),
+    };
+  }
+
+  if (step.type === "upscale") {
+    const upscaleParams = step.params as UpscaleParams;
+    return {
+      ...baseInput,
+      upscaleFactor: upscaleParams.factor,
       outputResolution: toOutputResolution(global.resolution),
     };
   }
@@ -511,6 +523,10 @@ export default function ComboPage() {
     if (steps.length === 0) return;
     if (productAssets.length === 0) {
       alert("请先上传商品图片");
+      return;
+    }
+    if (!(await hasEnabledImageModel())) {
+      alert("还没有配置模型 API Key，任务无法运行。请先到「设置 → AI 模型配置」配置并启用模型后再生成。");
       return;
     }
     setExecuting(true);
@@ -2227,19 +2243,30 @@ function UpscaleStepParams({
 }) {
   return (
     <>
-      <section className="flex flex-col gap-2">
-        <FieldLabel>放大倍数</FieldLabel>
-        <ChipGroup
-          value={String(params.factor) as "2" | "3" | "4"}
-          onChange={(v) => onChange({ factor: Number(v) })}
-          options={[
-            { id: "2", label: "2×" },
-            { id: "3", label: "3×" },
-            { id: "4", label: "4×" },
-          ]}
-          cols={3}
-        />
-      </section>
+      <SliderRow
+        label="放大倍数"
+        value={params.factor}
+        suffix="×"
+        min={1.1}
+        max={4}
+        step={0.1}
+        onChange={(v) => onChange({ factor: Math.round(v * 10) / 10 })}
+      />
+      <div className="flex gap-2">
+        {[1.2, 1.5, 2, 3, 4].map((f) => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => onChange({ factor: f })}
+            className={cn(
+              "min-h-8 flex-1 rounded-[9px] border text-[12px] font-semibold transition-colors",
+              params.factor === f ? "border-brand bg-brand-soft text-brand-text" : "border-line-strong text-ink-2 hover:text-ink"
+            )}
+          >
+            {f}×
+          </button>
+        ))}
+      </div>
       <SliderRow
         label="降噪强度"
         value={params.denoise}
@@ -2354,6 +2381,14 @@ function WatermarkStepParams({
           cols={3}
         />
       </section>
+      <SliderRow
+        label="水印大小"
+        value={Math.round((params.sizeRatio ?? 0.2) * 100)}
+        suffix="%"
+        min={5}
+        max={60}
+        onChange={(v) => onChange({ sizeRatio: v / 100 })}
+      />
       <SliderRow
         label="不透明度"
         value={params.opacity}

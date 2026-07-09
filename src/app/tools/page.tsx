@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { apiPost } from "@/lib/api-client";
 import { useUpload } from "@/lib/use-upload";
 import { useToast } from "@/components/ui/use-toast";
+import { hasEnabledImageModel } from "@/lib/ensure-model";
 import { useWorkflowTaskPolling } from "@/hooks/workbench/useWorkflowTaskPolling";
 import { mapProviderErrorMessage } from "@/lib/provider-error-utils";
 import { BrandEmptyState } from "@/components/brands/SpriteImage";
@@ -525,6 +526,10 @@ function ToolboxPageInner() {
       toast({ title: "请先上传图片", description: "工具任务至少需要一张输入图片。", variant: "destructive" });
       return;
     }
+    if (!(await hasEnabledImageModel())) {
+      toast({ title: "还没有配置模型 Key", description: "请先到「设置 → AI 模型配置」配置并启用模型后再生成，否则任务无法运行。", variant: "destructive" });
+      return;
+    }
 
     const isBatch = draft.inputAssets.length > 1;
     setCreatingTask(true);
@@ -948,33 +953,32 @@ function ToolParameterPanel({
     return (
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label>放大倍数</Label>
-          {isMobile ? (
-            <BottomSheetSelect
-              title="放大倍数"
-              options={[2, 4, 8].map((factor) => ({ id: String(factor), label: `${factor}x` }))}
-              value={String(params.upscaleFactor)}
-              onChange={(value) => {
-                if (typeof value === "string") {
-                  const factor = Number(value);
-                  updateParameters({ upscaleFactor: factor, outputResolution: `${factor}x` } as Partial<UpscaleParams>);
-                }
-              }}
-              trigger={<SheetTrigger label={`${params.upscaleFactor}x`} />}
-            />
-          ) : (
-            <div className="grid grid-cols-3 gap-2">
-              {[2, 4, 8].map((factor) => (
-                <button
-                  key={factor}
-	                className={cn("min-h-11 rounded-lg border px-3 py-2 text-data", params.upscaleFactor === factor ? "border-primary bg-primary/5 text-primary" : "border-border")}
-                  onClick={() => updateParameters({ upscaleFactor: factor, outputResolution: `${factor}x` } as Partial<UpscaleParams>)}
-                >
-                  {factor}x
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="flex items-center justify-between">
+            <Label>放大倍数</Label>
+            <span className="text-data font-semibold text-primary">{params.upscaleFactor}×</span>
+          </div>
+          <Slider
+            value={[params.upscaleFactor]}
+            min={1.1}
+            max={4}
+            step={0.1}
+            onValueChange={([v]) => {
+              const f = Math.round(v * 10) / 10;
+              updateParameters({ upscaleFactor: f, outputResolution: `${f}x` } as Partial<UpscaleParams>);
+            }}
+          />
+          <div className="grid grid-cols-5 gap-2">
+            {[1.2, 1.5, 2, 3, 4].map((factor) => (
+              <button
+                key={factor}
+                type="button"
+                className={cn("min-h-9 rounded-lg border text-[12px] font-medium", params.upscaleFactor === factor ? "border-primary bg-primary/5 text-primary" : "border-border")}
+                onClick={() => updateParameters({ upscaleFactor: factor, outputResolution: `${factor}x` } as Partial<UpscaleParams>)}
+              >
+                {factor}×
+              </button>
+            ))}
+          </div>
         </div>
         <ModelAndResolutionFields
           aiModel={params.aiModel}
