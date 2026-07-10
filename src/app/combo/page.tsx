@@ -2528,6 +2528,7 @@ function WatermarkPositionPreview({
   // 预览与后端合成同口径：水印宽度 = 图宽 × sizeRatio（见 lib/watermark.ts）
   const sizeRatio = params.sizeRatio && params.sizeRatio > 0 ? params.sizeRatio : 0.2;
   const [previewWidth, setPreviewWidth] = useState(0);
+  const [resizeDragStart, setResizeDragStart] = useState({ x: 0, ratio: 0 });
 
   useEffect(() => {
     const el = previewRef.current;
@@ -2636,6 +2637,26 @@ function WatermarkPositionPreview({
     });
   };
 
+  const handleResizeHandlePointerDown = (event: PointerEvent<HTMLSpanElement>) => {
+    event.stopPropagation(); // 不触发父级拖拽定位
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setResizeDragStart({ x: event.clientX, ratio: sizeRatio });
+  };
+
+  const handleResizeHandlePointerMove = (event: PointerEvent<HTMLSpanElement>) => {
+    if (event.buttons !== 1 || resizeDragStart.ratio === 0) return;
+    const preview = previewRef.current;
+    if (!preview) return;
+    const rect = preview.getBoundingClientRect();
+    const delta = (event.clientX - resizeDragStart.x) / rect.width;
+    const next = clamp(resizeDragStart.ratio + delta, 0.05, 0.6);
+    onChange({ sizeRatio: next });
+  };
+
+  const handleResizeHandlePointerUp = () => {
+    setResizeDragStart({ x: 0, ratio: 0 });
+  };
+
   return (
     <section className="flex flex-col gap-2">
       <FieldLabel>
@@ -2701,6 +2722,14 @@ function WatermarkPositionPreview({
           ) : (
             previewText
           )}
+          {/* 右下角缩放手柄 */}
+          <span
+            onPointerDown={handleResizeHandlePointerDown}
+            onPointerMove={handleResizeHandlePointerMove}
+            onPointerUp={handleResizeHandlePointerUp}
+            onPointerCancel={handleResizeHandlePointerUp}
+            className="absolute -bottom-1.5 -right-1.5 h-6 w-6 touch-none cursor-se-resize rounded-full bg-brand shadow-soft hover:bg-brand-soft active:bg-brand"
+          />
         </span>
       </div>
     </section>
