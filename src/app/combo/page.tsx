@@ -384,6 +384,16 @@ function normalizeStepTaskInput(
     };
   }
 
+  if (step.type === "outpaint") {
+    const outpaintParams = step.params as OutpaintParams;
+    return {
+      ...baseInput,
+      direction: outpaintParams.direction,
+      ratio: outpaintParams.ratio,
+      outputResolution: toOutputResolution(global.resolution),
+    };
+  }
+
   return {
     ...baseInput,
     ...params,
@@ -2600,8 +2610,8 @@ function OutpaintStepParams({
         label="扩展比例"
         value={params.ratio}
         suffix="%"
-        min={10}
-        max={80}
+        min={5}
+        max={50}
         onChange={(ratio) => onChange({ ratio })}
       />
     </>

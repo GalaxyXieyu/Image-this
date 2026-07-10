@@ -24,6 +24,7 @@ export interface OrderedPipelineStep {
   aiModel?: string;
   // outpaint
   ratio?: number;
+  direction?: string; // 扩图方向：'all'/'horizontal'/'vertical'
   xScale?: number;
   yScale?: number;
   outpaintPrompt?: string;
@@ -115,14 +116,21 @@ export async function executeOrderedPipeline(params: OrderedPipelineParams) {
           current = out;
         } else if (step.stepType === 'outpaint') {
           const each = Math.min(0.5, Math.max(0.05, (step.ratio ?? 25) / 100));
+          const dir = (step.direction as string) || 'all';
+          const horiz = dir === 'all' || dir === 'horizontal';
+          const vert  = dir === 'all' || dir === 'vertical';
+          const left = horiz ? each : 0;
+          const right = horiz ? each : 0;
+          const top  = vert  ? each : 0;
+          const bottom = vert  ? each : 0;
           const r = await outpaintWithVolcengine(
             userId,
             current,
             step.outpaintPrompt || step.customPrompt || DEFAULT_OUTPAINT_PROMPT,
-            each,
-            each,
-            each,
-            each,
+            top,
+            bottom,
+            left,
+            right,
             2048,
             2048,
             volcengineConfig,
