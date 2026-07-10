@@ -125,6 +125,7 @@ const watermarkHandler = {
         watermarkPosition,
         watermarkOpacity,
         watermarkText,
+        watermarkScale: input.watermarkScale,
         outputResolution,
       });
 

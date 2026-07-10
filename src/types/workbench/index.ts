@@ -146,6 +146,8 @@ export interface WatermarkParams {
   watermarkOpacity: number;
   /** 预设角落/居中，或自由拖拽坐标对象 */
   watermarkPosition: WatermarkPreset | WatermarkFreePosition;
+  /** 水印大小：占图片宽度比例（0.05~0.6），缺省 0.2（见 lib/watermark.ts） */
+  watermarkScale?: number;
   outputResolution: string;
 }
 

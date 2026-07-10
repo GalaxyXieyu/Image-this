@@ -1203,6 +1203,7 @@ class TaskProcessor {
       watermarkOpacity = 0.3,
       watermarkPosition = 'bottom-right',
       watermarkType = 'logo',
+      watermarkScale,
       outputResolution = 'original'
     } = inputData;
 
@@ -1242,6 +1243,7 @@ class TaskProcessor {
         watermarkPosition,
         watermarkOpacity,
         watermarkText,
+        watermarkScale,
         outputResolution
       });
       

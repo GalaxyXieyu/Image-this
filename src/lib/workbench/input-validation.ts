@@ -91,12 +91,20 @@ export function validateWatermarkParams(raw: unknown): WatermarkParams {
   const type = obj.watermarkType;
   const validType = type === 'logo' ? 'logo' : 'text';
 
+  // 水印大小（占图宽比例）：合法区间 0.05~0.6，越界钳制；非数字则不传（引擎用默认 0.2）
+  const rawScale = obj.watermarkScale;
+  const watermarkScale =
+    typeof rawScale === 'number' && Number.isFinite(rawScale) && rawScale > 0
+      ? Math.min(0.6, Math.max(0.05, rawScale))
+      : undefined;
+
   return {
     watermarkType: validType,
     watermarkText: typeof obj.watermarkText === 'string' ? obj.watermarkText : '',
     watermarkLogoAsset: obj.watermarkLogoAsset ? validateInputAssetRef(obj.watermarkLogoAsset) : undefined,
     watermarkOpacity: typeof obj.watermarkOpacity === 'number' ? obj.watermarkOpacity : 50,
     watermarkPosition: validPosition,
+    watermarkScale,
     outputResolution: typeof obj.outputResolution === 'string' ? obj.outputResolution : '1024x1024',
   };
 }
