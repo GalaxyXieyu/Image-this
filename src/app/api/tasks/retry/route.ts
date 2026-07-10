@@ -35,7 +35,10 @@ export async function POST(request: NextRequest) {
         inputData: true,
         priority: true,
         totalSteps: true,
-        projectId: true
+        projectId: true,
+        contractVersion: true,
+        workflowType: true,
+        handlerName: true
       }
     });
 
@@ -57,22 +60,25 @@ export async function POST(request: NextRequest) {
             totalSteps: task.totalSteps,
             userId: session.user.id,
             projectId: task.projectId,
-            currentStep: '任务已创建，等待处理（重新运行）'
+            currentStep: '任务已创建，等待处理（重新运行）',
+            contractVersion: task.contractVersion,
+            workflowType: task.workflowType,
+            handlerName: task.handlerName
           }
         })
       )
     );
 
-    // 自动触发任务处理器
-    try {
-      await fetch(getInternalWorkerUrl(request), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ batch: true })
-      });
-    } catch (e) {
-      console.warn('自动触发任务处理器失败:', e);
-    }
+    const retryTaskIds = newTasks.map((task) => task.id);
+
+    // 自动触发任务处理器，仅处理本次新建的重跑任务，避免误领取其它用户队列。
+    void fetch(getInternalWorkerUrl(request), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ batch: true, maxTasks: retryTaskIds.length, taskIds: retryTaskIds })
+    }).catch((error) => {
+      console.warn('自动触发任务处理器失败:', error);
+    });
 
     return NextResponse.json({
       success: true,

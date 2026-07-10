@@ -128,6 +128,7 @@ interface BackendImage {
   height: number | null;
   qualityScore: number | null;
   createdAt: string;
+  updatedAt: string;
   metadata?: string | null;
   project: { id: string; name: string } | null;
 }
@@ -137,6 +138,7 @@ interface ResultImage {
   name: string;
   category: string;
   createdAt: string;
+  sortTime: number;
   thumbnail?: string | null;
   processedUrl?: string | null;
   /** 同一大任务的合并键（套图 setId / 场景 taskId），无则为单张 */
@@ -271,19 +273,23 @@ export default function ResultsPage() {
       const data = await apiGet<{ success: boolean; images: BackendImage[]; pagination: { total: number } }>(
         `/api/images?${params.toString()}`
       );
-      const mapped = data.images.map((img) => {
-        const group = parseGroup(img.metadata);
-        return {
-          id: img.id,
-          name: img.filename,
-          category: mapProcessType(img.processType),
-          createdAt: formatDate(img.createdAt),
-          thumbnail: img.thumbnailUrl,
-          processedUrl: img.processedUrl,
-          groupKey: group.key,
-          groupLabel: group.label,
-        };
-      });
+      const mapped = data.images
+        .map((img) => {
+          const group = parseGroup(img.metadata);
+          const sortTime = new Date(img.updatedAt || img.createdAt).getTime();
+          return {
+            id: img.id,
+            name: img.filename,
+            category: mapProcessType(img.processType),
+            createdAt: formatDate(img.updatedAt || img.createdAt),
+            sortTime: Number.isFinite(sortTime) ? sortTime : 0,
+            thumbnail: img.thumbnailUrl,
+            processedUrl: img.processedUrl,
+            groupKey: group.key,
+            groupLabel: group.label,
+          };
+        })
+        .sort((a, b) => b.sortTime - a.sortTime);
       setResults(mapped);
 
       // Compute category counts
@@ -470,23 +476,29 @@ export default function ResultsPage() {
   };
 
   // 按任务把结果合并成分组（保持出现顺序）；无合并键的作为单张
-  const taskGroups: Array<{ key: string; label: string; createdAt: string; items: ResultImage[] }> = [];
+  const taskGroups: Array<{ key: string; label: string; createdAt: string; sortTime: number; items: ResultImage[] }> = [];
   const ungrouped: ResultImage[] = [];
   if (groupByTask) {
-    const map = new Map<string, { key: string; label: string; createdAt: string; items: ResultImage[] }>();
+    const map = new Map<string, { key: string; label: string; createdAt: string; sortTime: number; items: ResultImage[] }>();
     for (const item of filteredResults) {
       if (item.groupKey) {
         let g = map.get(item.groupKey);
         if (!g) {
-          g = { key: item.groupKey, label: item.groupLabel || "生成任务", createdAt: item.createdAt, items: [] };
+          g = { key: item.groupKey, label: item.groupLabel || "生成任务", createdAt: item.createdAt, sortTime: item.sortTime, items: [] };
           map.set(item.groupKey, g);
           taskGroups.push(g);
         }
         g.items.push(item);
+        if (item.sortTime > g.sortTime) {
+          g.sortTime = item.sortTime;
+          g.createdAt = item.createdAt;
+        }
       } else {
         ungrouped.push(item);
       }
     }
+    taskGroups.sort((a, b) => b.sortTime - a.sortTime);
+    ungrouped.sort((a, b) => b.sortTime - a.sortTime);
   }
 
   // #2 灯箱：当前可见有序列表（镜像渲染顺序），供左右切换

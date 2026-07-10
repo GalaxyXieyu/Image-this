@@ -19,6 +19,7 @@ interface ImageQueryResult {
   height: number | null;
   qualityScore: number | null;
   createdAt: Date;
+  updatedAt: Date;
   metadata?: string | null;
   project: {
     id: string;
@@ -98,7 +99,10 @@ export async function GET(request: NextRequest) {
     // 查询图片 - 使用固定的 select 避免类型推断问题
     const rawImages = await prisma.processedImage.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: [
+        { updatedAt: 'desc' },
+        { createdAt: 'desc' },
+      ],
       take: queryLimit,
       skip: offset,
       select: {
@@ -114,6 +118,7 @@ export async function GET(request: NextRequest) {
         height: true,
         qualityScore: true,
         createdAt: true,
+        updatedAt: true,
         metadata: true,
         project: {
           select: {

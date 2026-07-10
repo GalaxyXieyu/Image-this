@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { apiGet, apiDelete } from "@/lib/api-client";
+import { apiGet, apiDelete, apiPost } from "@/lib/api-client";
 import { useTaskPolling } from "@/lib/use-task-polling";
 import { getWorkflowTypeLabel, normalizeTaskStatus } from "@/lib/workbench/task-compat";
 import { BrandEmptyState } from "@/components/brands/SpriteImage";
@@ -131,12 +131,32 @@ function TaskThumbnail({ src, isResult }: { src?: string | null; isResult: boole
   );
 }
 
-function TaskActions({ task, onDelete }: { task: Task; onDelete: (_id: string) => void }) {
+function TaskActions({
+  task,
+  onDelete,
+  onRetry,
+  retrying,
+}: {
+  task: Task;
+  onDelete: (_id: string) => void;
+  onRetry: (_id: string) => void;
+  retrying: boolean;
+}) {
   return (
     <>
       {task.status === "failed" && (
-        <Button variant="ghost" size="sm" className="min-h-10" onClick={() => alert("重试功能待实现")}>
-          <RotateCcw className="w-4 h-4 mr-1.5" />
+        <Button
+          variant="ghost"
+          size="sm"
+          className="min-h-10"
+          onClick={() => onRetry(task.id)}
+          disabled={retrying}
+        >
+          {retrying ? (
+            <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+          ) : (
+            <RotateCcw className="w-4 h-4 mr-1.5" />
+          )}
           重试
         </Button>
       )}
@@ -167,6 +187,7 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState({ pending: 0, running: 0, completed: 0, failed: 0, total: 0 });
+  const [retryingTaskIds, setRetryingTaskIds] = useState<Set<string>>(() => new Set());
 
   const fetchTasks = useCallback(async () => {
     if (status !== "authenticated") return;
@@ -234,6 +255,26 @@ export default function TasksPage() {
       setTasks((prev) => prev.filter((t) => t.id !== taskId));
     } catch (err) {
       alert(err instanceof Error ? err.message : "删除失败");
+    }
+  };
+
+  const handleRetry = async (taskId: string) => {
+    if (retryingTaskIds.has(taskId)) return;
+
+    setRetryingTaskIds((prev) => new Set(prev).add(taskId));
+    try {
+      await apiPost<{ success: boolean; tasks: Array<{ id: string }> }>("/api/tasks/retry", {
+        taskIds: [taskId],
+      });
+      await fetchTasks();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "重试失败");
+    } finally {
+      setRetryingTaskIds((prev) => {
+        const next = new Set(prev);
+        next.delete(taskId);
+        return next;
+      });
     }
   };
 
@@ -414,7 +455,12 @@ export default function TasksPage() {
                 )}
 
                 <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-border md:mt-4 md:pt-4">
-                  <TaskActions task={task} onDelete={handleDelete} />
+                  <TaskActions
+                    task={task}
+                    onDelete={handleDelete}
+                    onRetry={handleRetry}
+                    retrying={retryingTaskIds.has(task.id)}
+                  />
                 </div>
               </div>
             ))}
@@ -464,7 +510,12 @@ export default function TasksPage() {
                       <td className="px-3 py-2.5 text-[12px] text-muted-foreground">{task.createdAt}</td>
                       <td className="px-4 py-2.5">
                         <div className="flex items-center justify-end gap-1">
-                          <TaskActions task={task} onDelete={handleDelete} />
+                          <TaskActions
+                            task={task}
+                            onDelete={handleDelete}
+                            onRetry={handleRetry}
+                            retrying={retryingTaskIds.has(task.id)}
+                          />
                         </div>
                       </td>
                     </tr>
