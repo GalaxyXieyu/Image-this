@@ -2251,6 +2251,21 @@ function UpscaleStepParams({
   params: UpscaleParams;
   onChange: (_patch: Partial<UpscaleParams>) => void;
 }) {
+  const [inputValue, setInputValue] = useState(String(params.factor));
+
+  const handleInputBlur = () => {
+    const raw = inputValue.trim();
+    const num = Number(raw);
+    const v = Number.isNaN(num) ? params.factor : Math.min(4, Math.max(1.1, num));
+    const rounded = Math.round(v * 100) / 100;
+    onChange({ factor: rounded });
+    setInputValue(String(rounded));
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+  };
+
   return (
     <>
       <SliderRow
@@ -2260,22 +2275,47 @@ function UpscaleStepParams({
         min={1.1}
         max={4}
         step={0.1}
-        onChange={(v) => onChange({ factor: Math.round(v * 10) / 10 })}
+        onChange={(v) => {
+          const rounded = Math.round(v * 100) / 100;
+          onChange({ factor: rounded });
+          setInputValue(String(rounded));
+        }}
       />
-      <div className="flex gap-2">
-        {[1.2, 1.5, 2, 3, 4].map((f) => (
-          <button
-            key={f}
-            type="button"
-            onClick={() => onChange({ factor: f })}
-            className={cn(
-              "min-h-8 flex-1 rounded-[9px] border text-[12px] font-semibold transition-colors",
-              params.factor === f ? "border-brand bg-brand-soft text-brand-text" : "border-line-strong text-ink-2 hover:text-ink"
-            )}
-          >
-            {f}×
-          </button>
-        ))}
+      <div className="space-y-2">
+        <Input
+          type="number"
+          step="0.01"
+          min={1.1}
+          max={4}
+          value={inputValue}
+          onChange={handleInputChange}
+          onBlur={handleInputBlur}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              handleInputBlur();
+            }
+          }}
+          placeholder="输入倍数"
+          className="h-8 text-center text-[13px]"
+        />
+        <div className="flex gap-2">
+          {[1.2, 1.5, 2, 3, 4].map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => {
+                onChange({ factor: f });
+                setInputValue(String(f));
+              }}
+              className={cn(
+                "min-h-8 flex-1 rounded-[9px] border text-[12px] font-semibold transition-colors",
+                params.factor === f ? "border-brand bg-brand-soft text-brand-text" : "border-line-strong text-ink-2 hover:text-ink"
+              )}
+            >
+              {f}×
+            </button>
+          ))}
+        </div>
       </div>
       <SliderRow
         label="降噪强度"
