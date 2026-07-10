@@ -203,9 +203,11 @@ async function addLogoWatermark(
       logoWidth = Math.round(logoOriginalWidth * actualScale);
       logoHeight = Math.round(logoOriginalHeight * actualScale);
     } else {
-      // === 默认值
-      logoWidth = Math.round(logoOriginalWidth * 0.2);
-      logoHeight = Math.round(logoOriginalHeight * 0.2);
+      // === 默认值：使用函数级 watermarkScale 参数
+      const targetLogoWidth = width * (watermarkScale && watermarkScale > 0 ? watermarkScale : 0.2);
+      const scale = targetLogoWidth / logoOriginalWidth;
+      logoWidth = Math.round(logoOriginalWidth * scale);
+      logoHeight = Math.round(logoOriginalHeight * scale);
     }
     
     // === 使用相对位置（百分比）来确保位置一致
