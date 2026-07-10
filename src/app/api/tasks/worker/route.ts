@@ -668,7 +668,14 @@ class TaskProcessor {
       if (!referenceImageUrl && refAsset) {
         referenceImageUrl = (await readAssetAsDataUrl(refAsset)) || getAssetClientUrl(refAsset) || undefined;
       }
-      steps.push({ ...s, stepType, referenceImageUrl });
+      // 水印步：Logo 资源转可用 URL（与 handlers/pipeline.ts 同款修复；
+      // 真实批量执行走本方法而非注册 handler，漏掉会导致 combo Logo 水印静默变占位块）
+      let watermarkLogoUrl = (s.watermarkLogoUrl as string) || undefined;
+      const logoAsset = s.watermarkLogoAsset as Parameters<typeof readAssetAsDataUrl>[0];
+      if (!watermarkLogoUrl && logoAsset) {
+        watermarkLogoUrl = (await readAssetAsDataUrl(logoAsset)) || getAssetClientUrl(logoAsset) || undefined;
+      }
+      steps.push({ ...s, stepType, referenceImageUrl, watermarkLogoUrl });
     }
 
     const { executeOrderedPipeline } = await import(

@@ -2547,7 +2547,8 @@ function WatermarkPositionPreview({
     })();
     return {
       aspectRatio: ratio.toString(),
-      maxWidth: ratio > 1 ? "100%" : `min(100%, ${(52 / ratio)}vh)`,
+      // 高度上限 52vh：竖比时按 52vh × (w/h) 收窄宽度，保证渲染比例不被高度截断
+      maxWidth: ratio > 1 ? "100%" : `min(100%, ${52 * ratio}vh)`,
     };
   }, [aspectRatio, finalAspect]);
 
