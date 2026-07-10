@@ -426,6 +426,41 @@ function toOutputResolution(resolution: string) {
   return resolutionMap[resolution] ?? "original";
 }
 
+function computeFinalAspect(
+  steps: WorkflowStep[],
+  currentStepId: string,
+  baseW: number,
+  baseH: number
+): number {
+  if (!baseW || !baseH || baseW <= 0 || baseH <= 0) return 1;
+
+  let xExpand = 1;
+  let yExpand = 1;
+
+  const currentIndex = steps.findIndex(s => s.id === currentStepId);
+  const precedingSteps = currentIndex >= 0 ? steps.slice(0, currentIndex) : [];
+
+  for (const step of precedingSteps) {
+    if (step.type === 'outpaint') {
+      const params = step.params as OutpaintParams;
+      const ratio = params.ratio ?? 25;
+      const each = Math.min(0.5, Math.max(0.05, ratio / 100));
+      const dir = params.direction || 'all';
+      const horiz = dir === 'all' || dir === 'horizontal';
+      const vert = dir === 'all' || dir === 'vertical';
+      if (horiz) xExpand *= 1 + 2 * each;
+      if (vert) yExpand *= 1 + 2 * each;
+    } else if (step.type === 'upscale') {
+      const params = step.params as UpscaleParams;
+      const factor = Math.min(4, Math.max(1.1, params.factor ?? 1));
+      xExpand *= factor;
+      yExpand *= factor;
+    }
+  }
+
+  return (baseW * xExpand) / (baseH * yExpand);
+}
+
 export default function ComboPage() {
   const [workflowTemplates, setWorkflowTemplates] = useState<WorkflowTemplateType[]>([]);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
@@ -450,6 +485,7 @@ export default function ComboPage() {
   const [productAssets, setProductAssets] = useState<InputAssetRef[]>([]);
   const [uploadingProductAssets, setUploadingProductAssets] = useState(false);
   const productInputRef = useRef<HTMLInputElement>(null);
+  const [productImageDims, setProductImageDims] = useState({ width: 0, height: 0 });
 
   // Add step drawer
   const [addStepOpen, setAddStepOpen] = useState(false);
@@ -986,6 +1022,12 @@ export default function ComboPage() {
                           onError={(e) => {
                             e.currentTarget.style.display = "none";
                           }}
+                          onLoad={(e) => {
+                            if (index === 0) {
+                              const img = e.currentTarget;
+                              setProductImageDims({ width: img.naturalWidth, height: img.naturalHeight });
+                            }
+                          }}
                         />
                       </div>
                       <button
@@ -1177,6 +1219,8 @@ export default function ComboPage() {
                             params={step.params as WatermarkParams}
                             aspectRatio={aspectRatio}
                             onChange={(patch) => updateStepParams(step.id, patch)}
+                            productImage={productAssets[0]}
+                            finalAspect={productImageDims.width && productImageDims.height ? computeFinalAspect(steps, step.id, productImageDims.width, productImageDims.height) : undefined}
                           />
                         )}
                         {step.type === "outpaint" && (
@@ -1704,6 +1748,8 @@ export default function ComboPage() {
                 onCollapse={() => setRightCollapsed(true)}
                 onChange={(patch) => updateStepParams(selectedStep.id, patch)}
                 aspectRatio={aspectRatio}
+                productImage={productAssets[0]}
+                finalAspect={productImageDims.width && productImageDims.height ? computeFinalAspect(steps, selectedStep.id, productImageDims.width, productImageDims.height) : undefined}
               />
             ) : (
               <GlobalSettingsPanel
@@ -1942,12 +1988,16 @@ function StepParamPanel({
   onCollapse,
   onChange,
   aspectRatio,
+  productImage,
+  finalAspect,
 }: {
   step: WorkflowStep;
   onClose: () => void;
   onCollapse: () => void;
   onChange: (_patch: Partial<StepParams["params"]>) => void;
   aspectRatio: string;
+  productImage?: InputAssetRef;
+  finalAspect?: number;
 }) {
   // 仅用于非 workflow 步，类型保证由调用处进行
   if (step.type === "workflow") {
@@ -1995,6 +2045,8 @@ function StepParamPanel({
           params={step.params as WatermarkParams}
           aspectRatio={aspectRatio}
           onChange={onChange}
+          productImage={productImage}
+          finalAspect={finalAspect}
         />
       )}
       {step.type === "outpaint" && (
@@ -2333,10 +2385,14 @@ function WatermarkStepParams({
   params,
   aspectRatio,
   onChange,
+  productImage,
+  finalAspect,
 }: {
   params: WatermarkParams;
   aspectRatio: string;
   onChange: (_patch: Partial<WatermarkParams>) => void;
+  productImage?: InputAssetRef;
+  finalAspect?: number;
 }) {
   const { upload, uploading } = useUpload();
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -2358,6 +2414,8 @@ function WatermarkStepParams({
         params={params}
         aspectRatio={aspectRatio}
         onChange={onChange}
+        productImage={productImage}
+        finalAspect={finalAspect}
       />
       <section className="flex flex-col gap-2">
         <FieldLabel>水印类型</FieldLabel>
@@ -2455,10 +2513,14 @@ function WatermarkPositionPreview({
   params,
   aspectRatio,
   onChange,
+  productImage,
+  finalAspect,
 }: {
   params: WatermarkParams;
   aspectRatio: string;
   onChange: (_patch: Partial<WatermarkParams>) => void;
+  productImage?: InputAssetRef;
+  finalAspect?: number;
 }) {
   const previewRef = useRef<HTMLDivElement>(null);
   const watermarkRef = useRef<HTMLSpanElement>(null);
@@ -2476,14 +2538,17 @@ function WatermarkPositionPreview({
     return () => observer.disconnect();
   }, []);
   const aspectStyle = useMemo(() => {
-    const [rawWidth, rawHeight] = aspectRatio.split(":").map(Number);
-    const width = Number.isFinite(rawWidth) && rawWidth > 0 ? rawWidth : 1;
-    const height = Number.isFinite(rawHeight) && rawHeight > 0 ? rawHeight : 1;
+    // 如果有 finalAspect，优先使用；否则用全局 aspectRatio
+    const ratio = finalAspect || (() => {
+      const [rawWidth, rawHeight] = aspectRatio.split(":").map(Number);
+      return (Number.isFinite(rawWidth) && rawWidth > 0 ? rawWidth : 1) /
+             (Number.isFinite(rawHeight) && rawHeight > 0 ? rawHeight : 1);
+    })();
     return {
-      aspectRatio: `${width} / ${height}`,
-      maxWidth: height > width ? `min(100%, ${(52 * width) / height}vh)` : "100%",
+      aspectRatio: ratio.toString(),
+      maxWidth: ratio > 1 ? "100%" : `min(100%, ${(52 / ratio)}vh)`,
     };
-  }, [aspectRatio]);
+  }, [aspectRatio, finalAspect]);
 
   const getPresetPosition = useCallback((
     position: WatermarkPresetPosition | "custom",
@@ -2573,15 +2638,37 @@ function WatermarkPositionPreview({
 
   return (
     <section className="flex flex-col gap-2">
-      <FieldLabel>位置预览</FieldLabel>
+      <FieldLabel>
+        <div className="flex items-center justify-between">
+          <span>位置预览</span>
+          {productImage && <span className="text-[11px] font-normal text-ink-3">预览为近似效果</span>}
+        </div>
+      </FieldLabel>
       <div
         ref={previewRef}
         className="relative mx-auto max-h-[52vh] min-h-40 w-full touch-none overflow-hidden rounded-[14px] border border-line bg-[linear-gradient(135deg,#f8fafc_0%,#e2e8f0_48%,#dbeafe_100%)]"
         style={aspectStyle}
       >
-        <div className="absolute inset-x-8 bottom-8 h-[44%] rounded-t-[40%] bg-white/70 shadow-soft" />
-        <div className="absolute left-1/2 top-[44%] h-16 w-16 -translate-x-1/2 rounded-[18px] bg-surface shadow-float ring-1 ring-line" />
-        <div className="absolute left-1/2 top-[47%] h-8 w-20 -translate-x-1/2 rounded-full bg-brand-soft/80" />
+        {productImage ? (
+          <>
+            {/* 真实产品图 */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={productImage.clientUrl}
+              alt=""
+              className="absolute inset-0 h-full w-full object-contain"
+              draggable={false}
+            />
+            {/* 半透明暗色 overlay 保证水印可读 */}
+            <div className="absolute inset-0 bg-black/25" />
+          </>
+        ) : (
+          <>
+            <div className="absolute inset-x-8 bottom-8 h-[44%] rounded-t-[40%] bg-white/70 shadow-soft" />
+            <div className="absolute left-1/2 top-[44%] h-16 w-16 -translate-x-1/2 rounded-[18px] bg-surface shadow-float ring-1 ring-line" />
+            <div className="absolute left-1/2 top-[47%] h-8 w-20 -translate-x-1/2 rounded-full bg-brand-soft/80" />
+          </>
+        )}
         <span
           ref={watermarkRef}
           onPointerDown={(event) => {
