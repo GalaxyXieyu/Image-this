@@ -2413,6 +2413,18 @@ function WatermarkPositionPreview({
   const previewRef = useRef<HTMLDivElement>(null);
   const watermarkRef = useRef<HTMLSpanElement>(null);
   const previewText = params.content.trim() || "@品牌名";
+  // 预览与后端合成同口径：水印宽度 = 图宽 × sizeRatio（见 lib/watermark.ts）
+  const sizeRatio = params.sizeRatio && params.sizeRatio > 0 ? params.sizeRatio : 0.2;
+  const [previewWidth, setPreviewWidth] = useState(0);
+
+  useEffect(() => {
+    const el = previewRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => setPreviewWidth(el.clientWidth));
+    observer.observe(el);
+    setPreviewWidth(el.clientWidth);
+    return () => observer.disconnect();
+  }, []);
   const aspectStyle = useMemo(() => {
     const [rawWidth, rawHeight] = aspectRatio.split(":").map(Number);
     const width = Number.isFinite(rawWidth) && rawWidth > 0 ? rawWidth : 1;
@@ -2478,7 +2490,7 @@ function WatermarkPositionPreview({
 
   useEffect(() => {
     updateWatermarkElement();
-  }, [updateWatermarkElement, previewText, aspectRatio]);
+  }, [updateWatermarkElement, previewText, aspectRatio, sizeRatio, previewWidth]);
 
   const handlePointerMove = (event: PointerEvent<HTMLSpanElement>) => {
     if (event.buttons !== 1) return;
@@ -2531,13 +2543,24 @@ function WatermarkPositionPreview({
             "absolute max-w-[72%] cursor-grab select-none shadow-soft active:cursor-grabbing",
             params.type === "logo" && params.logoAsset
               ? ""
-              : "rounded-full bg-ink px-2.5 py-1 text-[11px] font-semibold text-white"
+              : "whitespace-nowrap rounded-full bg-ink px-[0.6em] py-[0.25em] font-semibold text-white"
           )}
-          style={{ opacity: Math.max(0.1, params.opacity / 100) }}
+          style={{
+            opacity: Math.max(0.1, params.opacity / 100),
+            ...(params.type === "logo" && params.logoAsset
+              ? { width: `${sizeRatio * 100}%` }
+              : { fontSize: `${Math.max(8, previewWidth * sizeRatio * 0.5)}px` }),
+          }}
         >
           {params.type === "logo" && params.logoAsset ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={params.logoAsset.clientUrl} alt="" className="h-8 w-auto object-contain" draggable={false} />
+            <img
+              src={params.logoAsset.clientUrl}
+              alt=""
+              className="h-auto w-full object-contain"
+              draggable={false}
+              onLoad={updateWatermarkElement}
+            />
           ) : (
             previewText
           )}
