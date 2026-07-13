@@ -14,7 +14,9 @@
 import { prisma } from '@/lib/prisma';
 import { createListingSetResumeTask } from '@/lib/workbench/listing-set-resume';
 
-const STALE_MS = 5 * 60 * 1000; // 5 分钟无心跳视为掉线（安全高于单张出图耗时）
+// 5 分钟无心跳视为掉线。worker 执行期间每 60s 写一次心跳（startTaskHeartbeat bump updatedAt），
+// 活任务不会被误判；只有进程真死（心跳随进程消失）才会触发回收，避免长 provider 调用被并行重跑导致重复计费。
+const STALE_MS = 5 * 60 * 1000;
 
 function workerBaseUrl(): string {
   // 不能用 NEXTAUTH_URL 公网地址自调用：生产 nginx 会把 http POST 301 到 https，

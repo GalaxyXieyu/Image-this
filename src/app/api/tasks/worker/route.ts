@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { uploadBase64Image } from '@/lib/storage';
 import { addWatermarkToImage } from '@/lib/watermark';
@@ -44,6 +45,10 @@ type QueueTaskForProcessing = {
   contractVersion?: number;
   workflowType?: string | null;
   handlerName?: string | null;
+  // 本次抢占的执行指纹（= claim 时写入的 startedAt）。
+  // 终态回写/心跳都用它做 fence：任务若被 sweep 回收后重新抢占，
+  // 旧执行的回写因 startedAt 不匹配而失效，防止僵尸执行覆盖状态或重新入队。
+  claimedAt: Date;
 };
 
 type PersistedTaskResult = {
@@ -235,6 +240,7 @@ class TaskProcessor {
     for (const task of candidates) {
       const retryCount = task.retryCount ?? 0;
       const retryInfo = retryCount > 0 ? ` (重试 ${retryCount} 次)` : '';
+      const claimedAt = new Date();
       const claimed = await prisma.taskQueue.updateMany({
         where: {
           id: task.id,
@@ -242,18 +248,56 @@ class TaskProcessor {
         },
         data: {
           status: 'PROCESSING',
-          startedAt: new Date(),
+          startedAt: claimedAt,
           currentStep: `开始处理任务${retryInfo}`,
           progress: 0,
         },
       });
 
       if (claimed.count === 1) {
-        claimedTasks.push(task);
+        claimedTasks.push({ ...task, claimedAt });
       }
     }
 
     return claimedTasks;
+  }
+
+  /**
+   * 执行期心跳：定期 bump updatedAt，证明任务仍在本进程内活跃执行。
+   * task-recovery 的 sweep 以「updatedAt 超过 STALE_MS 无变化」判定掉线——
+   * 单步任务在 provider 长调用期间没有任何进度写库，没有心跳时任何一次
+   * 超过 STALE_MS 的生成调用都会被 sweep 误判回收并重复执行（重复计费）。
+   * 心跳带 claimedAt fence：任务被回收重抢后旧心跳自然失效。
+   */
+  private startTaskHeartbeat(task: Pick<QueueTaskForProcessing, 'id' | 'claimedAt'>): () => void {
+    const HEARTBEAT_INTERVAL_MS = 60 * 1000;
+    const timer = setInterval(() => {
+      prisma.taskQueue
+        .updateMany({
+          where: { id: task.id, status: 'PROCESSING', startedAt: task.claimedAt },
+          data: { updatedAt: new Date() },
+        })
+        .catch((error) => {
+          console.warn(`[Task Worker] 任务 ${task.id} 心跳写入失败:`, error);
+        });
+    }, HEARTBEAT_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }
+
+  /**
+   * 带 fence 的终态回写：仅当任务仍处于「本次执行抢占的 PROCESSING」时生效。
+   * count=0 表示任务已被删除，或已被 sweep 回收并由其它执行接管——
+   * 本次（僵尸）执行不得覆盖状态，否则会掩盖重复执行/覆盖新执行的真实状态。
+   */
+  private async writeTerminalState(
+    task: Pick<QueueTaskForProcessing, 'id' | 'claimedAt'>,
+    data: Prisma.TaskQueueUncheckedUpdateManyInput
+  ): Promise<boolean> {
+    const updated = await prisma.taskQueue.updateMany({
+      where: { id: task.id, status: 'PROCESSING', startedAt: task.claimedAt },
+      data,
+    });
+    return updated.count === 1;
   }
 
   async processNextTask(taskIds?: string[]) {
@@ -262,6 +306,7 @@ class TaskProcessor {
     }
 
     this.isProcessing = true;
+    let stopHeartbeat: (() => void) | undefined;
 
     try {
       const { concurrencyLimit, runningTasks, availableSlots } = await this.getAvailableSlots(1);
@@ -279,6 +324,8 @@ class TaskProcessor {
       if (!task) {
         return { message: '没有待处理的任务', running: runningTasks, limit: concurrencyLimit };
       }
+
+      stopHeartbeat = this.startTaskHeartbeat(task);
 
       // 根据任务类型处理
       // Phase 5: Try typed handler registry first, fall back to legacy switch
@@ -361,22 +408,22 @@ class TaskProcessor {
         ? handler.normalizeResult(result)
         : this.buildPersistedResult(task.type, result);
 
-      // 更新任务为完成状态，并关联处理结果
-      await prisma.taskQueue.update({
-        where: { id: task.id },
-        data: {
-          status: 'COMPLETED',
-          progress: 100,
-          currentStep: '处理完成',
-          completedAt: new Date(),
-          outputData: JSON.stringify(persistedResult),
-          completedSteps: task.totalSteps,
-          processedImageId: persistedResult.processedImageId || null
-        }
+      // 更新任务为完成状态，并关联处理结果（fence：仅本次执行可回写）
+      const committed = await this.writeTerminalState(task, {
+        status: 'COMPLETED',
+        progress: 100,
+        currentStep: '处理完成',
+        completedAt: new Date(),
+        outputData: JSON.stringify(persistedResult),
+        completedSteps: task.totalSteps,
+        processedImageId: persistedResult.processedImageId || null
       });
+      if (!committed) {
+        console.warn(`[Task Worker] 任务 ${task.id} 完成回写被拒（任务已删除或已被其它执行接管），本次结果不落任务状态`);
+      }
 
-      return { 
-        message: '任务处理完成', 
+      return {
+        message: '任务处理完成',
         taskId: task.id,
         type: task.type,
         result: persistedResult
@@ -385,6 +432,7 @@ class TaskProcessor {
     } catch (error) {
       throw error;
     } finally {
+      stopHeartbeat?.();
       this.isProcessing = false;
     }
   }
@@ -490,6 +538,7 @@ class TaskProcessor {
   }
 
   private async processSingleTask(task: QueueTaskForProcessing) {
+    const stopHeartbeat = this.startTaskHeartbeat(task);
     try {
       const userConfig = await getUserConfig(task.userId);
       
@@ -523,20 +572,20 @@ class TaskProcessor {
       
       clearTimeout(timeoutHandle!);
       const persistedResult = this.buildPersistedResult(task.type, result);
-      
-      // 更新任务为完成状态，并关联处理结果
-      await prisma.taskQueue.update({
-        where: { id: task.id },
-        data: {
-          status: 'COMPLETED',
-          progress: 100,
-          currentStep: '处理完成',
-          completedAt: new Date(),
-          outputData: JSON.stringify(persistedResult),
-          completedSteps: task.totalSteps,
-          processedImageId: persistedResult.processedImageId || null
-        }
+
+      // 更新任务为完成状态，并关联处理结果（fence：仅本次执行可回写）
+      const committed = await this.writeTerminalState(task, {
+        status: 'COMPLETED',
+        progress: 100,
+        currentStep: '处理完成',
+        completedAt: new Date(),
+        outputData: JSON.stringify(persistedResult),
+        completedSteps: task.totalSteps,
+        processedImageId: persistedResult.processedImageId || null
       });
+      if (!committed) {
+        console.warn(`[Task Worker] 任务 ${task.id} 完成回写被拒（任务已删除或已被其它执行接管），本次结果不落任务状态`);
+      }
 
       return persistedResult;
 
@@ -561,28 +610,31 @@ class TaskProcessor {
       const retryCount = currentTask?.retryCount ?? 0;
       const maxRetries = currentTask?.maxRetries ?? 3;
       const rawMessage = error instanceof Error ? error.message : '未知错误';
-      const friendlyMessage = mapProviderErrorMessage(rawMessage);
+      // 进程内看门狗超时 ≠ provider 调用失败：底层 HTTP 调用无法 abort、仍在继续跑，
+      // 大概率已在 provider 侧生成并计费。此时自动重试必然产生第二次计费，
+      // 因此判为不可重试，提示用户确认结果后手动重试。
+      const isWatchdogTimeout = rawMessage.includes('任务处理超时');
+      const friendlyMessage = isWatchdogTimeout
+        ? '生成耗时超过 10 分钟，为避免重复计费已停止自动重试；请到任务中心确认无结果后再手动重试'
+        : mapProviderErrorMessage(rawMessage);
       // 配额/余额不足、鉴权、模型/接口/参数类错误重试也不会成功，直接失败并给出可操作提示，
       // 避免一直卡在「等待重试」却无人重新触发 worker。
-      const retryable = isRetryableProviderError(rawMessage);
+      const retryable = !isWatchdogTimeout && isRetryableProviderError(rawMessage);
 
-      // updateMany 天然容忍行不存在（返回 count 0 而非抛 P2025），
-      // 覆盖「findUnique 之后、回写之前」任务被用户删除的竞态窗口。
+      // 终态回写带 fence（id + PROCESSING + claimedAt）：count 0 覆盖两种情况——
+      // 任务在处理期间被用户删除，或已被 sweep 回收并由其它执行接管；两者都不得再回写。
       if (retryable && retryCount < maxRetries) {
         // 还可以重试：增加重试次数，重置为 PENDING 状态
-        const updated = await prisma.taskQueue.updateMany({
-          where: { id: task.id },
-          data: {
-            status: 'PENDING',
-            retryCount: retryCount + 1,
-            progress: 0,
-            currentStep: `等待重试 (${retryCount + 1}/${maxRetries})`,
-            startedAt: null,
-            errorMessage: `处理失败: ${friendlyMessage}，准备第 ${retryCount + 1} 次重试`
-          }
+        const committed = await this.writeTerminalState(task, {
+          status: 'PENDING',
+          retryCount: retryCount + 1,
+          progress: 0,
+          currentStep: `等待重试 (${retryCount + 1}/${maxRetries})`,
+          startedAt: null,
+          errorMessage: `处理失败: ${friendlyMessage}，准备第 ${retryCount + 1} 次重试`
         });
-        if (updated.count === 0) {
-          console.warn(`[Task Worker] 任务 ${task.id} 回写重试状态时已被删除（用户取消），跳过`);
+        if (!committed) {
+          console.warn(`[Task Worker] 任务 ${task.id} 回写重试状态被拒（已删除或已被其它执行接管），跳过`);
           return null;
         }
         console.log(`[Task Worker] 任务 ${task.id} 处理失败，将进行第 ${retryCount + 1} 次重试`);
@@ -591,23 +643,22 @@ class TaskProcessor {
         const failMessage = retryable
           ? `重试 ${maxRetries} 次后仍然失败: ${friendlyMessage}`
           : friendlyMessage;
-        const updated = await prisma.taskQueue.updateMany({
-          where: { id: task.id },
-          data: {
-            status: 'FAILED',
-            completedAt: new Date(),
-            errorMessage: failMessage,
-            currentStep: retryable ? '处理失败（已达最大重试次数）' : '处理失败'
-          }
+        const committed = await this.writeTerminalState(task, {
+          status: 'FAILED',
+          completedAt: new Date(),
+          errorMessage: failMessage,
+          currentStep: retryable ? '处理失败（已达最大重试次数）' : '处理失败'
         });
-        if (updated.count === 0) {
-          console.warn(`[Task Worker] 任务 ${task.id} 回写失败状态时已被删除（用户取消），跳过`);
+        if (!committed) {
+          console.warn(`[Task Worker] 任务 ${task.id} 回写失败状态被拒（已删除或已被其它执行接管），跳过`);
           return null;
         }
         console.log(`[Task Worker] 任务 ${task.id} ${retryable ? `已达最大重试次数 (${maxRetries})` : '遇到不可重试错误'}，标记为失败`);
       }
 
       throw error;
+    } finally {
+      stopHeartbeat();
     }
   }
 
