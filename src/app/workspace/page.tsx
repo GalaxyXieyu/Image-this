@@ -29,13 +29,34 @@ const QUICK_ENTRIES: { href: string; icon: LucideIcon; title: string; desc: stri
   { href: "/combo", icon: Layers, title: "工作流", desc: "多步骤批量流水线" },
 ];
 
-function SceneThumb({ src, alt }: { src: string; alt: string }) {
+function thumbUrl(url?: string | null, w = 400): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith("/api/files/") || url.startsWith("/uploads/")) {
+    return `${url}${url.includes("?") ? "&" : "?"}w=${w}`;
+  }
+  return url;
+}
+
+function SceneThumb({ src, alt, thumbWidth = 400, loading = "lazy" }: { src: string; alt: string; thumbWidth?: number; loading?: "eager" | "lazy" }) {
   const [error, setError] = useState(false);
-  if (error) {
+  const resolved = thumbUrl(src, thumbWidth);
+  if (!resolved || error) {
     return <div className="h-full w-full bg-surface-muted" />;
   }
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt={alt} className="h-full w-full object-cover" onError={() => setError(true)} />;
+  return (
+    <img
+      src={resolved}
+      alt={alt}
+      loading={loading}
+      decoding="async"
+      fetchPriority={loading === "eager" ? "auto" : "low"}
+      width={thumbWidth}
+      height={thumbWidth}
+      className="h-full w-full object-cover"
+      onError={() => setError(true)}
+    />
+  );
 }
 
 function SectionHeader({ title, moreHref }: { title: string; moreHref: string }) {
@@ -119,7 +140,7 @@ export default function WorkbenchHubPage() {
                 className="glass-panel card-interactive relative overflow-hidden rounded-[20px] shadow-soft lg:col-span-2 lg:h-full"
               >
                 <div className="relative aspect-[16/9] overflow-hidden bg-surface-muted sm:aspect-[16/7] lg:aspect-auto lg:h-full">
-                  <SceneThumb src={sceneCover} alt={s.label} />
+                  <SceneThumb src={sceneCover} alt={s.label} thumbWidth={720} loading="eager" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent lg:bg-gradient-to-r lg:from-black/75 lg:via-black/30 lg:to-transparent" />
                   <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5 lg:inset-y-0 lg:right-auto lg:flex lg:max-w-[62%] lg:flex-col lg:justify-center lg:p-7">
                     <span className="mb-1.5 inline-flex w-fit rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-semibold text-white backdrop-blur-sm">
@@ -179,7 +200,7 @@ export default function WorkbenchHubPage() {
                   className="glass-panel card-interactive overflow-hidden rounded-[14px] shadow-soft"
                 >
                   <div className="relative aspect-square overflow-hidden bg-surface-muted">
-                    <SceneThumb src={img.url} alt="最近生成" />
+                    <SceneThumb src={img.url} alt="最近生成" thumbWidth={320} />
                   </div>
                 </Link>
               ))}

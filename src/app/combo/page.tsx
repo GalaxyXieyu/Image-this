@@ -20,7 +20,7 @@ import { BottomSheetSelect, type BottomSheetSelectOption } from "@/components/wo
 import { useUpload } from "@/lib/use-upload";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
-import { apiPost, apiGet } from "@/lib/api-client";
+import { apiPost, apiGet, apiPatch } from "@/lib/api-client";
 import type { InputAssetRef } from "@/types/workbench";
 import { usePageDraft } from "@/lib/use-page-draft";
 import {
@@ -330,6 +330,8 @@ interface PostWorkflowTemplateResponse {
   template: WorkflowTemplateType;
 }
 
+type TemplateSaveMode = "create" | "overwrite";
+
 function normalizeStepTaskInput(
   step: WorkflowStep,
   global: {
@@ -587,9 +589,12 @@ export default function ComboPage() {
     () => steps.find((s) => s.id === selectedStepId) ?? null,
     [steps, selectedStepId]
   );
-  const selectedTemplateName = selectedTemplate
-    ? templates.find((t) => t.id === selectedTemplate)?.name ?? null
-    : null;
+  const selectedWorkflowTemplate = useMemo(
+    () => (selectedTemplate ? templates.find((t) => t.id === selectedTemplate) ?? null : null),
+    [selectedTemplate, templates]
+  );
+  const canOverwriteSelectedTemplate = Boolean(selectedWorkflowTemplate && !selectedWorkflowTemplate.isSystem);
+  const selectedTemplateName = selectedWorkflowTemplate?.name ?? null;
   const previewSteps = useMemo(() => {
     if (steps.length === 0) return steps;
     const templatesById = Object.fromEntries(workflowTemplates.map((t) => [t.id, t]));
@@ -674,33 +679,62 @@ export default function ComboPage() {
     }
   };
 
+  const openSaveTemplateDrawer = () => {
+    const editableTemplate = selectedWorkflowTemplate && !selectedWorkflowTemplate.isSystem
+      ? selectedWorkflowTemplate
+      : null;
+
+    setTemplateSaveData({
+      name: editableTemplate?.name ?? "",
+      category: editableTemplate?.category ?? "",
+    });
+    setSaveTemplateOpen(true);
+  };
+
   // Save current workflow as template
-  const handleSave = async () => {
-    if (!templateSaveData.name.trim()) {
+  const handleSave = async (mode: TemplateSaveMode = "create") => {
+    const templateToOverwrite = mode === "overwrite" && canOverwriteSelectedTemplate
+      ? selectedWorkflowTemplate
+      : null;
+    const shouldOverwrite = Boolean(templateToOverwrite);
+    const name = templateSaveData.name.trim() || (templateToOverwrite ? templateToOverwrite.name : "");
+
+    if (!name) {
       alert("模板名称不能为空");
       return;
     }
+
+    const payload = {
+      name,
+      description: templateToOverwrite?.description ?? "",
+      category: templateSaveData.category || undefined,
+      steps: steps,
+      globalParams: {
+        aspectRatio,
+        resolution,
+        watermarkEnabled,
+        autoRetry,
+      },
+      tags: templateToOverwrite?.tags ?? [],
+    };
+
     try {
-      await apiPost<PostWorkflowTemplateResponse>("/api/workflow-templates", {
-        name: templateSaveData.name,
-        description: "",
-        category: templateSaveData.category || undefined,
-        steps: steps,
-        globalParams: {
-          aspectRatio,
-          resolution,
-          watermarkEnabled,
-          autoRetry,
-        },
-        tags: [],
-      });
+      const saved = templateToOverwrite
+        ? await apiPatch<PostWorkflowTemplateResponse>(`/api/workflow-templates/${templateToOverwrite.id}`, payload)
+        : await apiPost<PostWorkflowTemplateResponse>("/api/workflow-templates", payload);
+
       // Reload templates
       const res = await apiGet<GetWorkflowTemplatesResponse>(
         "/api/workflow-templates"
       );
       setWorkflowTemplates(res.templates || []);
+      setSelectedTemplate(saved.template.id);
       setSaveTemplateOpen(false);
       setTemplateSaveData({ name: "", category: "" });
+      toast({
+        title: shouldOverwrite ? "已覆盖模板" : "已保存为新模板",
+        description: shouldOverwrite ? `已更新「${name}」` : `已创建「${name}」`,
+      });
     } catch (error) {
       console.error("保存模板失败:", error);
       alert("保存模板失败，请重试");
@@ -1286,9 +1320,14 @@ export default function ComboPage() {
         <DrawerRoot open={saveTemplateOpen} onOpenChange={setSaveTemplateOpen}>
           <DrawerContent>
             <DrawerHeader>
-              <DrawerTitle>保存为常用模板</DrawerTitle>
+              <DrawerTitle>{canOverwriteSelectedTemplate ? "保存或覆盖模板" : "保存为常用模板"}</DrawerTitle>
             </DrawerHeader>
             <div className="flex flex-col gap-4 px-4 pb-4">
+              {canOverwriteSelectedTemplate && selectedWorkflowTemplate && (
+                <div className="rounded-[12px] border border-brand/20 bg-brand-soft px-3 py-2 text-[12px] text-ink-2">
+                  当前选中「{selectedWorkflowTemplate.name}」。可覆盖这个自定义模板，也可以另存为新模板。
+                </div>
+              )}
               <div className="space-y-2">
                 <Label className="text-[13px] font-semibold text-ink">模板名称</Label>
                 <Input
@@ -1319,17 +1358,26 @@ export default function ComboPage() {
               </div>
             </div>
             <DrawerFooter>
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <DrawerClose asChild>
                   <Button variant="outline" className="h-12 flex-1 rounded-full">
                     取消
                   </Button>
                 </DrawerClose>
+                {canOverwriteSelectedTemplate && (
+                  <Button
+                    onClick={() => handleSave("overwrite")}
+                    variant="outline"
+                    className="h-12 flex-1 rounded-full border-brand text-brand hover:bg-brand-soft"
+                  >
+                    覆盖当前模板
+                  </Button>
+                )}
                 <Button
-                  onClick={handleSave}
+                  onClick={() => handleSave("create")}
                   className="h-12 flex-1 rounded-full bg-accent-gradient text-white font-semibold"
                 >
-                  保存
+                  {canOverwriteSelectedTemplate ? "另存为新模板" : "保存"}
                 </Button>
               </div>
             </DrawerFooter>
@@ -1407,7 +1455,7 @@ export default function ComboPage() {
           {mobileStage === "params" && (
             <div className="flex items-center gap-2">
               <Button
-                onClick={() => setSaveTemplateOpen(true)}
+                onClick={openSaveTemplateDrawer}
                 variant="outline"
                 className="h-12 shrink-0 rounded-full border-line-strong bg-surface px-4 text-[13px] font-semibold"
               >
@@ -1751,7 +1799,7 @@ export default function ComboPage() {
           <div className="pointer-events-none absolute inset-x-0 bottom-5 z-30 flex justify-center">
             <div className="glass-panel pointer-events-auto flex items-center gap-2 rounded-full p-1.5 shadow-float">
               <Button
-                onClick={() => setSaveTemplateOpen(true)}
+                onClick={openSaveTemplateDrawer}
                 variant="ghost"
                 className="h-11 gap-1.5 rounded-full px-5 text-[14px] font-semibold text-ink-2 hover:bg-surface-muted"
               >
