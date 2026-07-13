@@ -5,7 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 import { signOut, useSession } from "next-auth/react";
 import { Suspense, useEffect, useState } from "react";
-import { Bell, Download, History, Moon, Sun, ListTodo, LogOut } from "lucide-react";
+import { Bell, History, Moon, Sun, ListTodo, LogOut } from "lucide-react";
 import { BrandLogo } from "@/components/brands/SpriteImage";
 import { MobileTabBar } from "@/components/navigation/MobileTabBar";
 import { DesktopSidebar } from "@/components/navigation/DesktopSidebar";
@@ -125,16 +125,6 @@ function TopNav({
             <History className="h-3.5 w-3.5" />
             <span className="hidden md:inline">历史记录</span>
           </Link>
-          <button
-            type="button"
-            className="relative inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-surface/80 px-3 py-1.5 text-data text-muted-foreground transition-colors hover:text-foreground"
-            aria-label="检查更新"
-            title="检查更新"
-          >
-            <Download className="h-3.5 w-3.5" />
-            <span className="hidden md:inline">更新</span>
-            <span className="absolute -right-0.5 -top-0.5 inline-flex h-2 w-2 rounded-full bg-danger ring-2 ring-background" aria-hidden />
-          </button>
           <button
             type="button"
             className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/70 bg-surface/80 text-muted-foreground transition-colors hover:text-foreground"
