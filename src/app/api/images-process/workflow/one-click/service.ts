@@ -31,7 +31,15 @@ export interface OrderedPipelineStep {
   // watermark
   watermarkText?: string;
   watermarkOpacity?: number;
-  watermarkPosition?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center' | string;
+  watermarkPosition?: string | {
+    x: number;
+    y: number;
+    width?: number;
+    height?: number;
+    scale?: number;
+    editorWidth?: number;
+    editorHeight?: number;
+  };
   watermarkType?: 'text' | 'logo' | string;
   watermarkLogoUrl?: string;
   watermarkScale?: number; // 水印大小（占图宽比例）
@@ -163,9 +171,7 @@ export async function executeOrderedPipeline(params: OrderedPipelineParams) {
             imageUrl: current,
             watermarkText: step.watermarkText || '@品牌名',
             watermarkOpacity: step.watermarkOpacity ?? 0.7,
-            watermarkPosition:
-              (step.watermarkPosition as 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center') ||
-              'bottom-right',
+            watermarkPosition: step.watermarkPosition || 'bottom-right',
             watermarkType: (step.watermarkType as 'text' | 'logo') || 'text',
             watermarkLogoUrl: step.watermarkLogoUrl,
             watermarkScale: step.watermarkScale,

@@ -22,6 +22,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 import { apiPost, apiGet } from "@/lib/api-client";
 import type { InputAssetRef } from "@/types/workbench";
+import { usePageDraft } from "@/lib/use-page-draft";
 import {
   expandSteps,
   CycleError,
@@ -426,48 +427,73 @@ function toOutputResolution(resolution: string) {
   return resolutionMap[resolution] ?? "original";
 }
 
-function computeFinalAspect(
+interface WatermarkCanvasPlan {
+  canvasWidth: number;
+  canvasHeight: number;
+  aspect: number;
+  sourceRect: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+}
+
+function computeWatermarkCanvasPlan(
   steps: WorkflowStep[],
   currentStepId: string,
   baseW: number,
   baseH: number
-): number {
-  if (!baseW || !baseH || baseW <= 0 || baseH <= 0) return 1;
+): WatermarkCanvasPlan | undefined {
+  if (!baseW || !baseH || baseW <= 0 || baseH <= 0) return undefined;
 
-  let xExpand = 1;
-  let yExpand = 1;
-
-  const currentIndex = steps.findIndex(s => s.id === currentStepId);
+  let canvasWidth = baseW;
+  let canvasHeight = baseH;
+  let sourceRect = { x: 0, y: 0, width: 1, height: 1 };
+  const currentIndex = steps.findIndex((step) => step.id === currentStepId);
   const precedingSteps = currentIndex >= 0 ? steps.slice(0, currentIndex) : [];
 
   for (const step of precedingSteps) {
-    if (step.type === 'outpaint') {
+    if (step.type === "outpaint") {
       const params = step.params as OutpaintParams;
-      const ratio = params.ratio ?? 25;
-      const each = Math.min(0.5, Math.max(0.05, ratio / 100));
-      const dir = params.direction || 'all';
-      const horiz = dir === 'all' || dir === 'horizontal';
-      const vert = dir === 'all' || dir === 'vertical';
-      if (horiz) xExpand *= 1 + 2 * each;
-      if (vert) yExpand *= 1 + 2 * each;
-    } else if (step.type === 'upscale') {
+      const each = clamp((params.ratio ?? 25) / 100, 0.05, 0.5);
+      const direction = params.direction || "all";
+      const horizontal = direction === "all" || direction === "horizontal";
+      const vertical = direction === "all" || direction === "vertical";
+      const nextWidth = canvasWidth * (horizontal ? 1 + 2 * each : 1);
+      const nextHeight = canvasHeight * (vertical ? 1 + 2 * each : 1);
+
+      sourceRect = {
+        x: (sourceRect.x * canvasWidth + (nextWidth - canvasWidth) / 2) / nextWidth,
+        y: (sourceRect.y * canvasHeight + (nextHeight - canvasHeight) / 2) / nextHeight,
+        width: (sourceRect.width * canvasWidth) / nextWidth,
+        height: (sourceRect.height * canvasHeight) / nextHeight,
+      };
+      canvasWidth = nextWidth;
+      canvasHeight = nextHeight;
+    } else if (step.type === "upscale") {
       const params = step.params as UpscaleParams;
-      const factor = Math.min(4, Math.max(1.1, params.factor ?? 1));
-      xExpand *= factor;
-      yExpand *= factor;
+      const factor = clamp(params.factor ?? 1, 1.1, 4);
+      canvasWidth *= factor;
+      canvasHeight *= factor;
     }
   }
 
-  return (baseW * xExpand) / (baseH * yExpand);
+  return {
+    canvasWidth,
+    canvasHeight,
+    aspect: canvasWidth / canvasHeight,
+    sourceRect,
+  };
 }
 
 export default function ComboPage() {
   const [workflowTemplates, setWorkflowTemplates] = useState<WorkflowTemplateType[]>([]);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
-  const [templateSearch, setTemplateSearch] = useState("");
-  const [steps, setSteps] = useState<WorkflowStep[]>(INITIAL_STEPS);
-  const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = usePageDraft<string | null>("workbench.combo.selectedTemplate", null);
+  const [templateSearch, setTemplateSearch] = usePageDraft("workbench.combo.templateSearch", "");
+  const [steps, setSteps] = usePageDraft<WorkflowStep[]>("workbench.combo.steps", INITIAL_STEPS);
+  const [selectedStepId, setSelectedStepId] = usePageDraft<string | null>("workbench.combo.selectedStepId", null);
   const { toast } = useToast();
   const { upload, uploading } = useUpload();
 
@@ -475,14 +501,14 @@ export default function ComboPage() {
   const [rightCollapsed, setRightCollapsed] = useState(false);
 
   // Runtime settings
-  const [aspectRatio, setAspectRatio] = useState("1:1");
-  const [resolution, setResolution] = useState("2k");
-  const [watermarkEnabled, setWatermarkEnabled] = useState(true);
-  const [autoRetry, setAutoRetry] = useState(true);
+  const [aspectRatio, setAspectRatio] = usePageDraft("workbench.combo.aspectRatio", "1:1");
+  const [resolution, setResolution] = usePageDraft("workbench.combo.resolution", "2k");
+  const [watermarkEnabled, setWatermarkEnabled] = usePageDraft("workbench.combo.watermarkEnabled", true);
+  const [autoRetry, setAutoRetry] = usePageDraft("workbench.combo.autoRetry", true);
   const [executing, setExecuting] = useState(false);
 
   // Product upload
-  const [productAssets, setProductAssets] = useState<InputAssetRef[]>([]);
+  const [productAssets, setProductAssets] = usePageDraft<InputAssetRef[]>("workbench.combo.productAssets", []);
   const [uploadingProductAssets, setUploadingProductAssets] = useState(false);
   const productInputRef = useRef<HTMLInputElement>(null);
   const [productImageDims, setProductImageDims] = useState({ width: 0, height: 0 });
@@ -497,7 +523,7 @@ export default function ComboPage() {
   // Workflow preview drawer
   const [workflowPreviewOpen, setWorkflowPreviewOpen] = useState(false);
   const [previewingWorkflowId, setPreviewingWorkflowId] = useState<string | null>(null);
-  const [mobileStage, setMobileStage] = useState<MobileWorkflowStage>("workflow");
+  const [mobileStage, setMobileStage] = usePageDraft<MobileWorkflowStage>("workbench.combo.mobileStage", "workflow");
   const [draggingStepId, setDraggingStepId] = useState<string | null>(null);
   const [dragOverStepId, setDragOverStepId] = useState<string | null>(null);
   const draggingStepIdRef = useRef<string | null>(null);
@@ -564,6 +590,22 @@ export default function ComboPage() {
   const selectedTemplateName = selectedTemplate
     ? templates.find((t) => t.id === selectedTemplate)?.name ?? null
     : null;
+  const previewSteps = useMemo(() => {
+    if (steps.length === 0) return steps;
+    const templatesById = Object.fromEntries(workflowTemplates.map((t) => [t.id, t]));
+    try {
+      return expandSteps(steps, templatesById) as WorkflowStep[];
+    } catch {
+      return steps;
+    }
+  }, [steps, workflowTemplates]);
+  const getWatermarkCanvasPlan = useCallback(
+    (currentStepId: string) =>
+      productImageDims.width && productImageDims.height
+        ? computeWatermarkCanvasPlan(previewSteps, currentStepId, productImageDims.width, productImageDims.height)
+        : undefined,
+    [previewSteps, productImageDims.height, productImageDims.width]
+  );
 
   const handleExecute = async () => {
     if (steps.length === 0) return;
@@ -1220,7 +1262,7 @@ export default function ComboPage() {
                             aspectRatio={aspectRatio}
                             onChange={(patch) => updateStepParams(step.id, patch)}
                             productImage={productAssets[0]}
-                            finalAspect={productImageDims.width && productImageDims.height ? computeFinalAspect(steps, step.id, productImageDims.width, productImageDims.height) : undefined}
+                            canvasPlan={getWatermarkCanvasPlan(step.id)}
                           />
                         )}
                         {step.type === "outpaint" && (
@@ -1749,7 +1791,7 @@ export default function ComboPage() {
                 onChange={(patch) => updateStepParams(selectedStep.id, patch)}
                 aspectRatio={aspectRatio}
                 productImage={productAssets[0]}
-                finalAspect={productImageDims.width && productImageDims.height ? computeFinalAspect(steps, selectedStep.id, productImageDims.width, productImageDims.height) : undefined}
+                canvasPlan={getWatermarkCanvasPlan(selectedStep.id)}
               />
             ) : (
               <GlobalSettingsPanel
@@ -1989,7 +2031,7 @@ function StepParamPanel({
   onChange,
   aspectRatio,
   productImage,
-  finalAspect,
+  canvasPlan,
 }: {
   step: WorkflowStep;
   onClose: () => void;
@@ -1997,7 +2039,7 @@ function StepParamPanel({
   onChange: (_patch: Partial<StepParams["params"]>) => void;
   aspectRatio: string;
   productImage?: InputAssetRef;
-  finalAspect?: number;
+  canvasPlan?: WatermarkCanvasPlan;
 }) {
   // 仅用于非 workflow 步，类型保证由调用处进行
   if (step.type === "workflow") {
@@ -2046,7 +2088,7 @@ function StepParamPanel({
           aspectRatio={aspectRatio}
           onChange={onChange}
           productImage={productImage}
-          finalAspect={finalAspect}
+          canvasPlan={canvasPlan}
         />
       )}
       {step.type === "outpaint" && (
@@ -2386,13 +2428,13 @@ function WatermarkStepParams({
   aspectRatio,
   onChange,
   productImage,
-  finalAspect,
+  canvasPlan,
 }: {
   params: WatermarkParams;
   aspectRatio: string;
   onChange: (_patch: Partial<WatermarkParams>) => void;
   productImage?: InputAssetRef;
-  finalAspect?: number;
+  canvasPlan?: WatermarkCanvasPlan;
 }) {
   const { upload, uploading } = useUpload();
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -2415,7 +2457,7 @@ function WatermarkStepParams({
         aspectRatio={aspectRatio}
         onChange={onChange}
         productImage={productImage}
-        finalAspect={finalAspect}
+        canvasPlan={canvasPlan}
       />
       <section className="flex flex-col gap-2">
         <FieldLabel>水印类型</FieldLabel>
@@ -2514,13 +2556,13 @@ function WatermarkPositionPreview({
   aspectRatio,
   onChange,
   productImage,
-  finalAspect,
+  canvasPlan,
 }: {
   params: WatermarkParams;
   aspectRatio: string;
   onChange: (_patch: Partial<WatermarkParams>) => void;
   productImage?: InputAssetRef;
-  finalAspect?: number;
+  canvasPlan?: WatermarkCanvasPlan;
 }) {
   const previewRef = useRef<HTMLDivElement>(null);
   const watermarkRef = useRef<HTMLSpanElement>(null);
@@ -2539,8 +2581,7 @@ function WatermarkPositionPreview({
     return () => observer.disconnect();
   }, []);
   const aspectStyle = useMemo(() => {
-    // 如果有 finalAspect，优先使用；否则用全局 aspectRatio
-    const ratio = finalAspect || (() => {
+    const ratio = canvasPlan?.aspect || (() => {
       const [rawWidth, rawHeight] = aspectRatio.split(":").map(Number);
       return (Number.isFinite(rawWidth) && rawWidth > 0 ? rawWidth : 1) /
              (Number.isFinite(rawHeight) && rawHeight > 0 ? rawHeight : 1);
@@ -2550,7 +2591,7 @@ function WatermarkPositionPreview({
       // 高度上限 52vh：竖比时按 52vh × (w/h) 收窄宽度，保证渲染比例不被高度截断
       maxWidth: ratio > 1 ? "100%" : `min(100%, ${52 * ratio}vh)`,
     };
-  }, [aspectRatio, finalAspect]);
+  }, [aspectRatio, canvasPlan?.aspect]);
 
   const getPresetPosition = useCallback((
     position: WatermarkPresetPosition | "custom",
@@ -2607,7 +2648,7 @@ function WatermarkPositionPreview({
 
   useEffect(() => {
     updateWatermarkElement();
-  }, [updateWatermarkElement, previewText, aspectRatio, sizeRatio, previewWidth]);
+  }, [updateWatermarkElement, previewText, aspectRatio, canvasPlan?.aspect, sizeRatio, previewWidth]);
 
   const handlePointerMove = (event: PointerEvent<HTMLSpanElement>) => {
     if (event.buttons !== 1) return;
@@ -2663,7 +2704,13 @@ function WatermarkPositionPreview({
       <FieldLabel>
         <div className="flex items-center justify-between">
           <span>位置预览</span>
-          {productImage && <span className="text-[11px] font-normal text-ink-3">预览为近似效果</span>}
+          {productImage && (
+            <span className="text-[11px] font-normal text-ink-3">
+              {canvasPlan
+                ? `预计最终画布 ${Math.round(canvasPlan.canvasWidth)} × ${Math.round(canvasPlan.canvasHeight)}`
+                : "预览为近似效果"}
+            </span>
+          )}
         </div>
       </FieldLabel>
       <div
@@ -2673,16 +2720,32 @@ function WatermarkPositionPreview({
       >
         {productImage ? (
           <>
-            {/* 真实产品图 */}
+            <div className="absolute inset-0 bg-[linear-gradient(135deg,#eef2f7_0%,#dbe4ef_100%)]" />
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={productImage.clientUrl}
               alt=""
-              className="absolute inset-0 h-full w-full object-contain"
+              className="absolute object-contain"
+              style={canvasPlan ? {
+                left: `${canvasPlan.sourceRect.x * 100}%`,
+                top: `${canvasPlan.sourceRect.y * 100}%`,
+                width: `${canvasPlan.sourceRect.width * 100}%`,
+                height: `${canvasPlan.sourceRect.height * 100}%`,
+              } : { inset: 0, width: "100%", height: "100%", objectFit: "contain" }}
               draggable={false}
             />
-            {/* 半透明暗色 overlay 保证水印可读 */}
-            <div className="absolute inset-0 bg-black/25" />
+            {canvasPlan && (canvasPlan.sourceRect.width < 1 || canvasPlan.sourceRect.height < 1) && (
+              <div
+                className="pointer-events-none absolute border border-dashed border-brand/70"
+                style={{
+                  left: `${canvasPlan.sourceRect.x * 100}%`,
+                  top: `${canvasPlan.sourceRect.y * 100}%`,
+                  width: `${canvasPlan.sourceRect.width * 100}%`,
+                  height: `${canvasPlan.sourceRect.height * 100}%`,
+                }}
+              />
+            )}
+            <div className="absolute inset-0 bg-black/20" />
           </>
         ) : (
           <>
