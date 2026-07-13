@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { uploadBase64Image } from '@/lib/storage';
 import { addWatermarkToImage } from '@/lib/watermark';
@@ -28,6 +29,10 @@ type QueueTaskForProcessing = {
   userId: string;
   retryCount?: number;
   maxRetries?: number;
+  // 本次抢占的执行指纹（= claim 时写入的 startedAt）。
+  // 终态回写用它做 fence：任务被重置重抢后，旧（僵尸）执行的回写因
+  // startedAt 不匹配而失效，防止覆盖状态或把已完成任务重新入队。
+  claimedAt: Date;
 };
 
 async function readAssetAsDataUrl(asset?: TaskAssetRef): Promise<string | null> {
@@ -151,6 +156,7 @@ class TaskProcessor {
     for (const task of candidates) {
       const retryCount = task.retryCount ?? 0;
       const retryInfo = retryCount > 0 ? ` (重试 ${retryCount} 次)` : '';
+      const claimedAt = new Date();
       const claimed = await prisma.taskQueue.updateMany({
         where: {
           id: task.id,
@@ -158,18 +164,33 @@ class TaskProcessor {
         },
         data: {
           status: 'PROCESSING',
-          startedAt: new Date(),
+          startedAt: claimedAt,
           currentStep: `开始处理任务${retryInfo}`,
           progress: 0,
         },
       });
 
       if (claimed.count === 1) {
-        claimedTasks.push(task);
+        claimedTasks.push({ ...task, claimedAt });
       }
     }
 
     return claimedTasks;
+  }
+
+  /**
+   * 带 fence 的终态回写：仅当任务仍处于「本次执行抢占的 PROCESSING」时生效。
+   * count=0 表示任务已被删除或已被其它执行接管——本次（僵尸）执行不得覆盖状态。
+   */
+  private async writeTerminalState(
+    task: Pick<QueueTaskForProcessing, 'id' | 'claimedAt'>,
+    data: Prisma.TaskQueueUncheckedUpdateManyInput
+  ): Promise<boolean> {
+    const updated = await prisma.taskQueue.updateMany({
+      where: { id: task.id, status: 'PROCESSING', startedAt: task.claimedAt },
+      data,
+    });
+    return updated.count === 1;
   }
 
   async processNextTask() {
@@ -223,22 +244,22 @@ class TaskProcessor {
 
       const persistedResult = this.buildPersistedResult(task.type, result);
 
-      // 更新任务为完成状态，并关联处理结果
-      await prisma.taskQueue.update({
-        where: { id: task.id },
-        data: {
-          status: 'COMPLETED',
-          progress: 100,
-          currentStep: '处理完成',
-          completedAt: new Date(),
-          outputData: JSON.stringify(persistedResult),
-          completedSteps: task.totalSteps,
-          processedImageId: persistedResult.processedImageId || null
-        }
+      // 更新任务为完成状态，并关联处理结果（fence：仅本次执行可回写）
+      const committed = await this.writeTerminalState(task, {
+        status: 'COMPLETED',
+        progress: 100,
+        currentStep: '处理完成',
+        completedAt: new Date(),
+        outputData: JSON.stringify(persistedResult),
+        completedSteps: task.totalSteps,
+        processedImageId: persistedResult.processedImageId || null
       });
+      if (!committed) {
+        console.warn(`[Task Worker] 任务 ${task.id} 完成回写被拒（任务已删除或已被其它执行接管），本次结果不落任务状态`);
+      }
 
-      return { 
-        message: '任务处理完成', 
+      return {
+        message: '任务处理完成',
         taskId: task.id,
         type: task.type,
         result: persistedResult
@@ -385,20 +406,20 @@ class TaskProcessor {
       
       clearTimeout(timeoutHandle!);
       const persistedResult = this.buildPersistedResult(task.type, result);
-      
-      // 更新任务为完成状态，并关联处理结果
-      await prisma.taskQueue.update({
-        where: { id: task.id },
-        data: {
-          status: 'COMPLETED',
-          progress: 100,
-          currentStep: '处理完成',
-          completedAt: new Date(),
-          outputData: JSON.stringify(persistedResult),
-          completedSteps: task.totalSteps,
-          processedImageId: persistedResult.processedImageId || null
-        }
+
+      // 更新任务为完成状态，并关联处理结果（fence：仅本次执行可回写）
+      const committed = await this.writeTerminalState(task, {
+        status: 'COMPLETED',
+        progress: 100,
+        currentStep: '处理完成',
+        completedAt: new Date(),
+        outputData: JSON.stringify(persistedResult),
+        completedSteps: task.totalSteps,
+        processedImageId: persistedResult.processedImageId || null
       });
+      if (!committed) {
+        console.warn(`[Task Worker] 任务 ${task.id} 完成回写被拒（任务已删除或已被其它执行接管），本次结果不落任务状态`);
+      }
 
       return persistedResult;
 
@@ -406,44 +427,54 @@ class TaskProcessor {
       console.error(`=== 任务处理失败 ===`);
       console.error(`任务ID: ${task.id}, 类型: ${task.type}`);
       console.error(`错误信息:`, error);
-      
+
       // 获取当前重试信息
       const currentTask = await prisma.taskQueue.findUnique({
         where: { id: task.id },
         select: { retryCount: true, maxRetries: true }
       });
-      
+
       const retryCount = currentTask?.retryCount ?? 0;
       const maxRetries = currentTask?.maxRetries ?? 3;
-      
-      if (retryCount < maxRetries) {
-        // 还可以重试：增加重试次数，重置为 PENDING 状态
-        await prisma.taskQueue.update({
-          where: { id: task.id },
-          data: {
-            status: 'PENDING',
-            retryCount: retryCount + 1,
-            progress: 0,
-            currentStep: `等待重试 (${retryCount + 1}/${maxRetries})`,
-            startedAt: null,
-            errorMessage: `处理失败: ${error instanceof Error ? error.message : '未知错误'}，准备第 ${retryCount + 1} 次重试`
-          }
+      const rawMessage = error instanceof Error ? error.message : '未知错误';
+      // 进程内看门狗超时 ≠ provider 调用失败：底层 HTTP 调用无法 abort、仍在继续跑，
+      // 大概率已在 provider 侧生成并计费。此时自动重试必然产生第二次计费，
+      // 因此判为不可重试，提示用户确认结果后手动重试。
+      const isWatchdogTimeout = rawMessage.includes('任务处理超时');
+
+      if (!isWatchdogTimeout && retryCount < maxRetries) {
+        // 还可以重试：增加重试次数，重置为 PENDING 状态（fence：仅本次执行可回写）
+        const committed = await this.writeTerminalState(task, {
+          status: 'PENDING',
+          retryCount: retryCount + 1,
+          progress: 0,
+          currentStep: `等待重试 (${retryCount + 1}/${maxRetries})`,
+          startedAt: null,
+          errorMessage: `处理失败: ${rawMessage}，准备第 ${retryCount + 1} 次重试`
         });
+        if (!committed) {
+          console.warn(`[Task Worker] 任务 ${task.id} 回写重试状态被拒（已删除或已被其它执行接管），跳过`);
+          return null;
+        }
         console.log(`[Task Worker] 任务 ${task.id} 处理失败，将进行第 ${retryCount + 1} 次重试`);
       } else {
-        // 超过最大重试次数：标记为失败
-        await prisma.taskQueue.update({
-          where: { id: task.id },
-          data: {
-            status: 'FAILED',
-            completedAt: new Date(),
-            errorMessage: `重试 ${maxRetries} 次后仍然失败: ${error instanceof Error ? error.message : '未知错误'}`,
-            currentStep: '处理失败（已达最大重试次数）'
-          }
+        // 看门狗超时 或 超过最大重试次数：标记为失败
+        const failMessage = isWatchdogTimeout
+          ? '生成耗时超过 10 分钟，为避免重复计费已停止自动重试；请到任务中心确认无结果后再手动重试'
+          : `重试 ${maxRetries} 次后仍然失败: ${rawMessage}`;
+        const committed = await this.writeTerminalState(task, {
+          status: 'FAILED',
+          completedAt: new Date(),
+          errorMessage: failMessage,
+          currentStep: isWatchdogTimeout ? '处理超时' : '处理失败（已达最大重试次数）'
         });
-        console.log(`[Task Worker] 任务 ${task.id} 已达最大重试次数 (${maxRetries})，标记为失败`);
+        if (!committed) {
+          console.warn(`[Task Worker] 任务 ${task.id} 回写失败状态被拒（已删除或已被其它执行接管），跳过`);
+          return null;
+        }
+        console.log(`[Task Worker] 任务 ${task.id} ${isWatchdogTimeout ? '看门狗超时' : `已达最大重试次数 (${maxRetries})`}，标记为失败`);
       }
-      
+
       throw error;
     }
   }
