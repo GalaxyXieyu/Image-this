@@ -23,6 +23,7 @@ import { useWorkflowTaskPolling } from "@/hooks/workbench/useWorkflowTaskPolling
 import { mapProviderErrorMessage } from "@/lib/provider-error-utils";
 import { useToast } from "@/components/ui/use-toast";
 import { hasEnabledImageModel } from "@/lib/ensure-model";
+import { usePageDraft } from "@/lib/use-page-draft";
 import { getPresetById } from "@/lib/workbench/presets";
 import { sceneStyleTemplates, type SceneStyleTemplate } from "@/lib/scene-presets";
 import { buildSceneLegacyTaskRequests } from "@/lib/workbench/scene-task-adapter";
@@ -275,7 +276,7 @@ interface UseSceneGenerationResult {
 
 function useSceneGeneration(workflowData: WorkflowData): UseSceneGenerationResult {
   const [generating, setGenerating] = useState(false);
-  const [results, setResults] = useState<SceneCandidateResult[]>([]);
+  const [results, setResults] = usePageDraft<SceneCandidateResult[]>("workbench.scene.results", []);
   const [savingCandidateId, setSavingCandidateId] = useState<string | null>(null);
   const { toast } = useToast();
   const { tasks: polledTasks, isPolling, startPolling, error: pollingError } = useWorkflowTaskPolling({
@@ -301,7 +302,20 @@ function useSceneGeneration(workflowData: WorkflowData): UseSceneGenerationResul
         };
       })
     );
-  }, [polledTasks]);
+  }, [polledTasks, setResults]);
+
+  const activeTaskIds = useMemo(
+    () => results.filter((result) => !isTerminalCandidateStatus(result.status) && result.taskId).map((result) => result.taskId as string),
+    [results]
+  );
+  const pollingTaskKeyRef = useRef("");
+
+  useEffect(() => {
+    const taskKey = [...activeTaskIds].sort().join(",");
+    if (!taskKey || pollingTaskKeyRef.current === taskKey) return;
+    pollingTaskKeyRef.current = taskKey;
+    startPolling(activeTaskIds);
+  }, [activeTaskIds, startPolling]);
 
   const completedCount = results.filter((result) => result.status === "completed").length;
   const failedCount = results.filter((result) => result.status === "failed" || result.status === "cancelled").length;
@@ -1722,9 +1736,10 @@ function SceneWorkspacePageInner() {
   );
   const sceneStyleId = searchParams.get("sceneStyle") ?? undefined;
   const isDesktop = !useIsMobile(1024);
-  const [step, setStep] = useState<Step>(1);
-  const [workflowData, setWorkflowData] = useState<WorkflowData>(() =>
-    createWorkflowDataFromPreset(activePreset)
+  const [step, setStep] = usePageDraft<Step>("workbench.scene.step", 1);
+  const [workflowData, setWorkflowData] = usePageDraft<WorkflowData>(
+    "workbench.scene.workflowData",
+    () => createWorkflowDataFromPreset(activePreset)
   );
 
   useEffect(() => {
@@ -1747,7 +1762,7 @@ function SceneWorkspacePageInner() {
       // Mobile steps to product info after preset selection
       setStep(2);
     }
-  }, [sceneStyleId, isDesktop]);
+  }, [sceneStyleId, isDesktop, setStep, setWorkflowData]);
 
   // Desktop: single dual-column view
   if (isDesktop) {

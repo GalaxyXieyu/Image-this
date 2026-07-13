@@ -21,6 +21,7 @@ import { ConicSpinner } from "@/components/ui/conic-spinner";
 import { BottomSheetSelect } from "@/components/workbench/BottomSheetSelect";
 import { useIsMobile } from "@/lib/use-is-mobile";
 import { getPresetById } from "@/lib/workbench/presets";
+import { usePageDraft } from "@/lib/use-page-draft";
 import {
   buildDefaultToolParameters,
   buildToolLegacyTaskRequest,
@@ -409,9 +410,11 @@ function ToolboxPageInner() {
   const logoInputRef = useRef<HTMLInputElement>(null);
   const { upload, uploading } = useUpload();
   const { toast } = useToast();
-  const [draft, setDraft] = useState<ToolDraftState>(() => createInitialDraft(presetId, toolParam));
+  const [draft, setDraft] = usePageDraft<ToolDraftState>("workbench.tools.draft", () =>
+    createInitialDraft(presetId, toolParam)
+  );
   const appliedSyncRef = useRef<{ preset?: string; tool?: string }>({ preset: presetId, tool: toolParam });
-  const [runState, setRunState] = useState<ToolRunState>(EMPTY_RUN_STATE);
+  const [runState, setRunState] = usePageDraft<ToolRunState>("workbench.tools.runState", EMPTY_RUN_STATE);
   const [creatingTask, setCreatingTask] = useState(false);
   const { tasks, isPolling, startPolling, error: pollingError } = useWorkflowTaskPolling({
     interval: 3000,
@@ -436,7 +439,15 @@ function ToolboxPageInner() {
       };
     });
     setRunState(EMPTY_RUN_STATE);
-  }, [presetId, toolParam]);
+  }, [presetId, toolParam, setDraft, setRunState]);
+
+  useEffect(() => {
+    if (!runState.taskId) return;
+    if (runState.status !== "queued" && runState.status !== "pending" && runState.status !== "processing") {
+      return;
+    }
+    startPolling([runState.taskId]);
+  }, [runState.taskId, runState.status, startPolling]);
 
   useEffect(() => {
     if (!runState.taskId || tasks.length === 0) return;
@@ -452,7 +463,7 @@ function ToolboxPageInner() {
       usedModel: task.usedModel,
       processedImageId: task.processedImageId,
     });
-  }, [runState.taskId, tasks]);
+  }, [runState.taskId, tasks, setRunState]);
 
   const updateToolType = (toolType: ToolType) => {
     setDraft((prev) => ({
