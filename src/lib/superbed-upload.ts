@@ -50,7 +50,9 @@ export async function uploadImageToSuperbed(
         formData,
         {
           headers: formData.getHeaders(),
-          timeout: 30000, // 30秒超时
+          // 扩图/放大后的中间图可达数 MB，慢链路 30s 不够传完；
+          // 上传失败会把整条流水线打回重跑（前置 AI 步骤重复计费），宁可等久一点
+          timeout: 120000,
           maxContentLength: 50 * 1024 * 1024, // 50MB
           maxBodyLength: 50 * 1024 * 1024
         }
@@ -69,13 +71,15 @@ export async function uploadImageToSuperbed(
       lastError = error instanceof Error ? error : new Error('Unknown error');
       
       // 判断是否是可重试的错误
-      const isRetryable = 
+      const isRetryable =
         axios.isAxiosError(error) && (
           error.code === 'ECONNRESET' ||
           error.code === 'ETIMEDOUT' ||
+          error.code === 'ECONNABORTED' || // axios 请求超时（timeout of Nms exceeded）
           error.code === 'ECONNREFUSED' ||
           error.code === 'ENOTFOUND' ||
           error.response?.status === 429 || // 请求过多
+          error.response?.status === 502 || // 网关错误
           error.response?.status === 503 || // 服务不可用
           error.response?.status === 504    // 网关超时
         );
@@ -112,16 +116,20 @@ export async function uploadBase64ToSuperbed(
     throw new Error(`无效的 base64 数据: 长度=${base64String.length}`);
   }
   
-  // 强制使用 .png 格式
-  const pngFilename = filename.replace(/\.(jpg|jpeg|webp)$/i, '.png');
-  
-  // 使用 Sharp 真正转换为 PNG 格式
+  // 无透明通道的照片类图片转 JPEG（体积比 PNG 小数倍，避免大图上传超时）；
+  // 带 alpha 的图片保留 PNG，防止透明信息丢失
   const originalBuffer = Buffer.from(base64String, 'base64');
-  const pngBuffer = await sharp(originalBuffer)
-    .png()
-    .toBuffer();
-  
-  console.log(`[Superbed] 准备上传: ${pngFilename}, 原始: ${(originalBuffer.length / 1024).toFixed(0)}KB -> PNG: ${(pngBuffer.length / 1024).toFixed(0)}KB`);
-  
-  return await uploadImageToSuperbed(pngBuffer, pngFilename, 3, superbedToken);
+  const metadata = await sharp(originalBuffer).metadata();
+  const keepPng = Boolean(metadata.hasAlpha);
+
+  const uploadBuffer = keepPng
+    ? await sharp(originalBuffer).png().toBuffer()
+    : await sharp(originalBuffer).jpeg({ quality: 92, mozjpeg: true }).toBuffer();
+  const uploadFilename = keepPng
+    ? filename.replace(/\.(jpg|jpeg|webp)$/i, '.png')
+    : filename.replace(/\.(png|webp)$/i, '.jpg');
+
+  console.log(`[Superbed] 准备上传: ${uploadFilename}, 原始: ${(originalBuffer.length / 1024).toFixed(0)}KB -> ${keepPng ? 'PNG' : 'JPEG'}: ${(uploadBuffer.length / 1024).toFixed(0)}KB`);
+
+  return await uploadImageToSuperbed(uploadBuffer, uploadFilename, 3, superbedToken);
 }

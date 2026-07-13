@@ -105,7 +105,18 @@ export function isRetryableProviderError(message: string): boolean {
     normalized.includes('unknown model') ||
     normalized.includes('unsupported') ||
     normalized.includes('does not support image') ||
-    normalized.includes('not support image')
+    normalized.includes('not support image') ||
+    // 确定性失败：配置缺失 / 输入非法 / 代码级参数错误，重试只会原样再失败，
+    // 且流水线重试会整链重跑前置 AI 步骤造成重复计费
+    normalized.includes('volcengine_public_image_url_required') ||
+    normalized.includes('volcengine_invalid_image_data') ||
+    normalized.includes('superbed_not_configured') ||
+    normalized.includes('火山引擎配置未设置') ||
+    normalized.includes('缺少必要参数') ||
+    normalized.includes('failed to parse url') ||
+    normalized.includes('无效的 base64') ||
+    normalized.includes('received nan') ||
+    normalized.includes('expected positive integer')
   ) {
     return false;
   }

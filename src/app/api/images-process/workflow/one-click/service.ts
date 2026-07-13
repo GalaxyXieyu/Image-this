@@ -68,18 +68,31 @@ const STEP_LABELS: Record<string, string> = {
   watermark: '水印与尺寸',
 };
 
+/** UI 分辨率档位（"1k"/"2k"/"4k"）归一化为水印层期望的 "宽x高"；已是 "宽x高"/"original" 则原样返回 */
+function normalizeResolutionTier(resolution?: string): string | undefined {
+  if (!resolution) return resolution;
+  const tierMap: Record<string, string> = {
+    '1k': '1024x1024',
+    '2k': '2048x2048',
+    '4k': '4096x4096',
+  };
+  return tierMap[resolution.toLowerCase()] || resolution;
+}
+
 export async function executeOrderedPipeline(params: OrderedPipelineParams) {
   const {
     imageUrl,
     steps,
     userId,
     aiModel: globalAiModel = 'gemini',
-    outputResolution,
     originalImageUrlForRecord,
     volcengineConfig,
     imagehostingConfig,
     onProgress,
   } = params;
+  // 两条 worker 路径（processPipeline 旧路径 / 注册 handler 新路径）都把 UI 档位原样传进来，
+  // 在唯一消费点统一归一化，避免各调用方各自映射产生分叉
+  const outputResolution = normalizeResolutionTier(params.outputResolution);
 
   if (!imageUrl) throw new Error('缺少必要参数：imageUrl');
   if (!Array.isArray(steps) || steps.length === 0) throw new Error('流水线没有可执行步骤');
@@ -175,7 +188,7 @@ export async function executeOrderedPipeline(params: OrderedPipelineParams) {
             watermarkType: (step.watermarkType as 'text' | 'logo') || 'text',
             watermarkLogoUrl: step.watermarkLogoUrl,
             watermarkScale: step.watermarkScale,
-            outputResolution: step.outputResolution || outputResolution,
+            outputResolution: normalizeResolutionTier(step.outputResolution) || outputResolution,
           });
         } else {
           continue; // 未知步骤跳过

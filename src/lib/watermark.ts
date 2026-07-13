@@ -83,15 +83,21 @@ export async function addWatermarkToImage(options: WatermarkOptions): Promise<st
   
   if (outputResolution && outputResolution !== 'original') {
     const [targetWidth, targetHeight] = outputResolution.split('x').map(Number);
-    const aspectRatio = originalWidth / originalHeight;
-    const targetAspectRatio = targetWidth / targetHeight;
-    
-    if (aspectRatio > targetAspectRatio) {
-      outputWidth = targetWidth;
-      outputHeight = Math.round(targetWidth / aspectRatio);
+    // 非 "宽x高" 格式（如误传 "2k"）会解析出 NaN，直接喂给 sharp.resize 会崩，
+    // 这里按原尺寸输出兜底
+    if (Number.isFinite(targetWidth) && targetWidth > 0 && Number.isFinite(targetHeight) && targetHeight > 0) {
+      const aspectRatio = originalWidth / originalHeight;
+      const targetAspectRatio = targetWidth / targetHeight;
+
+      if (aspectRatio > targetAspectRatio) {
+        outputWidth = targetWidth;
+        outputHeight = Math.round(targetWidth / aspectRatio);
+      } else {
+        outputHeight = targetHeight;
+        outputWidth = Math.round(targetHeight * aspectRatio);
+      }
     } else {
-      outputHeight = targetHeight;
-      outputWidth = Math.round(targetHeight * aspectRatio);
+      console.warn(`[addWatermarkToImage] outputResolution 格式无效（期望 "宽x高"）: ${outputResolution}，按原尺寸输出`);
     }
   }
 
