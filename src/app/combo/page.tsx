@@ -2619,6 +2619,7 @@ function WatermarkPositionPreview({
   const sizeRatio = params.sizeRatio && params.sizeRatio > 0 ? params.sizeRatio : 0.2;
   const [previewWidth, setPreviewWidth] = useState(0);
   const [resizeDragStart, setResizeDragStart] = useState({ x: 0, ratio: 0 });
+  const dragOffsetRef = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     const el = previewRef.current;
@@ -2687,32 +2688,28 @@ function WatermarkPositionPreview({
             y: (params.customPosition.y / params.customPosition.editorHeight) * editorHeight,
           }
         : getPresetPosition(params.position, editorWidth, editorHeight, markWidth, markHeight);
-    const x = clamp(raw.x, 0, Math.max(0, editorWidth - markWidth));
-    const y = clamp(raw.y, 0, Math.max(0, editorHeight - markHeight));
-
-    watermark.style.left = `${x}px`;
-    watermark.style.top = `${y}px`;
+    // 自定义坐标允许为负数或超过画布边界；预览容器与后端分别负责可视裁切和像素裁切。
+    watermark.style.left = `${raw.x}px`;
+    watermark.style.top = `${raw.y}px`;
   }, [getPresetPosition, params.customPosition, params.position]);
 
   useEffect(() => {
     updateWatermarkElement();
   }, [updateWatermarkElement, previewText, aspectRatio, canvasPlan?.aspect, sizeRatio, previewWidth]);
 
-  const handlePointerMove = (event: PointerEvent<HTMLSpanElement>) => {
-    if (event.buttons !== 1) return;
-    updateCustomPosition(event);
-  };
-
-  const updateCustomPosition = (event: PointerEvent<HTMLSpanElement>) => {
+  const updateCustomPosition = (
+    event: PointerEvent<HTMLSpanElement>,
+    dragOffset: { x: number; y: number }
+  ) => {
     const preview = previewRef.current;
     const watermark = watermarkRef.current;
     if (!preview || !watermark) return;
 
     const rect = preview.getBoundingClientRect();
-    const markWidth = watermark.offsetWidth;
-    const markHeight = watermark.offsetHeight;
-    const x = clamp(event.clientX - rect.left - markWidth / 2, 0, Math.max(0, rect.width - markWidth));
-    const y = clamp(event.clientY - rect.top - markHeight / 2, 0, Math.max(0, rect.height - markHeight));
+    const editorWidth = preview.clientWidth;
+    const editorHeight = preview.clientHeight;
+    const x = event.clientX - rect.left - preview.clientLeft - dragOffset.x;
+    const y = event.clientY - rect.top - preview.clientTop - dragOffset.y;
 
     watermark.style.left = `${x}px`;
     watermark.style.top = `${y}px`;
@@ -2721,10 +2718,34 @@ function WatermarkPositionPreview({
       customPosition: {
         x: Math.round(x),
         y: Math.round(y),
-        editorWidth: Math.round(rect.width),
-        editorHeight: Math.round(rect.height),
+        editorWidth,
+        editorHeight,
       },
     });
+  };
+
+  const handlePointerDown = (event: PointerEvent<HTMLSpanElement>) => {
+    const watermark = watermarkRef.current;
+    if (!watermark) return;
+
+    const watermarkRect = watermark.getBoundingClientRect();
+    const dragOffset = {
+      x: event.clientX - watermarkRect.left,
+      y: event.clientY - watermarkRect.top,
+    };
+    dragOffsetRef.current = dragOffset;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    updateCustomPosition(event, dragOffset);
+  };
+
+  const handlePointerMove = (event: PointerEvent<HTMLSpanElement>) => {
+    const dragOffset = dragOffsetRef.current;
+    if (event.buttons !== 1 || !dragOffset) return;
+    updateCustomPosition(event, dragOffset);
+  };
+
+  const handlePointerEnd = () => {
+    dragOffsetRef.current = null;
   };
 
   const handleResizeHandlePointerDown = (event: PointerEvent<HTMLSpanElement>) => {
@@ -2804,11 +2825,10 @@ function WatermarkPositionPreview({
         )}
         <span
           ref={watermarkRef}
-          onPointerDown={(event) => {
-            event.currentTarget.setPointerCapture(event.pointerId);
-            updateCustomPosition(event);
-          }}
+          onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerEnd}
+          onPointerCancel={handlePointerEnd}
           className={cn(
             "absolute max-w-[72%] cursor-grab select-none shadow-soft active:cursor-grabbing",
             params.type === "logo" && params.logoAsset
