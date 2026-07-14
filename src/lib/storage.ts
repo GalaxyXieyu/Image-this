@@ -57,6 +57,22 @@ export async function uploadBase64Image(
   return uploadBase64ImageToLocal(base64Data, filename, customPath);
 }
 
+/**
+ * 将可能是 data URL 的图片引用转为可持久化的轻量引用。
+ * 已经是路径或远程 URL 时不重复写入。
+ */
+export async function persistImageReference(
+  source: string,
+  filename: string,
+  userId?: string
+): Promise<string> {
+  if (!/^data:/i.test(source.trimStart())) {
+    return source;
+  }
+
+  return uploadBase64Image(source.trimStart(), filename, userId);
+}
+
 // 删除图片
 export async function deleteImage(objectName: string, userId?: string): Promise<void> {
   const customPath = await resolveCustomStoragePath(userId);

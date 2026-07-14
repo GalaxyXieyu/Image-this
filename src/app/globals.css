@@ -33,6 +33,11 @@
   .pb-mobile-safe {
     padding-bottom: calc(env(safe-area-inset-bottom, 0) + 64px);
   }
+  /* 移动端同时渲染多张图片时避免大量实时模糊合成占用 GPU。 */
+  .glass-panel {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
 }
 
 /* === v2.0 玻璃拟态 / 强调渐变 utilities（设计规范第 1.4 节）=== */
@@ -62,7 +67,7 @@
   }
   /* 衬线标题：Newsreader(西文) + 思源宋体(中文)，用于 Hero/空状态/大标题的优雅层级 */
   .font-serif-brand {
-    font-family: var(--font-serif), var(--font-noto-serif-sc), Georgia, "Songti SC", serif;
+    font-family: var(--font-serif), "Songti SC", Georgia, serif;
     letter-spacing: -0.01em;
   }
   .ring-ai {

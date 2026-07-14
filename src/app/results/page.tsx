@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +27,12 @@ import {
   ChevronRight,
   X,
 } from "lucide-react";
-import { InpaintDialog, type InpaintSubmitPayload } from "@/components/workbench/InpaintDialog";
+import type { InpaintSubmitPayload } from "@/components/workbench/InpaintDialog";
+
+const InpaintDialog = dynamic(
+  () => import("@/components/workbench/InpaintDialog").then((mod) => mod.InpaintDialog),
+  { ssr: false }
+);
 
 // 图库网格用小尺寸缩略图：/api/files 支持 ?w= 按需缩放为 webp，把 ~1MB 原图降到 ~20-30KB
 function thumbUrl(url?: string | null, w = 400): string | undefined {
@@ -44,6 +50,8 @@ function ImageThumbnail({ src, alt, className, thumbWidth }: { src?: string | nu
     return <BrandImageFallback title="图片预览" description="素材暂不可用" pose="sleep" className={cn("rounded-none", className)} />;
   }
   return (
+    // 缩略图已由 /api/files?w= 生成 WebP，保留原生 img 以支持任意本地文件 URL。
+    // eslint-disable-next-line @next/next/no-img-element
     <img
       src={resolved}
       alt={alt}
@@ -119,18 +127,12 @@ interface BackendImage {
   id: string;
   filename: string;
   thumbnailUrl: string | null;
-  originalUrl: string | null;
   processedUrl: string | null;
   processType: string;
   status: string;
-  fileSize: number | null;
-  width: number | null;
-  height: number | null;
-  qualityScore: number | null;
   createdAt: string;
   updatedAt: string;
   metadata?: string | null;
-  project: { id: string; name: string } | null;
 }
 
 interface ResultImage {
@@ -186,6 +188,7 @@ function mapProcessType(type: string): string {
     WATERMARK: "marketing",
     ONE_CLICK_WORKFLOW: "poster",
     ONE_CLICK: "poster",
+    WHITE_BACKGROUND: "white-bg",
     VIDEO_GENERATION: "other",
   };
   return map[type] || "other";
@@ -224,17 +227,31 @@ const CATEGORY_LABELS: Record<string, string> = {
   "white-bg": "白底图",
 };
 
+const CATEGORY_PROCESS_TYPES: Record<string, string[]> = {
+  scene: ["BACKGROUND_REMOVAL", "BACKGROUND_REPLACE"],
+  main: ["IMAGE_UPSCALING", "UPSCALE"],
+  detail: ["IMAGE_OUTPAINTING", "IMAGE_EXPANSION", "OUTPAINT"],
+  marketing: ["WATERMARK"],
+  poster: ["ONE_CLICK_WORKFLOW", "ONE_CLICK"],
+  "white-bg": ["WHITE_BACKGROUND"],
+};
+
+const RESULTS_PAGE_SIZE = 24;
+
 export default function ResultsPage() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [groupByTask, setGroupByTask] = useState(false);
   const [focusedGroupKey, setFocusedGroupKey] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [results, setResults] = useState<ResultImage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({ all: 0 });
   const [error, setError] = useState<string | null>(null);
-  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
   const [activeTasks, setActiveTasks] = useState<ActiveTask[]>([]);
   const [failedTasks, setFailedTasks] = useState<FailedTask[]>([]);
   const [dismissedFailures, setDismissedFailures] = useState<Set<string>>(new Set());
@@ -258,19 +275,31 @@ export default function ResultsPage() {
     }
   }, []);
 
-  const fetchResults = useCallback(async () => {
-    setLoading(true);
+  const fetchResults = useCallback(async (offset = 0) => {
+    const append = offset > 0;
+    if (append) setLoadingMore(true);
+    else setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams();
-      params.append("limit", "50");
+      params.append("view", "gallery");
+      params.append("limit", String(RESULTS_PAGE_SIZE));
+      params.append("offset", String(offset));
       params.append("status", "COMPLETED");
-      params.append("includeFullSize", "true");
-      if (searchQuery.trim()) {
-        params.append("search", searchQuery.trim());
+      params.append("includeStats", "true");
+      if (activeCategory !== "all") {
+        params.append("processTypes", CATEGORY_PROCESS_TYPES[activeCategory].join(","));
+      }
+      if (appliedSearch) {
+        params.append("search", appliedSearch);
       }
 
-      const data = await apiGet<{ success: boolean; images: BackendImage[]; pagination: { total: number } }>(
+      const data = await apiGet<{
+        success: boolean;
+        images: BackendImage[];
+        pagination: { total: number; hasMore: boolean };
+        stats?: { total: number; processTypes: Record<string, number> };
+      }>(
         `/api/images?${params.toString()}`
       );
       const mapped = data.images
@@ -290,19 +319,34 @@ export default function ResultsPage() {
           };
         })
         .sort((a, b) => b.sortTime - a.sortTime);
-      setResults(mapped);
-
-      // Compute category counts
-      const counts: Record<string, number> = { all: data.pagination.total };
-      for (const item of mapped) {
-        counts[item.category] = (counts[item.category] || 0) + 1;
+      setResults((current) => {
+        const seen = new Set(current.map((item) => item.id));
+        return append
+          ? [...current, ...mapped.filter((item) => !seen.has(item.id))]
+          : mapped;
+      });
+      setHasMore(data.pagination.hasMore);
+      if (data.stats) {
+        const nextCounts: Record<string, number> = { all: data.stats.total };
+        for (const [processType, count] of Object.entries(data.stats.processTypes)) {
+          const category = mapProcessType(processType);
+          nextCounts[category] = (nextCounts[category] || 0) + count;
+        }
+        setCategoryCounts(nextCounts);
       }
-      setCategoryCounts(counts);
     } catch (err) {
       setError(err instanceof Error ? err.message : "加载失败");
     } finally {
-      setLoading(false);
+      if (append) setLoadingMore(false);
+      else setLoading(false);
     }
+  }, [activeCategory, appliedSearch]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setAppliedSearch(searchQuery.trim());
+    }, 300);
+    return () => window.clearTimeout(timer);
   }, [searchQuery]);
 
   useEffect(() => {
@@ -349,15 +393,25 @@ export default function ResultsPage() {
   useEffect(() => {
     fetchActive();
     fetchFailed();
-    const timer = setInterval(() => {
-      fetchActive();
-      fetchFailed();
-    }, 3500);
-    return () => clearInterval(timer);
   }, [fetchActive, fetchFailed]);
 
-  const visibleFailures = failedTasks.filter((f) => !dismissedFailures.has(f.id));
+  useEffect(() => {
+    if (activeTasks.length === 0) return;
 
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        fetchActive();
+      }
+    };
+    const timer = window.setInterval(refreshWhenVisible, 5000);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [activeTasks.length, fetchActive]);
+
+  const visibleFailures = failedTasks.filter((f) => !dismissedFailures.has(f.id));
   const handleRetryMissing = async (id: string) => {
     setRetryingId(id);
     try {
@@ -443,6 +497,7 @@ export default function ResultsPage() {
         strength: payload.strength,
       });
       setInpaintTarget(null);
+      fetchActive();
       // 轮询拉取，等待 worker 产出结果
       setTimeout(() => fetchResults(), 2500);
       setTimeout(() => fetchResults(), 8000);
@@ -750,7 +805,9 @@ export default function ResultsPage() {
                     className="h-9 w-full rounded-full pl-8 text-[13px]"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && fetchResults()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") setAppliedSearch(searchQuery.trim());
+                    }}
                   />
                 </div>
                 <button
@@ -790,7 +847,7 @@ export default function ResultsPage() {
             {error && (
               <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-6 text-center">
                 <p className="text-data text-destructive">{error}</p>
-	                <Button variant="outline" size="sm" className="mt-3 min-h-11" onClick={fetchResults}>
+	                <Button variant="outline" size="sm" className="mt-3 min-h-11" onClick={() => fetchResults()}>
                   重试
                 </Button>
               </div>
@@ -1014,6 +1071,20 @@ export default function ResultsPage() {
                   />
                   </div>
                 )}
+
+                {hasMore && results.length > 0 && (
+                  <div className="flex justify-center py-6">
+                    <Button
+                      variant="outline"
+                      className="min-h-11 rounded-full px-6"
+                      disabled={loadingMore}
+                      onClick={() => fetchResults(results.length)}
+                    >
+                      {loadingMore ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      {loadingMore ? "加载中" : "加载更多"}
+                    </Button>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -1035,6 +1106,8 @@ export default function ResultsPage() {
             if (Math.abs(dx) > 40) moveLightbox(dx < 0 ? 1 : -1);
           }}
         >
+          {/* 灯箱需要原始分辨率，不走 Next Image 的预设尺寸。 */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={lightboxUrl}
             alt={lightboxItem.name}
@@ -1099,13 +1172,15 @@ export default function ResultsPage() {
       )}
 
       {/* 局部重绘弹窗 */}
-      <InpaintDialog
-        open={!!inpaintTarget}
-        imageUrl={inpaintTarget?.url || ""}
-        imageId={inpaintTarget?.id || ""}
-        onClose={() => setInpaintTarget(null)}
-        onSubmit={handleInpaintSubmit}
-      />
+      {inpaintTarget && (
+        <InpaintDialog
+          open
+          imageUrl={inpaintTarget.url}
+          imageId={inpaintTarget.id}
+          onClose={() => setInpaintTarget(null)}
+          onSubmit={handleInpaintSubmit}
+        />
+      )}
     </div>
   );
 }

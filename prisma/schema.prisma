@@ -146,6 +146,7 @@ model ProcessedImage {
   @@index([userId, status])
   @@index([userId, processType])
   @@index([userId, createdAt])
+  @@index([userId, status, updatedAt, createdAt])
   @@index([projectId])
   @@map("processed_images")
 }
@@ -207,6 +208,7 @@ model TaskQueue {
   @@index([userId, status])
   @@index([status, priority])
   @@index([userId, createdAt])
+  @@index([processedImageId])
   @@index([status])  // 单独 status 索引，优化 groupBy 统计查询
   @@map("task_queue")
 }

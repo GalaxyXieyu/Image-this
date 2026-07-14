@@ -9,6 +9,7 @@ import { Bell, History, Moon, Sun, ListTodo, LogOut } from "lucide-react";
 import { BrandLogo } from "@/components/brands/SpriteImage";
 import { MobileTabBar } from "@/components/navigation/MobileTabBar";
 import { DesktopSidebar } from "@/components/navigation/DesktopSidebar";
+import { NavigationProgress } from "@/components/navigation/NavigationProgress";
 import { PRIMARY_ITEMS, WORKSPACE_SEGMENTS, TOOL_PILLS, DEFAULT_TOOL } from "@/components/navigation/nav-config";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +30,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-[100dvh] flex-col bg-background text-foreground app-bg-glow">
+      <Suspense fallback={null}>
+        <NavigationProgress />
+      </Suspense>
       <Suspense fallback={<TopNav pathname={pathname} isWorkspace={isWorkspace} isTools={isTools} activeTool={DEFAULT_TOOL} />}>
         <TopNavWithSearch pathname={pathname} isWorkspace={isWorkspace} isTools={isTools} />
       </Suspense>
@@ -83,7 +87,7 @@ function TopNav({
   activeTool: string;
 }) {
   return (
-    <header className="shrink-0 border-b border-border/60 bg-surface-glass backdrop-blur-[20px] backdrop-saturate-150">
+    <header className="shrink-0 border-b border-border/60 bg-surface-glass backdrop-blur-none backdrop-saturate-100 md:backdrop-blur-[20px] md:backdrop-saturate-150">
       {/* Row 1: logo / 一级 nav(md~lg) / 右上按钮(桌面) / 任务入口(移动) */}
       <div className="flex h-14 items-center gap-4 px-4 md:px-6">
         <Link href="/" className="flex min-h-11 items-center transition-opacity hover:opacity-80">

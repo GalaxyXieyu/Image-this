@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -29,8 +30,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { DesktopUpdateCard } from '@/components/settings/DesktopUpdateCard';
-import { LogDiagnosticsCard } from '@/components/settings/LogDiagnosticsCard';
 import { BottomSheetSelect } from '@/components/workbench/BottomSheetSelect';
 import { useIsMobile } from '@/lib/use-is-mobile';
 import { Key, Sparkles, User, Image, FileText, Plus, Edit, Trash2, Star, StarOff, Cpu, HardDrive, FolderOpen, Folder, RefreshCw, Search, ChevronsUpDown, SlidersHorizontal, FileSearch, ChevronRight, X, History, FlaskConical, Check, LogOut } from 'lucide-react';
@@ -38,6 +37,16 @@ import Link from 'next/link';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/use-toast';
 import { BrandEmptyState } from '@/components/brands/SpriteImage';
+
+const DesktopUpdateCard = dynamic(
+  () => import('@/components/settings/DesktopUpdateCard').then((module) => module.DesktopUpdateCard),
+  { loading: () => <div className="h-44 animate-pulse rounded-[18px] bg-surface-muted" /> }
+);
+
+const LogDiagnosticsCard = dynamic(
+  () => import('@/components/settings/LogDiagnosticsCard').then((module) => module.LogDiagnosticsCard),
+  { loading: () => <div className="h-64 animate-pulse rounded-[18px] bg-surface-muted" /> }
+);
 
 type SettingSection = 'models' | 'imagehosting' | 'runtime' | 'logs' | 'profile' | 'prompts' | 'updates';
 

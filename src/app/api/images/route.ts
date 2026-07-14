@@ -5,12 +5,11 @@ import { prisma } from '@/lib/prisma';
 import { checkImageExists, deleteImage } from '@/lib/storage';
 import { normalizeImageUrlForClient } from '@/lib/image-url';
 
-// 图片查询结果类型
-interface ImageQueryResult {
+interface ImageListRecord {
   id: string;
   filename: string;
   thumbnailUrl: string | null;
-  originalUrl: string | null;
+  originalUrl?: string | null;
   processedUrl: string | null;
   processType: string;
   status: string;
@@ -20,16 +19,71 @@ interface ImageQueryResult {
   qualityScore: number | null;
   createdAt: Date;
   updatedAt: Date;
-  metadata?: string | null;
-  project: {
-    id: string;
-    name: string;
-  } | null;
-  taskQueue?: {
-    id: string;
-    status: string;
-    type: string;
-  }[];
+  metadata: string | null;
+}
+
+const lightweightImageFields = [
+  'id',
+  'filename',
+  'thumbnailUrl',
+  'processedUrl',
+  'processType',
+  'status',
+  'fileSize',
+  'width',
+  'height',
+  'qualityScore',
+  'createdAt',
+  'updatedAt',
+  'metadata',
+] as const;
+
+type LightweightImageField = (typeof lightweightImageFields)[number];
+const lightweightImageFieldSet = new Set<string>(lightweightImageFields);
+
+function sanitizeListUrl(url: string | null | undefined): string | null {
+  if (!url || /^data:/i.test(url.trimStart())) {
+    return null;
+  }
+
+  return normalizeImageUrlForClient(url);
+}
+
+function stripDataUrls(value: unknown): unknown {
+  if (typeof value === 'string') {
+    return /^data:/i.test(value.trimStart()) ? null : value;
+  }
+  if (Array.isArray(value)) {
+    return value.map(stripDataUrls);
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nestedValue]) => [key, stripDataUrls(nestedValue)])
+    );
+  }
+  return value;
+}
+
+function sanitizeMetadataForList(metadata: string | null): string | null {
+  if (!metadata || !/data:/i.test(metadata)) {
+    return metadata;
+  }
+
+  try {
+    return JSON.stringify(stripDataUrls(JSON.parse(metadata)));
+  } catch {
+    return null;
+  }
+}
+
+function pickLightweightFields(
+  image: ImageListRecord,
+  fields: LightweightImageField[]
+): Partial<ImageListRecord> {
+  const selected = new Set<LightweightImageField>(['id', ...fields]);
+  return Object.fromEntries(
+    Object.entries(image).filter(([key]) => selected.has(key as LightweightImageField))
+  ) as Partial<ImageListRecord>;
 }
 
 // 获取用户的图片列表
@@ -46,9 +100,15 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const type = searchParams.get('type');
     const processTypes = searchParams.get('processTypes'); // 支持多个类型过滤
+    const view = searchParams.get('view');
+    const fieldsParam = searchParams.get('fields');
+    const includeStats = searchParams.get('includeStats') === 'true';
+    const isLightweightView = ['workspace', 'gallery', 'results'].includes(view || '') || Boolean(fieldsParam);
     // 限制最大返回数量，防止单次查询过多数据
-    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
-    const offset = parseInt(searchParams.get('offset') || '0');
+    const parsedLimit = parseInt(searchParams.get('limit') || '20', 10);
+    const parsedOffset = parseInt(searchParams.get('offset') || '0', 10);
+    const limit = Math.min(Math.max(Number.isFinite(parsedLimit) ? parsedLimit : 20, 1), 100);
+    const offset = Math.max(Number.isFinite(parsedOffset) ? parsedOffset : 0, 0);
     // 图片尺寸优化参数
     const includeFullSize = searchParams.get('includeFullSize') === 'true'; // 是否包含完整尺寸图片
     // 文件存在性验证（默认关闭，可通过参数开启）
@@ -78,6 +138,9 @@ export async function GET(request: NextRequest) {
       where.status = status;
     }
 
+    // 分类统计基于搜索/项目/状态条件，但不受当前分类筛选影响。
+    const statsWhere = { ...where };
+
     if (type) {
       where.processType = type;
     }
@@ -96,53 +159,55 @@ export async function GET(request: NextRequest) {
     // 因为可能有些图片文件不存在，需要过滤掉
     const queryLimit = checkFiles ? limit * 2 : limit; // 查询更多以弥补可能被过滤的数量
     
-    // 查询图片 - 使用固定的 select 避免类型推断问题
-    const rawImages = await prisma.processedImage.findMany({
+    const queryOptions = {
       where,
       orderBy: [
-        { updatedAt: 'desc' },
-        { createdAt: 'desc' },
+        { updatedAt: 'desc' as const },
+        { createdAt: 'desc' as const },
       ],
       take: queryLimit,
       skip: offset,
-      select: {
-        id: true,
-        filename: true,
-        thumbnailUrl: true,
-        originalUrl: true,
-        processedUrl: true,
-        processType: true,
-        status: true,
-        fileSize: true,
-        width: true,
-        height: true,
-        qualityScore: true,
-        createdAt: true,
-        updatedAt: true,
-        metadata: true,
-        project: {
-          select: {
-            id: true,
-            name: true
-          }
-        },
-        taskQueue: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: {
-            id: true,
-            status: true,
-            type: true
-          }
-        }
-      }
-    });
-    
-    let images: ImageQueryResult[] = rawImages as ImageQueryResult[];
+    };
+
+    const lightweightSelect = {
+      id: true,
+      filename: true,
+      thumbnailUrl: true,
+      processedUrl: true,
+      processType: true,
+      status: true,
+      fileSize: true,
+      width: true,
+      height: true,
+      qualityScore: true,
+      createdAt: true,
+      updatedAt: true,
+      metadata: true,
+    } as const;
+    const legacySelect = {
+      ...lightweightSelect,
+      originalUrl: true,
+    } as const;
+
+    const [rawImages, total, processTypeCounts] = await Promise.all([
+      isLightweightView && !checkFiles
+        ? prisma.processedImage.findMany({ ...queryOptions, select: lightweightSelect })
+        : prisma.processedImage.findMany({ ...queryOptions, select: legacySelect }),
+      prisma.processedImage.count({ where }),
+      includeStats
+        ? prisma.processedImage.groupBy({
+            by: ['processType'],
+            where: statsWhere,
+            _count: { processType: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    let images = rawImages as ImageListRecord[];
 
     // 验证本地文件是否存在，过滤掉不存在的图片
     if (checkFiles && images.length > 0) {
-      const validImages: ImageQueryResult[] = [];
+      const validImages: ImageListRecord[] = [];
       const invalidImageIds: string[] = [];
       
       for (const image of images) {
@@ -185,23 +250,32 @@ export async function GET(request: NextRequest) {
     // 限制返回数量
     images = images.slice(0, limit);
 
-    // 统一 URL，避免 /uploads 在某些部署环境中无法直接访问
+    // 统一 URL，同时防止历史 data URL 再进入列表响应。
     images = images.map((img) => ({
       ...img,
-      originalUrl: normalizeImageUrlForClient(img.originalUrl),
-      processedUrl: normalizeImageUrlForClient(img.processedUrl),
-      thumbnailUrl: normalizeImageUrlForClient(img.thumbnailUrl),
+      ...(Object.hasOwn(img, 'originalUrl') ? { originalUrl: sanitizeListUrl(img.originalUrl) } : {}),
+      processedUrl: sanitizeListUrl(img.processedUrl),
+      thumbnailUrl: sanitizeListUrl(img.thumbnailUrl),
+      metadata: sanitizeMetadataForList(img.metadata),
     }));
-    
-    const finalImages = includeFullSize
-      ? images
-      : images.map(img => {
-          const { originalUrl, processedUrl, metadata, ...rest } = img;
-          return rest;
-        });
 
-    // 获取总数（这个总数可能包含文件不存在的记录，但作为近似值使用）
-    const total = await prisma.processedImage.count({ where });
+    let finalImages: Array<Partial<ImageListRecord>>;
+    if (isLightweightView) {
+      const requestedFields = fieldsParam
+        ? fieldsParam
+            .split(',')
+            .map((field) => field.trim())
+            .filter((field): field is LightweightImageField => lightweightImageFieldSet.has(field))
+        : [...lightweightImageFields];
+      finalImages = images.map((image) => pickLightweightFields(image, requestedFields));
+    } else if (includeFullSize) {
+      finalImages = images;
+    } else {
+      finalImages = images.map((image) => {
+        const { originalUrl, processedUrl, metadata, ...rest } = image;
+        return rest;
+      });
+    }
 
     return NextResponse.json({
       success: true,
@@ -210,8 +284,18 @@ export async function GET(request: NextRequest) {
         total,
         limit,
         offset,
-        hasMore: finalImages.length === limit // 基于实际返回的数量判断
-      }
+        hasMore: offset + finalImages.length < total
+      },
+      ...(includeStats
+        ? {
+            stats: {
+              total: processTypeCounts.reduce((sum, item) => sum + item._count.processType, 0),
+              processTypes: Object.fromEntries(
+                processTypeCounts.map((item) => [item.processType, item._count.processType])
+              ),
+            },
+          }
+        : {}),
     });
 
   } catch (error) {

@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Newsreader } from "next/font/google";
-import { Noto_Sans_SC, Noto_Serif_SC } from "next/font/google";
+import type { CSSProperties } from "react";
 import { DesktopUpdateProvider } from "@/components/providers/DesktopUpdateProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { AppShell } from "@/components/navigation/AppShell";
@@ -24,17 +24,12 @@ const newsreader = Newsreader({
   style: ["normal", "italic"],
 });
 
-const notoSansSC = Noto_Sans_SC({
-  subsets: ["latin"],
-  variable: "--font-noto-sans-sc",
-  weight: ["400", "500", "600", "700"],
-});
-
-const notoSerifSC = Noto_Serif_SC({
-  subsets: ["latin"],
-  variable: "--font-noto-serif-sc",
-  weight: ["500", "600", "700"],
-});
+// 中文直接使用系统字体，避免为每个字重生成数百条 unicode-range 和字体分片。
+// 保留原 CSS 变量名，现有 Tailwind/品牌字体声明无需同步迁移。
+const systemCjkFontVariables = {
+  "--font-noto-sans-sc": '"PingFang SC", "Hiragino Sans GB", "Microsoft YaHei"',
+  "--font-noto-serif-sc": '"Songti SC", STSong, SimSun',
+} as CSSProperties;
 
 export const metadata: Metadata = {
   title: "AI 商品视觉工作台",
@@ -71,7 +66,8 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <body
-        className={`${jakarta.variable} ${newsreader.variable} ${notoSansSC.variable} ${notoSerifSC.variable} font-sans`}
+        className={`${jakarta.variable} ${newsreader.variable} font-sans`}
+        style={systemCjkFontVariables}
       >
         <ThemeProvider>
           <NextAuthProvider>

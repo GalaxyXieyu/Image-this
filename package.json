@@ -10,6 +10,7 @@
   "main": "electron/main.js",
   "scripts": {
     "dev": "next dev -p 34123",
+    "dev:turbo": "next dev --turbopack -p 34123",
     "build": "node scripts/run-next-build.mjs",
     "start": "next start -p 34123",
     "lint": "eslint . --config config/eslint.config.mjs",

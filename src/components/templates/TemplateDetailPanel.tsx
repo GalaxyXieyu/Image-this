@@ -45,7 +45,7 @@ export function TemplateDetailPanel({
       {/* Preview area: 180px height, muted bg, 12px radius */}
       <div className="p-4">
         <div className="h-[180px] overflow-hidden rounded-xl">
-          <TemplateReferencePreview preset={preset} />
+          <TemplateReferencePreview preset={preset} loading="eager" />
         </div>
       </div>
 

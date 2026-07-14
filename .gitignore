@@ -166,6 +166,10 @@ IMG_*.JPG
 !public/brands/
 !public/brands/**
 
+# Optimized template preview assets
+!public/template-previews/thumbs/
+!public/template-previews/thumbs/*.webp
+
 # Backup files
 *.bak
 *.backup

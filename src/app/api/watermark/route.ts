@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { uploadBase64Image } from '@/lib/storage';
+import { persistImageReference } from '@/lib/storage';
 import { addWatermarkToImage } from '@/lib/watermark';
 
 export async function POST(request: NextRequest) {
@@ -39,10 +39,18 @@ export async function POST(request: NextRequest) {
       userId = session.user.id;
     }
 
+    const timestamp = Date.now();
+    const [persistedOriginalUrl, persistedLogoUrl] = await Promise.all([
+      persistImageReference(imageUrl, `watermark-source-${timestamp}.png`, userId),
+      watermarkLogoUrl
+        ? persistImageReference(watermarkLogoUrl, `watermark-logo-${timestamp}.png`, userId)
+        : Promise.resolve(undefined),
+    ]);
+
     const processedImage = await prisma.processedImage.create({
       data: {
-        filename: `watermark-${Date.now()}.png`,
-        originalUrl: imageUrl,
+        filename: `watermark-${timestamp}.png`,
+        originalUrl: persistedOriginalUrl,
         processType: 'WATERMARK',
         status: 'PROCESSING',
         userId: userId,
@@ -51,7 +59,7 @@ export async function POST(request: NextRequest) {
           watermarkOpacity,
           watermarkPosition,
           watermarkType,
-          watermarkLogoUrl,
+          watermarkLogoUrl: persistedLogoUrl,
           outputResolution,
         })
       }
@@ -68,9 +76,10 @@ export async function POST(request: NextRequest) {
         outputResolution
       });
 
-      const minioUrl = await uploadBase64Image(
+      const minioUrl = await persistImageReference(
         watermarkedImageData,
-        `watermark-${processedImage.id}.png`
+        `watermark-${processedImage.id}.png`,
+        userId
       );
 
       const updatedImage = await prisma.processedImage.update({

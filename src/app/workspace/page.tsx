@@ -32,7 +32,10 @@ const QUICK_ENTRIES: { href: string; icon: LucideIcon; title: string; desc: stri
 function thumbUrl(url?: string | null, w = 400): string | undefined {
   if (!url) return undefined;
   if (url.startsWith("/api/files/") || url.startsWith("/uploads/")) {
-    return `${url}${url.includes("?") ? "&" : "?"}w=${w}`;
+    const [pathname, query = ""] = url.split("?", 2);
+    const params = new URLSearchParams(query);
+    params.set("w", String(w));
+    return `${pathname}?${params.toString()}`;
   }
   return url;
 }
@@ -43,14 +46,15 @@ function SceneThumb({ src, alt, thumbWidth = 400, loading = "lazy" }: { src: str
   if (!resolved || error) {
     return <div className="h-full w-full bg-surface-muted" />;
   }
-  // eslint-disable-next-line @next/next/no-img-element
   return (
+    // 本地图片已经通过 /api/files?w= 输出缓存 WebP。
+    // eslint-disable-next-line @next/next/no-img-element
     <img
       src={resolved}
       alt={alt}
       loading={loading}
       decoding="async"
-      fetchPriority={loading === "eager" ? "auto" : "low"}
+      fetchPriority={loading === "eager" ? "high" : "low"}
       width={thumbWidth}
       height={thumbWidth}
       className="h-full w-full object-cover"
@@ -98,7 +102,7 @@ export default function WorkbenchHubPage() {
   useEffect(() => {
     // 最近生成图：套图/场景来源的图作为场景封面；「最近生成」网格用全部
     apiGet<{ images: Array<{ id: string; processedUrl?: string | null; thumbnailUrl?: string | null; metadata?: string | null }> }>(
-      "/api/images?limit=12&status=COMPLETED&includeFullSize=true"
+      "/api/images?view=workspace&limit=6&status=COMPLETED"
     )
       .then((res) => {
         const imgs = res.images || [];

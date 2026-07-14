@@ -8,6 +8,13 @@ import { authOptions } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
+const THUMBNAIL_CACHE_DIR = path.join(
+  os.homedir(),
+  'ImagineThis',
+  'cache',
+  'thumbnails'
+);
+
 async function pathExists(filePath: string) {
   try {
     await fs.access(filePath);
@@ -135,9 +142,6 @@ export async function GET(
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
     
-    // 读取文件
-    const fileBuffer = await fs.readFile(filePath);
-
     // 确定 MIME 类型
     const ext = path.extname(filePath).toLowerCase();
     const mimeTypes: Record<string, string> = {
@@ -157,26 +161,42 @@ export async function GET(
     if (reqWidth && ['.jpg', '.jpeg', '.png', '.webp'].includes(ext)) {
       try {
         const crypto = await import('crypto');
-        const key = crypto.createHash('md5').update(`${resolvedPath}|w${reqWidth}`).digest('hex');
-        const cacheDir = path.join(os.tmpdir(), 'imagethis-thumb-cache');
-        const cacheFile = path.join(cacheDir, `${key}.webp`);
-        let out: Buffer;
+        const fileStat = await fs.stat(filePath);
+        const key = crypto
+          .createHash('sha256')
+          .update(`${resolvedPath}|${fileStat.size}|${fileStat.mtimeMs}|w${reqWidth}`)
+          .digest('hex');
+        const cacheFile = path.join(THUMBNAIL_CACHE_DIR, `${key}.webp`);
+
         try {
-          out = await fs.readFile(cacheFile);
+          const cachedThumbnail = await fs.readFile(cacheFile);
+          return new NextResponse(new Uint8Array(cachedThumbnail), {
+            headers: {
+              'Content-Type': 'image/webp',
+              'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
+            },
+          });
         } catch {
-          const sharp = (await import('sharp')).default;
-          out = await sharp(fileBuffer)
-            .rotate()
-            .resize({ width: reqWidth, withoutEnlargement: true })
-            .webp({ quality: 72 })
-            .toBuffer();
-          await fs.mkdir(cacheDir, { recursive: true }).catch(() => {});
-          await fs.writeFile(cacheFile, out).catch(() => {});
+          // 缓存 miss 后才读原图和加载 sharp，避免缓存命中仍触发大文件 I/O。
         }
-        return new NextResponse(new Uint8Array(out), {
+
+        const [fileBuffer, sharpModule] = await Promise.all([
+          fs.readFile(filePath),
+          import('sharp'),
+        ]);
+        const thumbnail = await sharpModule.default(fileBuffer)
+          .rotate()
+          .resize({ width: reqWidth, withoutEnlargement: true })
+          .webp({ quality: 72 })
+          .toBuffer();
+
+        await fs.mkdir(THUMBNAIL_CACHE_DIR, { recursive: true });
+        await fs.writeFile(cacheFile, thumbnail).catch(() => {});
+
+        return new NextResponse(new Uint8Array(thumbnail), {
           headers: {
             'Content-Type': 'image/webp',
-            'Cache-Control': 'public, max-age=31536000, immutable',
+            'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
           },
         });
       } catch (e) {
@@ -184,6 +204,8 @@ export async function GET(
         // 落到下面返回原图
       }
     }
+
+    const fileBuffer = await fs.readFile(filePath);
 
     return new NextResponse(new Uint8Array(fileBuffer), {
       headers: {
