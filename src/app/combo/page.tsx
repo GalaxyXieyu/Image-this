@@ -671,7 +671,7 @@ export default function ComboPage() {
       }));
 
       await apiPost("/api/tasks", tasks);
-      window.location.href = "/tasks";
+      window.location.href = "/tasks?tab=running";
     } catch (error) {
       setExecuting(false);
       console.error("执行批量处理失败:", error);

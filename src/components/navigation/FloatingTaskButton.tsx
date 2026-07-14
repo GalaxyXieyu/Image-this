@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,20 @@ interface Task {
   originalImageUrl?: string | null;
   resultImageUrl?: string | null;
   videoUrl?: string | null;
+}
+
+interface TaskSummaryResponse {
+  success: boolean;
+  status?: QueueStats;
+  summary?: QueueStats;
+}
+
+function taskThumbnailUrl(src?: string | null, width = 96): string | null | undefined {
+  if (!src) return src;
+  if (src.startsWith('/api/files/') || src.startsWith('/uploads/')) {
+    return `${src}${src.includes('?') ? '&' : '?'}w=${width}`;
+  }
+  return src;
 }
 
 // 任务类型映射
@@ -61,7 +75,7 @@ const taskTypeIcons: Record<string, React.ElementType> = {
 };
 
 export default function FloatingTaskButton() {
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const [stats, setStats] = useState<QueueStats>({
     pending: 0,
     processing: 0,
@@ -71,47 +85,68 @@ export default function FloatingTaskButton() {
   });
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isOpen, setIsOpen] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // 获取统计
-        const statsRes = await fetch('/api/tasks/worker', {
-          signal: AbortSignal.timeout(10000)
-        });
-        if (statsRes.ok) {
-          const data = await statsRes.json();
-          if (data.success && data.status) {
-            setStats(data.status);
-          }
-        }
+    const mediaQuery = window.matchMedia('(min-width: 768px)');
+    const updateDesktop = () => setIsDesktop(mediaQuery.matches);
+    updateDesktop();
+    mediaQuery.addEventListener('change', updateDesktop);
+    return () => mediaQuery.removeEventListener('change', updateDesktop);
+  }, []);
 
-        // 获取最近任务列表
-        const tasksRes = await fetch('/api/tasks/recent', {
-          signal: AbortSignal.timeout(10000)
-        });
-        if (tasksRes.ok) {
-          const data = await tasksRes.json();
-          if (data.success && data.tasks) {
-            setTasks(data.tasks);
-          }
-        }
-      } catch (err) {
-        if (err instanceof Error && err.name !== 'AbortError' && err.name !== 'TimeoutError') {
-          console.error('获取任务数据失败:', err);
-        }
+  const fetchSummary = useCallback(async () => {
+    try {
+      const response = await fetch('/api/tasks/summary', {
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!response.ok) return;
+      const data = await response.json() as TaskSummaryResponse;
+      const nextStats = data.status ?? data.summary;
+      if (data.success && nextStats) setStats(nextStats);
+    } catch {
+      // 全局任务入口是增强项，失败时不打断当前页面。
+    }
+  }, []);
+
+  const fetchRecent = useCallback(async () => {
+    try {
+      const response = await fetch('/api/tasks/recent', {
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!response.ok) return;
+      const data = await response.json() as { success: boolean; tasks?: Task[] };
+      if (data.success && data.tasks) setTasks(data.tasks);
+    } catch {
+      // 弹窗仍可展示上一次成功加载的任务。
+    }
+  }, []);
+
+  const fetchOpenData = useCallback(async () => {
+    await Promise.all([fetchSummary(), fetchRecent()]);
+  }, [fetchRecent, fetchSummary]);
+
+  useEffect(() => {
+    if (sessionStatus !== 'authenticated' || !isDesktop) return;
+    void fetchSummary();
+  }, [fetchSummary, isDesktop, sessionStatus]);
+
+  useEffect(() => {
+    if (sessionStatus !== 'authenticated' || !isDesktop || !isOpen) return;
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void fetchOpenData();
       }
     };
-
-    // 初次加载时获取一次
-    fetchData();
-
-    // 只在打开弹窗时才轮询
-    if (isOpen) {
-      const interval = setInterval(fetchData, 3000);
-      return () => clearInterval(interval);
-    }
-  }, [isOpen]);
+    refreshWhenVisible();
+    const interval = window.setInterval(refreshWhenVisible, 10000);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [fetchOpenData, isDesktop, isOpen, sessionStatus]);
 
   const handleDeleteTask = async (task: Task) => {
     const isPending = isTaskStatus(task, 'pending');
@@ -136,8 +171,8 @@ export default function FloatingTaskButton() {
 
   const hasActiveTasks = stats.pending > 0 || stats.processing > 0;
 
-  // 只在登录状态下显示
-  if (!session) {
+  // 移动端不挂载任务数据请求，避免隐藏组件与当前页面争抢资源。
+  if (!session || !isDesktop) {
     return null;
   }
 
@@ -199,6 +234,7 @@ export default function FloatingTaskButton() {
                   const videoUrl = task.videoUrl || null;
                   const isVideoTask = task.workflowType === 'video_generation' || task.type === 'VIDEO_GENERATION';
                   const displayUrl = isVideoTask ? (videoUrl || originalUrl) : (resultUrl || originalUrl);
+                  const thumbnailUrl = taskThumbnailUrl(displayUrl);
 
                   return (
                     <div
@@ -208,9 +244,17 @@ export default function FloatingTaskButton() {
                       {/* 缩略图 */}
                       <div className="relative w-12 h-12 rounded-md overflow-hidden bg-gray-100 flex-shrink-0 border">
                         {isVideoTask && videoUrl ? (
-                          <video src={videoUrl} className="w-full h-full object-cover" muted />
-                        ) : displayUrl ? (
-                          <img src={displayUrl} alt="" className="w-full h-full object-cover" />
+                          <video src={videoUrl} className="w-full h-full object-cover" muted preload="none" />
+                        ) : thumbnailUrl ? (
+                          // 图片已通过 /api/files?w=96 输出小尺寸 WebP。
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={thumbnailUrl}
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                            className="w-full h-full object-cover"
+                          />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
                             <ImagePlus className="w-5 h-5 text-gray-300" />

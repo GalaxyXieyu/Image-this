@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { Suspense, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -22,6 +22,11 @@ import {
 } from "lucide-react";
 
 type TaskStatus = "pending" | "running" | "completed" | "failed";
+type TaskTab = "all" | "running" | "completed" | "failed";
+
+function normalizeTaskTab(tab: string | null): TaskTab {
+  return tab === "running" || tab === "completed" || tab === "failed" ? tab : "all";
+}
 
 interface Task {
   id: string;
@@ -104,9 +109,18 @@ interface TasksApiResponse {
   stats: { pending: number; processing: number; completed: number; failed: number; total: number };
 }
 
+function taskThumbnailUrl(src?: string | null): string | null | undefined {
+  if (!src) return src;
+  if (src.startsWith("/api/files/") || src.startsWith("/uploads/")) {
+    return `${src}${src.includes("?") ? "&" : "?"}w=112`;
+  }
+  return src;
+}
+
 function TaskThumbnail({ src, isResult }: { src?: string | null; isResult: boolean }) {
   const [error, setError] = useState(false);
-  if (!src || error) {
+  const thumbnailSrc = taskThumbnailUrl(src);
+  if (!thumbnailSrc || error) {
     return (
       <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[12px] bg-muted">
         <ImageIcon className="h-5 w-5 text-muted-foreground" />
@@ -117,8 +131,10 @@ function TaskThumbnail({ src, isResult }: { src?: string | null; isResult: boole
     <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[12px] border border-line bg-surface-muted">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={src}
+        src={thumbnailSrc}
         alt={isResult ? "结果" : "原图"}
+        loading="lazy"
+        decoding="async"
         className="h-full w-full object-cover"
         onError={() => setError(true)}
       />
@@ -179,10 +195,11 @@ function TaskActions({
   );
 }
 
-export default function TasksPage() {
+function TasksPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: session, status } = useSession();
-  const [activeTab, setActiveTab] = useState("all");
+  const activeTab = normalizeTaskTab(searchParams.get("tab"));
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -196,13 +213,14 @@ export default function TasksPage() {
     setError(null);
     try {
       const params = new URLSearchParams();
-      if (activeTab !== "all") {
-        const statusMap: Record<string, string> = {
-          running: "PROCESSING",
+      if (activeTab === "running") {
+        params.append("statuses", "PENDING,PROCESSING");
+      } else if (activeTab !== "all") {
+        const statusMap: Record<Exclude<TaskTab, "all" | "running">, string> = {
           completed: "COMPLETED",
           failed: "FAILED",
         };
-        if (statusMap[activeTab]) params.append("status", statusMap[activeTab]);
+        params.append("status", statusMap[activeTab]);
       }
       params.append("limit", "50");
 
@@ -327,7 +345,11 @@ export default function TasksPage() {
     { id: "running", label: `进行中 (${stats.running + stats.pending})` },
     { id: "completed", label: `已完成 (${stats.completed})` },
     { id: "failed", label: `失败 (${stats.failed})` },
-  ];
+  ] satisfies Array<{ id: TaskTab; label: string }>;
+
+  const handleTabChange = (tab: TaskTab) => {
+    router.replace(tab === "all" ? "/tasks" : `/tasks?tab=${tab}`, { scroll: false });
+  };
 
   return (
     <div className="h-full flex flex-col bg-background">
@@ -368,7 +390,7 @@ export default function TasksPage() {
           {tabLabels.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
               className={cn(
 	                "min-h-9 shrink-0 px-3 text-[12px] font-medium rounded-full transition-all md:min-h-0 md:py-1.5",
                 activeTab === tab.id
@@ -527,5 +549,19 @@ export default function TasksPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function TasksPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      }
+    >
+      <TasksPageContent />
+    </Suspense>
   );
 }

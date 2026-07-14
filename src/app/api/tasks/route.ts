@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -16,17 +17,21 @@ type TaskInputData = {
   [key: string]: unknown;
 };
 
-type TaskOutputData = {
-  processedImageUrl?: string;
-  processedUrl?: string;
-  imageUrl?: string;
-  videoUrl?: string;
-  result?: {
-    processedUrl?: string;
-    processedImageUrl?: string;
-  };
-  [key: string]: unknown;
+type TaskPayloadSummary = {
+  id: string;
+  originalImageUrl: string | null;
+  resultImageUrl: string | null;
+  setId: string | null;
+  videoUrl: string | null;
+  usedModel: string | null;
 };
+
+function normalizeTaskSummaryUrl(value?: string | null): string | null {
+  if (!value || value.length > 2048 || /^data:/i.test(value.trimStart())) {
+    return null;
+  }
+  return normalizeImageUrlForClient(value);
+}
 
 function normalizeTaskInputData(rawInputData: string): string {
   try {
@@ -80,88 +85,6 @@ async function sanitizeTaskInputDataAsync(rawInputData: string, userId: string):
     return modified ? JSON.stringify(parsed) : rawInputData;
   } catch {
     return rawInputData;
-  }
-}
-
-function getClientUrlFromAsset(asset: unknown): string | null {
-  if (!asset || typeof asset !== 'object') {
-    return null;
-  }
-
-  const value = (asset as { clientUrl?: unknown }).clientUrl;
-  return typeof value === 'string' ? normalizeImageUrlForClient(value) : null;
-}
-
-function extractOriginalImageUrl(inputData?: string | null): string | null {
-  if (!inputData) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(inputData) as TaskInputData;
-    return getClientUrlFromAsset(parsed.inputAsset)
-      || normalizeImageUrlForClient(parsed.imageUrl)
-      || normalizeImageUrlForClient(parsed.originalUrl)
-      || normalizeImageUrlForClient(parsed.sourceUrl);
-  } catch {
-    return null;
-  }
-}
-
-// 套图任务的 setId（用于图库按任务聚焦）；非套图返回 null
-function extractSetId(outputData?: string | null): string | null {
-  if (!outputData) return null;
-  try {
-    const parsed = JSON.parse(outputData) as { setId?: string };
-    return typeof parsed.setId === 'string' && parsed.setId ? parsed.setId : null;
-  } catch {
-    return null;
-  }
-}
-
-function extractResultImageUrl(outputData?: string | null): string | null {
-  if (!outputData) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(outputData) as TaskOutputData;
-    return normalizeImageUrlForClient(
-      parsed.processedImageUrl
-      || parsed.processedUrl
-      || parsed.imageUrl
-      || parsed.result?.processedUrl
-      || parsed.result?.processedImageUrl
-      || null
-    );
-  } catch {
-    return null;
-  }
-}
-
-function extractVideoUrl(taskType: string, outputData?: string | null): string | null {
-  if (taskType !== 'VIDEO_GENERATION' || !outputData) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(outputData) as TaskOutputData;
-    return normalizeImageUrlForClient(parsed.videoUrl || null);
-  } catch {
-    return null;
-  }
-}
-
-function extractUsedModel(outputData?: string | null): string | null {
-  if (!outputData) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(outputData) as Record<string, unknown>;
-    return (parsed.usedModel as string) || (parsed.modelName as string) || null;
-  } catch {
-    return null;
   }
 }
 
@@ -316,6 +239,10 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
+    const statuses = searchParams.get('statuses')
+      ?.split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
     const type = searchParams.get('type');
     // 限制最大返回数量
     const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
@@ -327,7 +254,9 @@ export async function GET(request: NextRequest) {
       userId: session.user.id
     };
 
-    if (status) {
+    if (statuses && statuses.length > 0) {
+      where.status = { in: statuses };
+    } else if (status) {
       where.status = status;
     }
 
@@ -375,10 +304,7 @@ export async function GET(request: NextRequest) {
     // 列表只返回轻量摘要。inputData/outputData 可能包含大 JSON/base64，避免每次轮询整页读出。
     const tasks = await prisma.taskQueue.findMany({
       where,
-      orderBy: [
-        { priority: 'desc' },
-        { createdAt: 'desc' }
-      ],
+      orderBy: { createdAt: 'desc' },
       take: limit,
       skip: offset,
       select: {
@@ -398,8 +324,7 @@ export async function GET(request: NextRequest) {
         userId: true,
         projectId: true,
         processedImageId: true,
-        inputData: true,
-        outputData: true,
+        workflowType: true,
         project: {
           select: { id: true, name: true }
         },
@@ -409,18 +334,63 @@ export async function GET(request: NextRequest) {
       }
     });
 
+    // 用 SQLite JSON 标量提取保留旧接口字段，但不把整段 inputData/outputData 传入 Node。
+    // substr 上限同时阻止历史 base64 字段重新进入列表响应。
+    const payloadSummaries = tasks.length > 0
+      ? await prisma.$queryRaw<TaskPayloadSummary[]>(Prisma.sql`
+          SELECT
+            "id",
+            substr(
+              CASE WHEN json_valid("inputData") THEN COALESCE(
+                json_extract("inputData", '$.inputAsset.clientUrl'),
+                json_extract("inputData", '$.imageUrl'),
+                json_extract("inputData", '$.originalUrl'),
+                json_extract("inputData", '$.sourceUrl')
+              ) END,
+              1,
+              2049
+            ) AS "originalImageUrl",
+            substr(
+              CASE WHEN json_valid("outputData") THEN COALESCE(
+                json_extract("outputData", '$.processedImageUrl'),
+                json_extract("outputData", '$.processedUrl'),
+                json_extract("outputData", '$.imageUrl'),
+                json_extract("outputData", '$.result.processedUrl'),
+                json_extract("outputData", '$.result.processedImageUrl')
+              ) END,
+              1,
+              2049
+            ) AS "resultImageUrl",
+            substr(CASE WHEN json_valid("outputData") THEN json_extract("outputData", '$.setId') END, 1, 513) AS "setId",
+            substr(CASE WHEN json_valid("outputData") THEN json_extract("outputData", '$.videoUrl') END, 1, 2049) AS "videoUrl",
+            substr(
+              CASE WHEN json_valid("outputData") THEN COALESCE(
+                json_extract("outputData", '$.usedModel'),
+                json_extract("outputData", '$.modelName')
+              ) END,
+              1,
+              513
+            ) AS "usedModel"
+          FROM "task_queue"
+          WHERE "userId" = ${session.user.id}
+            AND "id" IN (${Prisma.join(tasks.map((task) => task.id))})
+        `)
+      : [];
+    const payloadSummaryById = new Map(payloadSummaries.map((summary) => [summary.id, summary]));
+
     const normalizedTasks = tasks.map((task) => {
+      const payloadSummary = payloadSummaryById.get(task.id);
       const originalImageUrl = task.processedImage?.originalUrl
         ? normalizeImageUrlForClient(task.processedImage.originalUrl)
-        : extractOriginalImageUrl(task.inputData);
+        : normalizeTaskSummaryUrl(payloadSummary?.originalImageUrl);
       const resultImageUrl = task.processedImage?.processedUrl
         ? normalizeImageUrlForClient(task.processedImage.processedUrl)
-        : extractResultImageUrl(task.outputData);
+        : normalizeTaskSummaryUrl(payloadSummary?.resultImageUrl);
 
       return {
         id: task.id,
         type: task.type,
-        workflowType: inferWorkflowTypeFromTask(task.type, task.inputData),
+        workflowType: task.workflowType || inferWorkflowTypeFromTask(task.type),
         status: task.status,
         priority: task.priority,
         progress: task.progress,
@@ -437,9 +407,13 @@ export async function GET(request: NextRequest) {
         processedImageId: task.processedImageId,
         originalImageUrl,
         resultImageUrl,
-        setId: extractSetId(task.outputData),
-        videoUrl: extractVideoUrl(task.type, task.outputData),
-        usedModel: extractUsedModel(task.outputData),
+        setId: payloadSummary?.setId && payloadSummary.setId.length <= 512
+          ? payloadSummary.setId
+          : null,
+        videoUrl: normalizeTaskSummaryUrl(payloadSummary?.videoUrl),
+        usedModel: payloadSummary?.usedModel && payloadSummary.usedModel.length <= 512
+          ? payloadSummary.usedModel
+          : null,
         project: task.project,
         processedImage: task.processedImage
           ? {
