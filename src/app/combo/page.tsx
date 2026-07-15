@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import {
   DrawerRoot,
@@ -146,7 +147,7 @@ type StepType = "scene" | "background" | "upscale" | "watermark" | "outpaint" | 
 type ExecutableStepType = Exclude<StepType, "workflow">;
 
 interface SceneParams { sceneStyle: string; candidateCount: number }
-interface BackgroundParams { bgType: string; featherEdge: number; keepShadow: boolean; referenceAsset?: InputAssetRef }
+interface BackgroundParams { bgType: string; featherEdge: number; keepShadow: boolean; referenceAsset?: InputAssetRef; customPrompt?: string }
 interface UpscaleParams { factor: number; denoise: number }
 type WatermarkPresetPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center";
 
@@ -356,7 +357,8 @@ function normalizeStepTaskInput(
     return {
       ...baseInput,
       referenceAsset: backgroundParams.referenceAsset,
-      customPrompt: buildBackgroundPrompt(backgroundParams),
+      // 用户在该步填了自定义提示词就用它，否则按背景类型等参数自动构建
+      customPrompt: backgroundParams.customPrompt?.trim() || buildBackgroundPrompt(backgroundParams),
       aiModel: global.aiModel ?? "gemini",   // 用全局 provider，不再写死
       model: global.model,                   // 具体模型 id，未选时为 undefined → executeOrderedPipeline 回退 globalModel
       outputResolution: global.resolution,
@@ -2507,6 +2509,17 @@ function BackgroundStepParams({
             { id: "blur", label: "虚化" },
           ]}
         />
+      </section>
+      <section className="flex flex-col gap-2">
+        <FieldLabel>换背景提示词（可选）</FieldLabel>
+        <Textarea
+          value={params.customPrompt ?? ""}
+          onChange={(event) => onChange({ customPrompt: event.target.value })}
+          placeholder={buildBackgroundPrompt(params)}
+          rows={3}
+          className="resize-none text-[13px]"
+        />
+        <p className="text-[11px] text-ink-3">留空则按上面的背景类型/羽化等自动生成提示词。</p>
       </section>
       <SliderRow
         label="边缘羽化"
