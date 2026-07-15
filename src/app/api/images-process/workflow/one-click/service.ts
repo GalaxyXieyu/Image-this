@@ -81,6 +81,23 @@ function normalizeResolutionTier(resolution?: string): string | undefined {
   return tierMap[resolution.toLowerCase()] || resolution;
 }
 
+/**
+ * 归一化生图步输出为 base64 data URL。
+ * Gemini 直接返回 base64（原样返回）；GPT/即梦 可能返回图片 URL，拉取后转 base64，
+ * 以兼容只认 base64 的下游步骤（水印/扩图/放大）与最终落盘逻辑。
+ */
+async function ensureDataUrl(image: string): Promise<string> {
+  if (image.startsWith('data:')) return image;
+  if (/^https?:\/\//i.test(image)) {
+    const resp = await fetch(image);
+    if (!resp.ok) throw new Error(`拉取生图结果失败：HTTP ${resp.status}`);
+    const buf = Buffer.from(await resp.arrayBuffer());
+    const mime = resp.headers.get('content-type')?.split(';')[0]?.trim() || 'image/png';
+    return `data:${mime};base64,${buf.toString('base64')}`;
+  }
+  return image;
+}
+
 export async function executeOrderedPipeline(params: OrderedPipelineParams) {
   const {
     imageUrl,
@@ -138,7 +155,9 @@ export async function executeOrderedPipeline(params: OrderedPipelineParams) {
             out = r || undefined;
           }
           if (!out) throw new Error('返回结果为空');
-          current = out;
+          // 部分 provider（GPT/即梦）返回图片 URL 而非 base64；下游水印步(Sharp)只认 base64，
+          // 在唯一消费点统一把 URL 拉成 base64 data URL，保证 scene/background 之后的步骤格式一致。
+          current = await ensureDataUrl(out);
         } else if (step.stepType === 'outpaint') {
           const each = Math.min(0.5, Math.max(0.05, (step.ratio ?? 25) / 100));
           const dir = (step.direction as string) || 'all';
