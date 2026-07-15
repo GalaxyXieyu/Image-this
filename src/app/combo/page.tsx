@@ -339,6 +339,8 @@ function normalizeStepTaskInput(
     resolution: string;
     watermarkEnabled: boolean;
     autoRetry: boolean;
+    aiModel?: string;   // provider（全局注入）
+    model?: string;     // 具体模型 id（全局注入）
   }
 ) {
   const params = step.params as Record<string, unknown>;
@@ -355,7 +357,8 @@ function normalizeStepTaskInput(
       ...baseInput,
       referenceAsset: backgroundParams.referenceAsset,
       customPrompt: buildBackgroundPrompt(backgroundParams),
-      aiModel: "gemini",
+      aiModel: global.aiModel ?? "gemini",   // 用全局 provider，不再写死
+      model: global.model,                   // 具体模型 id，未选时为 undefined → executeOrderedPipeline 回退 globalModel
       outputResolution: global.resolution,
     };
   }
@@ -509,6 +512,13 @@ export default function ComboPage() {
   const [autoRetry, setAutoRetry] = usePageDraft("workbench.combo.autoRetry", true);
   const [executing, setExecuting] = useState(false);
 
+  // 生图模型清单（来自 /api/models/available）
+  const [availableModels, setAvailableModels] = useState<{ provider: string; modelName: string }[]>([]);
+  // 选中的生图模型（provider 决定走哪个 provider，modelName 是具体模型 id）——用 usePageDraft 记住用户选择
+  const [selectedImageModel, setSelectedImageModel] = usePageDraft<{ provider: string; modelName: string } | null>(
+    "workbench.combo.imageModel", null
+  );
+
   // Product upload
   const [productAssets, setProductAssets] = usePageDraft<InputAssetRef[]>("workbench.combo.productAssets", []);
   const [uploadingProductAssets, setUploadingProductAssets] = useState(false);
@@ -546,6 +556,24 @@ export default function ComboPage() {
       }
     };
     loadTemplates();
+  }, []);
+
+  // 加载可用生图模型清单并设默认
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await apiGet<{ models: { provider: string; modelName: string }[] }>("/api/models/available");
+        const models = res.models || [];
+        setAvailableModels(models);
+        // 默认：优先沿用已持久化的选择（若仍在清单内），否则选 gemini，否则第一个
+        setSelectedImageModel((prev) => {
+          if (prev && models.some((m) => m.provider === prev.provider && m.modelName === prev.modelName)) return prev;
+          return models.find((m) => m.provider === "gemini") ?? models[0] ?? null;
+        });
+      } catch (e) {
+        console.error("加载可用生图模型失败:", e);   // 清单为空/失败不阻塞——提交时 hasEnabledImageModel() 已兜底
+      }
+    })();
   }, []);
 
   const handleUploadProductAssets = async (files?: FileList | File[]) => {
@@ -653,7 +681,14 @@ export default function ComboPage() {
         return;
       }
 
-      const global = { aspectRatio, resolution, watermarkEnabled, autoRetry };
+      const global = {
+        aspectRatio,
+        resolution,
+        watermarkEnabled,
+        autoRetry,
+        aiModel: selectedImageModel?.provider ?? "gemini",     // provider
+        model: selectedImageModel?.modelName ?? undefined,     // 具体模型 id
+      };
 
       // 每个步骤的归一化参数（含 stepType），整条链共用，按上传的每张图各创建一个链式任务
       const pipelineSteps = expandedSteps.map((step) =>
@@ -714,6 +749,8 @@ export default function ComboPage() {
         resolution,
         watermarkEnabled,
         autoRetry,
+        aiModel: selectedImageModel?.provider,     // provider
+        model: selectedImageModel?.modelName,      // 具体模型 id
       },
       tags: templateToOverwrite?.tags ?? [],
     };
@@ -750,6 +787,18 @@ export default function ComboPage() {
       setResolution(template.globalParams?.resolution ?? "2k");
       setWatermarkEnabled(template.globalParams?.watermarkEnabled ?? true);
       setAutoRetry(template.globalParams?.autoRetry ?? true);
+      // 模型：旧模板无 aiModel/model → 保持当前选择/默认，不覆盖为空、不崩
+      const gp = template.globalParams as { aiModel?: string; model?: string } | undefined;
+      if (gp?.aiModel && gp?.model) {
+        const restored = { provider: gp.aiModel, modelName: gp.model };
+        // 仅当该模型仍在用户已启用清单内才应用，否则保留当前选择（避免选到已删除模型）
+        setSelectedImageModel((prev) =>
+          availableModels.some((m) => m.provider === restored.provider && m.modelName === restored.modelName)
+            ? restored
+            : prev
+        );
+      }
+      // 旧模板（无字段）：不动 selectedImageModel，沿用挂载时的默认
     }
   };
 
@@ -1226,6 +1275,9 @@ export default function ComboPage() {
                 setAspectRatio={setAspectRatio}
                 resolution={resolution}
                 setResolution={setResolution}
+                availableModels={availableModels}
+                selectedImageModel={selectedImageModel}
+                setSelectedImageModel={setSelectedImageModel}
               />
             </div>
             <div className="mt-3 flex flex-col gap-3">
@@ -1853,6 +1905,9 @@ export default function ComboPage() {
                 setAspectRatio={setAspectRatio}
                 resolution={resolution}
                 setResolution={setResolution}
+                availableModels={availableModels}
+                selectedImageModel={selectedImageModel}
+                setSelectedImageModel={setSelectedImageModel}
               />
             )}
           </aside>
@@ -1871,6 +1926,9 @@ function GlobalSettingsPanel({
   setAspectRatio,
   resolution,
   setResolution,
+  availableModels,
+  selectedImageModel,
+  setSelectedImageModel,
 }: {
   onCollapse: () => void;
   selectedTemplateName: string | null;
@@ -1878,6 +1936,9 @@ function GlobalSettingsPanel({
   setAspectRatio: (_value: string) => void;
   resolution: string;
   setResolution: (_value: string) => void;
+  availableModels: { provider: string; modelName: string }[];
+  selectedImageModel: { provider: string; modelName: string } | null;
+  setSelectedImageModel: (_value: { provider: string; modelName: string } | null) => void;
 }) {
   return (
     <div className="flex flex-col gap-5 p-5">
@@ -1950,6 +2011,43 @@ function GlobalSettingsPanel({
         </div>
       </section>
 
+      <section className="flex flex-col gap-2">
+        <Label className="text-caption font-medium text-ink-3">生图模型</Label>
+        {availableModels.length === 0 ? (
+          <div className="rounded-[10px] border border-line bg-surface-muted p-3 text-[12px] text-ink-3">
+            未启用生图模型，请到 设置 → AI 模型配置 启用
+          </div>
+        ) : (
+          <BottomSheetSelect
+            options={availableModels.map((m) => ({
+              id: `${m.provider}::${m.modelName}`,
+              label: `${m.provider.toUpperCase()} · ${m.modelName}`,
+            }))}
+            value={selectedImageModel ? `${selectedImageModel.provider}::${selectedImageModel.modelName}` : ""}
+            onChange={(value) => {
+              if (typeof value === "string") {
+                const [provider, modelName] = value.split("::");
+                setSelectedImageModel({ provider, modelName });
+              }
+            }}
+            title="选择生图模型"
+            trigger={
+              <button
+                type="button"
+                className="rounded-[10px] border border-line bg-surface px-3 py-2 text-[12px] font-medium text-ink transition-colors hover:bg-surface-muted"
+              >
+                {selectedImageModel
+                  ? `${selectedImageModel.provider.toUpperCase()} · ${selectedImageModel.modelName}`
+                  : "选择模型"}
+              </button>
+            }
+          />
+        )}
+        <p className="text-[11px] text-ink-3">
+          该模型仅作用于「生成场景图 / AI 换背景」步骤；扩图、放大、水印不受影响。
+        </p>
+      </section>
+
     </div>
   );
 }
@@ -1960,12 +2058,18 @@ function MobileGlobalSettings({
   setAspectRatio,
   resolution,
   setResolution,
+  availableModels,
+  selectedImageModel,
+  setSelectedImageModel,
 }: {
   selectedTemplateName: string | null;
   aspectRatio: string;
   setAspectRatio: (_value: string) => void;
   resolution: string;
   setResolution: (_value: string) => void;
+  availableModels: { provider: string; modelName: string }[];
+  selectedImageModel: { provider: string; modelName: string } | null;
+  setSelectedImageModel: (_value: { provider: string; modelName: string } | null) => void;
 }) {
   return (
     <div className="flex flex-col gap-3 p-4">
@@ -2008,6 +2112,43 @@ function MobileGlobalSettings({
             </button>
           ))}
         </div>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <FieldLabel>生图模型</FieldLabel>
+        {availableModels.length === 0 ? (
+          <div className="rounded-[10px] border border-line bg-surface-muted p-3 text-[12px] text-ink-3">
+            未启用生图模型，请到 设置 → AI 模型配置 启用
+          </div>
+        ) : (
+          <BottomSheetSelect
+            options={availableModels.map((m) => ({
+              id: `${m.provider}::${m.modelName}`,
+              label: `${m.provider.toUpperCase()} · ${m.modelName}`,
+            }))}
+            value={selectedImageModel ? `${selectedImageModel.provider}::${selectedImageModel.modelName}` : ""}
+            onChange={(value) => {
+              if (typeof value === "string") {
+                const [provider, modelName] = value.split("::");
+                setSelectedImageModel({ provider, modelName });
+              }
+            }}
+            title="选择生图模型"
+            trigger={
+              <button
+                type="button"
+                className="rounded-[10px] border border-line bg-surface px-3 py-2 text-[12px] font-medium text-ink transition-colors hover:bg-surface-muted"
+              >
+                {selectedImageModel
+                  ? `${selectedImageModel.provider.toUpperCase()} · ${selectedImageModel.modelName}`
+                  : "选择模型"}
+              </button>
+            }
+          />
+        )}
+        <p className="text-[11px] text-ink-3">
+          该模型仅作用于「生成场景图 / AI 换背景」步骤；扩图、放大、水印不受影响。
+        </p>
       </section>
 
     </div>
