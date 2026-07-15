@@ -737,6 +737,7 @@ class TaskProcessor {
       steps,
       userId: task.userId,
       aiModel: (global.aiModel as string) || 'gemini',
+      model: (global.model as string) || undefined,      // 转发全局具体模型 id
       outputResolution: (global.resolution as string) || (global.outputResolution as string),
       originalImageUrlForRecord,
       volcengineConfig: inputData.volcengineConfig,

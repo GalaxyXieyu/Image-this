@@ -22,6 +22,7 @@ export interface OrderedPipelineStep {
   customPrompt?: string;
   referenceImageUrl?: string;
   aiModel?: string;
+  model?: string;   // 该步指定的具体模型 id（全局注入，per-step 覆盖用；本期不填 per-step，仅回退 global）
   // outpaint
   ratio?: number;
   direction?: string; // 扩图方向：'all'/'horizontal'/'vertical'
@@ -53,6 +54,7 @@ export interface OrderedPipelineParams {
   steps: OrderedPipelineStep[];
   userId: string;
   aiModel?: string;
+  model?: string;   // 全局具体模型 id（provider 由 aiModel 决定）
   outputResolution?: string;
   originalImageUrlForRecord?: string;
   volcengineConfig?: { accessKey: string; secretKey: string };
@@ -85,6 +87,7 @@ export async function executeOrderedPipeline(params: OrderedPipelineParams) {
     steps,
     userId,
     aiModel: globalAiModel = 'gemini',
+    model: globalModel,
     originalImageUrlForRecord,
     volcengineConfig,
     imagehostingConfig,
@@ -123,14 +126,15 @@ export async function executeOrderedPipeline(params: OrderedPipelineParams) {
           const prompt = step.customPrompt || DEFAULT_BACKGROUND_PROMPT;
           // 无参考图（如纯色棚拍/白底）时，用输入图自身占位，避免向 provider 传空 URL
           const ref = step.referenceImageUrl || current;
-          const model = step.aiModel || globalAiModel;
+          const provider = step.aiModel || globalAiModel;      // 字段名保持 aiModel=provider
+          const modelName = step.model || globalModel;          // 字段名保持 model=具体模型 id
           let out: string | undefined;
-          if (model === 'gpt') {
-            out = (await processWithGPT(current, ref, prompt, userId)).imageData;
-          } else if (model === 'jimeng') {
-            out = (await processWithJimeng(current, ref, prompt, userId)).imageData;
+          if (provider === 'gpt') {
+            out = (await processWithGPT(current, ref, prompt, userId, modelName)).imageData;
+          } else if (provider === 'jimeng') {
+            out = (await processWithJimeng(current, ref, prompt, userId, modelName)).imageData;
           } else {
-            const r = await processWithGemini(current, ref, prompt, userId);
+            const r = await processWithGemini(current, ref, prompt, userId, modelName);
             out = r || undefined;
           }
           if (!out) throw new Error('返回结果为空');
@@ -217,6 +221,8 @@ export async function executeOrderedPipeline(params: OrderedPipelineParams) {
         fileSize: imageSize,
         metadata: JSON.stringify({
           pipeline: done,
+          provider: globalAiModel,        // 本次真实使用的 provider
+          model: globalModel,             // 本次真实使用的具体模型 id（未选具体模型时为 undefined）
           processingCompletedAt: new Date().toISOString(),
         }),
       },
