@@ -81,7 +81,7 @@ const pipelineHandler = {
       imageUrl,
       steps,
       userId: task.userId,
-      aiModel: (global.aiModel as string) || 'gemini',
+      aiModel: (global.aiModel as string) || 'mediakit',
       model: (global.model as string) || undefined,       // 与 processPipeline 一致
       outputResolution: (global.resolution as string) || (global.outputResolution as string),
       originalImageUrlForRecord,

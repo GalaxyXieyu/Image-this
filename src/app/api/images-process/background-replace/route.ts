@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { uploadBase64Image } from '@/lib/storage';
 import { getUserIdFromRequest, handleApiError, validateRequiredParams } from '@/lib/api-utils';
-import { processWithGemini, processWithGPT, processWithJimeng } from '@/lib/image-processor/service';
+import { processWithGemini, processWithGPT, processWithJimeng, processWithMediaKit } from '@/lib/image-processor/service';
 
 const DEFAULT_PROMPT = `请将第二张图片中的所有产品替换为第一张图片的产品，要求：
 1. 保持原图产品的形状、材质、特征比例、摆放角度及数量完全一致
@@ -89,6 +89,17 @@ export async function POST(request: NextRequest) {
             userId
           );
           resultImageUrl = jimengResult.imageData;
+          break;
+
+        case 'mediakit':
+          resultImageUrl = (await processWithMediaKit(
+            originalImageUrl,
+            referenceImageUrl,
+            finalPrompt,
+            userId,
+            undefined,
+            1
+          )).imageData;
           break;
 
         default:

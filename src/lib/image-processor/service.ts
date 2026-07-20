@@ -6,6 +6,13 @@
 import { ImageProcessorFactory } from './factory';
 import { ImageProvider, ProcessResult } from './types';
 import { getUserConfig } from '@/lib/user-config';
+import {
+  downloadMediaKitImage,
+  enhanceImageWithMediaKit,
+  expandImageCanvasWithMediaKit,
+  generateProductSceneWithMediaKit,
+  toPublicImageUrl,
+} from '@/lib/media-kit';
 
 type ProviderOverrides = {
   gpt?: { modelName?: string };
@@ -158,6 +165,52 @@ export async function processWithJimeng(
   });
 }
 
+export async function processWithMediaKit(
+  originalImageUrl: string,
+  referenceImageUrl: string,
+  prompt: string,
+  userId: string,
+  superbedToken?: string,
+  batchCount = 1
+): Promise<ProcessResult> {
+  const userConfig = await getUserConfig(userId);
+  const resolvedSuperbedToken = superbedToken || userConfig.imagehosting?.superbedToken;
+  const publicProductUrl = await toPublicImageUrl(
+    originalImageUrl,
+    `mediakit-scene-product-${Date.now()}.jpg`,
+    resolvedSuperbedToken
+  );
+  const publicReferenceUrl = referenceImageUrl
+    ? await toPublicImageUrl(
+        referenceImageUrl,
+        `mediakit-scene-reference-${Date.now()}.jpg`,
+        resolvedSuperbedToken
+      )
+    : undefined;
+  const results = await generateProductSceneWithMediaKit(
+    publicProductUrl,
+    prompt,
+    publicReferenceUrl,
+    batchCount
+  );
+  const first = results[0];
+  if (!first?.image_url) {
+    throw new Error('MEDIAKIT_EMPTY_RESULT: 商品场景图接口未返回结果图片');
+  }
+  const downloaded = await downloadMediaKitImage(first.image_url);
+  return {
+    id: `mediakit-scene-${Date.now()}`,
+    imageData: downloaded.dataUrl,
+    imageSize: first.image_size || downloaded.imageSize,
+    metadata: {
+      provider: 'mediakit',
+      tool: 'generate-product-scene-image',
+      batchCount,
+      referenceImageUrl: Boolean(publicReferenceUrl),
+    },
+  };
+}
+
 // ==================== Qwen 服务 ====================
 
 /**
@@ -196,36 +249,33 @@ export async function enhanceWithVolcengine(
   jpgQuality = 95,
   skipDbSave = false,
   volcengineConfig?: { accessKey: string; secretKey: string },
-  imagehostingConfig?: { superbedToken: string }
+  imagehostingConfig?: { superbedToken: string },
+  mediaKitMultiple = 1
 ): Promise<ProcessResult> {
-  // 如果传入了配置，直接使用
-  if (volcengineConfig) {
-    ImageProcessorFactory.initialize({
-      volcengine: {
-        enabled: true,
-        accessKey: volcengineConfig.accessKey,
-        secretKey: volcengineConfig.secretKey
-      },
-      gpt: { enabled: false, apiUrl: '', apiKey: '' },
-      gemini: { enabled: false, apiKey: '', baseUrl: '', modelName: '' },
-      qwen: { enabled: false, apiKey: '' },
-      jimeng: { enabled: false, accessKey: '', secretKey: '', arkApiKey: '', baseUrl: '', modelName: '' }
-    });
-  } else {
-    await initializeProvider(userId, ImageProvider.VOLCENGINE);
-  }
-  
-  const processor = ImageProcessorFactory.getProcessor(ImageProvider.VOLCENGINE);
-  
-  return await processor.enhance!(userId, imageInput, {
-    resolutionBoundary,
-    enableHdr,
-    enableWb,
-    resultFormat,
-    jpgQuality,
-    skipDbSave,
-    superbedToken: imagehostingConfig?.superbedToken
-  });
+  const userConfig = await getUserConfig(userId);
+  const publicUrl = await toPublicImageUrl(
+    imageInput,
+    `mediakit-enhance-input-${Date.now()}.jpg`,
+    imagehostingConfig?.superbedToken || userConfig.imagehosting?.superbedToken
+  );
+  const result = await enhanceImageWithMediaKit(publicUrl, Math.min(30, Math.max(1, mediaKitMultiple)), 'professional');
+  const downloaded = await downloadMediaKitImage(result.image_url);
+  return {
+    id: `mediakit-enhance-${Date.now()}`,
+    imageData: downloaded.dataUrl,
+    imageSize: result.image_size || downloaded.imageSize,
+    metadata: {
+      provider: 'mediakit',
+      tool: 'enhance-image',
+      toolVersion: 'professional',
+      resolutionBoundary,
+      enableHdr,
+      enableWb,
+      resultFormat,
+      jpgQuality,
+      skipDbSave,
+    },
+  };
 }
 
 /**
@@ -244,33 +294,33 @@ export async function outpaintWithVolcengine(
   volcengineConfig?: { accessKey: string; secretKey: string },
   imagehostingConfig?: { superbedToken: string }
 ): Promise<ProcessResult> {
-  // 如果传入了配置，直接使用
-  if (volcengineConfig) {
-    ImageProcessorFactory.initialize({
-      volcengine: {
-        enabled: true,
-        accessKey: volcengineConfig.accessKey,
-        secretKey: volcengineConfig.secretKey
-      },
-      gpt: { enabled: false, apiUrl: '', apiKey: '' },
-      gemini: { enabled: false, apiKey: '', baseUrl: '', modelName: '' },
-      qwen: { enabled: false, apiKey: '' },
-      jimeng: { enabled: false, accessKey: '', secretKey: '', arkApiKey: '', baseUrl: '', modelName: '' }
-    });
-  } else {
-    await initializeProvider(userId, ImageProvider.VOLCENGINE);
-  }
-  
-  const processor = ImageProcessorFactory.getProcessor(ImageProvider.VOLCENGINE);
-  
-  return await processor.outpaint!(userId, imageInput, {
-    prompt,
+  const userConfig = await getUserConfig(userId);
+  const publicUrl = await toPublicImageUrl(
+    imageInput,
+    `mediakit-expand-input-${Date.now()}.jpg`,
+    imagehostingConfig?.superbedToken || userConfig.imagehosting?.superbedToken
+  );
+  const result = await expandImageCanvasWithMediaKit(publicUrl, {
     top,
     bottom,
     left,
     right,
-    maxHeight,
-    maxWidth,
-    superbedToken: imagehostingConfig?.superbedToken
   });
+  const downloaded = await downloadMediaKitImage(result.image_url);
+  return {
+    id: `mediakit-expand-${Date.now()}`,
+    imageData: downloaded.dataUrl,
+    imageSize: result.image_size || downloaded.imageSize,
+    metadata: {
+      provider: 'mediakit',
+      tool: 'expand-image-canvas',
+      prompt,
+      top,
+      bottom,
+      left,
+      right,
+      maxHeight,
+      maxWidth,
+    },
+  };
 }

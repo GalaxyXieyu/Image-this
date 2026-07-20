@@ -23,6 +23,10 @@ export async function GET() {
     const config = await getUserConfig(user.id);
     const models: { provider: string; modelName: string }[] = [];
 
+    if (process.env.MEDIAKIT_API_KEY || process.env.VOLCENGINE_MEDIAKIT_API_KEY) {
+      models.push({ provider: 'mediakit', modelName: 'product-scene' });
+    }
+
     const collect = (provider: string, list?: { id: string; enabled: boolean; kind?: string }[]) => {
       for (const m of list ?? []) {
         if (m.enabled && m.kind !== 'llm') models.push({ provider, modelName: m.id });

@@ -98,3 +98,18 @@ export function clearPageDraft(key: string) {
   memoryCache.delete(key);
   clearFromStorage(key);
 }
+
+/** 清除指定前缀下的全部页面草稿缓存 */
+export function clearPageDraftPrefix(prefix: string) {
+  for (const key of Array.from(memoryCache.keys())) {
+    if (key.startsWith(prefix)) memoryCache.delete(key);
+  }
+  if (typeof window === "undefined") return;
+  try {
+    for (const key of Object.keys(window.sessionStorage)) {
+      if (key.startsWith(STORAGE_PREFIX + prefix)) window.sessionStorage.removeItem(key);
+    }
+  } catch {
+    // ignore storage access errors
+  }
+}

@@ -23,7 +23,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 import { apiPost, apiGet, apiPatch } from "@/lib/api-client";
 import type { InputAssetRef } from "@/types/workbench";
-import { usePageDraft } from "@/lib/use-page-draft";
+import { clearPageDraftPrefix, usePageDraft } from "@/lib/use-page-draft";
+import { PromptTemplateSelector } from "@/components/workbench/PromptTemplateSelector";
 import {
   expandSteps,
   CycleError,
@@ -55,6 +56,7 @@ import {
   Settings2,
   Layers,
   AlertTriangle,
+  RotateCcw,
 } from "lucide-react";
 
 /* ─── Data ───────────────────────────────────────────────────────── */
@@ -146,7 +148,7 @@ type StepType = "scene" | "background" | "upscale" | "watermark" | "outpaint" | 
 // 可执行步骤类型（workflow 不是可执行的叶子，执行前需展开）
 type ExecutableStepType = Exclude<StepType, "workflow">;
 
-interface SceneParams { sceneStyle: string; candidateCount: number }
+interface SceneParams { sceneStyle: string; candidateCount: number; customPrompt?: string }
 interface BackgroundParams { bgType: string; featherEdge: number; keepShadow: boolean; referenceAsset?: InputAssetRef; customPrompt?: string }
 interface UpscaleParams { factor: number; denoise: number }
 type WatermarkPresetPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center";
@@ -254,7 +256,7 @@ function getStepOptions(
 }
 
 const DEFAULT_PARAMS: Record<ExecutableStepType, StepParams["params"]> = {
-  scene: { sceneStyle: "natural", candidateCount: 4 } as SceneParams,
+  scene: { sceneStyle: "natural", candidateCount: 4, customPrompt: "" } as SceneParams,
   background: { bgType: "studio", featherEdge: 8, keepShadow: true } as BackgroundParams,
   upscale: { factor: 2, denoise: 30 } as UpscaleParams,
   watermark: { content: "@品牌名", position: "bottom-right", opacity: 70 } as WatermarkParams,
@@ -359,8 +361,20 @@ function normalizeStepTaskInput(
       referenceAsset: backgroundParams.referenceAsset,
       // 用户在该步填了自定义提示词就用它，否则按背景类型等参数自动构建
       customPrompt: backgroundParams.customPrompt?.trim() || buildBackgroundPrompt(backgroundParams),
-      aiModel: global.aiModel ?? "gemini",   // 用全局 provider，不再写死
+      aiModel: global.aiModel ?? "mediakit",   // 用全局 provider，不再写死
       model: global.model,                   // 具体模型 id，未选时为 undefined → executeOrderedPipeline 回退 globalModel
+      outputResolution: global.resolution,
+    };
+  }
+
+  if (step.type === "scene") {
+    const sceneParams = step.params as SceneParams;
+    return {
+      ...baseInput,
+      customPrompt: sceneParams.customPrompt?.trim() || undefined,
+      batchCount: sceneParams.candidateCount,
+      aiModel: global.aiModel ?? "mediakit",
+      model: global.model,
       outputResolution: global.resolution,
     };
   }
@@ -570,7 +584,7 @@ export default function ComboPage() {
         // 默认：优先沿用已持久化的选择（若仍在清单内），否则选 gemini，否则第一个
         setSelectedImageModel((prev) => {
           if (prev && models.some((m) => m.provider === prev.provider && m.modelName === prev.modelName)) return prev;
-          return models.find((m) => m.provider === "gemini") ?? models[0] ?? null;
+          return models.find((m) => m.provider === "mediakit") ?? models.find((m) => m.provider === "gemini") ?? models[0] ?? null;
         });
       } catch (e) {
         console.error("加载可用生图模型失败:", e);   // 清单为空/失败不阻塞——提交时 hasEnabledImageModel() 已兜底
@@ -688,7 +702,7 @@ export default function ComboPage() {
         resolution,
         watermarkEnabled,
         autoRetry,
-        aiModel: selectedImageModel?.provider ?? "gemini",     // provider
+        aiModel: selectedImageModel?.provider ?? "mediakit",     // provider
         model: selectedImageModel?.modelName ?? undefined,     // 具体模型 id
       };
 
@@ -751,7 +765,7 @@ export default function ComboPage() {
         resolution,
         watermarkEnabled,
         autoRetry,
-        aiModel: selectedImageModel?.provider,     // provider
+        aiModel: selectedImageModel?.provider ?? "mediakit",     // provider
         model: selectedImageModel?.modelName,      // 具体模型 id
       },
       tags: templateToOverwrite?.tags ?? [],
@@ -943,6 +957,23 @@ export default function ComboPage() {
     setSteps((prev) =>
       prev.map((s) => (s.id === id ? { ...s, params: { ...s.params, ...patch } } : s))
     );
+  };
+
+  const clearWorkflowDraft = () => {
+    if (!window.confirm("清空当前 workflow 的缓存配置？这会恢复默认步骤、参数和模型选择。")) return;
+    clearPageDraftPrefix("workbench.combo.");
+    setSelectedTemplate(null);
+    setTemplateSearch("");
+    setSteps(INITIAL_STEPS.map((step) => ({ ...step, params: { ...step.params } })));
+    setSelectedStepId(null);
+    setAspectRatio("1:1");
+    setResolution("2k");
+    setWatermarkEnabled(true);
+    setAutoRetry(true);
+    setSelectedImageModel(null);
+    setProductAssets([]);
+    setMobileStage("workflow");
+    toast({ title: "已清空 workflow 缓存", description: "页面已恢复默认配置。" });
   };
 
   return (
@@ -1509,6 +1540,14 @@ export default function ComboPage() {
           {mobileStage === "params" && (
             <div className="flex items-center gap-2">
               <Button
+                onClick={clearWorkflowDraft}
+                variant="outline"
+                className="h-12 shrink-0 rounded-full border-line-strong bg-surface px-4 text-[13px] font-semibold"
+              >
+                <RotateCcw className="h-4 w-4" />
+                清空缓存
+              </Button>
+              <Button
                 onClick={openSaveTemplateDrawer}
                 variant="outline"
                 className="h-12 shrink-0 rounded-full border-line-strong bg-surface px-4 text-[13px] font-semibold"
@@ -1852,6 +1891,14 @@ export default function ComboPage() {
           {/* Floating action group */}
           <div className="pointer-events-none absolute inset-x-0 bottom-5 z-30 flex justify-center">
             <div className="glass-panel pointer-events-auto flex items-center gap-2 rounded-full p-1.5 shadow-float">
+              <Button
+                onClick={clearWorkflowDraft}
+                variant="ghost"
+                className="h-11 gap-1.5 rounded-full px-4 text-[14px] font-semibold text-ink-2 hover:bg-surface-muted"
+              >
+                <RotateCcw className="h-4 w-4" />
+                清空缓存
+              </Button>
               <Button
                 onClick={openSaveTemplateDrawer}
                 variant="ghost"
@@ -2406,6 +2453,15 @@ function SceneStepParams({
           ))}
         </div>
       </section>
+      <section className="flex flex-col gap-2">
+        <FieldLabel>场景提示词</FieldLabel>
+        <PromptTemplateSelector
+          category="ONE_CLICK"
+          value={params.customPrompt ?? ""}
+          onChange={(customPrompt) => onChange({ customPrompt })}
+          placeholder="描述商品要生成的背景、光线、构图和营销氛围。"
+        />
+      </section>
     </>
   );
 }
@@ -2512,12 +2568,11 @@ function BackgroundStepParams({
       </section>
       <section className="flex flex-col gap-2">
         <FieldLabel>换背景提示词（可选）</FieldLabel>
-        <Textarea
+        <PromptTemplateSelector
+          category="BACKGROUND_REPLACE"
           value={params.customPrompt ?? ""}
-          onChange={(event) => onChange({ customPrompt: event.target.value })}
+          onChange={(customPrompt) => onChange({ customPrompt })}
           placeholder={buildBackgroundPrompt(params)}
-          rows={3}
-          className="resize-none text-[13px]"
         />
         <p className="text-[11px] text-ink-3">留空则按上面的背景类型/羽化等自动生成提示词。</p>
       </section>

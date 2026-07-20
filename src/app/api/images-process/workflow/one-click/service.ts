@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { uploadBase64Image } from '@/lib/storage';
-import { processWithGemini, processWithGPT, processWithJimeng, outpaintWithVolcengine, enhanceWithVolcengine } from '@/lib/image-processor/service';
+import { processWithGemini, processWithGPT, processWithJimeng, processWithMediaKit, outpaintWithVolcengine, enhanceWithVolcengine } from '@/lib/image-processor/service';
 
 const DEFAULT_BACKGROUND_PROMPT = '保持第一张图的产品主体完全不变，仅替换第二张图的背景为类似参考场景的风格（要完全把第二张图的产品去掉），不要有同时出现的情况，保持第一张产品的形状、材质、特征比例、摆放角度及数量完全一致，专业摄影，高质量，4K分辨率';
 const DEFAULT_OUTPAINT_PROMPT = '扩展图像，保持产品主体和风格完全一致，自然延伸背景';
@@ -20,6 +20,7 @@ function stopWorkflow(stepName: string, error: unknown): never {
 export interface OrderedPipelineStep {
   stepType: 'scene' | 'background' | 'outpaint' | 'upscale' | 'watermark' | string;
   customPrompt?: string;
+  batchCount?: number;
   referenceImageUrl?: string;
   aiModel?: string;
   model?: string;   // 该步指定的具体模型 id（全局注入，per-step 覆盖用；本期不填 per-step，仅回退 global）
@@ -103,7 +104,7 @@ export async function executeOrderedPipeline(params: OrderedPipelineParams) {
     imageUrl,
     steps,
     userId,
-    aiModel: globalAiModel = 'gemini',
+    aiModel: globalAiModel = 'mediakit',
     model: globalModel,
     originalImageUrlForRecord,
     volcengineConfig,
@@ -146,7 +147,16 @@ export async function executeOrderedPipeline(params: OrderedPipelineParams) {
           const provider = step.aiModel || globalAiModel;      // 字段名保持 aiModel=provider
           const modelName = step.model || globalModel;          // 字段名保持 model=具体模型 id
           let out: string | undefined;
-          if (provider === 'gpt') {
+          if (provider === 'mediakit') {
+            out = (await processWithMediaKit(
+              current,
+              ref,
+              prompt,
+              userId,
+              imagehostingConfig?.superbedToken,
+              Number(step.batchCount) || 1
+            )).imageData;
+          } else if (provider === 'gpt') {
             out = (await processWithGPT(current, ref, prompt, userId, modelName)).imageData;
           } else if (provider === 'jimeng') {
             out = (await processWithJimeng(current, ref, prompt, userId, modelName)).imageData;
@@ -159,7 +169,7 @@ export async function executeOrderedPipeline(params: OrderedPipelineParams) {
           // 在唯一消费点统一把 URL 拉成 base64 data URL，保证 scene/background 之后的步骤格式一致。
           current = await ensureDataUrl(out);
         } else if (step.stepType === 'outpaint') {
-          const each = Math.min(0.5, Math.max(0.05, (step.ratio ?? 25) / 100));
+          const each = Math.min(0.4, Math.max(0.05, (step.ratio ?? 25) / 100));
           const dir = (step.direction as string) || 'all';
           const horiz = dir === 'all' || dir === 'horizontal';
           const vert  = dir === 'all' || dir === 'vertical';
@@ -192,15 +202,10 @@ export async function executeOrderedPipeline(params: OrderedPipelineParams) {
             95,
             true,
             volcengineConfig,
-            imagehostingConfig
+            imagehostingConfig,
+            Number(step.upscaleFactor) || 1
           );
           current = r.imageData;
-          // 真正按用户选的倍数缩放分辨率（旧逻辑倍数不生效）
-          const factor = Number(step.upscaleFactor) || 0;
-          if (factor > 0 && Math.abs(factor - 1) > 0.001) {
-            const { scaleImageByFactor } = await import('@/lib/image-scale');
-            current = await scaleImageByFactor(current, factor);
-          }
         } else if (step.stepType === 'watermark') {
           const { addWatermarkToImage } = await import('@/lib/watermark');
           current = await addWatermarkToImage({
@@ -341,7 +346,7 @@ export async function executeOneClickWorkflow(
     watermarkType = 'text',
     watermarkLogoUrl,
     outputResolution = 'original',
-    aiModel = 'gemini',
+    aiModel = 'mediakit',
     // 视频生成参数
     enableVideo = false,
     videoPrompt = '',
@@ -421,7 +426,17 @@ export async function executeOneClickWorkflow(
         let bgResultImageData: string | undefined;
 
         // 根据选择的 AI 模型调用不同的服务
-        if (aiModel === 'gpt') {
+        if (aiModel === 'mediakit') {
+          const result = await processWithMediaKit(
+            imageUrl,
+            referenceImageUrl,
+            prompt,
+            userId,
+            imagehostingConfig?.superbedToken,
+            1
+          );
+          bgResultImageData = result.imageData;
+        } else if (aiModel === 'gpt') {
           const result = await processWithGPT(imageUrl, referenceImageUrl, prompt, userId);
           bgResultImageData = result.imageData;
         } else if (aiModel === 'gemini') {
@@ -431,7 +446,7 @@ export async function executeOneClickWorkflow(
           const result = await processWithJimeng(imageUrl, referenceImageUrl, prompt, userId);
           bgResultImageData = result.imageData;
         } else {
-          throw new Error(`不支持的 AI 模型: ${aiModel}，请使用 gpt, gemini 或 jimeng`);
+          throw new Error(`不支持的 AI 模型: ${aiModel}，请使用 mediakit、gpt、gemini 或 jimeng`);
         }
         
         if (bgResultImageData) {
@@ -509,7 +524,8 @@ export async function executeOneClickWorkflow(
           95,    // jpgQuality
           true,  // skipDbSave
           volcengineConfig, // 如果为空，函数内部会从数据库读取
-          imagehostingConfig // 图床配置
+          imagehostingConfig, // 图床配置
+          upscaleFactor
         );
         processedImageUrl = result.imageData;
         

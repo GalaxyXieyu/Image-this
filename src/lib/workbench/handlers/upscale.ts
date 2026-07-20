@@ -94,19 +94,12 @@ const upscaleHandler = {
         95,
         false, // skipDbSave
         volcengineConfig,
-        imagehostingConfig
+        imagehostingConfig,
+        Number(upscaleFactor) || 1
       );
 
-      // 真正按倍数缩放分辨率（旧逻辑只把倍数存 metadata、对输出无影响）
-      let finalImageData = result.imageData;
-      const factor = Number(upscaleFactor) || 0;
-      if (factor > 0 && Math.abs(factor - 1) > 0.001) {
-        const { scaleImageByFactor } = await import('@/lib/image-scale');
-        finalImageData = await scaleImageByFactor(result.imageData, factor);
-      }
-
       const processedUrl = await uploadBase64Image(
-        finalImageData,
+        result.imageData,
         `enhance-${Date.now()}.jpg`,
         task.userId
       );

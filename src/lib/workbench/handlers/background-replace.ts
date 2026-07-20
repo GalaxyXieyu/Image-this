@@ -2,7 +2,7 @@
  * Background Replace Workflow Handler
  *
  * Extracted from src/app/api/tasks/worker/route.ts processBackgroundRemoval.
- * Supports GPT, Gemini, and Jimeng providers with model fallback.
+ * Supports MediaKit, GPT, Gemini, and Jimeng providers with model fallback.
  */
 
 import { prisma } from '@/lib/prisma';
@@ -81,7 +81,7 @@ const backgroundReplaceHandler = {
 
     // Extract config fields
     const customPrompt = rawInput.customPrompt as string | undefined;
-    const aiModel = (rawInput.aiModel as string) || 'gemini';
+    const aiModel = (rawInput.aiModel as string) || 'mediakit';
     const explicitProvider = rawInput.provider as string | undefined;
     const explicitModelName = rawInput.modelName as string | undefined;
     const fallbackModels = rawInput.fallbackModels as string[] | undefined;
@@ -97,7 +97,7 @@ const backgroundReplaceHandler = {
             ? 'jimeng'
             : aiModel);
 
-    const isProviderAlias = ['gemini', 'gpt', 'jimeng', 'seedream'].includes(aiModel);
+    const isProviderAlias = ['mediakit', 'gemini', 'gpt', 'jimeng', 'seedream'].includes(aiModel);
     const modelName = explicitModelName || (isProviderAlias ? undefined : aiModel);
 
     // Persist original URLs for record
@@ -121,7 +121,7 @@ const backgroundReplaceHandler = {
     if (referenceImageUrl) referenceImages.push(referenceImageUrl);
 
     let lastError: Error | undefined;
-    const attemptModels = [modelName, ...(fallbackModels || [])].filter(Boolean) as string[];
+    const attemptModels = [modelName || provider, ...(fallbackModels || [])].filter(Boolean) as string[];
 
     for (const attemptModel of attemptModels) {
       try {
@@ -186,6 +186,17 @@ async function processWithProvider(
   originalImageUrlForRecord: string,
   referenceImageUrlForRecord: string
 ): Promise<{ processedImageId: string; processedImageUrl: string }> {
+  if (provider === 'mediakit') {
+    return processWithMediaKitHandler(
+      imageUrl,
+      referenceImageUrl,
+      prompt,
+      userId,
+      originalImageUrlForRecord,
+      referenceImageUrlForRecord
+    );
+  }
+
   if (provider === 'gpt') {
     return processWithGPT(
       imageUrl,
@@ -222,7 +233,40 @@ async function processWithProvider(
     );
   }
 
-  throw new Error(`不支持的 AI 模型: ${provider}，请使用 gpt、gemini 或 jimeng`);
+  throw new Error(`不支持的 AI 模型: ${provider}，请使用 mediakit、gpt、gemini 或 jimeng`);
+}
+
+async function processWithMediaKitHandler(
+  imageUrl: string,
+  referenceImageUrl: string,
+  prompt: string,
+  userId: string,
+  originalImageUrlForRecord: string,
+  referenceImageUrlForRecord: string
+): Promise<{ processedImageId: string; processedImageUrl: string }> {
+  const { processWithMediaKit: mediaKitService } = await import('@/lib/image-processor/service');
+  const result = await mediaKitService(imageUrl, referenceImageUrl, prompt, userId);
+  const filename = `mediakit-bg-replace-${Date.now()}.jpg`;
+  const processedUrl = await uploadBase64Image(result.imageData, filename, userId);
+  const processedImage = await prisma.processedImage.create({
+    data: {
+      filename,
+      originalUrl: originalImageUrlForRecord,
+      processedUrl,
+      processType: 'BACKGROUND_REMOVAL',
+      status: 'COMPLETED',
+      fileSize: result.imageSize,
+      metadata: JSON.stringify({
+        provider: 'mediakit',
+        tool: 'generate-product-scene-image',
+        prompt,
+        referenceImageUrl: referenceImageUrlForRecord,
+        processingCompletedAt: new Date().toISOString(),
+      }),
+      userId,
+    },
+  });
+  return { processedImageId: processedImage.id, processedImageUrl: processedUrl };
 }
 
 // ---------------------------------------------------------------------------

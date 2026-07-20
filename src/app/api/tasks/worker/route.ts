@@ -736,7 +736,7 @@ class TaskProcessor {
       imageUrl,
       steps,
       userId: task.userId,
-      aiModel: (global.aiModel as string) || 'gemini',
+      aiModel: (global.aiModel as string) || 'mediakit',
       model: (global.model as string) || undefined,      // 转发全局具体模型 id
       outputResolution: (global.resolution as string) || (global.outputResolution as string),
       originalImageUrlForRecord,
@@ -841,7 +841,7 @@ class TaskProcessor {
       watermarkPosition = 'bottom-right',
       watermarkType = 'text',
       outputResolution = 'original',
-      aiModel = 'gemini',
+      aiModel = 'mediakit',
       backgroundPrompt = '',
       outpaintPrompt = '',
       volcengineConfig,
@@ -905,7 +905,7 @@ class TaskProcessor {
     const referenceImageUrl = (await readAssetAsDataUrl(inputData.referenceAsset)) || inputData.referenceImageUrl;
     const {
       customPrompt,
-      aiModel = 'gemini',
+      aiModel = 'mediakit',
       provider: explicitProvider,
       modelName: explicitModelName,
       fallbackModels,
@@ -1207,7 +1207,8 @@ class TaskProcessor {
         95,
         false, // skipDbSave
         volcengineConfig,
-        imagehostingConfig
+        imagehostingConfig,
+        Number(upscaleFactor) || 1
       );
 
       // 保存到本地存储（使用用户配置的保存路径）
