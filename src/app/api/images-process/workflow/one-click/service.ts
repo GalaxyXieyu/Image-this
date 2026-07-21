@@ -14,6 +14,17 @@ function stopWorkflow(stepName: string, error: unknown): never {
   throw new Error(`${stepName}失败，已停止后续步骤：${getErrorMessage(error)}`);
 }
 
+/**
+ * 扩图比例统一为「百分比 5–40」。
+ * 兼容历史脏数据：0–1 小数（如 0.4）按比例分数理解并转成百分比。
+ */
+function normalizeOutpaintRatioPercent(raw: unknown): number {
+  const n = typeof raw === 'string' ? Number(raw) : Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return 25;
+  if (n > 0 && n <= 1) return Math.min(40, Math.max(5, n * 100));
+  return Math.min(40, Math.max(5, n));
+}
+
 async function probeImageSize(image: string): Promise<{ width: number; height: number } | null> {
   try {
     if (image.startsWith('data:')) {
@@ -193,8 +204,12 @@ export async function executeOrderedPipeline(params: OrderedPipelineParams) {
           // 在唯一消费点统一把 URL 拉成 base64 data URL，保证 scene/background 之后的步骤格式一致。
           current = await ensureDataUrl(out);
         } else if (step.stepType === 'outpaint') {
-          const each = Math.min(0.4, Math.max(0.05, (step.ratio ?? 25) / 100));
-          const dir = (step.direction as string) || 'all';
+          // 兼容：历史任务/模板可能把 ratio、direction 只放在 stepParams 里；
+          // ratio 可能是 25（百分比）或 0.25/0.4（小数比例）。
+          const stepParams = (step as OrderedPipelineStep & { stepParams?: Record<string, unknown> }).stepParams || {};
+          const ratio = normalizeOutpaintRatioPercent(step.ratio ?? stepParams.ratio ?? 25);
+          const each = Math.min(0.4, Math.max(0.05, ratio / 100));
+          const dir = String(step.direction || stepParams.direction || 'all');
           const horiz = dir === 'all' || dir === 'horizontal';
           const vert  = dir === 'all' || dir === 'vertical';
           const left = horiz ? each : 0;
@@ -202,7 +217,7 @@ export async function executeOrderedPipeline(params: OrderedPipelineParams) {
           const top  = vert  ? each : 0;
           const bottom = vert  ? each : 0;
           console.log(
-            `[pipeline] outpaint dir=${dir} ratio=${step.ratio ?? 25} each=${each}` +
+            `[pipeline] outpaint dir=${dir} ratio=${ratio} each=${each}` +
               ` L${left} R${right} T${top} B${bottom}` +
               (beforeSize ? ` before=${beforeSize.width}x${beforeSize.height}` : '')
           );
@@ -220,6 +235,27 @@ export async function executeOrderedPipeline(params: OrderedPipelineParams) {
             imagehostingConfig
           );
           current = r.imageData;
+          const afterExpand = await probeImageSize(current);
+          const metaW = Number(r.metadata?.imageWidth) || afterExpand?.width || 0;
+          const metaH = Number(r.metadata?.imageHeight) || afterExpand?.height || 0;
+          if (beforeSize && metaW > 0 && metaH > 0) {
+            const needWider = horiz && metaW <= beforeSize.width * 1.01;
+            const needTaller = vert && metaH <= beforeSize.height * 1.01;
+            if (needWider || needTaller) {
+              throw new Error(
+                `智能扩图未生效：输入 ${beforeSize.width}x${beforeSize.height}，输出 ${metaW}x${metaH}` +
+                  `（方向=${dir}, 比例=${ratio}%）。请检查 MEDIAKIT 返回或输入图是否过大被服务端忽略扩展。`
+              );
+            }
+          }
+          // 把本次真实扩图参数挂到 step 上，便于 stepTraces 记录
+          (step as OrderedPipelineStep & { __expandTrace?: Record<string, unknown> }).__expandTrace = {
+            direction: dir,
+            ratio,
+            expand: { left, right, top, bottom },
+            resultSize: { width: metaW, height: metaH },
+            providerMeta: r.metadata?.expandRatio ?? null,
+          };
         } else if (step.stepType === 'upscale') {
           const r = await enhanceWithVolcengine(
             userId,
@@ -255,13 +291,19 @@ export async function executeOrderedPipeline(params: OrderedPipelineParams) {
       }
 
       const afterSize = await probeImageSize(current);
+      const expandTrace = (step as OrderedPipelineStep & { __expandTrace?: Record<string, unknown> }).__expandTrace;
       stepTraces.push({
         stepType: step.stepType,
         index: i,
         before: beforeSize,
         after: afterSize,
         ...(step.stepType === 'outpaint'
-          ? { direction: step.direction || 'all', ratio: step.ratio ?? 25 }
+          ? {
+              direction: expandTrace?.direction || step.direction || 'all',
+              ratio: expandTrace?.ratio ?? step.ratio ?? 25,
+              expand: expandTrace?.expand,
+              providerMeta: expandTrace?.providerMeta ?? null,
+            }
           : {}),
         ...(step.stepType === 'upscale'
           ? { upscaleFactor: Number(step.upscaleFactor) || 1 }
