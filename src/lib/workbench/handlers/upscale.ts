@@ -113,7 +113,7 @@ const upscaleHandler = {
           status: 'COMPLETED',
           fileSize: result.imageSize,
           metadata: JSON.stringify({
-            provider: 'volcengine',
+            provider: 'mediakit',
             upscaleFactor,
             processingCompletedAt: new Date().toISOString(),
           }),

@@ -203,7 +203,7 @@ export async function executeOrderedPipeline(params: OrderedPipelineParams) {
             true,
             volcengineConfig,
             imagehostingConfig,
-            Math.max(1, Math.ceil(Number(step.upscaleFactor) || 1))
+            Math.max(1, Number(step.upscaleFactor) || 1)
           );
           current = r.imageData;
         } else if (step.stepType === 'watermark') {

@@ -234,10 +234,12 @@ export async function outpaintWithQwen(
   });
 }
 
-// ==================== Volcengine 服务 ====================
+// ==================== MediaKit 服务（兼容旧 Volcengine 函数名） ====================
 
 /**
- * 火山引擎画质增强
+ * 画质增强（MediaKit enhance-image）
+ * 保留 enhanceWithVolcengine 函数名以兼容 worker / handler 调用方。
+ * 旧参数 resolutionBoundary/enableHdr/... 已废弃，不再发给上游。
  */
 export async function enhanceWithVolcengine(
   userId: string,
@@ -252,13 +254,23 @@ export async function enhanceWithVolcengine(
   imagehostingConfig?: { superbedToken: string },
   mediaKitMultiple = 1
 ): Promise<ProcessResult> {
+  void resolutionBoundary;
+  void enableHdr;
+  void enableWb;
+  void resultFormat;
+  void jpgQuality;
+  void skipDbSave;
+  void volcengineConfig;
+
   const userConfig = await getUserConfig(userId);
   const publicUrl = await toPublicImageUrl(
     imageInput,
     `mediakit-enhance-input-${Date.now()}.jpg`,
     imagehostingConfig?.superbedToken || userConfig.imagehosting?.superbedToken
   );
-  const result = await enhanceImageWithMediaKit(publicUrl, Math.min(30, Math.max(1, Math.ceil(mediaKitMultiple))), 'professional');
+
+  // 保留小数倍数（官方支持 2 位小数），按输入尺寸自动选择 standard/professional/max
+  const result = await enhanceImageWithMediaKit(publicUrl, Number(mediaKitMultiple) || 1);
   const downloaded = await downloadMediaKitImage(result.image_url);
   return {
     id: `mediakit-enhance-${Date.now()}`,
@@ -267,19 +279,18 @@ export async function enhanceWithVolcengine(
     metadata: {
       provider: 'mediakit',
       tool: 'enhance-image',
-      toolVersion: 'professional',
-      resolutionBoundary,
-      enableHdr,
-      enableWb,
-      resultFormat,
-      jpgQuality,
-      skipDbSave,
+      toolVersion: result.tool_version,
+      multiple: result.multiple,
+      imageWidth: result.image_width,
+      imageHeight: result.image_height,
     },
   };
 }
 
 /**
- * 火山引擎智能扩图
+ * 智能扩图（MediaKit expand-image-canvas）
+ * 保留 outpaintWithVolcengine 函数名以兼容 worker / handler 调用方。
+ * prompt / maxHeight / maxWidth / volcengineConfig 已废弃，不再发给上游。
  */
 export async function outpaintWithVolcengine(
   userId: string,
@@ -294,6 +305,11 @@ export async function outpaintWithVolcengine(
   volcengineConfig?: { accessKey: string; secretKey: string },
   imagehostingConfig?: { superbedToken: string }
 ): Promise<ProcessResult> {
+  void prompt;
+  void maxHeight;
+  void maxWidth;
+  void volcengineConfig;
+
   const userConfig = await getUserConfig(userId);
   const publicUrl = await toPublicImageUrl(
     imageInput,
@@ -314,13 +330,14 @@ export async function outpaintWithVolcengine(
     metadata: {
       provider: 'mediakit',
       tool: 'expand-image-canvas',
-      prompt,
-      top,
-      bottom,
-      left,
-      right,
-      maxHeight,
-      maxWidth,
+      expandRatio: {
+        top: result.expand_top,
+        bottom: result.expand_bottom,
+        left: result.expand_left,
+        right: result.expand_right,
+      },
+      imageWidth: result.image_width,
+      imageHeight: result.image_height,
     },
   };
 }

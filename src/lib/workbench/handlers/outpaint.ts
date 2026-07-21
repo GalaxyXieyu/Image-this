@@ -121,7 +121,7 @@ const outpaintHandler = {
           status: 'COMPLETED',
           fileSize: result.imageSize,
           metadata: JSON.stringify({
-            provider: 'volcengine',
+            provider: 'mediakit',
             expandRatio: { top, bottom, left, right },
             processingCompletedAt: new Date().toISOString(),
           }),

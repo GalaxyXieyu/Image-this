@@ -1159,7 +1159,7 @@ class TaskProcessor {
           status: 'COMPLETED',
           fileSize: result.imageSize,
           metadata: JSON.stringify({
-            provider: 'volcengine',
+            provider: 'mediakit',
             expandRatio: { top, bottom, left, right },
             processingCompletedAt: new Date().toISOString()
           }),
@@ -1227,7 +1227,7 @@ class TaskProcessor {
           status: 'COMPLETED',
           fileSize: result.imageSize,
           metadata: JSON.stringify({
-            provider: 'volcengine',
+            provider: 'mediakit',
             upscaleFactor,
             processingCompletedAt: new Date().toISOString()
           }),

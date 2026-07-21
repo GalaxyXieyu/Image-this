@@ -477,7 +477,7 @@ function computeWatermarkCanvasPlan(
   for (const step of precedingSteps) {
     if (step.type === "outpaint") {
       const params = step.params as OutpaintParams;
-      const each = clamp((params.ratio ?? 25) / 100, 0.05, 0.5);
+      const each = clamp((params.ratio ?? 25) / 100, 0.05, 0.4);
       const direction = params.direction || "all";
       const horizontal = direction === "all" || direction === "horizontal";
       const vertical = direction === "all" || direction === "vertical";
@@ -3108,7 +3108,7 @@ function OutpaintStepParams({
         value={params.ratio}
         suffix="%"
         min={5}
-        max={50}
+        max={40}
         onChange={(ratio) => onChange({ ratio })}
       />
     </>
