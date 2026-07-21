@@ -28,6 +28,23 @@ import {
   X,
 } from "lucide-react";
 import type { InpaintSubmitPayload } from "@/components/workbench/InpaintDialog";
+import {
+  type ActiveTask,
+  type BackendImage,
+  type FailedTask,
+  type ResultImage,
+  CATEGORY_LABELS,
+  CATEGORY_PROCESS_TYPES,
+  RESULTS_PAGE_SIZE,
+  ImageThumbnail,
+  WaterFillCard,
+  downloadFile,
+  formatDate,
+  mapProcessType,
+  parseGroup,
+  thumbUrl,
+} from "@/components/results/results-helpers";
+import { ResultsLightbox } from "@/components/results/ResultsLightbox";
 
 const InpaintDialog = dynamic(
   () => import("@/components/workbench/InpaintDialog").then((mod) => mod.InpaintDialog),
@@ -35,208 +52,6 @@ const InpaintDialog = dynamic(
 );
 
 // 图库网格用小尺寸缩略图：/api/files 支持 ?w= 按需缩放为 webp，把 ~1MB 原图降到 ~20-30KB
-function thumbUrl(url?: string | null, w = 400): string | undefined {
-  if (!url) return undefined;
-  if (url.startsWith("/api/files/") || url.startsWith("/uploads/")) {
-    return `${url}${url.includes("?") ? "&" : "?"}w=${w}`;
-  }
-  return url;
-}
-
-function ImageThumbnail({ src, alt, className, thumbWidth }: { src?: string | null; alt: string; className?: string; thumbWidth?: number }) {
-  const [error, setError] = useState(false);
-  const resolved = thumbWidth ? thumbUrl(src, thumbWidth) : src;
-  if (!resolved || error) {
-    return <BrandImageFallback title="图片预览" description="素材暂不可用" pose="sleep" className={cn("rounded-none", className)} />;
-  }
-  return (
-    // 缩略图已由 /api/files?w= 生成 WebP，保留原生 img 以支持任意本地文件 URL。
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={resolved}
-      alt={alt}
-      loading="lazy"
-      decoding="async"
-      className={cn("w-full h-full object-cover", className)}
-      onError={() => setError(true)}
-    />
-  );
-}
-
-interface ActiveTask {
-  id: string;
-  type: string;
-  status: string;
-  progress: number;
-  completedSteps?: number;
-  totalSteps?: number;
-  currentStep?: string | null;
-  originalImageUrl: string | null;
-  category: string;
-}
-
-interface FailedTask {
-  id: string;
-  setId: string | null;
-  status: string;
-  total: number | null;
-  failed: number | null;
-  reason: string | null;
-  originalImageUrl: string | null;
-  createdAt: string;
-}
-
-// 进行中任务占位：原图打底，水位随进度上涨，跑完即变成实景
-function WaterFillCard({ task }: { task: ActiveTask }) {
-  const pending = task.status === "PENDING";
-  const total = task.totalSteps ?? 0;
-  const done = task.completedSteps ?? 0;
-  // 有多张任务时按「已完成/总数」显示水位，更贴合套图逐张出图
-  const level = total > 1
-    ? Math.max(6, Math.min(100, Math.round((done / total) * 100)))
-    : Math.max(6, Math.min(100, Math.round(task.progress || 0)));
-  const countLabel = total > 1 ? `${done}/${total} 张` : null;
-  return (
-    <div className="relative aspect-square overflow-hidden bg-surface-muted">
-      <ImageThumbnail src={task.originalImageUrl} alt="处理中" className="h-full w-full" thumbWidth={400} />
-      {/* 原图压暗，凸显水位 */}
-      <div className="absolute inset-0 bg-black/35" />
-      {/* 水体（随进度上涨，平滑过渡） */}
-      <div
-        className="absolute inset-x-0 bottom-0 transition-[height] duration-700 ease-out"
-        style={{ height: pending && total <= 1 ? "6%" : `${level}%` }}
-      >
-        {/* 两层水面波浪 */}
-        <div className="water-wave absolute -top-3 inset-x-0 h-4" />
-        <div className="water-wave-2 absolute -top-2 inset-x-0 h-3.5" />
-        {/* 水体渐变 */}
-        <div className="absolute inset-x-0 top-1 bottom-0 bg-gradient-to-t from-[#7c6cff]/75 to-[#a78bff]/30" />
-      </div>
-      {/* 进度文案 */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span className="flex items-center gap-1.5 rounded-full bg-black/45 px-2.5 py-1 text-[12px] font-semibold text-white backdrop-blur-sm">
-          <Loader2 className="h-3 w-3 animate-spin" />
-          {countLabel ? `生成中 ${countLabel}` : pending ? "排队中" : `生成中 ${level}%`}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-interface BackendImage {
-  id: string;
-  filename: string;
-  thumbnailUrl: string | null;
-  processedUrl: string | null;
-  processType: string;
-  status: string;
-  createdAt: string;
-  updatedAt: string;
-  metadata?: string | null;
-}
-
-interface ResultImage {
-  id: string;
-  name: string;
-  category: string;
-  createdAt: string;
-  sortTime: number;
-  thumbnail?: string | null;
-  processedUrl?: string | null;
-  /** 同一大任务的合并键（套图 setId / 场景 taskId），无则为单张 */
-  groupKey?: string;
-  groupLabel?: string;
-}
-
-const WORKFLOW_LABELS: Record<string, string> = {
-  listing_set: "商品套图",
-  scene_generation: "场景图",
-  background_replace: "背景替换",
-  video_generation: "视频生成",
-};
-
-// 从 ProcessedImage.metadata 解析「所属大任务」的合并键与标题
-function parseGroup(metaStr?: string | null): { key?: string; label?: string } {
-  if (!metaStr) return {};
-  try {
-    const m = JSON.parse(metaStr) as Record<string, unknown>;
-    const op = typeof m.operation === "string" ? m.operation : undefined;
-    const wf = typeof m.workflowType === "string" ? m.workflowType : undefined;
-    const name = (typeof m.productName === "string" && m.productName) ||
-      (typeof m.presetName === "string" && m.presetName) || "";
-    if (typeof m.setId === "string" && m.setId) {
-      return { key: `set:${m.setId}`, label: name || WORKFLOW_LABELS[op ?? ""] || "商品套图" };
-    }
-    if (typeof m.taskId === "string" && m.taskId) {
-      return { key: `task:${m.taskId}`, label: name || WORKFLOW_LABELS[wf ?? ""] || "生成任务" };
-    }
-    return {};
-  } catch {
-    return {};
-  }
-}
-
-function mapProcessType(type: string): string {
-  const map: Record<string, string> = {
-    BACKGROUND_REMOVAL: "scene",
-    BACKGROUND_REPLACE: "scene",
-    IMAGE_UPSCALING: "main",
-    UPSCALE: "main",
-    IMAGE_OUTPAINTING: "detail",
-    IMAGE_EXPANSION: "detail",
-    OUTPAINT: "detail",
-    WATERMARK: "marketing",
-    ONE_CLICK_WORKFLOW: "poster",
-    ONE_CLICK: "poster",
-    WHITE_BACKGROUND: "white-bg",
-    VIDEO_GENERATION: "other",
-  };
-  return map[type] || "other";
-}
-
-function formatDate(dateStr: string | Date): string {
-  const d = new Date(dateStr);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
-
-// 下载图片：拉成 blob 强制下载，失败则新标签打开
-async function downloadFile(url: string, name: string) {
-  try {
-    const res = await fetch(url);
-    const blob = await res.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = objectUrl;
-    a.download = name || "image";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(objectUrl);
-  } catch {
-    window.open(url, "_blank");
-  }
-}
-
-const CATEGORY_LABELS: Record<string, string> = {
-  all: "全部",
-  scene: "场景图",
-  main: "主图",
-  detail: "详情图",
-  marketing: "营销图",
-  poster: "海报",
-  "white-bg": "白底图",
-};
-
-const CATEGORY_PROCESS_TYPES: Record<string, string[]> = {
-  scene: ["BACKGROUND_REMOVAL", "BACKGROUND_REPLACE"],
-  main: ["IMAGE_UPSCALING", "UPSCALE"],
-  detail: ["IMAGE_OUTPAINTING", "IMAGE_EXPANSION", "OUTPAINT"],
-  marketing: ["WATERMARK"],
-  poster: ["ONE_CLICK_WORKFLOW", "ONE_CLICK"],
-  "white-bg": ["WHITE_BACKGROUND"],
-};
-
-const RESULTS_PAGE_SIZE = 24;
 
 export default function ResultsPage() {
   const [activeCategory, setActiveCategory] = useState("all");
@@ -1093,82 +908,15 @@ export default function ResultsPage() {
 
       {/* 大图灯箱：左右箭头 / 键盘 ←→ / 触摸滑动 切换 */}
       {lightboxItem && lightboxUrl && lightboxIndex != null && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
-          onClick={() => setLightboxIndex(null)}
-          onTouchStart={(e) => {
-            touchStartX.current = e.touches[0]?.clientX ?? null;
-          }}
-          onTouchEnd={(e) => {
-            if (touchStartX.current == null) return;
-            const dx = (e.changedTouches[0]?.clientX ?? touchStartX.current) - touchStartX.current;
-            touchStartX.current = null;
-            if (Math.abs(dx) > 40) moveLightbox(dx < 0 ? 1 : -1);
-          }}
-        >
-          {/* 灯箱需要原始分辨率，不走 Next Image 的预设尺寸。 */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={lightboxUrl}
-            alt={lightboxItem.name}
-            className="max-h-[90vh] max-w-[92vw] rounded-lg object-contain shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          />
-          <button
-            type="button"
-            aria-label="关闭"
-            className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur-sm transition-colors hover:bg-white/25"
-            onClick={() => setLightboxIndex(null)}
-          >
-            <X className="h-5 w-5" />
-          </button>
-
-          {/* 上一张 */}
-          {lightboxIndex > 0 && (
-            <button
-              type="button"
-              aria-label="上一张"
-              className="absolute left-3 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur-sm transition-colors hover:bg-white/25 sm:left-6"
-              onClick={(e) => {
-                e.stopPropagation();
-                moveLightbox(-1);
-              }}
-            >
-              <ChevronLeft className="h-6 w-6" />
-            </button>
-          )}
-          {/* 下一张 */}
-          {lightboxIndex < visibleImages.length - 1 && (
-            <button
-              type="button"
-              aria-label="下一张"
-              className="absolute right-3 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur-sm transition-colors hover:bg-white/25 sm:right-6"
-              onClick={(e) => {
-                e.stopPropagation();
-                moveLightbox(1);
-              }}
-            >
-              <ChevronRight className="h-6 w-6" />
-            </button>
-          )}
-
-          {/* 位置指示 */}
-          <span className="absolute left-1/2 top-4 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-[12px] font-semibold text-white backdrop-blur-sm">
-            {lightboxIndex + 1} / {visibleImages.length}
-          </span>
-
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              downloadFile(lightboxUrl, lightboxItem.name);
-            }}
-            className="absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-[13px] font-semibold text-ink transition-colors hover:bg-white"
-          >
-            <Download className="h-4 w-4" />
-            下载图片
-          </button>
-        </div>
+        <ResultsLightbox
+          item={lightboxItem}
+          url={lightboxUrl}
+          index={lightboxIndex}
+          total={visibleImages.length}
+          onClose={() => setLightboxIndex(null)}
+          onPrev={() => moveLightbox(-1)}
+          onNext={() => moveLightbox(1)}
+        />
       )}
 
       {/* 局部重绘弹窗 */}
