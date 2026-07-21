@@ -32,6 +32,25 @@ import {
   StepsLimitError,
   MissingTemplateError,
 } from "@/lib/workbench/expand-workflow";
+import { computeWatermarkCanvasPlan, clamp } from "@/components/combo/canvas-plan";
+import { GlobalQuickBar } from "@/components/combo/GlobalQuickBar";
+import { GlobalSettingsPanel } from "@/components/combo/GlobalSettingsPanel";
+import type {
+  BackgroundParams,
+  ExecutableStepType,
+  OutpaintParams,
+  SceneParams,
+  StepParams,
+  StepType,
+  UpscaleParams,
+  WatermarkCanvasPlan,
+  WatermarkCustomPosition,
+  WatermarkParams,
+  WatermarkPresetPosition,
+  WorkflowParams,
+  WorkflowStep,
+} from "@/components/combo/types";
+import { ASPECT_RATIOS, RESOLUTIONS } from "@/components/combo/types";
 import {
   Trash2,
   GripVertical,
@@ -143,59 +162,6 @@ function getTemplatePreview(templateId: string, categoryId: string) {
   return TEMPLATE_PREVIEWS[templateId] ?? CATEGORY_FALLBACK_PREVIEWS[categoryId] ?? "/scene-presets/scene-elegant.webp";
 }
 
-type StepType = "scene" | "background" | "upscale" | "watermark" | "outpaint" | "workflow";
-
-// 可执行步骤类型（workflow 不是可执行的叶子，执行前需展开）
-type ExecutableStepType = Exclude<StepType, "workflow">;
-
-interface SceneParams { sceneStyle: string; candidateCount: number; customPrompt?: string }
-interface BackgroundParams { bgType: string; featherEdge: number; keepShadow: boolean; referenceAsset?: InputAssetRef; customPrompt?: string }
-interface UpscaleParams { factor: number; denoise: number }
-type WatermarkPresetPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center";
-
-interface WatermarkCustomPosition {
-  x: number;
-  y: number;
-  editorWidth: number;
-  editorHeight: number;
-}
-
-interface WatermarkParams {
-  type?: "text" | "logo";
-  content: string;
-  logoAsset?: InputAssetRef;
-  sizeRatio?: number; // 水印大小：占图宽比例（0.05~0.6），缺省 0.2
-  position: WatermarkPresetPosition | "custom";
-  opacity: number;
-  customPosition?: WatermarkCustomPosition;
-}
-interface OutpaintParams { direction: string; ratio: number }
-interface WorkflowParams {} // workflow 步无参数
-
-type StepParams =
-  | { type: "scene"; params: SceneParams }
-  | { type: "background"; params: BackgroundParams }
-  | { type: "upscale"; params: UpscaleParams }
-  | { type: "watermark"; params: WatermarkParams }
-  | { type: "outpaint"; params: OutpaintParams }
-  | { type: "workflow"; params: WorkflowParams };
-
-interface WorkflowStep {
-  id: string;
-  order: number;
-  type: StepType;
-  name: string;
-  description: string;
-  params: StepParams["params"];
-  /**
-   * Phase 3 扩展位（工作流嵌套）：未来支持把一个已保存的工作流模板作为一步嵌入。
-   * 届时 StepType 增加 "workflow"，本字段引用被嵌入的 WorkflowTemplate.id；
-   * 执行时递归展开为扁平步骤（需环检测/深度限制）。
-   * 当前未启用，仅预留数据形状，保证已保存模板的 steps(JSON) 向前兼容。
-   */
-  refTemplateId?: string;
-}
-
 const STEP_META: Record<
   StepType,
   { icon: React.ElementType; name: string; description: string }
@@ -287,19 +253,6 @@ const INITIAL_STEPS: WorkflowStep[] = [
   },
 ];
 
-const ASPECT_RATIOS = [
-  { id: "1:1", label: "1:1" },
-  { id: "3:4", label: "3:4" },
-  { id: "4:3", label: "4:3" },
-  { id: "16:9", label: "16:9" },
-  { id: "9:16", label: "9:16" },
-];
-
-const RESOLUTIONS = [
-  { id: "1k", label: "1K · 标准" },
-  { id: "2k", label: "2K · 推荐" },
-  { id: "4k", label: "4K · 超清" },
-];
 
 type MobileWorkflowStage = "workflow" | "params";
 
@@ -446,112 +399,6 @@ function toOutputResolution(resolution: string) {
   };
 
   return resolutionMap[resolution] ?? "original";
-}
-
-interface WatermarkCanvasPlan {
-  canvasWidth: number;
-  canvasHeight: number;
-  aspect: number;
-  sourceRect: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
-}
-
-function applyOutpaintToCanvasPlan(
-  canvasWidth: number,
-  canvasHeight: number,
-  sourceRect: WatermarkCanvasPlan["sourceRect"],
-  params: OutpaintParams
-) {
-  const each = clamp((params.ratio ?? 25) / 100, 0.05, 0.4);
-  const direction = params.direction || "all";
-  const horizontal = direction === "all" || direction === "horizontal";
-  const vertical = direction === "all" || direction === "vertical";
-  const nextWidth = canvasWidth * (horizontal ? 1 + 2 * each : 1);
-  const nextHeight = canvasHeight * (vertical ? 1 + 2 * each : 1);
-
-  return {
-    canvasWidth: nextWidth,
-    canvasHeight: nextHeight,
-    sourceRect: {
-      x: (sourceRect.x * canvasWidth + (nextWidth - canvasWidth) / 2) / nextWidth,
-      y: (sourceRect.y * canvasHeight + (nextHeight - canvasHeight) / 2) / nextHeight,
-      width: (sourceRect.width * canvasWidth) / nextWidth,
-      height: (sourceRect.height * canvasHeight) / nextHeight,
-    },
-  };
-}
-
-function applyUpscaleToCanvasPlan(
-  canvasWidth: number,
-  canvasHeight: number,
-  sourceRect: WatermarkCanvasPlan["sourceRect"],
-  params: UpscaleParams
-) {
-  const factor = clamp(params.factor ?? 1, 1.1, 4);
-  return {
-    canvasWidth: canvasWidth * factor,
-    canvasHeight: canvasHeight * factor,
-    sourceRect,
-  };
-}
-
-/**
- * 推导某一步对应的画布计划。
- * - watermark：只累计前置 outpaint/upscale（水印落在最终画布上）
- * - outpaint/upscale 预览：includeCurrentStep=true，把当前步效果也算进去
- */
-function computeWatermarkCanvasPlan(
-  steps: WorkflowStep[],
-  currentStepId: string,
-  baseW: number,
-  baseH: number,
-  options?: { includeCurrentStep?: boolean }
-): WatermarkCanvasPlan | undefined {
-  if (!baseW || !baseH || baseW <= 0 || baseH <= 0) return undefined;
-
-  let canvasWidth = baseW;
-  let canvasHeight = baseH;
-  let sourceRect = { x: 0, y: 0, width: 1, height: 1 };
-  const currentIndex = steps.findIndex((step) => step.id === currentStepId);
-  if (currentIndex < 0) return undefined;
-
-  const endIndex = options?.includeCurrentStep ? currentIndex + 1 : currentIndex;
-  const relevantSteps = steps.slice(0, endIndex);
-
-  for (const step of relevantSteps) {
-    if (step.type === "outpaint") {
-      const next = applyOutpaintToCanvasPlan(
-        canvasWidth,
-        canvasHeight,
-        sourceRect,
-        step.params as OutpaintParams
-      );
-      canvasWidth = next.canvasWidth;
-      canvasHeight = next.canvasHeight;
-      sourceRect = next.sourceRect;
-    } else if (step.type === "upscale") {
-      const next = applyUpscaleToCanvasPlan(
-        canvasWidth,
-        canvasHeight,
-        sourceRect,
-        step.params as UpscaleParams
-      );
-      canvasWidth = next.canvasWidth;
-      canvasHeight = next.canvasHeight;
-      sourceRect = next.sourceRect;
-    }
-  }
-
-  return {
-    canvasWidth,
-    canvasHeight,
-    aspect: canvasWidth / canvasHeight,
-    sourceRect,
-  };
 }
 
 export default function ComboPage() {
@@ -2030,38 +1877,60 @@ export default function ComboPage() {
             onExpand={() => setRightCollapsed(false)}
           />
         ) : (
-          <aside className="flex w-[320px] shrink-0 flex-col overflow-y-auto border-l border-line bg-surface-glass backdrop-blur-[20px] backdrop-saturate-150">
-            {selectedStep && selectedStep.type !== "workflow" ? (
-              <StepParamPanel
-                step={selectedStep}
-                onClose={() => setSelectedStepId(null)}
-                onCollapse={() => setRightCollapsed(true)}
-                onChange={(patch) => updateStepParams(selectedStep.id, patch)}
-                aspectRatio={aspectRatio}
-                productImage={productAssets[0]}
-                canvasPlan={
-                  selectedStep.type === "watermark"
-                    ? getWatermarkCanvasPlan(selectedStep.id)
-                    : getStepCanvasPlan(selectedStep.id)
-                }
-              />
-            ) : (
-              <GlobalSettingsPanel
+          <aside className="flex w-[320px] shrink-0 flex-col border-l border-line bg-surface-glass backdrop-blur-[20px] backdrop-saturate-150">
+            {/* 全局模型/清晰度固定顶部，点步骤参数时也不再被整页替换 */}
+            <div className="shrink-0 border-b border-line p-4">
+              <GlobalQuickBar
                 onCollapse={() => setRightCollapsed(true)}
                 selectedTemplateName={
                   selectedTemplate
                     ? templates.find((t) => t.id === selectedTemplate)?.name ?? null
                     : null
                 }
-                aspectRatio={aspectRatio}
-                setAspectRatio={setAspectRatio}
                 resolution={resolution}
                 setResolution={setResolution}
                 availableModels={availableModels}
                 selectedImageModel={selectedImageModel}
                 setSelectedImageModel={setSelectedImageModel}
+                showFullSettings={!(selectedStep && selectedStep.type !== "workflow")}
+                onShowFullSettings={() => setSelectedStepId(null)}
               />
-            )}
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {selectedStep && selectedStep.type !== "workflow" ? (
+                <StepParamPanel
+                  step={selectedStep}
+                  onClose={() => setSelectedStepId(null)}
+                  onCollapse={() => setRightCollapsed(true)}
+                  onChange={(patch) => updateStepParams(selectedStep.id, patch)}
+                  aspectRatio={aspectRatio}
+                  productImage={productAssets[0]}
+                  canvasPlan={
+                    selectedStep.type === "watermark"
+                      ? getWatermarkCanvasPlan(selectedStep.id)
+                      : getStepCanvasPlan(selectedStep.id)
+                  }
+                  hideChrome
+                />
+              ) : (
+                <GlobalSettingsPanel
+                  onCollapse={() => setRightCollapsed(true)}
+                  selectedTemplateName={
+                    selectedTemplate
+                      ? templates.find((t) => t.id === selectedTemplate)?.name ?? null
+                      : null
+                  }
+                  aspectRatio={aspectRatio}
+                  setAspectRatio={setAspectRatio}
+                  resolution={resolution}
+                  setResolution={setResolution}
+                  availableModels={availableModels}
+                  selectedImageModel={selectedImageModel}
+                  setSelectedImageModel={setSelectedImageModel}
+                  compact
+                />
+              )}
+            </div>
           </aside>
         )}
       </div>
@@ -2069,140 +1938,7 @@ export default function ComboPage() {
   );
 }
 
-/* ─── Right: global settings ─────────────────────────────────────── */
-
-function GlobalSettingsPanel({
-  onCollapse,
-  selectedTemplateName,
-  aspectRatio,
-  setAspectRatio,
-  resolution,
-  setResolution,
-  availableModels,
-  selectedImageModel,
-  setSelectedImageModel,
-}: {
-  onCollapse: () => void;
-  selectedTemplateName: string | null;
-  aspectRatio: string;
-  setAspectRatio: (_value: string) => void;
-  resolution: string;
-  setResolution: (_value: string) => void;
-  availableModels: { provider: string; modelName: string }[];
-  selectedImageModel: { provider: string; modelName: string } | null;
-  setSelectedImageModel: (_value: { provider: string; modelName: string } | null) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-5 p-5">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Settings2 className="h-4 w-4 text-brand" />
-          <span className="text-data font-semibold text-ink">全局执行设置</span>
-        </div>
-        <button
-          type="button"
-          onClick={onCollapse}
-          className="rounded-md p-1 text-ink-3 hover:bg-surface-muted hover:text-ink"
-          aria-label="折叠"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </button>
-      </div>
-
-      <section className="flex flex-col gap-2">
-        <Label className="text-caption font-medium text-ink-3">方案信息</Label>
-        <div className="rounded-[14px] border border-line bg-surface p-3">
-          <p className="truncate text-[13px] font-semibold text-ink">
-            {selectedTemplateName ?? "未选择模板"}
-          </p>
-          <p className="mt-0.5 hidden text-[12px] text-ink-3 md:block">
-            {selectedTemplateName ? "已加载该模板的步骤和参数" : "从左侧选择一个工作流模板"}
-          </p>
-        </div>
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <Label className="text-caption font-medium text-ink-3">画面比例</Label>
-        <div className="grid grid-cols-5 gap-1.5">
-          {ASPECT_RATIOS.map((r) => (
-            <button
-              key={r.id}
-              type="button"
-              onClick={() => setAspectRatio(r.id)}
-              className={cn(
-                "rounded-[10px] border px-1 py-1.5 text-[11px] font-semibold transition-colors",
-                aspectRatio === r.id
-                  ? "border-brand bg-brand-soft text-brand-text"
-                  : "border-line-strong text-ink-2 hover:text-ink"
-              )}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <Label className="text-caption font-medium text-ink-3">输出清晰度</Label>
-        <div className="grid grid-cols-3 gap-1.5">
-          {RESOLUTIONS.map((r) => (
-            <button
-              key={r.id}
-              type="button"
-              onClick={() => setResolution(r.id)}
-              className={cn(
-                "rounded-[10px] border px-1 py-2 text-[11px] font-semibold transition-colors",
-                resolution === r.id
-                  ? "border-brand bg-brand-soft text-brand-text"
-                  : "border-line-strong text-ink-2 hover:text-ink"
-              )}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <Label className="text-caption font-medium text-ink-3">生图模型</Label>
-        {availableModels.length === 0 ? (
-          <div className="rounded-[10px] border border-line bg-surface-muted p-3 text-[12px] text-ink-3">
-            未启用生图模型，请到 设置 → AI 模型配置 启用
-          </div>
-        ) : (
-          <BottomSheetSelect
-            options={availableModels.map((m) => ({
-              id: `${m.provider}::${m.modelName}`,
-              label: `${m.provider.toUpperCase()} · ${m.modelName}`,
-            }))}
-            value={selectedImageModel ? `${selectedImageModel.provider}::${selectedImageModel.modelName}` : ""}
-            onChange={(value) => {
-              if (typeof value === "string") {
-                const [provider, modelName] = value.split("::");
-                setSelectedImageModel({ provider, modelName });
-              }
-            }}
-            title="选择生图模型"
-            trigger={
-              <button
-                type="button"
-                className="rounded-[10px] border border-line bg-surface px-3 py-2 text-[12px] font-medium text-ink transition-colors hover:bg-surface-muted"
-              >
-                {selectedImageModel
-                  ? `${selectedImageModel.provider.toUpperCase()} · ${selectedImageModel.modelName}`
-                  : "选择模型"}
-              </button>
-            }
-          />
-        )}
-        <p className="text-[11px] text-ink-3">
-          该模型仅作用于「生成场景图 / AI 换背景」步骤；扩图、放大、水印不受影响。
-        </p>
-      </section>
-
-    </div>
-  );
-}
+/* ─── Right: global settings extracted to components/combo ─── */
 
 function MobileGlobalSettings({
   selectedTemplateName,
@@ -2240,7 +1976,7 @@ function MobileGlobalSettings({
         <ChipGroup
           value={resolution}
           onChange={setResolution}
-          options={RESOLUTIONS}
+          options={[...RESOLUTIONS]}
           cols={3}
         />
       </section>
@@ -2389,6 +2125,7 @@ function StepParamPanel({
   aspectRatio,
   productImage,
   canvasPlan,
+  hideChrome = false,
 }: {
   step: WorkflowStep;
   onClose: () => void;
@@ -2397,6 +2134,7 @@ function StepParamPanel({
   aspectRatio: string;
   productImage?: InputAssetRef;
   canvasPlan?: WatermarkCanvasPlan;
+  hideChrome?: boolean;
 }) {
   // 仅用于非 workflow 步，类型保证由调用处进行
   if (step.type === "workflow") {
@@ -2406,28 +2144,41 @@ function StepParamPanel({
   const Icon = STEP_META[step.type].icon;
   return (
     <div className="flex flex-col gap-5 p-5">
-      <div className="flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-ink-2 hover:bg-surface-muted hover:text-ink"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span className="text-data font-semibold">{step.name}</span>
-        </button>
-        <button
-          type="button"
-          onClick={onCollapse}
-          className="rounded-md p-1 text-ink-3 hover:bg-surface-muted hover:text-ink"
-          aria-label="折叠"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </button>
-      </div>
+      {!hideChrome && (
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-ink-2 hover:bg-surface-muted hover:text-ink"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="text-data font-semibold">{step.name}</span>
+          </button>
+          <button
+            type="button"
+            onClick={onCollapse}
+            className="rounded-md p-1 text-ink-3 hover:bg-surface-muted hover:text-ink"
+            aria-label="折叠"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
-      <div className="flex items-center gap-2.5 rounded-[14px] bg-brand-soft p-3 text-brand-text">
-        <Icon className="h-4 w-4" />
-        <span className="text-[12px] font-semibold">步骤 {step.order} · {step.name}</span>
+      <div className="flex items-center justify-between gap-2 rounded-[14px] bg-brand-soft p-3 text-brand-text">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Icon className="h-4 w-4 shrink-0" />
+          <span className="truncate text-[12px] font-semibold">步骤 {step.order} · {step.name}</span>
+        </div>
+        {hideChrome && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 rounded-md px-2 py-1 text-[11px] font-semibold text-brand-text/80 hover:bg-white/40"
+          >
+            关闭
+          </button>
+        )}
       </div>
 
       {step.type === "scene" && (
@@ -3302,10 +3053,6 @@ function WatermarkPositionPreview({
       </div>
     </section>
   );
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
 }
 
 function OutpaintStepParams({

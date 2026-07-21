@@ -1,3 +1,4 @@
+import sharp from 'sharp';
 import { prisma } from '@/lib/prisma';
 import { uploadBase64Image } from '@/lib/storage';
 import { processWithGemini, processWithGPT, processWithJimeng, processWithMediaKit, outpaintWithVolcengine, enhanceWithVolcengine } from '@/lib/image-processor/service';
@@ -11,6 +12,27 @@ function getErrorMessage(error: unknown): string {
 
 function stopWorkflow(stepName: string, error: unknown): never {
   throw new Error(`${stepName}失败，已停止后续步骤：${getErrorMessage(error)}`);
+}
+
+async function probeImageSize(image: string): Promise<{ width: number; height: number } | null> {
+  try {
+    if (image.startsWith('data:')) {
+      const base64 = image.split(',')[1] || '';
+      const meta = await sharp(Buffer.from(base64, 'base64')).metadata();
+      if (meta.width && meta.height) return { width: meta.width, height: meta.height };
+      return null;
+    }
+    if (/^https?:\/\//i.test(image)) {
+      const resp = await fetch(image);
+      if (!resp.ok) return null;
+      const buf = Buffer.from(await resp.arrayBuffer());
+      const meta = await sharp(buf).metadata();
+      if (meta.width && meta.height) return { width: meta.width, height: meta.height };
+    }
+  } catch {
+    // 诊断信息失败不影响主流程
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -132,12 +154,14 @@ export async function executeOrderedPipeline(params: OrderedPipelineParams) {
   try {
     let current = imageUrl;
     const done: string[] = [];
+    const stepTraces: Array<Record<string, unknown>> = [];
     const total = steps.length;
 
     for (let i = 0; i < total; i++) {
       const step = steps[i];
       const label = `第 ${i + 1}/${total} 步：${STEP_LABELS[step.stepType] || step.stepType}`;
       if (onProgress) await onProgress(label, Math.round((i / total) * 100) + 2, i);
+      const beforeSize = await probeImageSize(current);
 
       try {
         if (step.stepType === 'background' || step.stepType === 'scene') {
@@ -177,6 +201,11 @@ export async function executeOrderedPipeline(params: OrderedPipelineParams) {
           const right = horiz ? each : 0;
           const top  = vert  ? each : 0;
           const bottom = vert  ? each : 0;
+          console.log(
+            `[pipeline] outpaint dir=${dir} ratio=${step.ratio ?? 25} each=${each}` +
+              ` L${left} R${right} T${top} B${bottom}` +
+              (beforeSize ? ` before=${beforeSize.width}x${beforeSize.height}` : '')
+          );
           const r = await outpaintWithVolcengine(
             userId,
             current,
@@ -225,6 +254,25 @@ export async function executeOrderedPipeline(params: OrderedPipelineParams) {
         stopWorkflow(STEP_LABELS[step.stepType] || step.stepType, error);
       }
 
+      const afterSize = await probeImageSize(current);
+      stepTraces.push({
+        stepType: step.stepType,
+        index: i,
+        before: beforeSize,
+        after: afterSize,
+        ...(step.stepType === 'outpaint'
+          ? { direction: step.direction || 'all', ratio: step.ratio ?? 25 }
+          : {}),
+        ...(step.stepType === 'upscale'
+          ? { upscaleFactor: Number(step.upscaleFactor) || 1 }
+          : {}),
+      });
+      if (beforeSize && afterSize) {
+        console.log(
+          `[pipeline] step=${step.stepType} ${beforeSize.width}x${beforeSize.height} -> ${afterSize.width}x${afterSize.height}`
+        );
+      }
+
       done.push(step.stepType);
     }
 
@@ -236,6 +284,7 @@ export async function executeOrderedPipeline(params: OrderedPipelineParams) {
     const savedUrl = current.startsWith('data:')
       ? await uploadBase64Image(current, `pipeline-${processedImage.id}.jpg`, userId)
       : current;
+    const finalSize = await probeImageSize(current);
 
     const updated = await prisma.processedImage.update({
       where: { id: processedImage.id },
@@ -245,6 +294,8 @@ export async function executeOrderedPipeline(params: OrderedPipelineParams) {
         fileSize: imageSize,
         metadata: JSON.stringify({
           pipeline: done,
+          stepTraces,
+          finalSize,
           provider: globalAiModel,        // 本次真实使用的 provider
           model: globalModel,             // 本次真实使用的具体模型 id（未选具体模型时为 undefined）
           processingCompletedAt: new Date().toISOString(),
