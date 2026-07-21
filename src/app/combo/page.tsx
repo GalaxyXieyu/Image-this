@@ -460,11 +460,56 @@ interface WatermarkCanvasPlan {
   };
 }
 
+function applyOutpaintToCanvasPlan(
+  canvasWidth: number,
+  canvasHeight: number,
+  sourceRect: WatermarkCanvasPlan["sourceRect"],
+  params: OutpaintParams
+) {
+  const each = clamp((params.ratio ?? 25) / 100, 0.05, 0.4);
+  const direction = params.direction || "all";
+  const horizontal = direction === "all" || direction === "horizontal";
+  const vertical = direction === "all" || direction === "vertical";
+  const nextWidth = canvasWidth * (horizontal ? 1 + 2 * each : 1);
+  const nextHeight = canvasHeight * (vertical ? 1 + 2 * each : 1);
+
+  return {
+    canvasWidth: nextWidth,
+    canvasHeight: nextHeight,
+    sourceRect: {
+      x: (sourceRect.x * canvasWidth + (nextWidth - canvasWidth) / 2) / nextWidth,
+      y: (sourceRect.y * canvasHeight + (nextHeight - canvasHeight) / 2) / nextHeight,
+      width: (sourceRect.width * canvasWidth) / nextWidth,
+      height: (sourceRect.height * canvasHeight) / nextHeight,
+    },
+  };
+}
+
+function applyUpscaleToCanvasPlan(
+  canvasWidth: number,
+  canvasHeight: number,
+  sourceRect: WatermarkCanvasPlan["sourceRect"],
+  params: UpscaleParams
+) {
+  const factor = clamp(params.factor ?? 1, 1.1, 4);
+  return {
+    canvasWidth: canvasWidth * factor,
+    canvasHeight: canvasHeight * factor,
+    sourceRect,
+  };
+}
+
+/**
+ * 推导某一步对应的画布计划。
+ * - watermark：只累计前置 outpaint/upscale（水印落在最终画布上）
+ * - outpaint/upscale 预览：includeCurrentStep=true，把当前步效果也算进去
+ */
 function computeWatermarkCanvasPlan(
   steps: WorkflowStep[],
   currentStepId: string,
   baseW: number,
-  baseH: number
+  baseH: number,
+  options?: { includeCurrentStep?: boolean }
 ): WatermarkCanvasPlan | undefined {
   if (!baseW || !baseH || baseW <= 0 || baseH <= 0) return undefined;
 
@@ -472,31 +517,32 @@ function computeWatermarkCanvasPlan(
   let canvasHeight = baseH;
   let sourceRect = { x: 0, y: 0, width: 1, height: 1 };
   const currentIndex = steps.findIndex((step) => step.id === currentStepId);
-  const precedingSteps = currentIndex >= 0 ? steps.slice(0, currentIndex) : [];
+  if (currentIndex < 0) return undefined;
 
-  for (const step of precedingSteps) {
+  const endIndex = options?.includeCurrentStep ? currentIndex + 1 : currentIndex;
+  const relevantSteps = steps.slice(0, endIndex);
+
+  for (const step of relevantSteps) {
     if (step.type === "outpaint") {
-      const params = step.params as OutpaintParams;
-      const each = clamp((params.ratio ?? 25) / 100, 0.05, 0.4);
-      const direction = params.direction || "all";
-      const horizontal = direction === "all" || direction === "horizontal";
-      const vertical = direction === "all" || direction === "vertical";
-      const nextWidth = canvasWidth * (horizontal ? 1 + 2 * each : 1);
-      const nextHeight = canvasHeight * (vertical ? 1 + 2 * each : 1);
-
-      sourceRect = {
-        x: (sourceRect.x * canvasWidth + (nextWidth - canvasWidth) / 2) / nextWidth,
-        y: (sourceRect.y * canvasHeight + (nextHeight - canvasHeight) / 2) / nextHeight,
-        width: (sourceRect.width * canvasWidth) / nextWidth,
-        height: (sourceRect.height * canvasHeight) / nextHeight,
-      };
-      canvasWidth = nextWidth;
-      canvasHeight = nextHeight;
+      const next = applyOutpaintToCanvasPlan(
+        canvasWidth,
+        canvasHeight,
+        sourceRect,
+        step.params as OutpaintParams
+      );
+      canvasWidth = next.canvasWidth;
+      canvasHeight = next.canvasHeight;
+      sourceRect = next.sourceRect;
     } else if (step.type === "upscale") {
-      const params = step.params as UpscaleParams;
-      const factor = clamp(params.factor ?? 1, 1.1, 4);
-      canvasWidth *= factor;
-      canvasHeight *= factor;
+      const next = applyUpscaleToCanvasPlan(
+        canvasWidth,
+        canvasHeight,
+        sourceRect,
+        step.params as UpscaleParams
+      );
+      canvasWidth = next.canvasWidth;
+      canvasHeight = next.canvasHeight;
+      sourceRect = next.sourceRect;
     }
   }
 
@@ -540,6 +586,33 @@ export default function ComboPage() {
   const [uploadingProductAssets, setUploadingProductAssets] = useState(false);
   const productInputRef = useRef<HTMLInputElement>(null);
   const [productImageDims, setProductImageDims] = useState({ width: 0, height: 0 });
+
+  // 桌面/移动端都可能缓存商品图，尺寸不能只靠某一块缩略图 onLoad；
+  // 否则 canvasPlan 为空时，水印预览会退回“原图铺满”而不是扩图后最终画布。
+  useEffect(() => {
+    const firstAsset = productAssets[0];
+    if (!firstAsset?.clientUrl) {
+      setProductImageDims({ width: 0, height: 0 });
+      return;
+    }
+
+    let cancelled = false;
+    const img = new window.Image();
+    img.onload = () => {
+      if (cancelled) return;
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+        setProductImageDims({ width: img.naturalWidth, height: img.naturalHeight });
+      }
+    };
+    img.onerror = () => {
+      if (!cancelled) setProductImageDims({ width: 0, height: 0 });
+    };
+    img.src = firstAsset.clientUrl;
+
+    return () => {
+      cancelled = true;
+    };
+  }, [productAssets]);
 
   // Add step drawer
   const [addStepOpen, setAddStepOpen] = useState(false);
@@ -652,6 +725,19 @@ export default function ComboPage() {
     (currentStepId: string) =>
       productImageDims.width && productImageDims.height
         ? computeWatermarkCanvasPlan(previewSteps, currentStepId, productImageDims.width, productImageDims.height)
+        : undefined,
+    [previewSteps, productImageDims.height, productImageDims.width]
+  );
+  const getStepCanvasPlan = useCallback(
+    (currentStepId: string) =>
+      productImageDims.width && productImageDims.height
+        ? computeWatermarkCanvasPlan(
+            previewSteps,
+            currentStepId,
+            productImageDims.width,
+            productImageDims.height,
+            { includeCurrentStep: true }
+          )
         : undefined,
     [previewSteps, productImageDims.height, productImageDims.width]
   );
@@ -1373,6 +1459,8 @@ export default function ComboPage() {
                           <UpscaleStepParams
                             params={step.params as UpscaleParams}
                             onChange={(patch) => updateStepParams(step.id, patch)}
+                            productImage={productAssets[0]}
+                            canvasPlan={getStepCanvasPlan(step.id)}
                           />
                         )}
                         {step.type === "watermark" && (
@@ -1388,6 +1476,8 @@ export default function ComboPage() {
                           <OutpaintStepParams
                             params={step.params as OutpaintParams}
                             onChange={(patch) => updateStepParams(step.id, patch)}
+                            productImage={productAssets[0]}
+                            canvasPlan={getStepCanvasPlan(step.id)}
                           />
                         )}
                       </div>
@@ -1707,6 +1797,15 @@ export default function ComboPage() {
                               onError={(e) => {
                                 e.currentTarget.style.display = "none";
                               }}
+                              onLoad={(e) => {
+                                if (index === 0) {
+                                  const img = e.currentTarget;
+                                  setProductImageDims({
+                                    width: img.naturalWidth,
+                                    height: img.naturalHeight,
+                                  });
+                                }
+                              }}
                             />
                           </div>
                           <button
@@ -1940,7 +2039,11 @@ export default function ComboPage() {
                 onChange={(patch) => updateStepParams(selectedStep.id, patch)}
                 aspectRatio={aspectRatio}
                 productImage={productAssets[0]}
-                canvasPlan={getWatermarkCanvasPlan(selectedStep.id)}
+                canvasPlan={
+                  selectedStep.type === "watermark"
+                    ? getWatermarkCanvasPlan(selectedStep.id)
+                    : getStepCanvasPlan(selectedStep.id)
+                }
               />
             ) : (
               <GlobalSettingsPanel
@@ -2209,11 +2312,15 @@ function MobileStepSettings({
   onClose,
   onChange,
   aspectRatio,
+  productImage,
+  canvasPlan,
 }: {
   step: WorkflowStep;
   onClose: () => void;
   onChange: (_patch: Partial<StepParams["params"]>) => void;
   aspectRatio: string;
+  productImage?: InputAssetRef;
+  canvasPlan?: WatermarkCanvasPlan;
 }) {
   const Icon = STEP_META[step.type].icon;
   return (
@@ -2244,17 +2351,29 @@ function MobileStepSettings({
         <BackgroundStepParams params={step.params as BackgroundParams} onChange={onChange} />
       )}
       {step.type === "upscale" && (
-        <UpscaleStepParams params={step.params as UpscaleParams} onChange={onChange} />
+        <UpscaleStepParams
+          params={step.params as UpscaleParams}
+          onChange={onChange}
+          productImage={productImage}
+          canvasPlan={canvasPlan}
+        />
       )}
       {step.type === "watermark" && (
         <WatermarkStepParams
           params={step.params as WatermarkParams}
           aspectRatio={aspectRatio}
           onChange={onChange}
+          productImage={productImage}
+          canvasPlan={canvasPlan}
         />
       )}
       {step.type === "outpaint" && (
-        <OutpaintStepParams params={step.params as OutpaintParams} onChange={onChange} />
+        <OutpaintStepParams
+          params={step.params as OutpaintParams}
+          onChange={onChange}
+          productImage={productImage}
+          canvasPlan={canvasPlan}
+        />
       )}
     </div>
   );
@@ -2318,7 +2437,12 @@ function StepParamPanel({
         <BackgroundStepParams params={step.params as BackgroundParams} onChange={onChange} />
       )}
       {step.type === "upscale" && (
-        <UpscaleStepParams params={step.params as UpscaleParams} onChange={onChange} />
+        <UpscaleStepParams
+          params={step.params as UpscaleParams}
+          onChange={onChange}
+          productImage={productImage}
+          canvasPlan={canvasPlan}
+        />
       )}
       {step.type === "watermark" && (
         <WatermarkStepParams
@@ -2330,7 +2454,12 @@ function StepParamPanel({
         />
       )}
       {step.type === "outpaint" && (
-        <OutpaintStepParams params={step.params as OutpaintParams} onChange={onChange} />
+        <OutpaintStepParams
+          params={step.params as OutpaintParams}
+          onChange={onChange}
+          productImage={productImage}
+          canvasPlan={canvasPlan}
+        />
       )}
     </div>
   );
@@ -2595,14 +2724,105 @@ function BackgroundStepParams({
   );
 }
 
+function CanvasPlanPreview({
+  title,
+  emptyHint,
+  productImage,
+  canvasPlan,
+  badge,
+}: {
+  title: string;
+  emptyHint: string;
+  productImage?: InputAssetRef;
+  canvasPlan?: WatermarkCanvasPlan;
+  badge?: string;
+}) {
+  const aspectStyle = useMemo(() => {
+    const ratio = canvasPlan?.aspect || 1;
+    return {
+      aspectRatio: ratio.toString(),
+      maxWidth: ratio > 1 ? "100%" : `min(100%, ${52 * ratio}vh)`,
+    };
+  }, [canvasPlan?.aspect]);
+
+  return (
+    <section className="flex flex-col gap-2">
+      <FieldLabel>
+        <div className="flex items-center justify-between gap-2">
+          <span>{title}</span>
+          {productImage && canvasPlan ? (
+            <span className="text-[11px] font-normal text-ink-3">
+              预计 {Math.round(canvasPlan.canvasWidth)} × {Math.round(canvasPlan.canvasHeight)}
+            </span>
+          ) : null}
+        </div>
+      </FieldLabel>
+      <div
+        className="relative mx-auto max-h-[52vh] min-h-40 w-full overflow-hidden rounded-[14px] border border-line bg-[linear-gradient(135deg,#f8fafc_0%,#e2e8f0_48%,#dbeafe_100%)]"
+        style={aspectStyle}
+      >
+        {productImage ? (
+          <>
+            <div className="absolute inset-0 bg-[linear-gradient(135deg,#eef2f7_0%,#dbe4ef_100%)]" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={productImage.clientUrl}
+              alt=""
+              className="absolute object-contain"
+              style={canvasPlan ? {
+                left: `${canvasPlan.sourceRect.x * 100}%`,
+                top: `${canvasPlan.sourceRect.y * 100}%`,
+                width: `${canvasPlan.sourceRect.width * 100}%`,
+                height: `${canvasPlan.sourceRect.height * 100}%`,
+              } : { inset: 0, width: "100%", height: "100%", objectFit: "contain" }}
+              draggable={false}
+            />
+            {canvasPlan && (canvasPlan.sourceRect.width < 0.999 || canvasPlan.sourceRect.height < 0.999) && (
+              <div
+                className="pointer-events-none absolute border border-dashed border-brand/70"
+                style={{
+                  left: `${canvasPlan.sourceRect.x * 100}%`,
+                  top: `${canvasPlan.sourceRect.y * 100}%`,
+                  width: `${canvasPlan.sourceRect.width * 100}%`,
+                  height: `${canvasPlan.sourceRect.height * 100}%`,
+                }}
+              />
+            )}
+            {badge ? (
+              <div className="absolute bottom-2 left-2 rounded-full bg-ink/75 px-2 py-0.5 text-[10px] font-semibold text-white">
+                {badge}
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <div className="flex h-full min-h-40 items-center justify-center px-4 text-center text-[12px] text-ink-3">
+            {emptyHint}
+          </div>
+        )}
+      </div>
+      {productImage && !canvasPlan ? (
+        <p className="text-[11px] text-ink-3">正在读取商品图尺寸，预览即将出现…</p>
+      ) : null}
+    </section>
+  );
+}
+
 function UpscaleStepParams({
   params,
   onChange,
+  productImage,
+  canvasPlan,
 }: {
   params: UpscaleParams;
   onChange: (_patch: Partial<UpscaleParams>) => void;
+  productImage?: InputAssetRef;
+  canvasPlan?: WatermarkCanvasPlan;
 }) {
   const [inputValue, setInputValue] = useState(String(params.factor));
+
+  useEffect(() => {
+    setInputValue(String(params.factor));
+  }, [params.factor]);
 
   const handleInputBlur = () => {
     const raw = inputValue.trim();
@@ -2619,6 +2839,13 @@ function UpscaleStepParams({
 
   return (
     <>
+      <CanvasPlanPreview
+        title="放大预览"
+        emptyHint="先上传商品图，可实时查看放大后的预计画布尺寸"
+        productImage={productImage}
+        canvasPlan={canvasPlan}
+        badge={`${Number(params.factor ?? 1).toFixed(2).replace(/\.00$/, "")}×`}
+      />
       <SliderRow
         label="放大倍数"
         value={params.factor}
@@ -3084,12 +3311,26 @@ function clamp(value: number, min: number, max: number) {
 function OutpaintStepParams({
   params,
   onChange,
+  productImage,
+  canvasPlan,
 }: {
   params: OutpaintParams;
   onChange: (_patch: Partial<OutpaintParams>) => void;
+  productImage?: InputAssetRef;
+  canvasPlan?: WatermarkCanvasPlan;
 }) {
+  const directionLabel =
+    params.direction === "horizontal" ? "左右" : params.direction === "vertical" ? "上下" : "四周";
+
   return (
     <>
+      <CanvasPlanPreview
+        title="扩图预览"
+        emptyHint="先上传商品图，可实时查看扩展后的最终画布与原图位置"
+        productImage={productImage}
+        canvasPlan={canvasPlan}
+        badge={`${directionLabel} · ${params.ratio ?? 25}%`}
+      />
       <section className="flex flex-col gap-2">
         <FieldLabel>扩展方向</FieldLabel>
         <ChipGroup
@@ -3111,6 +3352,9 @@ function OutpaintStepParams({
         max={40}
         onChange={(ratio) => onChange({ ratio })}
       />
+      <p className="text-[11px] text-ink-3">
+        虚线框内是原图位置，外围区域为扩图补充；这是预估画布，不是真实 AI 扩图结果。
+      </p>
     </>
   );
 }
