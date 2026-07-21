@@ -13,6 +13,7 @@ import {
   type OrderedPipelineStep,
 } from '@/app/api/images-process/workflow/one-click/service';
 import fs from 'fs/promises';
+import path from 'path';
 
 type TaskAssetRef = {
   assetId: string;
@@ -22,13 +23,32 @@ type TaskAssetRef = {
 };
 
 async function readAssetAsDataUrl(asset?: TaskAssetRef): Promise<string | null> {
-  if (!asset?.filePath) return null;
-  try {
-    const buffer = await fs.readFile(asset.filePath);
-    return `data:${asset.mimeType || 'application/octet-stream'};base64,${buffer.toString('base64')}`;
-  } catch {
-    return null;
+  if (!asset) return null;
+  const mimeType = asset.mimeType || 'application/octet-stream';
+
+  // 生产每次部署换 release 目录，历史任务 filePath 可能指向已清理的旧 release。
+  // public/uploads 通过 shared 软链跨部署持久，用 clientUrl 相对当前 cwd 重解析。
+  const candidates: string[] = [];
+  if (asset.filePath) candidates.push(asset.filePath);
+  if (asset.clientUrl) {
+    let rel = asset.clientUrl.replace(/^\/+/, '');
+    if (rel.startsWith('api/files/')) rel = rel.slice('api/files/'.length);
+    candidates.push(
+      rel.startsWith('uploads/')
+        ? path.join(process.cwd(), 'public', rel)
+        : path.join(process.cwd(), 'public', 'uploads', rel)
+    );
   }
+
+  for (const candidate of candidates) {
+    try {
+      const buffer = await fs.readFile(candidate);
+      return `data:${mimeType};base64,${buffer.toString('base64')}`;
+    } catch {
+      // try next candidate
+    }
+  }
+  return null;
 }
 
 const pipelineHandler = {

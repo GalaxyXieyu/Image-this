@@ -37,6 +37,7 @@ import Link from 'next/link';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/use-toast';
 import { BrandEmptyState } from '@/components/brands/SpriteImage';
+import { isDesktopApp } from '@/lib/desktop-updates';
 
 const DesktopUpdateCard = dynamic(
   () => import('@/components/settings/DesktopUpdateCard').then((module) => module.DesktopUpdateCard),
@@ -278,6 +279,11 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [initialLoaded, setInitialLoaded] = useState(false);
   const lastSavedRef = useRef<string | null>(null);
+  // 本地存储路径只对桌面版有意义（指向服务器所在机器的本地磁盘），Web 版隐藏以免误导用户配置
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    setIsDesktop(isDesktopApp());
+  }, []);
 
   // 每 provider 的模型列表（新设计：一张卡 = 一个模型）
   const [providerModels, setProviderModels] = useState<Record<ProviderId, ProviderModel[]>>({
@@ -1073,57 +1079,58 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
-            {/* 本地存储配置 */}
-            <Card>
-              <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between">
-                <CardTitle className="flex items-center text-[18px] sm:text-body">
-                  <div className="flex items-center">
-                    <HardDrive className="w-5 h-5 mr-2 text-primary" />
-                    本地存储配置
-                  </div>
-                </CardTitle>
-                {renderInlineSaveButton()}
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-data text-muted-foreground mb-4">
-                  配置图片本地保存路径，默认为应用目录下的 public/uploads/
-                </div>
-                <div>
-                  <Label htmlFor="localStoragePath">
-                    <div className="flex items-center gap-2 mb-2">
-                      <FolderOpen className="w-4 h-4" />
-                      保存路径
+            {/* 本地存储配置：仅桌面版可见。该路径指向运行服务的本机磁盘，Web 版配置无效且会误导用户 */}
+            {isDesktop && (
+              <Card>
+                <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between">
+                  <CardTitle className="flex items-center text-[18px] sm:text-body">
+                    <div className="flex items-center">
+                      <HardDrive className="w-5 h-5 mr-2 text-primary" />
+                      本地存储配置
                     </div>
-                  </Label>
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <Input
-                      id="localStoragePath"
-                      type="text"
-                      placeholder="例如：/Users/yourname/Pictures/ai-images 或 ~/Pictures/ai-images"
-                      value={apiSettings.localStoragePath}
-                      onChange={(e) => handleInputChange('localStoragePath', e.target.value)}
-                      className="min-h-11 flex-1"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleSelectFolder}
-                      className="min-h-11 gap-2 whitespace-nowrap"
-                    >
-                      <Folder className="w-4 h-4" />
-                      浏览
-                    </Button>
+                  </CardTitle>
+                  {renderInlineSaveButton()}
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="text-data text-muted-foreground mb-4">
+                    配置图片本地保存路径，默认为应用目录下的 public/uploads/
                   </div>
-                  <div className="text-caption text-muted-foreground mt-2 space-y-1">
-                    <div>• 留空使用默认路径：public/uploads/</div>
-                    <div>• 支持绝对路径：/Users/yourname/Pictures/ai-images</div>
-                    <div>• 支持相对路径：./my-images（相对于项目根目录）</div>
-                    <div>• 支持 ~ 符号：~/Pictures/ai-images（用户主目录）</div>
-                    <div>• “浏览”按钮：桌面版可选择文件夹，Web 版请手动输入路径</div>
+                  <div>
+                    <Label htmlFor="localStoragePath">
+                      <div className="flex items-center gap-2 mb-2">
+                        <FolderOpen className="w-4 h-4" />
+                        保存路径
+                      </div>
+                    </Label>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Input
+                        id="localStoragePath"
+                        type="text"
+                        placeholder="例如：/Users/yourname/Pictures/ai-images 或 ~/Pictures/ai-images"
+                        value={apiSettings.localStoragePath}
+                        onChange={(e) => handleInputChange('localStoragePath', e.target.value)}
+                        className="min-h-11 flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleSelectFolder}
+                        className="min-h-11 gap-2 whitespace-nowrap"
+                      >
+                        <Folder className="w-4 h-4" />
+                        浏览
+                      </Button>
+                    </div>
+                    <div className="text-caption text-muted-foreground mt-2 space-y-1">
+                      <div>• 留空使用默认路径：public/uploads/</div>
+                      <div>• 支持绝对路径：/Users/yourname/Pictures/ai-images</div>
+                      <div>• 支持相对路径：./my-images（相对于项目根目录）</div>
+                      <div>• 支持 ~ 符号：~/Pictures/ai-images（用户主目录）</div>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
           </div>
         );
 
