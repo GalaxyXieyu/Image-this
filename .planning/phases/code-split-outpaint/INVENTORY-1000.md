@@ -1,60 +1,56 @@
-# Inventory: src 超 1000 行源码盘点
+# Inventory: src 超 1000 行源码盘点（更新）
 
-扫描时间：2026-07-22  
-扫描命令：`find src -type f \( -name '*.ts' -o -name '*.tsx' \) | xargs wc -l | sort -nr`  
-阈值：≥1000 必拆/必筛；800–999 观察/可顺手拆  
+扫描时间：2026-07-22（split 中后复扫）  
+阈值：≥1000 必须处理；800–999 观察  
 
-## ≥1000 行（必须处理）
+## 当前 ≥1000 行（残留）
 
-| 优先级 | 文件 | 行数 | 风险 | 拆分策略 |
-|--------|------|------|------|----------|
-| P0 | `src/app/combo/page.tsx` | 3144 | 中（UI 编排） | 继续抽 StepParamPanel / *StepParams / CanvasPlanPreview / WatermarkPositionPreview / Mobile* 到 `src/components/combo/`；page 只留状态与提交 |
-| P0 | `src/app/api/tasks/worker/route.ts` | 1528 | **高** | 仅安全抽离：纯工具函数/legacy 分支注释块；**不**重写调度/claim/dispatch；优先确认 handler registry 已覆盖后删死代码 |
-| P1 | `src/app/settings/page.tsx` | 1969 | 中 | 按 provider 卡片 / 模型选择器 / 存储与图床 / 账号区 拆到 `src/components/settings/`；page 编排 + fetch |
-| P1 | `src/app/workspace/scene/page.tsx` | 1812 | 中 | 已有内部组件：`SceneProductForm`/`SceneResultsView`/`SceneDesktopWorkspace` 等外提 `src/components/scene/`；hooks 抽 `useSceneGeneration` |
-| P2 | `src/app/results/page.tsx` | 1186 | 中低 | 卡片、筛选栏、缩略图、分组逻辑拆组件；列表数据 hook 独立 |
-| P2 | `src/app/tools/page.tsx` | 1062 | 中 | `ToolParameterPanel` / `WatermarkDragEditor` / draft helpers 外提 `src/components/tools/` |
+| 优先级 | 文件 | 当前行数 | 基线 | 状态 / 处理结论 |
+|--------|------|----------|------|-----------------|
+| P0 | `src/app/combo/page.tsx` | ~1676 | 3144 | **已大幅拆分** → `components/combo/*`（types/canvas-plan/Global*/step-*/form-controls/layout-bits/normalize-step/template-data）；page 仍编排+移动/桌面 UI，可继续拆工作区 JSX |
+| P0 | `src/app/api/tasks/worker/route.ts` | ~1444 | 1528 | **安全抽离完成** → `lib/workbench/task-asset-utils.ts`；调度/claim/fence **豁免整包重写**（见 WORKER-SPLIT-EVAL.md） |
+| P1 | `src/app/settings/page.tsx` | ~1581 | 1969 | **部分拆分** → model-select / SettingsModelsSection / SettingsSystemSections；prompts+dialogs 仍在 page，可后续专项 |
 
-## 800–999 行（观察，非本目标强制）
+## 已压到 <1000（本目标达标）
 
-| 文件 | 行数 | 备注 |
-|------|------|------|
-| `src/app/workspace/listing-set/page.tsx` | 928 | 未超 1000；本目标可不强制，若改 listing-set 再顺手拆 |
+| 文件 | 当前行数 | 基线 | 去向 |
+|------|----------|------|------|
+| `src/app/workspace/scene/page.tsx` | ~105 | 1812 | `components/scene/*` |
+| `src/app/results/page.tsx` | ~934 | 1186 | `components/results/*` |
+| `src/app/tools/page.tsx` | ~923 | 1062 | `components/tools/watermark-editor.tsx` |
 
-## 已完成的部分拆分（combo）
+## 800–999 观察
 
-| 模块 | 路径 | 行数 |
-|------|------|------|
-| 类型 | `src/components/combo/types.ts` | 105 |
-| 画布计划 | `src/components/combo/canvas-plan.ts` | 106 |
-| 全局快捷条 | `src/components/combo/GlobalQuickBar.tsx` | 123 |
-| 全局设置面板 | `src/components/combo/GlobalSettingsPanel.tsx` | 158 |
+| 文件 | 行数 |
+|------|------|
+| `src/app/workspace/listing-set/page.tsx` | 928 |
 
-`combo/page.tsx` 从约 3556 降至 3144（仍远超 1000，继续 P0）。
+## 复用模块清单（新建）
 
-## 筛选结论
+### combo
+- `types.ts` / `canvas-plan.ts` / `form-controls.tsx` / `CanvasPlanPreview.tsx`
+- `GlobalQuickBar.tsx` / `GlobalSettingsPanel.tsx` / `layout-bits.tsx`
+- `step-meta.ts` / `step-params.tsx` / `step-panels.tsx` / `normalize-step.ts` / `template-data.ts`
 
-1. **该拆**：上表 6 个 ≥1000 文件全部纳入。  
-2. **复用优先**：  
-   - UI atoms 已在 `src/components/ui/`，不重复造；  
-   - 工作台壳在 `src/components/workbench/`；  
-   - combo 预览几何统一走 `computeWatermarkCanvasPlan`；  
-   - worker 已有 `src/lib/workbench/handlers/*`，新逻辑不回塞 `worker/route.ts`。  
-3. **豁免条件**（须写明）：仅当拆分会破坏 Electron/生产调度且收益极低时，可保留单文件但需在结项扫描里写理由；默认不豁免。  
-4. **worker 特殊规则**：先评估 legacy 占比与引用面，只做安全抽离；若用户未批准大改，不整文件重写。
+### scene
+- `types-and-helpers.tsx` / `use-scene-generation.ts` / `scene-preview-bits.tsx`
+- `scene-product-forms.tsx` / `scene-results.tsx` / `scene-workspace.tsx` / barrels
 
-## 建议执行顺序
+### results / tools / settings / worker
+- `results-helpers.tsx` / `ResultsLightbox.tsx`
+- `tools/watermark-editor.tsx`
+- `settings/model-select.tsx` / `SettingsModelsSection.tsx` / `SettingsSystemSections.tsx`
+- `lib/workbench/task-asset-utils.ts`
 
-1. `combo/page.tsx` 继续拆（与扩图预览/修复同一战场）  
-2. `fix-outpaint` 根治扩图（可与 combo 拆并行，但提交分开）  
-3. `settings` / `scene`  
-4. `results` / `tools`  
-5. `worker` 受保护评估 + 最小抽离  
-6. 全量再扫 ≥1000 + 线上扩图验证  
+## worker 豁免理由
+见 `WORKER-SPLIT-EVAL.md`：仅安全抽离资产工具；不重写 claim/retry/fence。
 
-## 验收对照（inventory-1000）
+## 扩图修复（并行完成）
+- MediaKit expand 冒烟通过（0.4 四周尺寸放大）
+- pipeline：`normalizeOutpaintRatioPercent`、stepParams 回退、扩后尺寸校验、`stepTraces`
+- 提交：`0a8abe6`
 
-- [x] 路径 + 行数与 `wc` 扫描一致  
-- [x] 给出拆分优先级 P0–P2  
-- [x] 标出 worker 高风险边界  
-- [x] 记录已有 combo 部分拆分基线  
+## 建议后续（非本目标阻塞）
+1. combo 桌面/移动工作区 JSX 继续外提  
+2. settings prompts+dialogs 外提  
+3. worker legacy process* → 与 handler registry 收敛（专项）  
