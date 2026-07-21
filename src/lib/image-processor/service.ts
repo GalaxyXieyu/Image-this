@@ -258,7 +258,7 @@ export async function enhanceWithVolcengine(
     `mediakit-enhance-input-${Date.now()}.jpg`,
     imagehostingConfig?.superbedToken || userConfig.imagehosting?.superbedToken
   );
-  const result = await enhanceImageWithMediaKit(publicUrl, Math.min(30, Math.max(1, mediaKitMultiple)), 'professional');
+  const result = await enhanceImageWithMediaKit(publicUrl, Math.min(30, Math.max(1, Math.ceil(mediaKitMultiple))), 'professional');
   const downloaded = await downloadMediaKitImage(result.image_url);
   return {
     id: `mediakit-enhance-${Date.now()}`,
