@@ -318,9 +318,14 @@ export async function expandImageCanvasWithMediaKit(
   }
 
   const result = await postMediaKit<MediaKitImageResult>('/tools-sync/expand-image-canvas', payload);
+  // 注意：不可 `...payload` 覆盖 result——payload.image_url 是输入图公网 URL，
+  // 会盖掉 MediaKit 返回的扩图结果 URL，导致后续下载到原图（生产表现为 claimed 3030、实下 2048）。
   return {
     ...result,
-    ...payload,
+    expand_left: payload.expand_left,
+    expand_right: payload.expand_right,
+    expand_top: payload.expand_top,
+    expand_bottom: payload.expand_bottom,
   };
 }
 
