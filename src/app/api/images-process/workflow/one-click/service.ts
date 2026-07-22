@@ -235,25 +235,36 @@ export async function executeOrderedPipeline(params: OrderedPipelineParams) {
             imagehostingConfig
           );
           current = r.imageData;
+          // 必须以下载后的真实像素为准，不能信 API 自报 image_width/height：
+          // 生产曾出现 metadata 声称扩大、实际 dataURL 仍是输入尺寸，导致「配置了扩图但画面没扩」。
           const afterExpand = await probeImageSize(current);
-          const metaW = Number(r.metadata?.imageWidth) || afterExpand?.width || 0;
-          const metaH = Number(r.metadata?.imageHeight) || afterExpand?.height || 0;
-          if (beforeSize && metaW > 0 && metaH > 0) {
-            const needWider = horiz && metaW <= beforeSize.width * 1.01;
-            const needTaller = vert && metaH <= beforeSize.height * 1.01;
+          const claimedW = Number(r.metadata?.imageWidth) || 0;
+          const claimedH = Number(r.metadata?.imageHeight) || 0;
+          const actualW = afterExpand?.width || 0;
+          const actualH = afterExpand?.height || 0;
+          if (beforeSize && actualW > 0 && actualH > 0) {
+            const needWider = horiz && actualW <= beforeSize.width * 1.01;
+            const needTaller = vert && actualH <= beforeSize.height * 1.01;
             if (needWider || needTaller) {
               throw new Error(
-                `智能扩图未生效：输入 ${beforeSize.width}x${beforeSize.height}，输出 ${metaW}x${metaH}` +
-                  `（方向=${dir}, 比例=${ratio}%）。请检查 MEDIAKIT 返回或输入图是否过大被服务端忽略扩展。`
+                `智能扩图未生效：输入 ${beforeSize.width}x${beforeSize.height}，` +
+                  `下载后 ${actualW}x${actualH}` +
+                  (claimedW || claimedH ? `（API 声称 ${claimedW}x${claimedH}）` : '') +
+                  `（方向=${dir}, 比例=${ratio}%）。`
               );
             }
+          } else if (beforeSize) {
+            throw new Error(
+              `智能扩图结果无法读取尺寸：输入 ${beforeSize.width}x${beforeSize.height}，请检查 MediaKit 返回图。`
+            );
           }
           // 把本次真实扩图参数挂到 step 上，便于 stepTraces 记录
           (step as OrderedPipelineStep & { __expandTrace?: Record<string, unknown> }).__expandTrace = {
             direction: dir,
             ratio,
             expand: { left, right, top, bottom },
-            resultSize: { width: metaW, height: metaH },
+            resultSize: { width: actualW, height: actualH },
+            claimedSize: claimedW || claimedH ? { width: claimedW, height: claimedH } : null,
             providerMeta: r.metadata?.expandRatio ?? null,
           };
         } else if (step.stepType === 'upscale') {

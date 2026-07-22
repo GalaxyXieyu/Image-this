@@ -316,6 +316,30 @@ export async function outpaintWithVolcengine(
     `mediakit-expand-input-${Date.now()}.jpg`,
     imagehostingConfig?.superbedToken || userConfig.imagehosting?.superbedToken
   );
+
+  // 扩前尺寸：用于下载后校验是否真的扩开
+  let inputWidth = 0;
+  let inputHeight = 0;
+  try {
+    const sharp = (await import('sharp')).default;
+    const probeTarget = imageInput.startsWith('data:') ? imageInput : publicUrl;
+    if (probeTarget.startsWith('data:')) {
+      const base64 = probeTarget.split(',')[1] || '';
+      const meta = await sharp(Buffer.from(base64, 'base64')).metadata();
+      inputWidth = meta.width || 0;
+      inputHeight = meta.height || 0;
+    } else if (/^https?:\/\//i.test(probeTarget)) {
+      const resp = await fetch(probeTarget, { signal: AbortSignal.timeout(60_000) });
+      if (resp.ok) {
+        const meta = await sharp(Buffer.from(await resp.arrayBuffer())).metadata();
+        inputWidth = meta.width || 0;
+        inputHeight = meta.height || 0;
+      }
+    }
+  } catch {
+    // 输入尺寸探测失败时仍继续调用扩图
+  }
+
   const result = await expandImageCanvasWithMediaKit(publicUrl, {
     top,
     bottom,
@@ -323,6 +347,33 @@ export async function outpaintWithVolcengine(
     right,
   });
   const downloaded = await downloadMediaKitImage(result.image_url);
+  // 元数据宽高优先用下载后的真实像素；API 自报尺寸仅作对照，避免“声称扩大、实图未变”。
+  const imageWidth = downloaded.width || result.image_width;
+  const imageHeight = downloaded.height || result.image_height;
+  console.log(
+    `[MediaKit] expand downloaded actual=${downloaded.width || '?'}x${downloaded.height || '?'}` +
+      ` claimed=${result.image_width || '?'}x${result.image_height || '?'}` +
+      ` input=${inputWidth || '?'}x${inputHeight || '?'}` +
+      ` bytes=${downloaded.imageSize}`
+  );
+
+  const expectWider = left + right > 0.001;
+  const expectTaller = top + bottom > 0.001;
+  if (inputWidth > 0 && inputHeight > 0 && downloaded.width && downloaded.height) {
+    const needWider = expectWider && downloaded.width <= inputWidth * 1.01;
+    const needTaller = expectTaller && downloaded.height <= inputHeight * 1.01;
+    if (needWider || needTaller) {
+      throw new Error(
+        `MEDIAKIT_EXPAND_NO_EFFECT: 输入 ${inputWidth}x${inputHeight}，下载结果 ${downloaded.width}x${downloaded.height}` +
+          `（请求 L${left} R${right} T${top} B${bottom}` +
+          (result.image_width || result.image_height
+            ? `，API 声称 ${result.image_width}x${result.image_height}`
+            : '') +
+          '）。扩图未改变画布尺寸。'
+      );
+    }
+  }
+
   return {
     id: `mediakit-expand-${Date.now()}`,
     imageData: downloaded.dataUrl,
@@ -336,8 +387,19 @@ export async function outpaintWithVolcengine(
         left: result.expand_left,
         right: result.expand_right,
       },
-      imageWidth: result.image_width,
-      imageHeight: result.image_height,
+      imageWidth,
+      imageHeight,
+      claimedImageWidth: result.image_width,
+      claimedImageHeight: result.image_height,
+      inputWidth: inputWidth || undefined,
+      inputHeight: inputHeight || undefined,
+      publicInputUrlHost: (() => {
+        try {
+          return new URL(publicUrl).host;
+        } catch {
+          return 'unknown';
+        }
+      })(),
     },
   };
 }

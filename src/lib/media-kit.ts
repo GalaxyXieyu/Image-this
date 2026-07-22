@@ -220,16 +220,32 @@ export async function toPublicImageUrl(
   throw new Error('MEDIAKIT_PUBLIC_IMAGE_REQUIRED: 输入图片必须是公网 URL 或 data URL');
 }
 
-export async function downloadMediaKitImage(imageUrl: string): Promise<{ dataUrl: string; imageSize: number }> {
+export async function downloadMediaKitImage(imageUrl: string): Promise<{
+  dataUrl: string;
+  imageSize: number;
+  width?: number;
+  height?: number;
+}> {
   const response = await fetch(imageUrl, { signal: AbortSignal.timeout(180_000) });
   if (!response.ok) {
     throw new Error(`MEDIAKIT_DOWNLOAD_FAILED: HTTP ${response.status}`);
   }
   const buffer = Buffer.from(await response.arrayBuffer());
   const mimeType = response.headers.get('content-type')?.split(';')[0].trim() || 'image/jpeg';
+  let width: number | undefined;
+  let height: number | undefined;
+  try {
+    const meta = await sharp(buffer).metadata();
+    width = meta.width;
+    height = meta.height;
+  } catch {
+    // 尺寸探测失败不阻断下载
+  }
   return {
     dataUrl: `data:${mimeType};base64,${buffer.toString('base64')}`,
     imageSize: buffer.length,
+    width,
+    height,
   };
 }
 
