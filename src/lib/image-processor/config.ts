@@ -15,14 +15,14 @@ export const defaultConfig: ProvidersConfig = {
   },
   gpt: {
     enabled: false,
-    apiUrl: 'https://toapis.com',
+    apiUrl: 'https://toapis.cn',
     apiKey: '',
     modelName: 'gpt-image-2',
   },
   gemini: {
     enabled: false,
     apiKey: '',
-    baseUrl: 'https://toapis.com',
+    baseUrl: 'https://toapis.cn',
     modelName: 'gemini-3.1-flash-image-preview',
   },
   qwen: {
@@ -56,7 +56,7 @@ export function loadConfigFromEnv(): ProvidersConfig {
     gemini: {
       enabled: !!process.env.GEMINI_API_KEY,
       apiKey: process.env.GEMINI_API_KEY || '',
-      baseUrl: process.env.GEMINI_BASE_URL || 'https://toapis.com',
+      baseUrl: process.env.GEMINI_BASE_URL || 'https://toapis.cn',
       modelName: process.env.GEMINI_MODEL_NAME || 'gemini-3.1-flash-image-preview',
     },
     qwen: {

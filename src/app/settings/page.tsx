@@ -110,7 +110,7 @@ export default function SettingsPage() {
     gptModelName: 'gpt-4o-image-vip',
     // Gemini 配置
     geminiApiKey: '',
-    geminiBaseUrl: 'https://toapis.com',
+    geminiBaseUrl: 'https://toapis.cn',
     geminiModelName: 'gemini-3.1-flash-image-preview',
     // 即梦配置
     arkApiKey: '',
@@ -120,7 +120,7 @@ export default function SettingsPage() {
     superbedToken: '',
     // 文案/出词多模态模型配置
     copywriterApiKey: '',
-    copywriterBaseUrl: 'https://toapis.com/v1',
+    copywriterBaseUrl: 'https://toapis.cn/v1',
     copywriterModelName: 'gpt-5.4-mini',
     // 本地存储配置
     localStoragePath: '',
@@ -263,14 +263,14 @@ export default function SettingsPage() {
               gptApiKey: data.config.gpt?.apiKey || '',
               gptModelName: data.config.gpt?.modelName || 'gpt-4o-image-vip',
               geminiApiKey: data.config.gemini?.apiKey || '',
-              geminiBaseUrl: data.config.gemini?.baseUrl || 'https://toapis.com',
+              geminiBaseUrl: data.config.gemini?.baseUrl || 'https://toapis.cn',
               geminiModelName: data.config.gemini?.modelName || 'gemini-3.1-flash-image-preview',
               arkApiKey: data.config.jimeng?.arkApiKey || '',
               jimengBaseUrl: data.config.jimeng?.baseUrl || 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
               jimengModelName: data.config.jimeng?.modelName || 'seedream-4.5',
               superbedToken: data.config.imagehosting?.superbedToken || '',
               copywriterApiKey: data.config.copywriter?.apiKey || '',
-              copywriterBaseUrl: data.config.copywriter?.baseUrl || 'https://toapis.com/v1',
+              copywriterBaseUrl: data.config.copywriter?.baseUrl || 'https://toapis.cn/v1',
               copywriterModelName: data.config.copywriter?.modelName || 'gpt-5.4-mini',
               localStoragePath: data.config.localStorage?.savePath || '',
               taskConcurrency: data.config.taskRuntime?.concurrency || 2
@@ -444,7 +444,7 @@ export default function SettingsPage() {
       if (failures.length > 0) {
         toast({
           title: '已保存，但令牌验证未通过',
-          description: `${failures.join('；')}。请检查 API Key 与 Base URL（toapis 的 Base URL 应为 https://toapis.com）。`,
+          description: `${failures.join('；')}。请检查 API Key 与 Base URL（toapis 的 Base URL 应为 https://toapis.cn）。`,
           variant: 'destructive',
         });
       } else if (silent) {

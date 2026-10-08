@@ -155,7 +155,7 @@ UI      → /plan  (ui-researcher → planner → plan-checker)
   - Use Playwright codegen/opencli recording for new or unstable flows, clean noisy recorded scripts, then promote stable steps into maintained UI/UX replay scripts.
   - Local UI testing account: `test@imaginethis.local` / `[REDACTED-见 .claude/credentials.local.md]`; register through `/auth/register` or the local registration API when needed.
   - Production owner account (for end-to-end checks on `https://image.bojie.store`): `xy523018705@gmail.com` / `[REDACTED-见 .claude/credentials.local.md]`. Sensitive — do not commit this credential to a tracked file other than as already noted here, and do not log it.
-  - Working Gemini/toapis provider token for end-to-end image generation: key `[REDACTED-见 .claude/credentials.local.md]`, Base URL `https://toapis.com` (no `/v1`), model `gemini-3.1-flash-image-preview`. Set under `/settings`; account setting overrides server env.
+  - Working Gemini/toapis provider token for end-to-end image generation: key `[REDACTED-见 .claude/credentials.local.md]`, Base URL `https://toapis.cn` (no `/v1`), model `gemini-3.1-flash-image-preview`. Set under `/settings`; account setting overrides server env.
   - `.pen` design files such as `docs/image-this.pen` are encrypted and must be accessed only through Pencil MCP tools, never direct file reads or greps.
 - Quality conventions
   - Prefer Server Components unless browser state, upload, drag/drop, polling, canvas, navigation hooks, or direct interaction require Client Components.

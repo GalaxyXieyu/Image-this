@@ -22,7 +22,7 @@ export const MODEL_KIND_LABEL: Record<ModelKind, string> = {
 
 export const PROVIDER_META: Record<ProviderId, { label: string; subtitle: string; defaultModel: string; keyPlaceholder: string; defaultUrl: string }> = {
   gpt:    { label: 'OpenAI',         subtitle: 'OpenAI 兼容图像接口（多模型）',  defaultModel: 'gpt-4o-image-vip',           keyPlaceholder: 'sk-...',  defaultUrl: 'https://yunwu.ai' },
-  gemini: { label: 'Google Gemini',  subtitle: 'Gemini 图像生成',      defaultModel: 'gemini-3.1-flash-image-preview', keyPlaceholder: 'AIza...', defaultUrl: 'https://toapis.com' },
+  gemini: { label: 'Google Gemini',  subtitle: 'Gemini 图像生成',      defaultModel: 'gemini-3.1-flash-image-preview', keyPlaceholder: 'AIza...', defaultUrl: 'https://toapis.cn' },
   jimeng: { label: '即梦 Seedream',  subtitle: '火山引擎 Ark API',    defaultModel: 'seedream-4.5',               keyPlaceholder: 'ark-...', defaultUrl: 'https://ark.cn-beijing.volces.com/api/v3/images/generations' },
 };
 

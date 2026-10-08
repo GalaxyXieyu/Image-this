@@ -55,7 +55,7 @@ interface ToApisGenerationTaskResponse {
   };
 }
 
-const DEFAULT_GEMINI_BASE_URL = 'https://toapis.com';
+const DEFAULT_GEMINI_BASE_URL = 'https://toapis.cn';
 const DEFAULT_GEMINI_MODEL = 'gemini-3.1-flash-image-preview';
 const DEFAULT_GEMINI_NATIVE_MODEL = 'gemini-3-pro-image-preview';
 const TOAPIS_POLL_INTERVAL_MS = 3000;
@@ -347,7 +347,7 @@ export class GeminiProcessor implements IImageProcessor {
   }
 
   private isToApisBaseUrl(baseUrl: string): boolean {
-    return baseUrl.includes('toapis.com');
+    return /toapis\.(com|cn)/.test(baseUrl);
   }
 
   private extractToApisUploadUrl(response: ToApisUploadResponse): string | undefined {

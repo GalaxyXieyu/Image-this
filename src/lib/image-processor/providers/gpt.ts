@@ -49,7 +49,7 @@ interface ToApisGenerationTaskResponse {
   }>;
 }
 
-const DEFAULT_BASE_URL = 'https://toapis.com';
+const DEFAULT_BASE_URL = 'https://toapis.cn';
 const DEFAULT_MODEL = 'gpt-image-2';
 const DEFAULT_IMAGE_SIZE = '1:1';
 const TOAPIS_POLL_INTERVAL_MS = 3000;

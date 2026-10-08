@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     if (body.gemini?.enabled && body.gemini?.apiKey) {
       userConfig.gemini = {
         apiKey: body.gemini.apiKey,
-        baseUrl: body.gemini.baseUrl || 'https://toapis.com',
+        baseUrl: body.gemini.baseUrl || 'https://toapis.cn',
         modelName: body.gemini.modelName || 'gemini-3.1-flash-image-preview',
         models: normalizeModels(body.gemini.models),
       };
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     if (body.copywriter?.apiKey) {
       userConfig.copywriter = {
         apiKey: body.copywriter.apiKey,
-        baseUrl: body.copywriter.baseUrl || 'https://toapis.com/v1',
+        baseUrl: body.copywriter.baseUrl || 'https://toapis.cn/v1',
         modelName: body.copywriter.modelName || 'gpt-5.4-mini',
       };
     }
@@ -146,7 +146,7 @@ export async function GET(request: NextRequest) {
       gemini: {
         enabled: !!userConfig.gemini,
         apiKey: userConfig.gemini?.apiKey || '',
-        baseUrl: userConfig.gemini?.baseUrl || 'https://toapis.com',
+        baseUrl: userConfig.gemini?.baseUrl || 'https://toapis.cn',
         modelName: userConfig.gemini?.modelName || 'gemini-3.1-flash-image-preview',
         models: userConfig.gemini?.models ?? (userConfig.gemini?.modelName ? [{ id: userConfig.gemini.modelName, enabled: true }] : [])
       },
@@ -166,7 +166,7 @@ export async function GET(request: NextRequest) {
       copywriter: {
         enabled: !!userConfig.copywriter,
         apiKey: userConfig.copywriter?.apiKey || '',
-        baseUrl: userConfig.copywriter?.baseUrl || 'https://toapis.com/v1',
+        baseUrl: userConfig.copywriter?.baseUrl || 'https://toapis.cn/v1',
         modelName: userConfig.copywriter?.modelName || 'gpt-5.4-mini'
       },
       localStorage: {

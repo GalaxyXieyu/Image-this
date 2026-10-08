@@ -69,14 +69,14 @@ async function initializeProvider(userId: string, provider: ImageProvider, overr
     },
     gpt: {
       enabled: provider === ImageProvider.GPT && !!userConfig.gpt,
-      apiUrl: userConfig.gpt?.apiUrl || 'https://toapis.com',
+      apiUrl: userConfig.gpt?.apiUrl || 'https://toapis.cn',
       apiKey: userConfig.gpt?.apiKey || '',
       modelName: overrides?.gpt?.modelName ?? userConfig.gpt?.modelName ?? undefined
     },
     gemini: {
       enabled: provider === ImageProvider.GEMINI && !!userConfig.gemini,
       apiKey: userConfig.gemini?.apiKey || '',
-      baseUrl: userConfig.gemini?.baseUrl || 'https://toapis.com',
+      baseUrl: userConfig.gemini?.baseUrl || 'https://toapis.cn',
       modelName: overrides?.gemini?.modelName ?? userConfig.gemini?.modelName ?? 'gemini-3.1-flash-image-preview'
     },
     qwen: {

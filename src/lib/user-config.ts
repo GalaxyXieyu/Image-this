@@ -184,14 +184,14 @@ export async function getUserConfig(userId: string): Promise<UserConfig> {
   const gptApiKey = desktopSecrets.gptApiKey || user.gptApiKey || envConfig.gpt.apiKey || '';
   const gptModelName = user.gptModelName || envConfig.gpt.modelName || undefined;
   const geminiApiKey = desktopSecrets.geminiApiKey || user.geminiApiKey || envConfig.gemini.apiKey || '';
-  const geminiBaseUrl = user.geminiBaseUrl || envConfig.gemini.baseUrl || 'https://toapis.com';
+  const geminiBaseUrl = user.geminiBaseUrl || envConfig.gemini.baseUrl || 'https://toapis.cn';
   const geminiModelName = user.geminiModelName || envConfig.gemini.modelName || 'gemini-3.1-flash-image-preview';
   const arkApiKey = desktopSecrets.arkApiKey || user.arkApiKey || envConfig.jimeng.arkApiKey || '';
   const jimengBaseUrl = user.jimengBaseUrl || envConfig.jimeng.baseUrl || undefined;
   const jimengModelName = user.jimengModelName || envConfig.jimeng.modelName || undefined;
   const superbedToken = desktopSecrets.superbedToken || user.superbedToken || process.env.SUPERBED_TOKEN || '';
   const copywriterApiKey = user.copywriterApiKey || gptApiKey || '';
-  const copywriterBaseUrl = user.copywriterBaseUrl || 'https://toapis.com/v1';
+  const copywriterBaseUrl = user.copywriterBaseUrl || 'https://toapis.cn/v1';
   const copywriterModelName = user.copywriterModelName || 'gpt-5.4-mini';
 
   // 火山引擎配置
